@@ -10,12 +10,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import { IsString, IsIn, MaxLength, Matches } from 'class-validator'
 import type { Response } from 'express'
@@ -69,7 +64,10 @@ export class CardsController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all cards for the authenticated user' })
-  @ApiResponse({ status: 200, description: 'Array of cards with themes, social links and qr codes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Array of cards with themes, social links and qr codes',
+  })
   @Get('cards')
   findAll(@CurrentUser() user: { id: string }) {
     return this.cardsService.findAllByUser(user.id)
@@ -99,11 +97,7 @@ export class CardsController {
   @ApiOperation({ summary: 'Update a card (partial update)' })
   @ApiResponse({ status: 200, description: 'Updated card' })
   @Put('cards/:id')
-  update(
-    @Param('id') id: string,
-    @CurrentUser() user: { id: string },
-    @Body() dto: UpdateCardDto,
-  ) {
+  update(@Param('id') id: string, @CurrentUser() user: { id: string }, @Body() dto: UpdateCardDto) {
     return this.cardsService.update(id, user.id, dto)
   }
 
@@ -144,6 +138,15 @@ export class CardsController {
   }
 
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Duplicate a card (creates a draft copy)' })
+  @ApiResponse({ status: 201, description: 'Duplicate card created as draft' })
+  @ApiResponse({ status: 403, description: 'Plan limit reached' })
+  @Post('cards/:id/duplicate')
+  duplicate(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.cardsService.duplicate(id, user.id)
+  }
+
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a card' })
   @ApiResponse({ status: 200, description: 'Card deleted' })
   @Delete('cards/:id')
@@ -162,7 +165,9 @@ export class CardsController {
    *   POST  /cards/:id/unpublish (set false)
    */
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Publish or unpublish a card. Body: { action: "publish" | "unpublish" }' })
+  @ApiOperation({
+    summary: 'Publish or unpublish a card. Body: { action: "publish" | "unpublish" }',
+  })
   @ApiResponse({ status: 200, description: 'Updated card with new isActive state' })
   @Patch('cards/:id/publish')
   publishControl(
@@ -217,10 +222,7 @@ export class CardsController {
   @ApiOperation({ summary: 'Download vCard for a published card (no auth)' })
   @ApiResponse({ status: 200, description: 'vCard 3.0 file attachment' })
   @Get('public/cards/:handle/vcard')
-  async getVcard(
-    @Param('handle') handle: string,
-    @Res() res: Response,
-  ) {
+  async getVcard(@Param('handle') handle: string, @Res() res: Response) {
     // F-17: getVcard() fetches the card from DB and attaches the DB-validated
     // handle as `_handle` on the returned string. We use that value in the
     // Content-Disposition header instead of the raw URL param so an attacker

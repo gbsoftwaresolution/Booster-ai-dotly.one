@@ -61,18 +61,34 @@ function DesktopSidebar(): JSX.Element {
   const { signingOut, handleSignOut } = useSignOut()
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
-      <nav className="flex h-full flex-col px-3 py-4" aria-label="Main navigation">
-        {/* Logo */}
-        <div className="mb-8 flex items-center gap-2 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-white">
-            <span className="text-xs font-bold">D</span>
+    <aside className="hidden w-60 shrink-0 border-r border-gray-100 bg-white lg:flex lg:flex-col">
+      <nav className="flex h-full flex-col px-3 py-5" aria-label="Main navigation">
+        {/* Wordmark */}
+        <div className="mb-7 flex items-center gap-2.5 px-2">
+          {/* Dot icon mark */}
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="3.5" fill="white" />
+              <circle
+                cx="8"
+                cy="8"
+                r="6.5"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeDasharray="3 2"
+              />
+            </svg>
           </div>
-          <span className="text-lg font-bold text-gray-900">Dotly.one</span>
+          <span className="text-[17px] font-extrabold tracking-tight text-gray-900">
+            Dotly<span className="text-brand-500">.one</span>
+          </span>
         </div>
 
         {/* Nav items */}
-        <ul className="flex-1 space-y-1">
+        <ul className="flex-1 space-y-0.5">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/')
             return (
@@ -81,13 +97,23 @@ function DesktopSidebar(): JSX.Element {
                   href={href}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
                     isActive
                       ? 'bg-brand-50 text-brand-600'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {/* Active accent line */}
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand-500" />
+                  )}
+                  <Icon
+                    className={cn(
+                      'h-4 w-4 shrink-0 transition-colors',
+                      isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600',
+                    )}
+                    aria-hidden="true"
+                  />
                   {label}
                 </Link>
               </li>
@@ -101,7 +127,7 @@ function DesktopSidebar(): JSX.Element {
             type="button"
             onClick={() => void handleSignOut()}
             disabled={signingOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
           >
             <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
             {signingOut ? 'Signing out…' : 'Sign out'}

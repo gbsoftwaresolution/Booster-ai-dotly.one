@@ -340,6 +340,84 @@ export class CardsService {
     })
   }
 
+  async duplicate(id: string, userId: string) {
+    const internalUserId = await this.resolveInternalUserId(userId)
+    const source = await this.findById(id, userId)
+
+    // Check plan limit before creating duplicate
+    const user = await this.prisma.user.findUnique({ where: { id: internalUserId } })
+    const plan = user?.plan ?? 'FREE'
+    const limit = PLAN_CARD_LIMITS[plan] ?? 1
+    const cardCount = await this.prisma.card.count({ where: { userId: internalUserId } })
+    if (cardCount >= limit) {
+      throw new ForbiddenException({
+        code: 'PLAN_LIMIT_REACHED',
+        limit,
+        current: cardCount,
+        message: `Plan ${plan} allows a maximum of ${limit} card(s)`,
+      })
+    }
+
+    // Generate a unique handle for the copy
+    const baseHandle = `${source.handle}-copy`
+    const newHandle = `${baseHandle}-${randomBytes(2).toString('hex')}`
+
+    const duplicate = await this.prisma.card.create({
+      data: {
+        userId: internalUserId,
+        handle: newHandle,
+        templateId: source.templateId,
+        fields: source.fields as Prisma.InputJsonValue,
+        isActive: false, // copies start as draft
+        theme: source.theme
+          ? {
+              create: {
+                primaryColor: source.theme.primaryColor,
+                secondaryColor: source.theme.secondaryColor,
+                fontFamily: source.theme.fontFamily,
+                backgroundUrl: source.theme.backgroundUrl,
+                logoUrl: source.theme.logoUrl,
+              },
+            }
+          : {
+              create: {
+                primaryColor: '#000000',
+                secondaryColor: '#ffffff',
+                fontFamily: 'Inter',
+              },
+            },
+        socialLinks: {
+          create: source.socialLinks.map((sl) => ({
+            platform: sl.platform,
+            url: sl.url,
+            displayOrder: sl.displayOrder,
+          })),
+        },
+        mediaBlocks: {
+          create: source.mediaBlocks.map((mb) => ({
+            type: mb.type,
+            url: mb.url,
+            caption: mb.caption,
+            displayOrder: mb.displayOrder,
+          })),
+        },
+      },
+      include: { theme: true, socialLinks: true, mediaBlocks: true },
+    })
+
+    void this.audit
+      .log({
+        userId: internalUserId,
+        action: 'card.duplicated',
+        resourceId: duplicate.id,
+        resourceType: 'card',
+        metadata: { sourceCardId: id },
+      })
+      .catch(() => void 0)
+
+    return duplicate
+  }
+
   async delete(id: string, userId: string) {
     const internalUserId = await this.resolveInternalUserId(userId)
     await this.findById(id, userId)
@@ -506,18 +584,54 @@ export class CardsService {
     const escapeVcard = (value: string): string =>
       value.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n')
 
-    const vcard = [
-      'BEGIN:VCARD',
-      'VERSION:3.0',
-      `FN:${escapeVcard(fields['name'] ?? '')}`,
-      `TITLE:${escapeVcard(fields['title'] ?? '')}`,
-      `ORG:${escapeVcard(fields['company'] ?? '')}`,
-      `TEL:${escapeVcard(fields['phone'] ?? '')}`,
-      `EMAIL:${escapeVcard(fields['email'] ?? '')}`,
-      `URL:${escapeVcard(fields['website'] ?? '')}`,
-      `NOTE:${escapeVcard(fields['bio'] ?? '')}`,
-      'END:VCARD',
-    ].join('\r\n')
+    const lines: string[] = ['BEGIN:VCARD', 'VERSION:3.0']
+
+    // Full name (required by spec)
+    if (fields['name']) lines.push(`FN:${escapeVcard(fields['name'])}`)
+
+    // Name components — split first/last on first space
+    if (fields['name']) {
+      const parts = fields['name'].trim().split(/\s+/)
+      const last = parts.length > 1 ? (parts.pop() ?? '') : ''
+      const first = parts.join(' ')
+      lines.push(`N:${escapeVcard(last)};${escapeVcard(first)};;;`)
+    }
+
+    if (fields['title']) lines.push(`TITLE:${escapeVcard(fields['title'])}`)
+    if (fields['company']) lines.push(`ORG:${escapeVcard(fields['company'])}`)
+
+    // Phone — prefer tel: type hint for mobile compatibility
+    if (fields['phone']) lines.push(`TEL;TYPE=CELL:${escapeVcard(fields['phone'])}`)
+
+    // Email
+    if (fields['email']) lines.push(`EMAIL;TYPE=WORK:${escapeVcard(fields['email'])}`)
+
+    // Website
+    if (fields['website']) lines.push(`URL:${escapeVcard(fields['website'])}`)
+
+    // Address — vCard ADR format: PO;Ext;Street;City;Region;ZIP;Country
+    // We store a single free-form string so map it into the street component.
+    if (fields['address']) lines.push(`ADR;TYPE=WORK:;;${escapeVcard(fields['address'])};;;;;`)
+
+    // Bio / note
+    if (fields['bio']) lines.push(`NOTE:${escapeVcard(fields['bio'])}`)
+
+    // Photo — inline URL reference (vCard 3.0 PHOTO;VALUE=URI)
+    if (fields['avatarUrl']) lines.push(`PHOTO;VALUE=URI:${fields['avatarUrl']}`)
+
+    // Social links — emit X- properties for major platforms
+    const socialLinks = card.socialLinks ?? []
+    for (const sl of socialLinks) {
+      const platform = String(sl.platform).toUpperCase()
+      lines.push(`X-SOCIALPROFILE;TYPE=${platform}:${sl.url}`)
+    }
+
+    // Source — the public card URL
+    lines.push(`URL;TYPE=HOME:https://dotly.one/card/${dbHandle}`)
+
+    lines.push('END:VCARD')
+
+    const vcard = lines.join('\r\n')
     // Return an object so the controller can use both the vcard content and the
     // DB-validated handle for the Content-Disposition filename.
     return Object.assign(vcard, { _handle: dbHandle })

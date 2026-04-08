@@ -10,6 +10,7 @@ import { LinksTab } from '@/components/card-builder/LinksTab'
 import { MediaTab } from '@/components/card-builder/MediaTab'
 import { ThemeTab } from '@/components/card-builder/ThemeTab'
 import { PublishBar } from '@/components/card-builder/PublishBar'
+import { QrSection } from '@/components/card-builder/QrSection'
 import type { CardTemplate, SocialLinkData, MediaBlockData } from '@dotly/types'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
@@ -20,6 +21,7 @@ import {
   Image,
   Palette,
   Eye,
+  QrCode,
   BarChart2,
   CheckCircle2,
   AlertCircle,
@@ -27,13 +29,14 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type Tab = 'profile' | 'links' | 'media' | 'theme' | 'preview'
+type Tab = 'profile' | 'links' | 'media' | 'theme' | 'qr' | 'preview'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'links', label: 'Links', icon: Link2 },
   { id: 'media', label: 'Media', icon: Image },
   { id: 'theme', label: 'Theme', icon: Palette },
+  { id: 'qr', label: 'QR', icon: QrCode },
   { id: 'preview', label: 'Preview', icon: Eye },
 ]
 
@@ -166,20 +169,23 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
 
         {/* Analytics — desktop only */}
         {analytics && (
-          <div className="hidden items-center gap-4 lg:flex">
-            <div className="flex items-center gap-1.5">
-              <BarChart2 className="h-3.5 w-3.5 text-gray-400" />
-              <span className="text-xs text-gray-500">
-                <span className="font-semibold text-blue-600">{analytics.totalViews}</span> views
-              </span>
-            </div>
+          <Link
+            href={`/cards/${id}/analytics`}
+            className="hidden items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-1.5 transition-colors hover:border-sky-200 hover:bg-sky-50 lg:flex"
+          >
+            <BarChart2 className="h-3.5 w-3.5 text-gray-400" />
+            <span className="text-xs text-gray-500">
+              <span className="font-semibold text-sky-600">{analytics.totalViews}</span> views
+            </span>
+            <span className="text-[10px] text-gray-300">·</span>
             <span className="text-xs text-gray-500">
               <span className="font-semibold text-purple-600">{analytics.totalClicks}</span> clicks
             </span>
+            <span className="text-[10px] text-gray-300">·</span>
             <span className="text-xs text-gray-500">
               <span className="font-semibold text-green-600">{analytics.totalLeads}</span> leads
             </span>
-          </div>
+          </Link>
         )}
 
         {/* Save indicator + button */}
@@ -298,12 +304,13 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                     onThemeChange={updateTheme}
                   />
                 )}
+                {activeTab === 'qr' && <QrSection cardId={id} />}
               </div>
             )}
           </div>
 
-          {/* Publish bar — always at bottom of editor panel, only when not on preview tab */}
-          {activeTab !== 'preview' && (
+          {/* Publish bar — hidden on preview and qr tabs */}
+          {activeTab !== 'preview' && activeTab !== 'qr' && (
             <PublishBar
               handle={card.handle}
               isActive={card.isActive}
