@@ -5,12 +5,14 @@ import { ContactsService } from './contacts.service'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { AiModule } from '../ai/ai.module'
 import { NotificationsModule } from '../notifications/notifications.module'
+import { WebhooksModule } from '../webhooks/webhooks.module'
 
 @Module({
   imports: [
     AnalyticsModule,
     AiModule,
     NotificationsModule,
+    WebhooksModule,
     // Re-register so @InjectQueue('contact-enrichment') is available in ContactsService
     BullModule.registerQueue({ name: 'contact-enrichment' }),
   ],

@@ -11,6 +11,7 @@ import { MediaTab } from '@/components/card-builder/MediaTab'
 import { ThemeTab } from '@/components/card-builder/ThemeTab'
 import { PublishBar } from '@/components/card-builder/PublishBar'
 import { QrSection } from '@/components/card-builder/QrSection'
+import { LeadFormTab } from '@/components/card-builder/LeadFormTab'
 import type { CardTemplate, SocialLinkData, MediaBlockData } from '@dotly/types'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
@@ -26,10 +27,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type Tab = 'profile' | 'links' | 'media' | 'theme' | 'qr' | 'preview'
+type Tab = 'profile' | 'links' | 'media' | 'theme' | 'qr' | 'form' | 'preview'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -37,6 +39,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'media', label: 'Media', icon: Image },
   { id: 'theme', label: 'Theme', icon: Palette },
   { id: 'qr', label: 'QR', icon: QrCode },
+  { id: 'form', label: 'Form', icon: ClipboardList },
   { id: 'preview', label: 'Preview', icon: Eye },
 ]
 
@@ -305,12 +308,13 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                   />
                 )}
                 {activeTab === 'qr' && <QrSection cardId={id} />}
+                {activeTab === 'form' && <LeadFormTab cardId={id} />}
               </div>
             )}
           </div>
 
-          {/* Publish bar — hidden on preview and qr tabs */}
-          {activeTab !== 'preview' && activeTab !== 'qr' && (
+          {/* Publish bar — hidden on preview, qr, and form tabs */}
+          {activeTab !== 'preview' && activeTab !== 'qr' && activeTab !== 'form' && (
             <PublishBar
               handle={card.handle}
               isActive={card.isActive}

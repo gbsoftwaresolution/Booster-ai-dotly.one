@@ -3,10 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "prebuild": "pnpm --filter @dotly/database run db:generate",
     "build": "nest build",
+    "predev": "pnpm --filter @dotly/database run db:generate",
     "dev": "nest start --watch",
     "start": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "pretypecheck": "pnpm --filter @dotly/database run db:generate",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json"

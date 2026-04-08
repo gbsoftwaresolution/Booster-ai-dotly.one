@@ -22,6 +22,9 @@ import { NotificationsModule } from './notifications/notifications.module'
 import { AiModule } from './ai/ai.module'
 import { LoggerModule } from './common/logger/logger.module'
 import { AuditModule } from './audit/audit.module'
+import { WebhooksModule } from './webhooks/webhooks.module'
+import { LeadFormModule } from './lead-form/lead-form.module'
+import { WalletPassesModule } from './wallet-passes/wallet-passes.module'
 import { validate } from './config/env.validation'
 
 @Module({
@@ -51,9 +54,7 @@ import { validate } from './config/env.validation'
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         throttlers: [{ ttl: 60000, limit: 100 }],
-        storage: new ThrottlerStorageRedisService(
-          config.getOrThrow<string>('REDIS_URL'),
-        ),
+        storage: new ThrottlerStorageRedisService(config.getOrThrow<string>('REDIS_URL')),
       }),
     }),
     LoggerModule,
@@ -72,6 +73,9 @@ import { validate } from './config/env.validation'
     NotificationsModule,
     AiModule,
     AuditModule,
+    WebhooksModule,
+    LeadFormModule,
+    WalletPassesModule,
   ],
   providers: [
     // ThrottlerGuard MUST run first (before JwtAuthGuard) so that every

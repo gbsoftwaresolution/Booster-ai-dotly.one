@@ -83,6 +83,15 @@ enum DomainStatus {
   FAILED
 }
 
+enum LeadFieldType {
+  TEXT
+  EMAIL
+  PHONE
+  URL
+  TEXTAREA
+  SELECT
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -104,6 +113,7 @@ model User {
   ownedTeams      Team[]       @relation("TeamOwner")
   teamMemberships TeamMember[]
   auditLogs       AuditLog[]
+  webhookEndpoints WebhookEndpoint[]
 
   @@map("users")
 }
@@ -126,6 +136,8 @@ model Card {
   analytics   AnalyticsEvent[]
   contacts    Contact[]        @relation("ContactSourceCard")
   customDomains CustomDomain[]
+  leadForm    LeadForm?
+  walletPass  WalletPass?
 
   @@index([userId])
   @@map("cards")
@@ -397,4 +409,96 @@ model TeamInvite {
   @@index([teamId])
   @@index([email])
   @@map("team_invites")
+}
+
+// ─── Lead Capture Form (P0.3) ─────────────────────────────────────────────────
+
+// One LeadForm per Card — defines the custom field schema shown on the public card.
+model LeadForm {
+  id          String      @id @default(cuid())
+  cardId      String      @unique
+  title       String      @default("Connect with me")
+  description String      @default("Leave your details and they'll be in touch.")
+  buttonText  String      @default("Connect")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  card   Card        @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  fields LeadField[]
+
+  @@map("lead_forms")
+}
+
+// Each row is one custom input field on the lead capture form.
+model LeadField {
+  id           String        @id @default(cuid())
+  leadFormId   String
+  label        String        @db.VarChar(100)
+  fieldType    LeadFieldType @default(TEXT)
+  placeholder  String?       @db.VarChar(200)
+  required     Boolean       @default(false)
+  displayOrder Int           @default(0)
+  // For SELECT type — JSON array of option strings, e.g. ["Sales","Marketing","Engineering"]
+  options      Json          @default("[]")
+
+  leadForm LeadForm @relation(fields: [leadFormId], references: [id], onDelete: Cascade)
+
+  @@index([leadFormId])
+  @@map("lead_fields")
+}
+
+// ─── Outbound Webhooks (P0.2) ─────────────────────────────────────────────────
+
+// A webhook endpoint registered by a user (e.g. Zapier catch-hook URL).
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String   @db.VarChar(2048)
+  // Comma-separated event names e.g. "lead.created,card.viewed"
+  events    String[]
+  secret    String   // HMAC-SHA256 signing secret (stored hashed in service, raw here for simplicity)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@map("webhook_endpoints")
+}
+
+// Delivery log — one row per webhook fan-out attempt.
+model WebhookDelivery {
+  id              String   @id @default(cuid())
+  endpointId      String
+  event           String
+  payload         Json
+  statusCode      Int?
+  responseBody    String?  @db.VarChar(2000)
+  durationMs      Int?
+  success         Boolean  @default(false)
+  attemptNumber   Int      @default(1)
+  deliveredAt     DateTime @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId])
+  @@index([endpointId, deliveredAt])
+  @@map("webhook_deliveries")
+}
+
+// ─── Wallet Passes (P0.1) ─────────────────────────────────────────────────────
+
+// Caches generated pass metadata per card — actual pass files are generated on-demand.
+model WalletPass {
+  id           String   @id @default(cuid())
+  cardId       String   @unique
+  // Google Wallet: JWT object ID stored after first issuance
+  googlePassId String?
+  updatedAt    DateTime @updatedAt
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_passes")
 }

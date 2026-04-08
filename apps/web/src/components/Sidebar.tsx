@@ -14,6 +14,7 @@ import {
   UsersRound,
   FileSignature,
   LogOut,
+  Webhook,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -26,6 +27,7 @@ const navItems = [
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/email-signature', label: 'Signature', icon: FileSignature },
   { href: '/team', label: 'Team', icon: UsersRound },
+  { href: '/settings/webhooks', label: 'Webhooks', icon: Webhook },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

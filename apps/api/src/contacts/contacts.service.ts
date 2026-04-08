@@ -1,4 +1,12 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, HttpException, HttpStatus, Logger } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bull'
 import { PrismaService } from '../prisma/prisma.service'
@@ -6,6 +14,7 @@ import { AnalyticsService } from '../analytics/analytics.service'
 import { EmailService } from '../email/email.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { RedisService } from '../redis/redis.service'
+import { WebhooksService } from '../webhooks/webhooks.service'
 import { Prisma } from '@dotly/database'
 
 const VALID_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
@@ -60,6 +69,7 @@ export class ContactsService {
     private emailService: EmailService,
     private notificationsService: NotificationsService,
     private redis: RedisService,
+    private webhooksService: WebhooksService,
     @InjectQueue('contact-enrichment') private enrichmentQueue: Queue,
   ) {}
 
@@ -79,14 +89,14 @@ export class ContactsService {
     const cardRateLimitWindow = 60 * 60 // 1 hour in seconds
     const cardRateLimitMax = 10
     const redisClient = this.redis.getClient()
-    const cardLeadCount = await redisClient.eval(
+    const cardLeadCount = (await redisClient.eval(
       `local v = redis.call('INCR', KEYS[1])
        if v == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
        return v`,
       1,
       cardRateLimitKey,
       String(cardRateLimitWindow),
-    ) as number
+    )) as number
     if (cardLeadCount > cardRateLimitMax) {
       throw new HttpException(
         'Too many lead submissions for this card — please try again later',
@@ -148,10 +158,7 @@ export class ContactsService {
     } catch (err) {
       // M-02: Catch unique constraint violation (P2002) — same email already
       // captured for this card owner. Return a 409 instead of a 500 crash.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new HttpException(
           'A contact with this email already exists in your CRM',
           HttpStatus.CONFLICT,
@@ -165,6 +172,18 @@ export class ContactsService {
       type: 'LEAD_SUBMIT',
       metadata: { contactId: contact.id },
     })
+
+    // Fan-out webhook event — fire-and-forget, never blocks the response
+    void this.webhooksService
+      .fanOut(card.userId, 'lead.created', {
+        contactId: contact.id,
+        name: dto.name,
+        email: dto.email ?? null,
+        phone: dto.phone ?? null,
+        cardId: dto.cardId,
+        cardHandle: dto.sourceHandle ?? card.handle,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (lead.created)', err))
 
     // Fire-and-forget: notify card owner
     const cardName = (card.fields as Record<string, string>)?.['name'] ?? card.handle
@@ -250,14 +269,18 @@ export class ContactsService {
     })
   }
 
-  async findAll(userId: string, params: { stage?: string; search?: string; page?: number; limit?: number }) {
+  async findAll(
+    userId: string,
+    params: { stage?: string; search?: string; page?: number; limit?: number },
+  ) {
     const where: Prisma.ContactWhereInput = { ownerUserId: userId }
     if (params.stage) where.crmPipeline = { stage: params.stage as CrmStage }
-    if (params.search) where.OR = [
-      { name: { contains: params.search, mode: 'insensitive' } },
-      { email: { contains: params.search, mode: 'insensitive' } },
-      { company: { contains: params.search, mode: 'insensitive' } },
-    ]
+    if (params.search)
+      where.OR = [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { company: { contains: params.search, mode: 'insensitive' } },
+      ]
     const [contacts, total] = await Promise.all([
       this.prisma.contact.findMany({
         where,
@@ -380,10 +403,15 @@ export class ContactsService {
     const page = truncated ? contacts.slice(0, CAP) : contacts
 
     const stages = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST']
-    const pipeline = stages.reduce((acc, stage) => {
-      acc[stage] = page.filter(c => c.crmPipeline?.stage === stage || (!c.crmPipeline && stage === 'NEW'))
-      return acc
-    }, {} as Record<string, typeof page>)
+    const pipeline = stages.reduce(
+      (acc, stage) => {
+        acc[stage] = page.filter(
+          (c) => c.crmPipeline?.stage === stage || (!c.crmPipeline && stage === 'NEW'),
+        )
+        return acc
+      },
+      {} as Record<string, typeof page>,
+    )
 
     // LOW-08: Surface truncation so callers (UI, API clients) know the pipeline
     // view is incomplete and can prompt the user to use paginated contacts instead.
@@ -414,17 +442,20 @@ export class ContactsService {
     //   1. If the key does not exist, create it with value=1 and TTL=windowSecs.
     //   2. Otherwise, increment and return the new value (TTL is unchanged).
     // This is safe because Lua scripts in Redis are executed as a single atomic unit.
-    const current = await redisClient.eval(
+    const current = (await redisClient.eval(
       `local v = redis.call('INCR', KEYS[1])
        if v == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
        return v`,
-      1,            // number of keys
+      1, // number of keys
       rateLimitKey, // KEYS[1]
       String(windowSecs), // ARGV[1]
-    ) as number
+    )) as number
 
     if (current > limit) {
-      throw new HttpException('Too many requests: email limit of 20/hour exceeded', HttpStatus.TOO_MANY_REQUESTS)
+      throw new HttpException(
+        'Too many requests: email limit of 20/hour exceeded',
+        HttpStatus.TOO_MANY_REQUESTS,
+      )
     }
 
     const fromName = contact.ownerUser?.name ?? 'Dotly User'
