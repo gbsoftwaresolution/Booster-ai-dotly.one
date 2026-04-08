@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
 
 interface ShareBarProps {
   handle: string
@@ -16,13 +17,13 @@ function useWalletSupport() {
 
   useEffect(() => {
     const ua = navigator.userAgent
-    // Apple Wallet: iOS or macOS Safari
+    // Apple Wallet: iOS or macOS Safari (not Chrome/Firefox)
     const isApple =
       /iPhone|iPad|iPod|Macintosh/i.test(ua) &&
       /Safari/i.test(ua) &&
       !/Chrome|CriOS|FxiOS/i.test(ua)
-    // Google Wallet: Android or any Chrome-based
-    const isGoogle = /Android/i.test(ua) || /Chrome/i.test(ua)
+    // Google Wallet: Android Chrome or desktop Chrome (not Safari)
+    const isGoogle = /Chrome/i.test(ua) && !/Edg|OPR/i.test(ua)
     setAppleSupported(isApple)
     setGoogleSupported(isGoogle && !isApple)
   }, [])
@@ -33,8 +34,19 @@ function useWalletSupport() {
 export function ShareBar({ handle, ownerName }: ShareBarProps) {
   const [copied, setCopied] = useState(false)
   const { appleSupported, googleSupported } = useWalletSupport()
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const url = `https://dotly.one/card/${handle}`
+  // Encode handle in case it contains special characters
+  const url = `${SITE_URL}/card/${encodeURIComponent(handle)}`
+
+  // Cleanup copied-state timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current !== null) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
 
   async function handleCopy() {
     try {
@@ -48,7 +60,8 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
       document.body.removeChild(input)
     }
     setCopied(true)
-    setTimeout(() => setCopied(false), 2200)
+    if (copiedTimerRef.current !== null) clearTimeout(copiedTimerRef.current)
+    copiedTimerRef.current = setTimeout(() => setCopied(false), 2200)
   }
 
   async function handleShare() {
@@ -64,7 +77,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
   }
 
   async function handleAppleWallet() {
-    // Triggers a .pkpass download
+    // Triggers a .pkpass download — navigate directly
     window.location.href = `${API_URL}/public/cards/${handle}/wallet/apple`
   }
 
@@ -108,19 +121,24 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
 
       {/* Main share row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {/* URL pill */}
-        <div
+        {/* URL pill — keyboard accessible button */}
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          title="Click to copy"
+          aria-label="Copy card link"
           style={{
             flex: 1,
             minWidth: 0,
             borderRadius: 12,
             background: 'rgba(241,245,249,0.8)',
             border: '1px solid rgba(226,232,240,0.6)',
-            padding: '7px 12px',
-            cursor: 'text',
+            padding: '0 12px',
+            cursor: 'pointer',
+            height: 44,
+            display: 'flex',
+            alignItems: 'center',
           }}
-          onClick={() => void handleCopy()}
-          title="Click to copy"
         >
           <p
             style={{
@@ -136,9 +154,9 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
           >
             {url}
           </p>
-        </div>
+        </button>
 
-        {/* Copy button */}
+        {/* Copy button — 44px touch target */}
         <button
           type="button"
           onClick={() => void handleCopy()}
@@ -146,8 +164,8 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
           title={copied ? 'Copied!' : 'Copy link'}
           style={{
             flexShrink: 0,
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             borderRadius: 10,
             border: copied ? '1px solid rgba(34,197,94,.3)' : '1px solid rgba(226,232,240,.8)',
             background: copied ? 'rgba(240,253,244,0.9)' : 'rgba(255,255,255,0.9)',
@@ -192,14 +210,14 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
           )}
         </button>
 
-        {/* Share button */}
+        {/* Share button — 44px touch target */}
         <button
           type="button"
           onClick={() => void handleShare()}
           aria-label="Share card"
           style={{
             flexShrink: 0,
-            height: 36,
+            height: 44,
             paddingLeft: 14,
             paddingRight: 14,
             borderRadius: 10,
@@ -263,7 +281,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 7,
-                height: 38,
+                height: 44,
                 borderRadius: 10,
                 border: 'none',
                 background: '#000',
@@ -304,7 +322,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 7,
-                height: 38,
+                height: 44,
                 borderRadius: 10,
                 border: '1.5px solid #e2e8f0',
                 background: '#fff',

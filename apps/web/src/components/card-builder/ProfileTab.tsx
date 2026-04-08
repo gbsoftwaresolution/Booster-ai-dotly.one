@@ -9,9 +9,11 @@ import {
   Mail,
   Globe,
   MapPin,
+  Map,
   AlignLeft,
   AtSign,
 } from 'lucide-react'
+import { FaWhatsapp } from 'react-icons/fa6'
 import { cn } from '@/lib/cn'
 
 interface ProfileTabProps {
@@ -196,6 +198,14 @@ export function ProfileTab({
         type="tel"
       />
       <IconInput
+        icon={FaWhatsapp}
+        label="WhatsApp"
+        value={fields.whatsapp ?? ''}
+        onChange={(v) => onFieldChange('whatsapp', v)}
+        placeholder="+1 555 000 0000"
+        type="tel"
+      />
+      <IconInput
         icon={Mail}
         label="Email"
         value={fields.email ?? ''}
@@ -217,6 +227,14 @@ export function ProfileTab({
         value={fields.address ?? ''}
         onChange={(v) => onFieldChange('address', v)}
         placeholder="San Francisco, CA"
+      />
+      <IconInput
+        icon={Map}
+        label="Google Maps Link"
+        value={fields.mapUrl ?? ''}
+        onChange={(v) => onFieldChange('mapUrl', v)}
+        placeholder="https://maps.google.com/?q=..."
+        type="url"
       />
     </div>
   )

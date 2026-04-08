@@ -63,6 +63,9 @@ enum SocialPlatform {
 enum MediaBlockType {
   VIDEO
   IMAGE
+  AUDIO
+  DOCUMENT
+  HEADING
 }
 
 enum TeamRole {
@@ -144,13 +147,15 @@ model Card {
 }
 
 model CardTheme {
-  id             String  @id @default(cuid())
-  cardId         String  @unique
-  primaryColor   String  @default("#000000")
-  secondaryColor String  @default("#ffffff")
-  fontFamily     String  @default("Inter")
-  backgroundUrl  String?
-  logoUrl        String?
+  id                String  @id @default(cuid())
+  cardId            String  @unique
+  primaryColor      String  @default("#000000")
+  secondaryColor    String  @default("#ffffff")
+  fontFamily        String  @default("Inter")
+  backgroundUrl     String?
+  logoUrl           String?
+  buttonStyle       String?
+  socialButtonStyle String?
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
@@ -174,8 +179,10 @@ model MediaBlock {
   id           String         @id @default(cuid())
   cardId       String
   type         MediaBlockType
-  url          String
+  url          String?
   caption      String?
+  altText      String?
+  linkUrl      String?
   displayOrder Int            @default(0)
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)

@@ -23,7 +23,16 @@ import { UpdateThemeDto } from './dto/update-theme.dto'
 import { UpsertSocialLinksDto } from './dto/upsert-social-links.dto'
 import { UpsertMediaBlocksDto } from './dto/upsert-media-blocks.dto'
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
+const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
+
+const ALLOWED_MIME_TYPES = [
+  ...ALLOWED_IMAGE_MIME_TYPES,
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'audio/mp4',
+  'application/pdf',
+] as const
 
 class UploadUrlDto {
   /**
@@ -48,7 +57,7 @@ class UploadAvatarDto {
   @MaxLength(7_000_000) // 7 MB base64 ceiling
   base64!: string
 
-  @IsIn(ALLOWED_MIME_TYPES)
+  @IsIn(ALLOWED_IMAGE_MIME_TYPES)
   mimeType!: string
 }
 

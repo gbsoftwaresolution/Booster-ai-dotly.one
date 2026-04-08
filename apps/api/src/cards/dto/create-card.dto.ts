@@ -1,4 +1,12 @@
-import { IsEnum, IsOptional, IsString, Matches, MaxLength, ValidateNested, IsObject } from 'class-validator'
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  ValidateNested,
+  IsObject,
+} from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { CardTemplate } from '@dotly/types'
@@ -27,13 +35,18 @@ export class CardFieldsDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(200)
-  email?: string
+  @MaxLength(50)
+  phone?: string
 
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  phone?: string
+  whatsapp?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  email?: string
 
   @IsOptional()
   @IsString()
@@ -44,6 +57,11 @@ export class CardFieldsDto {
   @IsString()
   @MaxLength(500)
   address?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  mapUrl?: string
 
   @IsOptional()
   @IsString()

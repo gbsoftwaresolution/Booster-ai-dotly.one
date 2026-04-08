@@ -53,6 +53,9 @@ export enum SocialPlatform {
 export enum MediaBlockType {
   VIDEO = 'VIDEO',
   IMAGE = 'IMAGE',
+  AUDIO = 'AUDIO',
+  DOCUMENT = 'DOCUMENT',
+  HEADING = 'HEADING',
 }
 
 export enum TeamRole {
@@ -86,13 +89,19 @@ export interface CardFields {
   title: string
   company: string
   phone: string
+  whatsapp: string
   email: string
   website: string
   bio: string
   address: string
+  mapUrl: string
   avatarUrl: string
   logoUrl: string
 }
+
+export type ButtonStyle = 'icon' | 'filled-icon' | 'icon-text' | 'filled-icon-text'
+
+export type SocialButtonStyle = 'icons' | 'pills' | 'list' | 'follow'
 
 export interface UpdateThemeDto {
   primaryColor?: string
@@ -100,6 +109,8 @@ export interface UpdateThemeDto {
   fontFamily?: string
   backgroundUrl?: string
   logoUrl?: string
+  buttonStyle?: ButtonStyle
+  socialButtonStyle?: SocialButtonStyle
 }
 
 export interface SocialLinkInput {
@@ -145,6 +156,8 @@ export interface CardThemeData {
   fontFamily: string
   backgroundUrl?: string
   logoUrl?: string
+  buttonStyle?: ButtonStyle
+  socialButtonStyle?: SocialButtonStyle
 }
 
 export interface SocialLinkData {
@@ -157,8 +170,10 @@ export interface SocialLinkData {
 export interface MediaBlockData {
   id: string
   type: MediaBlockType
-  url: string
+  url: string | null
   caption?: string
+  altText?: string
+  linkUrl?: string
   displayOrder: number
 }
 

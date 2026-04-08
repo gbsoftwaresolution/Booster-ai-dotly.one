@@ -19,19 +19,33 @@ export class MediaBlockItemDto {
   @IsEnum(MediaBlockType)
   type!: MediaBlockType
 
-  // HIGH-10: Restrict @IsUrl to http/https only (same reasoning as social links).
-  @ApiProperty({ example: 'https://cdn.dotly.one/card-id/video.mp4' })
+  @ApiPropertyOptional({ example: 'https://cdn.dotly.one/card-id/video.mp4' })
+  @IsOptional()
   @IsUrl(
     { protocols: ['http', 'https'], require_protocol: true },
     { message: 'url must be a valid http or https URL' },
   )
-  url!: string
+  url?: string
 
   @ApiPropertyOptional({ example: 'Product demo' })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   caption?: string
+
+  @ApiPropertyOptional({ example: 'A photo of our product on a white background' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  altText?: string
+
+  @ApiPropertyOptional({ example: 'https://mysite.com/products' })
+  @IsOptional()
+  @IsUrl(
+    { protocols: ['http', 'https'], require_protocol: true },
+    { message: 'linkUrl must be a valid http or https URL' },
+  )
+  linkUrl?: string
 
   @ApiProperty({ example: 0 })
   @IsInt()

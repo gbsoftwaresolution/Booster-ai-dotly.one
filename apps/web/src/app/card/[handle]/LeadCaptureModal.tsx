@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
@@ -171,10 +171,14 @@ function DynamicField({
   field,
   value,
   onChange,
+  inputId,
+  autoFocus,
 }: {
   field: LeadField
   value: string
   onChange: (v: string) => void
+  inputId: string
+  autoFocus?: boolean
 }) {
   const [focused, setFocused] = useState(false)
 
@@ -206,6 +210,7 @@ function DynamicField({
   return (
     <div>
       <label
+        htmlFor={inputId}
         style={{
           display: 'block',
           fontSize: 11,
@@ -217,7 +222,12 @@ function DynamicField({
         }}
       >
         {field.label}
-        {field.required && <span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>}
+        {field.required && (
+          <span style={{ color: '#ef4444', marginLeft: 2 }} aria-hidden="true">
+            *
+          </span>
+        )}
+        {field.required && <span className="sr-only"> (required)</span>}
       </label>
       <div style={wrapStyle}>
         <span
@@ -230,12 +240,14 @@ function DynamicField({
             alignItems: 'center',
             transition: 'color 0.15s',
           }}
+          aria-hidden="true"
         >
           <FieldIcon type={field.fieldType} focused={focused} />
         </span>
 
         {field.fieldType === 'TEXTAREA' ? (
           <textarea
+            id={inputId}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
@@ -243,6 +255,7 @@ function DynamicField({
             placeholder={field.placeholder}
             required={field.required}
             rows={3}
+            autoFocus={autoFocus}
             style={{
               ...baseInputStyle,
               paddingTop: 10,
@@ -252,11 +265,13 @@ function DynamicField({
           />
         ) : field.fieldType === 'SELECT' ? (
           <select
+            id={inputId}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             required={field.required}
+            autoFocus={autoFocus}
             style={{ ...baseInputStyle, appearance: 'none', paddingRight: 32 }}
           >
             <option value="">{field.placeholder || `Select ${field.label}`}</option>
@@ -268,6 +283,7 @@ function DynamicField({
           </select>
         ) : (
           <input
+            id={inputId}
             type={
               field.fieldType === 'EMAIL'
                 ? 'email'
@@ -283,6 +299,7 @@ function DynamicField({
             onBlur={() => setFocused(false)}
             placeholder={field.placeholder}
             required={field.required}
+            autoFocus={autoFocus}
             style={baseInputStyle}
           />
         )}
@@ -313,40 +330,78 @@ export function LeadCaptureModal({
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = `lead-modal-title-${cardHandle}`
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isControlled = !!onClose
   const isOpen = isControlled ? true : open
 
-  // Fetch form schema from public API
+  // Fetch form schema from public API (with abort on unmount / re-run)
   useEffect(() => {
-    fetch(`${API_URL}/public/cards/${cardHandle}/lead-form`)
+    const controller = new AbortController()
+    fetch(`${API_URL}/public/cards/${cardHandle}/lead-form`, { signal: controller.signal })
       .then((r) => (r.ok ? (r.json() as Promise<LeadForm>) : Promise.reject()))
       .then((data: LeadForm) => {
-        setForm(data)
-        // Initialise values map for all fields
+        // Sort fields by displayOrder
+        const sorted = [...data.fields].sort((a, b) => a.displayOrder - b.displayOrder)
+        setForm({ ...data, fields: sorted })
         const init: Record<string, string> = {}
-        data.fields.forEach((f) => {
+        sorted.forEach((f) => {
           init[f.id] = ''
         })
         setValues(init)
       })
-      .catch(() => {
-        // Fallback to defaults — already set
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return
+        // Fallback to defaults — already set, just initialise values
         const init: Record<string, string> = {}
         DEFAULT_FORM.fields.forEach((f) => {
           init[f.id] = ''
         })
         setValues(init)
       })
+    return () => {
+      controller.abort()
+    }
   }, [cardHandle])
 
-  function handleClose() {
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (!isOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isOpen])
+
+  // Escape key closes the dialog
+  const handleClose = useCallback(() => {
     if (isControlled) {
       onClose?.()
     } else {
       setOpen(false)
     }
-  }
+  }, [isControlled, onClose])
+
+  useEffect(() => {
+    if (!isOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') handleClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [isOpen, handleClose])
+
+  // Cleanup success timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) clearTimeout(successTimerRef.current)
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -363,8 +418,6 @@ export function LeadCaptureModal({
     setError('')
 
     // Map field values to submission payload
-    // Keep backward-compatible name/email/phone keys for default fields,
-    // plus a generic `fields` map for custom ones.
     const fieldValues: Record<string, string> = {}
     form.fields.forEach((f) => {
       fieldValues[f.label.toLowerCase().replace(/\s+/g, '_')] = values[f.id] ?? ''
@@ -393,7 +446,8 @@ export function LeadCaptureModal({
         setError(body.message ?? 'Something went wrong. Please try again.')
       } else {
         setSuccess(true)
-        setTimeout(() => {
+        if (successTimerRef.current !== null) clearTimeout(successTimerRef.current)
+        successTimerRef.current = setTimeout(() => {
           handleClose()
           setSuccess(false)
           setValues({})
@@ -406,11 +460,15 @@ export function LeadCaptureModal({
     }
   }
 
+  // Personalize title safely using word-boundary replace
+  const personalizedTitle = form.title.replace(/\bme\b/gi, ownerName)
+
   return (
     <>
       {/* Standalone trigger — only shown when not externally controlled */}
       {!isControlled && (
         <button
+          type="button"
           onClick={() => setOpen(true)}
           style={{
             marginTop: 16,
@@ -432,6 +490,10 @@ export function LeadCaptureModal({
 
       {isOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          ref={dialogRef}
           style={{
             position: 'fixed',
             inset: 0,
@@ -482,6 +544,7 @@ export function LeadCaptureModal({
             >
               <div>
                 <h2
+                  id={titleId}
                   style={{
                     fontSize: 20,
                     fontWeight: 800,
@@ -490,11 +553,12 @@ export function LeadCaptureModal({
                     letterSpacing: '-0.3px',
                   }}
                 >
-                  {form.title.replace('me', ownerName)}
+                  {personalizedTitle}
                 </h2>
                 <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>{form.description}</p>
               </div>
               <button
+                type="button"
                 onClick={handleClose}
                 aria-label="Close"
                 style={{
@@ -538,6 +602,7 @@ export function LeadCaptureModal({
                   padding: '24px 0',
                   gap: 12,
                 }}
+                aria-live="polite"
               >
                 <div
                   style={{
@@ -578,17 +643,23 @@ export function LeadCaptureModal({
                 }}
                 style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
               >
-                {form.fields.map((field) => (
-                  <DynamicField
-                    key={field.id}
-                    field={field}
-                    value={values[field.id] ?? ''}
-                    onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
-                  />
-                ))}
+                {form.fields.map((field, index) => {
+                  const inputId = `lead-field-${cardHandle}-${field.id}`
+                  return (
+                    <DynamicField
+                      key={field.id}
+                      field={field}
+                      value={values[field.id] ?? ''}
+                      onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
+                      inputId={inputId}
+                      autoFocus={index === 0}
+                    />
+                  )
+                })}
 
                 {error && (
                   <div
+                    role="alert"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -607,6 +678,7 @@ export function LeadCaptureModal({
                       stroke="#ef4444"
                       strokeWidth="2"
                       strokeLinecap="round"
+                      aria-hidden="true"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <line x1="12" y1="8" x2="12" y2="12" />

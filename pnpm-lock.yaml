@@ -117,7 +117,7 @@ importers:
         version: 0.5.1(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(@nestjs/throttler@6.5.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2))(ioredis@5.10.1)(reflect-metadata@0.2.2)
       openai:
         specifier: ^6.33.0
-        version: 6.33.0(ws@8.18.3)(zod@3.25.76)
+        version: 6.33.0(ws@8.20.0)(zod@3.25.76)
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -312,6 +312,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      react-icons:
+        specifier: ^5.6.0
+        version: 5.6.0(react@18.3.1)
       recharts:
         specifier: ^2.12.7
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -8105,6 +8108,11 @@ packages:
     engines: {node: '>=10'}
     peerDependencies:
       react: '>=17.0.0'
+
+  react-icons@5.6.0:
+    resolution: {integrity: sha512-RH93p5ki6LfOiIt0UtDyNg/cee+HLVR6cHHtW3wALfo+eOHTp8RnU2kRkI6E+H19zMIs03DyxUG/GfZMOGvmiA==}
+    peerDependencies:
+      react: '*'
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -19129,9 +19137,9 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@6.33.0(ws@8.18.3)(zod@3.25.76):
+  openai@6.33.0(ws@8.20.0)(zod@3.25.76):
     optionalDependencies:
-      ws: 8.18.3
+      ws: 8.20.0
       zod: 3.25.76
 
   opener@1.5.2: {}
@@ -19636,6 +19644,10 @@ snapshots:
   react-freeze@1.0.4(react@18.2.0):
     dependencies:
       react: 18.2.0
+
+  react-icons@5.6.0(react@18.3.1):
+    dependencies:
+      react: 18.3.1
 
   react-is@16.13.1: {}
 

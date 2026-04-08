@@ -36,10 +36,13 @@ function toSocialLinkPayload(links: SocialLinkData[]) {
 }
 
 function toMediaBlockPayload(blocks: MediaBlockData[]) {
-  return blocks.map(({ type, url, caption, displayOrder }) => ({
+  return blocks.map(({ type, url, caption, altText, linkUrl, displayOrder }) => ({
     type,
-    url,
+    // HEADING blocks have no URL — omit the field so @IsOptional passes validation
+    url: url || undefined,
     caption,
+    altText,
+    linkUrl,
     displayOrder,
   }))
 }

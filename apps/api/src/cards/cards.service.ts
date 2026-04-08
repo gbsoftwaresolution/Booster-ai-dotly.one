@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { Prisma } from '@dotly/database'
+import { Prisma, MediaBlockType as PrismaMediaBlockType } from '@dotly/database'
 import { CreateCardDto } from './dto/create-card.dto'
 import { UpdateCardDto } from './dto/update-card.dto'
 import { UpdateThemeDto } from './dto/update-theme.dto'
@@ -295,6 +295,8 @@ export class CardsService {
         fontFamily: dto.fontFamily ?? 'Inter',
         backgroundUrl: dto.backgroundUrl,
         logoUrl: dto.logoUrl,
+        buttonStyle: dto.buttonStyle,
+        socialButtonStyle: dto.socialButtonStyle,
       },
       update: {
         ...(dto.primaryColor !== undefined && { primaryColor: dto.primaryColor }),
@@ -302,6 +304,8 @@ export class CardsService {
         ...(dto.fontFamily !== undefined && { fontFamily: dto.fontFamily }),
         ...(dto.backgroundUrl !== undefined && { backgroundUrl: dto.backgroundUrl }),
         ...(dto.logoUrl !== undefined && { logoUrl: dto.logoUrl }),
+        ...(dto.buttonStyle !== undefined && { buttonStyle: dto.buttonStyle }),
+        ...(dto.socialButtonStyle !== undefined && { socialButtonStyle: dto.socialButtonStyle }),
       },
     })
   }
@@ -331,9 +335,11 @@ export class CardsService {
       return tx.mediaBlock.createMany({
         data: dto.blocks.map((b) => ({
           cardId: id,
-          type: b.type,
+          type: b.type as unknown as PrismaMediaBlockType,
           url: b.url,
           caption: b.caption,
+          altText: b.altText,
+          linkUrl: b.linkUrl,
           displayOrder: b.displayOrder,
         })),
       })
@@ -395,9 +401,11 @@ export class CardsService {
         },
         mediaBlocks: {
           create: source.mediaBlocks.map((mb) => ({
-            type: mb.type,
+            type: mb.type as unknown as PrismaMediaBlockType,
             url: mb.url,
             caption: mb.caption,
+            altText: mb.altText,
+            linkUrl: mb.linkUrl,
             displayOrder: mb.displayOrder,
           })),
         },

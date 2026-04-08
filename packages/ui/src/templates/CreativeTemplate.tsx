@@ -5,6 +5,19 @@ import { SocialLinkList } from '../components/SocialLinkList'
 import { SaveContactButton } from '../components/SaveContactButton'
 import { LeadCaptureButton } from '../components/LeadCaptureButton'
 
+/**
+ * Normalize a user-entered URL:
+ * - If it already has http:// or https://, return it unchanged.
+ * - If it has a disallowed scheme (javascript:, data:, etc.), return '#'.
+ * - Otherwise, prepend https://.
+ */
+function normalizeExternalUrl(url: string): string {
+  if (!url) return '#'
+  if (/^https?:\/\//i.test(url)) return url
+  if (/^[a-z][a-z0-9+\-.]*:/i.test(url)) return '#' // block non-http schemes
+  return `https://${url}`
+}
+
 function ContactChip({
   href,
   icon,
@@ -100,7 +113,8 @@ export function CreativeTemplate({
       }
     : { background: gradient }
 
-  const hasContact = fields.phone || fields.email || fields.website
+  const hasContact =
+    fields.phone || fields.whatsapp || fields.email || fields.website || fields.address
 
   return (
     <div
@@ -206,7 +220,7 @@ export function CreativeTemplate({
               socialLinks={socialLinks}
               onSocialLinkClick={onSocialLinkClick}
               accentColor="rgba(255,255,255,0.92)"
-              style="icons"
+              socialButtonStyle={theme.socialButtonStyle ?? 'follow'}
             />
           )}
         </div>
@@ -280,6 +294,18 @@ export function CreativeTemplate({
                 }
               />
             )}
+            {fields.whatsapp && (
+              <ContactChip
+                href={`https://wa.me/${fields.whatsapp.replace(/\D/g, '')}`}
+                label={fields.whatsapp}
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.556 4.116 1.527 5.845L.057 23.428a.75.75 0 0 0 .914.915l5.648-1.473A11.93 11.93 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.725 9.725 0 0 1-4.97-1.365l-.355-.21-3.685.96.983-3.596-.232-.371A9.718 9.718 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z" />
+                  </svg>
+                }
+              />
+            )}
             {fields.email && (
               <ContactChip
                 href={`mailto:${fields.email}`}
@@ -303,7 +329,7 @@ export function CreativeTemplate({
             )}
             {fields.website && (
               <ContactChip
-                href={fields.website}
+                href={normalizeExternalUrl(fields.website)}
                 label={fields.website.replace(/^https?:\/\//, '')}
                 icon={
                   <svg
@@ -322,24 +348,74 @@ export function CreativeTemplate({
                 }
               />
             )}
+            {fields.address && (
+              <ContactChip
+                href={
+                  fields.mapUrl
+                    ? normalizeExternalUrl(fields.mapUrl)
+                    : `https://maps.google.com/?q=${encodeURIComponent(fields.address)}`
+                }
+                label={fields.address}
+                icon={
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                }
+              />
+            )}
           </div>
         )}
 
         {/* ── Portfolio strip ── */}
         {mediaBlocks && mediaBlocks.length > 0 && (
           <div style={{ marginBottom: 22 }}>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: '#94a3b8',
-                textTransform: 'uppercase',
-                letterSpacing: 1.2,
-                marginBottom: 10,
-              }}
-            >
-              Portfolio
-            </p>
+            {/* Section heading: use HEADING blocks if present, else fall back to "Portfolio" */}
+            {(() => {
+              const headingBlocks = [...mediaBlocks]
+                .sort((a, b) => a.displayOrder - b.displayOrder)
+                .filter((b) => b.type === 'HEADING')
+              if (headingBlocks.length > 0) {
+                return headingBlocks.map((hb) => (
+                  <p
+                    key={hb.id}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: primary,
+                      textTransform: 'uppercase',
+                      letterSpacing: 1.2,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {hb.caption || 'Section'}
+                  </p>
+                ))
+              }
+              return (
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#94a3b8',
+                    textTransform: 'uppercase',
+                    letterSpacing: 1.2,
+                    marginBottom: 10,
+                  }}
+                >
+                  Portfolio
+                </p>
+              )
+            })()}
             <div
               style={{
                 display: 'flex',
@@ -352,24 +428,24 @@ export function CreativeTemplate({
             >
               {[...mediaBlocks]
                 .sort((a, b) => a.displayOrder - b.displayOrder)
-                .map((block) => (
-                  <div
-                    key={block.id}
-                    style={{
-                      flexShrink: 0,
-                      width: 110,
-                      height: 110,
-                      borderRadius: 14,
-                      overflow: 'hidden',
-                      background: '#e5e7eb',
-                      position: 'relative',
-                      boxShadow: '0 2px 10px rgba(0,0,0,0.10)',
-                    }}
-                  >
-                    {block.type === 'IMAGE' ? (
+                .filter((block) => block.type !== 'HEADING')
+                .map((block) => {
+                  const tileStyle: React.CSSProperties = {
+                    flexShrink: 0,
+                    width: 110,
+                    height: 110,
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                    background: '#e5e7eb',
+                    position: 'relative',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.10)',
+                  }
+
+                  if (block.type === 'IMAGE') {
+                    const content = (
                       <img
-                        src={block.url}
-                        alt={block.caption ?? ''}
+                        src={block.url ?? undefined}
+                        alt={block.altText ?? block.caption ?? ''}
                         style={{
                           width: '100%',
                           height: '100%',
@@ -377,27 +453,197 @@ export function CreativeTemplate({
                           display: 'block',
                         }}
                       />
-                    ) : (
-                      <>
-                        {/* YouTube thumbnail */}
-                        <img
-                          src={`https://img.youtube.com/vi/${extractYouTubeId(block.url)}/mqdefault.jpg`}
-                          alt={block.caption ?? 'video'}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            display: 'block',
-                          }}
-                          onError={(e) => {
-                            ;(e.target as HTMLImageElement).style.display = 'none'
-                          }}
-                        />
+                    )
+                    return (
+                      <div key={block.id} style={tileStyle}>
+                        {block.linkUrl ? (
+                          <a
+                            href={block.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'block', width: '100%', height: '100%' }}
+                          >
+                            {content}
+                          </a>
+                        ) : (
+                          content
+                        )}
+                      </div>
+                    )
+                  }
+
+                  if (block.type === 'VIDEO') {
+                    const videoUrl = block.url ?? undefined
+                    const thumbUrl = getVideoThumbnail(block.url ?? '')
+                    return (
+                      <a
+                        key={block.id}
+                        href={videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={block.caption ?? 'Watch video'}
+                        aria-label={block.caption ?? 'Watch video'}
+                        style={{ ...tileStyle, display: 'block', textDecoration: 'none' }}
+                      >
+                        {thumbUrl ? (
+                          <img
+                            src={thumbUrl}
+                            alt={block.caption ?? 'video thumbnail'}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              display: 'block',
+                            }}
+                            onError={(e) => {
+                              // Hide broken thumbnail; play overlay + background remain visible
+                              ;(e.target as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          /* Generic video icon for non-YouTube/Vimeo URLs */
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: '#1e293b',
+                            }}
+                          >
+                            <svg
+                              width="32"
+                              height="32"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="rgba(255,255,255,0.7)"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                              <line x1="7" y1="2" x2="7" y2="22" />
+                              <line x1="17" y1="2" x2="17" y2="22" />
+                              <line x1="2" y1="12" x2="22" y2="12" />
+                              <line x1="2" y1="7" x2="7" y2="7" />
+                              <line x1="2" y1="17" x2="7" y2="17" />
+                              <line x1="17" y1="17" x2="22" y2="17" />
+                              <line x1="17" y1="7" x2="22" y2="7" />
+                            </svg>
+                          </div>
+                        )}
                         <PlayOverlay />
-                      </>
-                    )}
-                  </div>
-                ))}
+                      </a>
+                    )
+                  }
+
+                  if (block.type === 'AUDIO') {
+                    return (
+                      <a
+                        key={block.id}
+                        href={block.url ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={block.caption ?? 'Audio'}
+                        style={{
+                          ...tileStyle,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          background: '#f1f5f9',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <svg
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={secondary}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M9 18V5l12-2v13" />
+                          <circle cx="6" cy="18" r="3" />
+                          <circle cx="18" cy="16" r="3" />
+                        </svg>
+                        {block.caption && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: '#64748b',
+                              textAlign: 'center',
+                              padding: '0 6px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '100%',
+                            }}
+                          >
+                            {block.caption}
+                          </span>
+                        )}
+                      </a>
+                    )
+                  }
+
+                  // DOCUMENT
+                  return (
+                    <a
+                      key={block.id}
+                      href={block.url ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={block.caption ?? 'Document'}
+                      style={{
+                        ...tileStyle,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        background: '#f1f5f9',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <svg
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={secondary}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                      </svg>
+                      {block.caption && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: '#64748b',
+                            textAlign: 'center',
+                            padding: '0 6px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '100%',
+                          }}
+                        >
+                          {block.caption}
+                        </span>
+                      )}
+                    </a>
+                  )
+                })}
             </div>
           </div>
         )}
@@ -407,16 +653,22 @@ export function CreativeTemplate({
 
         {/* CTA buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <LeadCaptureButton onLeadCapture={onLeadCapture} mode={mode} primaryColor={primary} />
+          <LeadCaptureButton
+            onLeadCapture={onLeadCapture}
+            mode={mode}
+            primaryColor={primary}
+            buttonStyle={theme.buttonStyle}
+          />
           <SaveContactButton
             card={card}
             handle={card.handle}
             onSaveContact={onSaveContact}
             primaryColor={primary}
+            buttonStyle={theme.buttonStyle}
           />
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: 11, color: '#cbd5e1', marginTop: 20 }}>
+        <p style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', marginTop: 20 }}>
           dotly.one/{card.handle}
         </p>
       </div>
@@ -428,8 +680,42 @@ function extractYouTubeId(url: string): string {
   try {
     const u = new URL(url)
     if (u.hostname.includes('youtu.be')) return u.pathname.slice(1)
-    return u.searchParams.get('v') ?? ''
+    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v') ?? ''
+    return ''
   } catch {
     return ''
   }
+}
+
+function extractVimeoId(url: string): string {
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('vimeo.com')) {
+      // pathname is like /123456789 or /channels/foo/123456789
+      const parts = u.pathname.split('/').filter(Boolean)
+      // last numeric segment is the video ID
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const part = parts[i]
+        if (part && /^\d+$/.test(part)) return part
+      }
+    }
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Returns a thumbnail URL for a video URL, or null if none can be derived.
+ * YouTube  → img.youtube.com/vi/{id}/mqdefault.jpg
+ * Vimeo    → vumbnail.com/{id}.jpg  (free Vimeo thumbnail proxy)
+ * Other    → null (caller should show a generic icon)
+ */
+function getVideoThumbnail(url: string): string | null {
+  if (!url) return null
+  const ytId = extractYouTubeId(url)
+  if (ytId) return `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+  const vimeoId = extractVimeoId(url)
+  if (vimeoId) return `https://vumbnail.com/${vimeoId}.jpg`
+  return null
 }

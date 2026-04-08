@@ -1,7 +1,12 @@
 'use client'
 
 import type { JSX } from 'react'
-import { CardTemplate, type CardThemeData } from '@dotly/types'
+import {
+  CardTemplate,
+  type CardThemeData,
+  type ButtonStyle,
+  type SocialButtonStyle,
+} from '@dotly/types'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -51,6 +56,60 @@ const TEMPLATES: {
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Playfair Display', 'Space Grotesk', 'Lato', 'Montserrat']
 
+const BUTTON_STYLES: {
+  id: ButtonStyle
+  label: string
+  description: string
+}[] = [
+  {
+    id: 'filled-icon-text',
+    label: 'Filled + Icon & Text',
+    description: 'Full-width filled button with icon and label',
+  },
+  {
+    id: 'icon-text',
+    label: 'Icon & Text',
+    description: 'Outlined button with icon and label',
+  },
+  {
+    id: 'filled-icon',
+    label: 'Filled + Icon',
+    description: 'Full-width filled button, icon only',
+  },
+  {
+    id: 'icon',
+    label: 'Icon Only',
+    description: 'Compact circular icon button',
+  },
+]
+
+const SOCIAL_BUTTON_STYLES: {
+  id: SocialButtonStyle
+  label: string
+  description: string
+}[] = [
+  {
+    id: 'follow',
+    label: 'Follow Buttons',
+    description: 'Full-width brand buttons — "Follow me on Facebook"',
+  },
+  {
+    id: 'pills',
+    label: 'Pills',
+    description: 'Compact brand-coloured pill with icon + name',
+  },
+  {
+    id: 'icons',
+    label: 'Icon Circles',
+    description: 'Small circular icon-only buttons',
+  },
+  {
+    id: 'list',
+    label: 'Text List',
+    description: 'Inline icon + underlined platform name',
+  },
+]
+
 interface ThemeTabProps {
   templateId: CardTemplate
   theme: CardThemeData
@@ -65,6 +124,104 @@ function SectionHeader({ label }: { label: string }) {
         {label}
       </p>
       <div className="h-px flex-1 bg-gray-100" />
+    </div>
+  )
+}
+
+/** Small visual preview of a button style variant */
+function ButtonStylePreview({ styleId }: { styleId: ButtonStyle }) {
+  const isIcon = styleId === 'icon'
+  const isFilled = styleId === 'filled-icon' || styleId === 'filled-icon-text'
+  const hasText = styleId === 'icon-text' || styleId === 'filled-icon-text'
+
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 items-center justify-center gap-1 rounded-full text-[10px] font-semibold',
+        isIcon ? 'h-7 w-7' : hasText ? 'h-7 px-2.5' : 'h-7 w-16',
+        isFilled ? 'bg-brand-500 text-white' : 'border border-brand-400 bg-white text-brand-500',
+      )}
+    >
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M8 21h8M12 17v4M12 7v6M9 10l3 3 3-3" />
+      </svg>
+      {hasText && <span>Save</span>}
+    </div>
+  )
+}
+
+/** Small visual preview of a social button style variant */
+function SocialButtonStylePreview({ styleId }: { styleId: SocialButtonStyle }) {
+  // Facebook brand colour for the mini preview
+  const fbBlue = '#1877F2'
+
+  if (styleId === 'follow') {
+    return (
+      <div
+        className="shrink-0 flex items-center gap-1.5 rounded-lg px-2 py-1 text-[9px] font-bold text-white"
+        style={{ background: fbBlue, minWidth: 80 }}
+      >
+        {/* Facebook F icon */}
+        <svg width="7" height="12" viewBox="0 0 10 20" fill="white" aria-hidden="true">
+          <path d="M10 0H7C5.343 0 4 1.343 4 3v3H0v4h4v10h4V10h3l1-4H8V3a1 1 0 0 1 1-1h1V0z" />
+        </svg>
+        <span>Follow on Facebook</span>
+      </div>
+    )
+  }
+
+  if (styleId === 'pills') {
+    return (
+      <div
+        className="shrink-0 flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold text-white"
+        style={{ background: fbBlue }}
+      >
+        <svg width="7" height="12" viewBox="0 0 10 20" fill="white" aria-hidden="true">
+          <path d="M10 0H7C5.343 0 4 1.343 4 3v3H0v4h4v10h4V10h3l1-4H8V3a1 1 0 0 1 1-1h1V0z" />
+        </svg>
+        <span>Facebook</span>
+      </div>
+    )
+  }
+
+  if (styleId === 'icons') {
+    return (
+      <div className="shrink-0 flex gap-1.5">
+        {[fbBlue, '#E1306C', '#000'].map((bg) => (
+          <div
+            key={bg}
+            className="h-6 w-6 rounded-full flex items-center justify-center"
+            style={{ background: bg }}
+          >
+            <div className="h-2 w-2 rounded-full bg-white/60" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // list
+  return (
+    <div className="shrink-0 flex items-center gap-1.5">
+      <div
+        className="h-5 w-5 rounded-full flex items-center justify-center"
+        style={{ background: fbBlue }}
+      >
+        <svg width="5" height="9" viewBox="0 0 10 20" fill="white" aria-hidden="true">
+          <path d="M10 0H7C5.343 0 4 1.343 4 3v3H0v4h4v10h4V10h3l1-4H8V3a1 1 0 0 1 1-1h1V0z" />
+        </svg>
+      </div>
+      <span className="text-[9px] font-semibold text-brand-500 underline">Facebook</span>
     </div>
   )
 }
@@ -238,6 +395,87 @@ export function ThemeTab({
                   {font}
                 </span>
                 {active && <Check className="h-4 w-4 text-brand-500" strokeWidth={2.5} />}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Button Style ── */}
+      <div className="space-y-3">
+        <SectionHeader label="Button Style" />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">CTA Buttons</p>
+        <div className="grid grid-cols-1 gap-2">
+          {BUTTON_STYLES.map((style) => {
+            const active = (theme.buttonStyle ?? 'filled-icon-text') === style.id
+            return (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => onThemeChange({ buttonStyle: style.id })}
+                className={cn(
+                  'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150 active:scale-[0.98]',
+                  active
+                    ? 'border-brand-500 bg-brand-50'
+                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white',
+                )}
+              >
+                {/* Mini preview */}
+                <ButtonStylePreview styleId={style.id} />
+                <span className="flex-1 min-w-0">
+                  <span
+                    className={cn(
+                      'block text-sm font-semibold',
+                      active ? 'text-brand-700' : 'text-gray-800',
+                    )}
+                  >
+                    {style.label}
+                  </span>
+                  <span className="block text-[11px] text-gray-400 mt-0.5">
+                    {style.description}
+                  </span>
+                </span>
+                {active && <Check className="h-4 w-4 shrink-0 text-brand-500" strokeWidth={2.5} />}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Social Links Style ── */}
+      <div className="space-y-3">
+        <SectionHeader label="Social Links" />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Button Style</p>
+        <div className="grid grid-cols-1 gap-2">
+          {SOCIAL_BUTTON_STYLES.map((style) => {
+            const active = (theme.socialButtonStyle ?? 'follow') === style.id
+            return (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => onThemeChange({ socialButtonStyle: style.id })}
+                className={cn(
+                  'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150 active:scale-[0.98]',
+                  active
+                    ? 'border-brand-500 bg-brand-50'
+                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white',
+                )}
+              >
+                <SocialButtonStylePreview styleId={style.id} />
+                <span className="flex-1 min-w-0">
+                  <span
+                    className={cn(
+                      'block text-sm font-semibold',
+                      active ? 'text-brand-700' : 'text-gray-800',
+                    )}
+                  >
+                    {style.label}
+                  </span>
+                  <span className="block text-[11px] text-gray-400 mt-0.5">
+                    {style.description}
+                  </span>
+                </span>
+                {active && <Check className="h-4 w-4 shrink-0 text-brand-500" strokeWidth={2.5} />}
               </button>
             )
           })}

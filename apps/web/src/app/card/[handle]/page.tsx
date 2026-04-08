@@ -6,9 +6,10 @@ import { getServerApiUrl } from '@/lib/server-api'
 import { CardView } from './CardView'
 import type { CardTemplate, SocialPlatform, MediaBlockType } from '@dotly/types'
 
-export const revalidate = 60
+export const revalidate = 0
 
 const API_URL = getServerApiUrl()
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
 
 interface TeamBrand {
   brandName: string | null
@@ -29,13 +30,17 @@ interface RawCard {
     fontFamily?: string
     backgroundUrl?: string
     logoUrl?: string
+    buttonStyle?: string
+    socialButtonStyle?: string
   }
   socialLinks?: Array<{ id: string; platform: string; url: string; displayOrder: number }>
   mediaBlocks?: Array<{
     id: string
     type: string
-    url: string
+    url?: string | null
     caption?: string
+    altText?: string
+    linkUrl?: string
     displayOrder: number
   }>
   teamBrand?: TeamBrand | null
@@ -47,6 +52,12 @@ function safeBrandColor(color: string | null | undefined): string | null {
   return /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : null
 }
 
+/**
+ * Fetch a card by handle.
+ * Next.js 15 automatically deduplicates fetch() calls to the same URL
+ * within the same render pass, so generateMetadata and the page component
+ * share one network request transparently.
+ */
 async function getCard(handle: string): Promise<RawCard | null> {
   try {
     const res = await fetch(`${API_URL}/public/cards/${handle}`)
@@ -65,22 +76,67 @@ export async function generateMetadata({
   const { handle } = await params
   const card = await getCard(handle)
   if (!card) return { title: 'Card Not Found' }
+
   const fields = card.fields
-  return {
-    title: `${fields.name ?? 'Digital Card'} — Dotly.one`,
-    description: fields.bio?.slice(0, 160) ?? `${fields.title} at ${fields.company}`,
-    openGraph: {
-      title: fields.name ?? 'Digital Card',
-      description: fields.bio?.slice(0, 160) ?? `${fields.title} at ${fields.company}`,
-      images: fields.avatarUrl ? [{ url: fields.avatarUrl }] : [],
-      type: 'profile',
+  const name = fields.name ?? 'Digital Card'
+  const title = `${name} — Dotly.one`
+  const canonicalUrl = `${SITE_URL}/card/${encodeURIComponent(handle)}`
+
+  // Build a clean description: bio, or "Title at Company", or just the name
+  const description =
+    fields.bio?.slice(0, 160) ??
+    (fields.title && fields.company
+      ? `${fields.title} at ${fields.company}`
+      : (fields.title ?? fields.company ?? `${name}'s digital business card on Dotly.one`))
+
+  const ogImages = fields.avatarUrl
+    ? [{ url: fields.avatarUrl, width: 400, height: 400, alt: name }]
+    : []
+
+  // JSON-LD structured data (Person / ProfilePage)
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    name: title,
+    url: canonicalUrl,
+    mainEntity: {
+      '@type': 'Person',
+      name,
+      ...(fields.title ? { jobTitle: fields.title } : {}),
+      ...(fields.company ? { worksFor: { '@type': 'Organization', name: fields.company } } : {}),
+      ...(fields.email ? { email: fields.email } : {}),
+      ...(fields.phone ? { telephone: fields.phone } : {}),
+      ...(fields.website ? { url: fields.website } : {}),
+      ...(fields.avatarUrl ? { image: fields.avatarUrl } : {}),
     },
-    twitter: { card: 'summary_large_image' },
+  }
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: name,
+      description,
+      url: canonicalUrl,
+      images: ogImages,
+      type: 'profile',
+      siteName: 'Dotly.one',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: name,
+      description,
+      images: ogImages.map((img) => img.url),
+    },
   }
 }
 
 export default async function CardPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params
+  // `getCard` is cached — this reuses the same response already fetched by generateMetadata
   const rawCard = await getCard(handle)
   if (!rawCard) notFound()
 
@@ -103,10 +159,12 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
       title: fields.title ?? '',
       company: fields.company ?? '',
       phone: fields.phone ?? '',
+      whatsapp: fields.whatsapp ?? '',
       email: fields.email ?? '',
       website: fields.website ?? '',
       bio: fields.bio ?? '',
       address: fields.address ?? '',
+      mapUrl: fields.mapUrl ?? '',
       avatarUrl: fields.avatarUrl ?? '',
       logoUrl: fields.logoUrl ?? '',
     },
@@ -118,24 +176,60 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
     fontFamily: theme.fontFamily ?? 'Inter',
     backgroundUrl: theme.backgroundUrl,
     logoUrl: theme.logoUrl,
+    buttonStyle: (theme.buttonStyle ?? 'filled-icon-text') as import('@dotly/types').ButtonStyle,
+    socialButtonStyle: (theme.socialButtonStyle ??
+      'follow') as import('@dotly/types').SocialButtonStyle,
   }
 
-  const socialLinks = (rawCard.socialLinks ?? []).map((l) => ({
-    id: l.id,
-    platform: l.platform as SocialPlatform,
-    url: l.url,
-    displayOrder: l.displayOrder,
-  }))
+  const socialLinks = (rawCard.socialLinks ?? []).map(
+    (l: { id: string; platform: string; url: string; displayOrder: number }) => ({
+      id: l.id,
+      platform: l.platform as SocialPlatform,
+      url: l.url,
+      displayOrder: l.displayOrder,
+    }),
+  )
 
-  const mediaBlocks = (rawCard.mediaBlocks ?? []).map((b) => ({
-    id: b.id,
-    type: b.type as MediaBlockType,
-    url: b.url,
-    caption: b.caption,
-    displayOrder: b.displayOrder,
-  }))
+  const mediaBlocks = (rawCard.mediaBlocks ?? []).map(
+    (b: {
+      id: string
+      type: string
+      url?: string | null
+      caption?: string
+      altText?: string
+      linkUrl?: string
+      displayOrder: number
+    }) => ({
+      id: b.id,
+      type: b.type as MediaBlockType,
+      url: b.url ?? null,
+      caption: b.caption,
+      altText: b.altText,
+      linkUrl: b.linkUrl,
+      displayOrder: b.displayOrder,
+    }),
+  )
 
   const brandColor = safeBrandColor(teamBrand?.brandColor)
+  const canonicalUrl = `${SITE_URL}/card/${encodeURIComponent(handle)}`
+
+  // JSON-LD structured data injected into the page <head>
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    name: `${fields.name ?? 'Digital Card'} — Dotly.one`,
+    url: canonicalUrl,
+    mainEntity: {
+      '@type': 'Person',
+      name: fields.name ?? 'Digital Card',
+      ...(fields.title ? { jobTitle: fields.title } : {}),
+      ...(fields.company ? { worksFor: { '@type': 'Organization', name: fields.company } } : {}),
+      ...(fields.email ? { email: fields.email } : {}),
+      ...(fields.phone ? { telephone: fields.phone } : {}),
+      ...(fields.website ? { url: fields.website } : {}),
+      ...(fields.avatarUrl ? { image: fields.avatarUrl } : {}),
+    },
+  }
 
   return (
     <main
@@ -145,6 +239,12 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
         background: 'linear-gradient(160deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
       }}
     >
+      {/* JSON-LD structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Team brand color as CSS custom property */}
       {brandColor && <style>{`:root { --brand-color: ${brandColor}; }`}</style>}
 

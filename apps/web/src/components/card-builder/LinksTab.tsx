@@ -4,8 +4,21 @@ import type { JSX } from 'react'
 import { useState, useRef } from 'react'
 import type { SocialLinkData } from '@dotly/types'
 import { SocialPlatform } from '@dotly/types'
-import { Trash2, Plus, Link2, ExternalLink } from 'lucide-react'
+import { Trash2, Plus, Link2, ExternalLink, Globe } from 'lucide-react'
+import {
+  FaLinkedinIn,
+  FaXTwitter,
+  FaInstagram,
+  FaGithub,
+  FaYoutube,
+  FaTiktok,
+  FaWhatsapp,
+  FaFacebookF,
+} from 'react-icons/fa6'
+import { SiCalendly } from 'react-icons/si'
+import { LuCalendarDays } from 'react-icons/lu'
 import { cn } from '@/lib/cn'
+import type { IconType } from 'react-icons'
 
 interface LinksTabProps {
   links: SocialLinkData[]
@@ -15,88 +28,135 @@ interface LinksTabProps {
 // ── Platform metadata ────────────────────────────────────────────────────────
 const PLATFORM_META: Record<
   string,
-  { label: string; color: string; dot: string; placeholder: string; icon: string }
+  {
+    label: string
+    color: string
+    dot: string
+    placeholder: string
+    Icon: IconType | null
+    iconBg: string
+  }
 > = {
   LINKEDIN: {
     label: 'LinkedIn',
     color: 'bg-[#0A66C2]',
     dot: 'bg-[#0A66C2]',
     placeholder: 'https://linkedin.com/in/username',
-    icon: 'in',
+    Icon: FaLinkedinIn,
+    iconBg: '#0A66C2',
   },
   TWITTER: {
     label: 'Twitter / X',
     color: 'bg-black',
     dot: 'bg-black',
     placeholder: 'https://x.com/username',
-    icon: 'X',
+    Icon: FaXTwitter,
+    iconBg: '#000000',
   },
   INSTAGRAM: {
     label: 'Instagram',
     color: 'bg-[#E1306C]',
     dot: 'bg-[#E1306C]',
     placeholder: 'https://instagram.com/username',
-    icon: 'ig',
+    Icon: FaInstagram,
+    iconBg: '#E1306C',
   },
   GITHUB: {
     label: 'GitHub',
     color: 'bg-gray-900',
     dot: 'bg-gray-900',
     placeholder: 'https://github.com/username',
-    icon: 'gh',
+    Icon: FaGithub,
+    iconBg: '#171515',
   },
   YOUTUBE: {
     label: 'YouTube',
     color: 'bg-[#FF0000]',
     dot: 'bg-[#FF0000]',
     placeholder: 'https://youtube.com/@channel',
-    icon: 'yt',
+    Icon: FaYoutube,
+    iconBg: '#FF0000',
   },
   TIKTOK: {
     label: 'TikTok',
     color: 'bg-black',
     dot: 'bg-black',
     placeholder: 'https://tiktok.com/@username',
-    icon: 'tt',
+    Icon: FaTiktok,
+    iconBg: '#010101',
   },
   WHATSAPP: {
     label: 'WhatsApp',
     color: 'bg-[#25D366]',
     dot: 'bg-[#25D366]',
     placeholder: 'https://wa.me/15550000000',
-    icon: 'wa',
+    Icon: FaWhatsapp,
+    iconBg: '#25D366',
   },
   FACEBOOK: {
     label: 'Facebook',
     color: 'bg-[#1877F2]',
     dot: 'bg-[#1877F2]',
     placeholder: 'https://facebook.com/username',
-    icon: 'fb',
+    Icon: FaFacebookF,
+    iconBg: '#1877F2',
   },
   CALENDLY: {
     label: 'Calendly',
     color: 'bg-[#0069FF]',
     dot: 'bg-[#0069FF]',
     placeholder: 'https://calendly.com/username',
-    icon: 'ca',
+    Icon: SiCalendly,
+    iconBg: '#0069FF',
   },
   CALCOM: {
     label: 'Cal.com',
     color: 'bg-gray-800',
     dot: 'bg-gray-800',
     placeholder: 'https://cal.com/username',
-    icon: 'cc',
+    Icon: LuCalendarDays,
+    iconBg: '#111827',
   },
   CUSTOM: {
     label: 'Custom URL',
     color: 'bg-gray-500',
     dot: 'bg-gray-400',
     placeholder: 'https://your-link.com',
-    icon: '🔗',
+    Icon: null,
+    iconBg: '#64748b',
   },
 }
 
 const PLATFORM_OPTIONS = Object.values(SocialPlatform)
+
+// ── Platform icon renderer ────────────────────────────────────────────────────
+function PlatformIcon({
+  platform,
+  size = 16,
+  className,
+}: {
+  platform: string
+  size?: number
+  className?: string
+}): JSX.Element {
+  const m = PLATFORM_META[platform] ?? PLATFORM_META['CUSTOM']
+  if (!m) return <Globe size={size} className={className} />
+
+  const { Icon, iconBg } = m
+
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full shrink-0"
+      style={{
+        width: size + 14,
+        height: size + 14,
+        backgroundColor: iconBg,
+      }}
+    >
+      {Icon ? <Icon size={size} color="#ffffff" /> : <Globe size={size} className="text-white" />}
+    </span>
+  )
+}
 
 export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
   const idCounterRef = useRef(1000)
@@ -143,10 +203,10 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
             return (
               <div
                 key={link.id}
-                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 transition-all hover:border-gray-200 hover:bg-white hover:shadow-sm"
+                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 transition-all hover:border-gray-200 hover:bg-white hover:shadow-sm"
               >
-                {/* Platform dot */}
-                <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', m.dot)} />
+                {/* Platform icon */}
+                <PlatformIcon platform={link.platform} size={14} />
 
                 {/* Platform name + url */}
                 <div className="flex-1 min-w-0">
@@ -215,14 +275,7 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
                       : 'border-transparent bg-white/60 hover:bg-white hover:border-gray-200',
                   )}
                 >
-                  <span
-                    className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-full text-white text-[9px] font-bold',
-                      m.color,
-                    )}
-                  >
-                    {m.icon}
-                  </span>
+                  <PlatformIcon platform={p} size={14} />
                   <span className="text-[9px] font-semibold text-gray-600 leading-tight text-center">
                     {m.label.replace(' / ', '/').replace('Custom URL', 'Custom')}
                   </span>

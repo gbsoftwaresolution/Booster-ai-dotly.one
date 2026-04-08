@@ -126,6 +126,8 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
     socialLinks,
     mediaBlocks,
     mode: 'preview' as const,
+    onLeadCapture: () => {},
+    onSaveContact: () => {},
   }
 
   const saveIndicator = () => {
@@ -295,6 +297,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                 )}
                 {activeTab === 'media' && (
                   <MediaTab
+                    cardId={id}
                     mediaBlocks={mediaBlocks}
                     onChange={updateMediaBlocks as (blocks: MediaBlockData[]) => void}
                   />
