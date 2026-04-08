@@ -39,7 +39,8 @@ export class WalletPassesService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.webUrl = config.get<string>('WEB_URL') ?? 'https://dotly.one'
+    const webUrlRaw = config.get<string>('WEB_URL') ?? 'https://dotly.one'
+    this.webUrl = webUrlRaw.startsWith('http') ? webUrlRaw : `https://${webUrlRaw}`
   }
 
   // ─── Ownership guard ─────────────────────────────────────────────────────────

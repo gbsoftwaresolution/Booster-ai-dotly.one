@@ -67,7 +67,8 @@ export class CardsService {
     const accessKeyId = this.config.getOrThrow<string>('R2_ACCESS_KEY_ID')
     const secretAccessKey = this.config.getOrThrow<string>('R2_SECRET_ACCESS_KEY')
     this.r2Bucket = this.config.getOrThrow<string>('R2_BUCKET')
-    this.r2PublicUrl = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
+    const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
+    this.r2PublicUrl = r2Url.startsWith('http') ? r2Url : `https://${r2Url}`
 
     this.r2Client = new S3Client({
       region: 'auto',

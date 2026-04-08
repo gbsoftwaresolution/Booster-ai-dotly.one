@@ -157,7 +157,7 @@ function AvatarPicker({
         >
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt={name || 'Avatar'} className="h-full w-full object-cover" />
+            <img src={avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:') ? avatarUrl : `https://${avatarUrl}`} alt={name || 'Avatar'} className="h-full w-full object-cover" />
           ) : (
             // Initials placeholder
             <div

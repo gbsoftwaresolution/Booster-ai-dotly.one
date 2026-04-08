@@ -41,11 +41,17 @@ export function AvatarBlock({
     boxShadow: `0 0 0 ${ringSize}px ${primaryColor}33, 0 4px 16px rgba(0,0,0,0.12)`,
   }
 
+  function normalizeUrl(url: string) {
+    if (!url) return url
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) return url
+    return `https://${url}`
+  }
+
   if (avatarUrl) {
     return (
       <div style={containerStyle}>
         <img
-          src={avatarUrl}
+          src={normalizeUrl(avatarUrl)}
           alt={name}
           style={{
             width: '100%',
