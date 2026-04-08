@@ -1,6 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
+import { useState } from 'react'
 import {
   User,
   Briefcase,
@@ -12,11 +13,14 @@ import {
   Map,
   AlignLeft,
   AtSign,
+  Camera,
 } from 'lucide-react'
 import { FaWhatsapp } from 'react-icons/fa6'
 import { cn } from '@/lib/cn'
+import { AvatarUploader } from './AvatarUploader'
 
 interface ProfileTabProps {
+  cardId: string
   fields: Record<string, string>
   handle: string
   onFieldChange: (key: string, value: string) => void
@@ -115,8 +119,86 @@ function SectionHeader({ label }: { label: string }) {
   )
 }
 
+// ── Avatar picker widget ─────────────────────────────────────────────────────
+function AvatarPicker({
+  cardId,
+  avatarUrl,
+  name,
+  onChange,
+}: {
+  cardId: string
+  avatarUrl: string
+  name: string
+  onChange: (url: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  // Generate initials for the placeholder
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => (w[0] ?? '').toUpperCase())
+    .join('')
+
+  return (
+    <>
+      <div className="flex flex-col items-center gap-3 py-2">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide self-start">
+          Profile Photo
+        </label>
+
+        {/* Avatar circle — click to open uploader */}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="group relative h-24 w-24 rounded-full overflow-hidden ring-4 ring-gray-100 hover:ring-brand-200 transition-all focus:outline-none focus:ring-brand-400"
+          aria-label="Change profile photo"
+        >
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt={name || 'Avatar'} className="h-full w-full object-cover" />
+          ) : (
+            // Initials placeholder
+            <div
+              className="h-full w-full flex items-center justify-center text-2xl font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+            >
+              {initials || <User className="h-8 w-8 text-white/80" />}
+            </div>
+          )}
+
+          {/* Hover overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Camera className="h-5 w-5 text-white" />
+            <span className="text-[10px] font-semibold text-white leading-none">Change</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+        >
+          {avatarUrl ? 'Change photo' : 'Add profile photo'}
+        </button>
+      </div>
+
+      {open && (
+        <AvatarUploader
+          cardId={cardId}
+          currentAvatarUrl={avatarUrl || undefined}
+          onAvatarChange={onChange}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  )
+}
+
 // ── Profile Tab ──────────────────────────────────────────────────────────────
 export function ProfileTab({
+  cardId,
   fields,
   handle,
   onFieldChange,
@@ -155,6 +237,15 @@ export function ProfileTab({
 
       {/* ── Identity ── */}
       <SectionHeader label="Identity" />
+
+      {/* Avatar picker */}
+      <AvatarPicker
+        cardId={cardId}
+        avatarUrl={fields.avatarUrl ?? ''}
+        name={fields.name ?? ''}
+        onChange={(url) => onFieldChange('avatarUrl', url)}
+      />
+
       <IconInput
         icon={User}
         label="Display Name"

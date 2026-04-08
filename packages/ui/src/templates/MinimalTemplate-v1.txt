@@ -29,14 +29,14 @@ function normalizeExternalUrl(url: string) {
 
 function SectionHeading({ label, caption }: { label: string; caption?: string }) {
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: 10 }}>
       <div
         style={{
-          fontSize: 11,
-          lineHeight: 1.2,
-          fontWeight: 800,
-          color: '#64748b',
-          letterSpacing: '0.1em',
+          fontSize: 12,
+          lineHeight: 1.3,
+          fontWeight: 700,
+          color: '#5f6368',
+          letterSpacing: '0.08em',
           textTransform: 'uppercase',
         }}
       >
@@ -45,12 +45,10 @@ function SectionHeading({ label, caption }: { label: string; caption?: string })
       {caption && (
         <div
           style={{
-            marginTop: 6,
-            fontSize: 14,
-            lineHeight: 1.4,
-            fontWeight: 500,
-            color: '#334155',
-            letterSpacing: '-0.01em',
+            marginTop: 4,
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: '#5f6368',
           }}
         >
           {caption}
@@ -92,15 +90,15 @@ function ContactRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 16,
-        padding: '16px 20px',
+        gap: 12,
+        padding: '15px 18px',
         textDecoration: 'none',
-        color: '#0f172a',
-        borderBottom: isLast ? 'none' : `1px solid ${blend(secondaryColor, 'white', 0.1)}`,
-        WebkitTapHighlightColor: 'transparent',
+        color: '#202124',
+        borderBottom: isLast ? 'none' : '1px solid #eef1f4',
+        WebkitTapHighlightColor: 'rgba(26, 115, 232, 0.08)',
         background: isLast
           ? 'transparent'
-          : `linear-gradient(180deg, #ffffff 0%, ${blend(secondaryColor, 'white', 0.05)} 100%)`,
+          : `linear-gradient(180deg, rgba(255,255,255,0.82) 0%, ${blend(secondaryColor, 'white', 0.12)} 100%)`,
       }}
     >
       <span
@@ -108,14 +106,14 @@ function ContactRow({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 46,
-          height: 46,
-          borderRadius: 14,
-          background: `linear-gradient(180deg, ${blend(accentColor, 'white', 0.04)} 0%, ${blend(secondaryColor, 'white', 0.12)} 100%)`,
+          width: 42,
+          height: 42,
+          borderRadius: 15,
+          background: `linear-gradient(180deg, ${blend(accentColor, 'white', 0.08)} 0%, ${blend(secondaryColor, 'white', 0.24)} 100%)`,
           color: accentColor,
           flexShrink: 0,
-          border: `1px solid ${blend(secondaryColor, 'white', 0.18)}`,
-          boxShadow: `0 4px 12px ${blend(accentColor, 'transparent', 0.06)}`,
+          border: `1px solid ${blend(secondaryColor, 'white', 0.34)}`,
+          boxShadow: `0 4px 12px ${blend(accentColor, 'transparent', 0.1)}`,
         }}
       >
         {icon}
@@ -125,12 +123,10 @@ function ContactRow({
         <span
           style={{
             display: 'block',
-            fontSize: 11,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            color: '#64748b',
-            marginBottom: 4,
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#5f6368',
+            marginBottom: 5,
           }}
         >
           {eyebrow}
@@ -139,8 +135,8 @@ function ContactRow({
           style={{
             display: 'block',
             fontSize: 16,
-            lineHeight: 1.4,
-            fontWeight: 600,
+            lineHeight: 1.35,
+            fontWeight: 500,
             overflowWrap: 'anywhere',
           }}
         >
@@ -192,18 +188,19 @@ function QuickAction({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: isIconOnly ? 46 : undefined,
-        height: isIconOnly ? 46 : undefined,
-        padding: isIconOnly ? 0 : '12px 18px',
+        width: isIconOnly ? 44 : undefined,
+        height: isIconOnly ? 44 : undefined,
+        padding: isIconOnly ? 0 : '10px 14px',
         borderRadius: 999,
         textDecoration: 'none',
         color: accentColor,
-        background: '#ffffff',
-        border: `1px solid ${blend(secondaryColor, 'white', 0.15)}`,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.06)',
-        fontSize: isIconOnly ? 0 : 14,
+        background: `linear-gradient(180deg, rgba(255,255,255,0.82) 0%, ${blend(secondaryColor, 'white', 0.18)} 100%)`,
+        border: `1px solid ${blend(secondaryColor, 'white', 0.42)}`,
+        boxShadow: '0 6px 18px rgba(60,64,67,0.08)',
+        backdropFilter: 'blur(12px)',
+        fontSize: isIconOnly ? 0 : 13,
         fontWeight: 600,
-        letterSpacing: '-0.01em',
+        letterSpacing: 0,
         flexShrink: 0,
       }}
     >
@@ -406,10 +403,10 @@ export function MinimalTemplate({
           <div
             style={{
               position: 'relative',
-              padding: '36px 24px 32px',
+              padding: '20px 18px 18px',
               background: theme.backgroundUrl
-                ? `linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(250,250,250,0.96) 100%), url(${theme.backgroundUrl}) center/cover`
-                : `linear-gradient(180deg, #ffffff 0%, #f8fafc 85%, ${blend(secondary, 'white', 0.15)} 100%)`,
+                ? `linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(248,250,255,0.94) 100%), url(${theme.backgroundUrl}) center/cover`
+                : `linear-gradient(180deg, #ffffff 0%, ${heroSurface} 72%, ${blend(secondary, 'white', 0.2)} 100%)`,
             }}
           >
             <div
@@ -488,43 +485,38 @@ export function MinimalTemplate({
                 style={{
                   display: 'flex',
                   justifyContent: 'center',
-                  marginBottom: 20,
+                  marginBottom: 16,
                 }}
               >
                 <div
                   style={{
-                    padding: 6,
-                    borderRadius: '50%',
-                    background: '#ffffff',
-                    border: `1px solid ${blend(secondary, 'white', 0.2)}`,
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+                    padding: 9,
+                    borderRadius: 34,
+                    background:
+                      'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,250,252,0.92) 100%)',
+                    border: '1px solid rgba(255,255,255,0.92)',
+                    boxShadow:
+                      '0 18px 40px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.72)',
+                    backdropFilter: 'blur(16px)',
                   }}
                 >
-                  <div
-                    style={{
-                      borderRadius: '50%',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <AvatarBlock
-                      avatarUrl={fields.avatarUrl}
-                      name={fields.name || 'User'}
-                      size={116}
-                      primaryColor={primary}
-                    />
-                  </div>
+                  <AvatarBlock
+                    avatarUrl={fields.avatarUrl}
+                    name={fields.name || 'User'}
+                    size={108}
+                    primaryColor={primary}
+                  />
                 </div>
               </div>
 
               <h1
                 style={{
-                  color: '#0f172a',
-                  fontSize: 38,
-                  fontWeight: 600,
+                  color: '#202124',
+                  fontSize: 36,
+                  fontWeight: 700,
                   margin: '0 0 8px',
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1.15,
-                  textWrap: 'balance',
+                  letterSpacing: '-0.05em',
+                  lineHeight: 1,
                 }}
               >
                 {fields.name || 'Your Name'}
@@ -533,18 +525,15 @@ export function MinimalTemplate({
               {(fields.title || fields.company) && (
                 <p
                   style={{
-                    color: '#64748b',
-                    fontSize: 12,
+                    color: '#5f6368',
+                    fontSize: 16,
                     margin: '0 auto',
-                    fontWeight: 700,
-                    lineHeight: 1.6,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    maxWidth: 420,
-                    textWrap: 'balance',
+                    fontWeight: 400,
+                    lineHeight: 1.4,
+                    maxWidth: 400,
                   }}
                 >
-                  {[fields.title, fields.company].filter(Boolean).join(' // ')}
+                  {[fields.title, fields.company].filter(Boolean).join(' at ')}
                 </p>
               )}
 
@@ -620,11 +609,12 @@ export function MinimalTemplate({
             {(hasBio || hasSocialLinks) && (
               <div
                 style={{
-                  background: '#ffffff',
-                  border: `1px solid ${blend(secondary, 'white', 0.15)}`,
-                  borderRadius: 28,
-                  padding: '24px 20px',
-                  boxShadow: '0 8px 32px rgba(15,23,42,0.04)',
+                  background: softSectionSurface,
+                  border: `1px solid ${blend(secondary, 'white', 0.3)}`,
+                  borderRadius: 24,
+                  padding: '16px 16px 14px',
+                  boxShadow: '0 10px 28px rgba(60,64,67,0.06)',
+                  backdropFilter: 'blur(12px)',
                 }}
               >
                 <SectionHeading
@@ -642,11 +632,9 @@ export function MinimalTemplate({
                   <p
                     style={{
                       margin: 0,
-                      fontSize: 16,
-                      lineHeight: 1.65,
-                      color: '#334155',
-                      fontWeight: 400,
-                      letterSpacing: '-0.01em',
+                      fontSize: 15,
+                      lineHeight: 1.7,
+                      color: '#3c4043',
                     }}
                   >
                     {fields.bio}
@@ -654,7 +642,7 @@ export function MinimalTemplate({
                 )}
 
                 {hasSocialLinks && (
-                  <div style={{ marginTop: hasBio ? 24 : 0 }}>
+                  <div style={{ marginTop: hasBio ? 14 : 0 }}>
                     <SocialLinkList
                       socialLinks={socialLinks}
                       onSocialLinkClick={onSocialLinkClick}
@@ -669,14 +657,14 @@ export function MinimalTemplate({
             {contactItems.length > 0 && (
               <div
                 style={{
-                  background: '#ffffff',
-                  borderRadius: 28,
+                  background: neutralSurface,
+                  borderRadius: 24,
                   overflow: 'hidden',
-                  border: `1px solid ${blend(secondary, 'white', 0.15)}`,
-                  boxShadow: '0 8px 32px rgba(15,23,42,0.04)',
+                  border: `1px solid ${blend(secondary, 'white', 0.22)}`,
+                  boxShadow: '0 10px 28px rgba(60,64,67,0.06)',
                 }}
               >
-                <div style={{ padding: '24px 20px 8px' }}>
+                <div style={{ padding: '16px 16px 4px' }}>
                   <SectionHeading
                     label="Contact"
                     caption="Choose the channel that fits the conversation."
@@ -701,34 +689,32 @@ export function MinimalTemplate({
             {hasMediaBlocks && (
               <div
                 style={{
-                  background: '#ffffff',
-                  borderRadius: 28,
-                  padding: '24px 20px',
-                  border: `1px solid ${blend(secondary, 'white', 0.15)}`,
-                  boxShadow: '0 8px 32px rgba(15,23,42,0.04)',
+                  background: neutralSurface,
+                  borderRadius: 24,
+                  padding: 14,
+                  border: `1px solid ${blend(secondary, 'white', 0.22)}`,
+                  boxShadow: '0 10px 28px rgba(60,64,67,0.06)',
                 }}
               >
                 <SectionHeading label="Highlights" caption="Media, links, and featured moments." />
-                <div style={{ marginTop: 20 }}>
-                  <MediaBlockList blocks={mediaBlocks} accentColor={primary} darkBackground={false} />
-                </div>
+                <MediaBlockList blocks={mediaBlocks} accentColor={primary} darkBackground={false} />
               </div>
             )}
 
             <div
               style={{
-                background: `linear-gradient(180deg, #ffffff 0%, ${blend(secondary, 'white', 0.08)} 100%)`,
-                borderRadius: 28,
-                padding: '24px 20px',
-                border: `1px solid ${blend(secondary, 'white', 0.15)}`,
-                boxShadow: `0 14px 40px ${blend(primary, 'transparent', 0.06)}`,
+                background: `linear-gradient(180deg, ${blend(secondary, 'white', 0.1)} 0%, ${blend(secondary, primary, 0.14)} 100%)`,
+                borderRadius: 24,
+                padding: '16px 14px 14px',
+                border: `1px solid ${blend(secondary, 'white', 0.42)}`,
+                boxShadow: `0 14px 30px ${blend(primary, 'transparent', 0.12)}`,
               }}
             >
               <SectionHeading
                 label="Save or connect"
                 caption="Keep the card handy or start a conversation now."
               />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <LeadCaptureButton
                   onLeadCapture={onLeadCapture}
                   mode={mode}
@@ -750,37 +736,36 @@ export function MinimalTemplate({
             <div
               style={{
                 textAlign: 'center',
-                padding: '24px 10px 10px',
-                color: '#64748b',
+                padding: '6px 10px 2px',
+                color: '#5f6368',
               }}
             >
               <div
                 style={{
                   display: 'inline-flex',
-                  gap: 8,
+                  gap: 6,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginBottom: 12,
+                  marginBottom: 8,
                 }}
               >
                 {footerDots.map((color) => (
                   <span
                     key={color}
                     style={{
-                      width: 6,
-                      height: 6,
+                      width: 7,
+                      height: 7,
                       borderRadius: '50%',
                       background: color,
                       display: 'inline-block',
-                      opacity: 0.8,
                     }}
                   />
                 ))}
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em', color: '#0f172a' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>
                 dotly.one/{card.handle}
               </div>
-              <div style={{ fontSize: 13, marginTop: 8, fontWeight: 400 }}>
+              <div style={{ fontSize: 12, marginTop: 6 }}>
                 Designed to feel simple, useful, and quietly premium.
               </div>
             </div>

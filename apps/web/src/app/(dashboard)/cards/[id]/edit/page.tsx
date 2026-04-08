@@ -283,6 +283,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
               >
                 {activeTab === 'profile' && (
                   <ProfileTab
+                    cardId={id}
                     fields={card.fields as unknown as Record<string, string>}
                     handle={card.handle}
                     onFieldChange={updateField}
