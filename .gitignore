@@ -1,0 +1,59 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Turborepo
+.turbo
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# NOT .env.example — that should be committed
+
+# Build outputs
+dist
+out
+build
+.next
+
+# Expo / React Native
+.expo
+
+# Mobile credentials — NEVER commit these
+apps/mobile/google-play-service-account.json
+*.keystore
+
+# TypeScript
+*.tsbuildinfo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage
+coverage
+.nyc_output
+
+# Playwright
+apps/web/playwright-report/
+apps/web/test-results/
+
+# Prisma
+prisma/migrations/dev
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo

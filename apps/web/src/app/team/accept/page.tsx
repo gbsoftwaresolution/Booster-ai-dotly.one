@@ -1,0 +1,144 @@
+'use client'
+
+import type { JSX } from 'react'
+import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { getAccessToken } from '@/lib/supabase/client'
+import { apiPost } from '@/lib/api'
+
+export const dynamic = 'force-dynamic'
+
+function AcceptInviteContent(): JSX.Element {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const token = searchParams.get('token')
+
+  const [status, setStatus] = useState<'loading' | 'accepting' | 'success' | 'error' | 'unauthenticated'>('loading')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (!token) {
+      setStatus('error')
+      setMessage('No invite token provided.')
+      return
+    }
+
+    const checkAuth = async () => {
+      const accessToken = await getAccessToken()
+
+      if (!accessToken) {
+        setStatus('unauthenticated')
+        return
+      }
+
+      setStatus('accepting')
+      try {
+        await apiPost<{ teamId: string }>(
+          '/teams/accept-invite',
+          { token },
+          accessToken,
+        )
+        setStatus('success')
+        setMessage('You have joined the team!')
+        setTimeout(() => router.push('/team'), 2000)
+      } catch {
+        setStatus('error')
+        setMessage('This invite is invalid or has expired.')
+      }
+    }
+
+    void checkAuth()
+  }, [token, router])
+
+  if (status === 'loading' || status === 'accepting') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+          <p className="mt-4 text-sm text-gray-500">
+            {status === 'accepting' ? 'Accepting invitation...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    const returnUrl = encodeURIComponent(`/team/accept?token=${token ?? ''}`)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
+            <span className="text-2xl">🤝</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">Team Invitation</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Sign in or create an account to accept this invitation and join the team.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <Link
+              href={`/auth?returnUrl=${returnUrl}`}
+              className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 text-center"
+            >
+              Sign In
+            </Link>
+            <Link
+              href={`/auth?mode=signup&returnUrl=${returnUrl}`}
+              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 text-center"
+            >
+              Create Account
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'success') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+            <span className="text-2xl">✓</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">Welcome to the team!</h1>
+          <p className="mt-2 text-sm text-gray-500">{message}</p>
+          <p className="mt-1 text-xs text-gray-400">Redirecting to your team dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+          <span className="text-2xl">✗</span>
+        </div>
+        <h1 className="text-xl font-bold text-gray-900">Invalid Invitation</h1>
+        <p className="mt-2 text-sm text-gray-500">{message}</p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+        >
+          Go to Dashboard
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+export default function AcceptInvitePage(): JSX.Element {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        </div>
+      }
+    >
+      <AcceptInviteContent />
+    </Suspense>
+  )
+}

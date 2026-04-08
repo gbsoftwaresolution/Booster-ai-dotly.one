@@ -1,0 +1,306 @@
+'use client'
+
+import type { JSX } from 'react'
+import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import { getAccessToken } from '@/lib/supabase/client'
+import { apiGet, apiPut } from '@/lib/api'
+
+const FONT_OPTIONS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Playfair Display', 'Lato']
+
+interface BrandConfig {
+  logoUrl: string
+  primaryColor: string
+  secondaryColor: string
+  fontFamily: string
+  brandLock: boolean
+  hideDotlyBranding: boolean
+}
+
+export default function TeamBrandPage(): JSX.Element {
+  // teamId is fetched on mount from the user's first team
+  const [teamId, setTeamId] = useState<string>('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [brand, setBrand] = useState<BrandConfig>({
+    logoUrl: '',
+    primaryColor: '#0ea5e9',
+    secondaryColor: '#ffffff',
+    fontFamily: 'Inter',
+    brandLock: false,
+    hideDotlyBranding: false,
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Fetch the user's team on mount so we have a teamId to save against
+  useEffect(() => {
+    async function loadTeam() {
+      try {
+        const token = await getAccessToken()
+        if (!token) return
+        // GET /teams returns the user's teams; use the first one
+        const teams = await apiGet<Array<{ id: string; brandConfig?: Record<string, unknown> }>>('/teams', token)
+        const first = teams[0]
+        if (!first) return
+        setTeamId(first.id)
+        // Pre-populate form from existing brand config
+        const cfg = first.brandConfig ?? {}
+        setBrand((prev) => ({
+          ...prev,
+          logoUrl: (cfg['logoUrl'] as string | undefined) ?? prev.logoUrl,
+          primaryColor: (cfg['primaryColor'] as string | undefined) ?? prev.primaryColor,
+          secondaryColor: (cfg['secondaryColor'] as string | undefined) ?? prev.secondaryColor,
+          fontFamily: (cfg['fontFamily'] as string | undefined) ?? prev.fontFamily,
+          hideDotlyBranding: (cfg['hideDotlyBranding'] as boolean | undefined) ?? prev.hideDotlyBranding,
+        }))
+      } catch {
+        setLoadError('Could not load team settings.')
+      }
+    }
+    void loadTeam()
+  }, [])
+
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleSave = async () => {
+    if (!teamId) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const token = await getAccessToken()
+      await apiPut(
+        `/teams/${teamId}`,
+        {
+          brandConfig: {
+            logoUrl: brand.logoUrl,
+            primaryColor: brand.primaryColor,
+            secondaryColor: brand.secondaryColor,
+            fontFamily: brand.fontFamily,
+            hideDotlyBranding: brand.hideDotlyBranding,
+          },
+          brandLock: brand.brandLock,
+        },
+        token ?? undefined,
+      )
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      setSaveError('Failed to save brand settings. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Brand Settings</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Configure shared brand settings for all team member cards.
+        </p>
+      </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
+
+      {saveError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {saveError}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Brand config form */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+          {/* Logo URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+            <input
+              type="url"
+              value={brand.logoUrl}
+              onChange={(e) => setBrand({ ...brand, logoUrl: e.target.value })}
+              placeholder="https://example.com/logo.png"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+
+          {/* Primary color */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={brand.primaryColor}
+                onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })}
+                className="h-10 w-16 cursor-pointer rounded border border-gray-200"
+              />
+              <input
+                type="text"
+                value={brand.primaryColor}
+                onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+
+          {/* Secondary color */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={brand.secondaryColor}
+                onChange={(e) => setBrand({ ...brand, secondaryColor: e.target.value })}
+                className="h-10 w-16 cursor-pointer rounded border border-gray-200"
+              />
+              <input
+                type="text"
+                value={brand.secondaryColor}
+                onChange={(e) => setBrand({ ...brand, secondaryColor: e.target.value })}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+
+          {/* Font family */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
+            <select
+              value={brand.fontFamily}
+              onChange={(e) => setBrand({ ...brand, fontFamily: e.target.value })}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Brand lock */}
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-900 text-sm">Brand Lock</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  When enabled, all team member cards will use these brand settings.
+                </p>
+              </div>
+              <button
+                onClick={() => setBrand({ ...brand, brandLock: !brand.brandLock })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  brand.brandLock ? 'bg-brand-500' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    brand.brandLock ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {brand.brandLock && (
+              <p className="mt-2 text-xs text-yellow-700">
+                Warning: Individual card theme changes will be overridden by these brand settings.
+              </p>
+            )}
+          </div>
+
+          {/* Hide Dotly Branding */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-900 text-sm">Hide &quot;Powered by Dotly&quot;</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Remove the Dotly branding footer from all team member public cards.
+                </p>
+              </div>
+              <button
+                onClick={() => setBrand({ ...brand, hideDotlyBranding: !brand.hideDotlyBranding })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  brand.hideDotlyBranding ? 'bg-brand-500' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    brand.hideDotlyBranding ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving || !teamId}
+            className="w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : saved ? 'Saved!' : !teamId ? 'Unavailable — team failed to load' : 'Save Brand Settings'}
+          </button>
+        </div>
+
+        {/* Live preview */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4">Live Preview</h3>
+          <div
+            className="rounded-xl p-6 shadow-md"
+            style={{
+              backgroundColor: brand.primaryColor,
+              fontFamily: brand.fontFamily,
+            }}
+          >
+            {brand.logoUrl ? (
+              <Image
+                src={brand.logoUrl}
+                alt="Team logo"
+                width={48}
+                height={48}
+                unoptimized
+                className="h-12 w-auto mb-4 rounded"
+              />
+            ) : (
+              <div
+                className="h-12 w-24 rounded mb-4 flex items-center justify-center"
+                style={{ backgroundColor: brand.secondaryColor }}
+              >
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: brand.primaryColor }}
+                >
+                  Logo
+                </span>
+              </div>
+            )}
+            <h4
+              className="text-xl font-bold"
+              style={{ color: brand.secondaryColor, fontFamily: brand.fontFamily }}
+            >
+              Your Name
+            </h4>
+            <p
+              className="text-sm mt-1 opacity-80"
+              style={{ color: brand.secondaryColor }}
+            >
+              Your Title · Company
+            </p>
+            <div
+              className="mt-4 rounded-lg px-4 py-2 text-center text-sm font-semibold"
+              style={{
+                backgroundColor: brand.secondaryColor,
+                color: brand.primaryColor,
+              }}
+            >
+              Connect with me
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-gray-400">
+            Preview of how your brand settings will appear on team member cards.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

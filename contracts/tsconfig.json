@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "resolveJsonModule": true
+  },
+  "include": ["hardhat.config.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules"]
+}

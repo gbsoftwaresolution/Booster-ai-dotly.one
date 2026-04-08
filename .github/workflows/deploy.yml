@@ -1,0 +1,102 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false  # Never cancel a deploy in progress
+
+jobs:
+  # Gate: all CI checks must pass
+  ci-gate:
+    uses: ./.github/workflows/ci.yml
+
+  deploy-api:
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run database migrations
+        # Run migrations against the production DB before deploying new API code.
+        # This ensures the schema is up to date before the new binary starts.
+        run: |
+          npm install -g prisma
+          prisma migrate deploy
+        working-directory: packages/database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Deploy to Railway
+        uses: bervProject/railway-deploy@main
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: dotly-api
+
+  deploy-web:
+    needs: [ci-gate, deploy-api]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: apps/web
+
+  smoke-test:
+    needs: [deploy-api, deploy-web]
+    runs-on: ubuntu-latest
+    steps:
+      - name: API health check
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.dotly.one/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "API is healthy"
+              exit 0
+            fi
+            echo "Attempt $i: Status $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "API health check failed after 5 attempts"
+          exit 1
+      - name: Web smoke test
+        # Check the homepage (/) instead of a hardcoded user handle.
+        # A 200 from the homepage confirms Next.js is up without depending on test data.
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://dotly.one/)
+          if [ "$STATUS" = "200" ]; then
+            echo "Web is healthy"
+          else
+            echo "Web smoke test failed: $STATUS"
+            exit 1
+          fi
+
+  rollback-on-failure:
+    needs: smoke-test
+    if: failure()
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Rollback API to previous Railway deployment
+        # Rolls back the Railway service to the last successful deployment.
+        # Requires RAILWAY_TOKEN with write access to the project.
+        run: |
+          echo "Smoke tests failed — triggering Railway rollback for dotly-api"
+          curl -s -X POST "https://backboard.railway.app/graphql/v2" \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"mutation { deploymentRestart(id: \"${{ secrets.RAILWAY_PREV_DEPLOYMENT_ID }}\") { id } }"}' \
+            || true
+          echo "IMPORTANT: Verify rollback manually in Railway dashboard if this step failed."
+          echo "Also revert the Vercel deployment via: vercel rollback --token=\$VERCEL_TOKEN"
+      - name: Notify rollback triggered
+        run: echo "::warning::Smoke tests failed. Rollback initiated. Check Railway and Vercel dashboards."

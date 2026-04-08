@@ -1,0 +1,295 @@
+'use client'
+
+import type { JSX } from 'react'
+import { useState, useRef } from 'react'
+import type { SocialLinkData } from '@dotly/types'
+import { SocialPlatform } from '@dotly/types'
+import { Trash2, Plus, Link2, ExternalLink } from 'lucide-react'
+import { cn } from '@/lib/cn'
+
+interface LinksTabProps {
+  links: SocialLinkData[]
+  onChange: (links: SocialLinkData[]) => void
+}
+
+// ── Platform metadata ────────────────────────────────────────────────────────
+const PLATFORM_META: Record<
+  string,
+  { label: string; color: string; dot: string; placeholder: string; icon: string }
+> = {
+  LINKEDIN: {
+    label: 'LinkedIn',
+    color: 'bg-[#0A66C2]',
+    dot: 'bg-[#0A66C2]',
+    placeholder: 'https://linkedin.com/in/username',
+    icon: 'in',
+  },
+  TWITTER: {
+    label: 'Twitter / X',
+    color: 'bg-black',
+    dot: 'bg-black',
+    placeholder: 'https://x.com/username',
+    icon: 'X',
+  },
+  INSTAGRAM: {
+    label: 'Instagram',
+    color: 'bg-[#E1306C]',
+    dot: 'bg-[#E1306C]',
+    placeholder: 'https://instagram.com/username',
+    icon: 'ig',
+  },
+  GITHUB: {
+    label: 'GitHub',
+    color: 'bg-gray-900',
+    dot: 'bg-gray-900',
+    placeholder: 'https://github.com/username',
+    icon: 'gh',
+  },
+  YOUTUBE: {
+    label: 'YouTube',
+    color: 'bg-[#FF0000]',
+    dot: 'bg-[#FF0000]',
+    placeholder: 'https://youtube.com/@channel',
+    icon: 'yt',
+  },
+  TIKTOK: {
+    label: 'TikTok',
+    color: 'bg-black',
+    dot: 'bg-black',
+    placeholder: 'https://tiktok.com/@username',
+    icon: 'tt',
+  },
+  WHATSAPP: {
+    label: 'WhatsApp',
+    color: 'bg-[#25D366]',
+    dot: 'bg-[#25D366]',
+    placeholder: 'https://wa.me/15550000000',
+    icon: 'wa',
+  },
+  FACEBOOK: {
+    label: 'Facebook',
+    color: 'bg-[#1877F2]',
+    dot: 'bg-[#1877F2]',
+    placeholder: 'https://facebook.com/username',
+    icon: 'fb',
+  },
+  CALENDLY: {
+    label: 'Calendly',
+    color: 'bg-[#0069FF]',
+    dot: 'bg-[#0069FF]',
+    placeholder: 'https://calendly.com/username',
+    icon: 'ca',
+  },
+  CALCOM: {
+    label: 'Cal.com',
+    color: 'bg-gray-800',
+    dot: 'bg-gray-800',
+    placeholder: 'https://cal.com/username',
+    icon: 'cc',
+  },
+  CUSTOM: {
+    label: 'Custom URL',
+    color: 'bg-gray-500',
+    dot: 'bg-gray-400',
+    placeholder: 'https://your-link.com',
+    icon: '🔗',
+  },
+}
+
+const PLATFORM_OPTIONS = Object.values(SocialPlatform)
+
+export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
+  const idCounterRef = useRef(1000)
+  const [selected, setSelected] = useState<SocialPlatform>(SocialPlatform.LINKEDIN)
+  const [newUrl, setNewUrl] = useState('')
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const [showAddForm, setShowAddForm] = useState(links.length === 0)
+
+  const meta = (platform: string): (typeof PLATFORM_META)[keyof typeof PLATFORM_META] =>
+    PLATFORM_META[platform] ??
+    (PLATFORM_META['CUSTOM'] as (typeof PLATFORM_META)[keyof typeof PLATFORM_META])
+
+  const addLink = () => {
+    if (!newUrl.trim()) return
+    try {
+      new URL(newUrl)
+    } catch {
+      setUrlError('Please enter a valid URL')
+      return
+    }
+    setUrlError(null)
+    const link: SocialLinkData = {
+      id: `new-${idCounterRef.current++}`,
+      platform: selected,
+      url: newUrl,
+      displayOrder: links.length,
+    }
+    onChange([...links, link])
+    setNewUrl('')
+    setShowAddForm(false)
+  }
+
+  const removeLink = (id: string) => {
+    onChange(links.filter((l) => l.id !== id).map((l, i) => ({ ...l, displayOrder: i })))
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ── Existing links ── */}
+      {links.length > 0 && (
+        <div className="space-y-2">
+          {links.map((link) => {
+            const m = meta(link.platform)
+            return (
+              <div
+                key={link.id}
+                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 transition-all hover:border-gray-200 hover:bg-white hover:shadow-sm"
+              >
+                {/* Platform dot */}
+                <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', m.dot)} />
+
+                {/* Platform name + url */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">{m.label}</p>
+                  <p className="truncate text-xs text-gray-400">{link.url}</p>
+                </div>
+
+                {/* Open link */}
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded-lg p-1.5 text-gray-300 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+
+                {/* Remove */}
+                <button
+                  type="button"
+                  onClick={() => removeLink(link.id)}
+                  className="shrink-0 rounded-lg p-1.5 text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
+      {links.length === 0 && !showAddForm && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-8 text-center">
+          <Link2 className="h-8 w-8 text-gray-300" />
+          <p className="text-sm font-medium text-gray-500">No links yet</p>
+          <p className="text-xs text-gray-400">Add your social profiles and custom links</p>
+        </div>
+      )}
+
+      {/* ── Add link form ── */}
+      {showAddForm ? (
+        <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-4 space-y-4">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+            Add Social Link
+          </p>
+
+          {/* Platform icon grid */}
+          <div className="grid grid-cols-4 gap-2">
+            {PLATFORM_OPTIONS.map((p) => {
+              const m = meta(p)
+              const active = selected === p
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => {
+                    setSelected(p as SocialPlatform)
+                    setNewUrl('')
+                    setUrlError(null)
+                  }}
+                  className={cn(
+                    'flex flex-col items-center gap-1.5 rounded-xl border-2 py-2.5 px-1 transition-all',
+                    active
+                      ? 'border-brand-400 bg-white shadow-sm'
+                      : 'border-transparent bg-white/60 hover:bg-white hover:border-gray-200',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full text-white text-[9px] font-bold',
+                      m.color,
+                    )}
+                  >
+                    {m.icon}
+                  </span>
+                  <span className="text-[9px] font-semibold text-gray-600 leading-tight text-center">
+                    {m.label.replace(' / ', '/').replace('Custom URL', 'Custom')}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* URL input */}
+          <div>
+            <div
+              className={cn(
+                'flex items-center gap-2.5 rounded-2xl border bg-white px-3.5 py-3',
+                'transition-all focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20',
+                urlError ? 'border-red-300' : 'border-gray-200',
+              )}
+            >
+              <Link2 className="h-4 w-4 shrink-0 text-gray-400" />
+              <input
+                type="url"
+                value={newUrl}
+                onChange={(e) => {
+                  setNewUrl(e.target.value)
+                  setUrlError(null)
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && addLink()}
+                placeholder={meta(selected).placeholder}
+                className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
+              />
+            </div>
+            {urlError && <p className="mt-1.5 px-1 text-xs text-red-500">{urlError}</p>}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm(false)
+                setNewUrl('')
+                setUrlError(null)
+              }}
+              className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={addLink}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-500 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 transition-colors active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+              Add Link
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* ── Show form button ── */
+        <button
+          type="button"
+          onClick={() => setShowAddForm(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/50 py-3.5 text-sm font-semibold text-brand-600 hover:border-brand-400 hover:bg-brand-50 transition-all active:scale-95"
+        >
+          <Plus className="h-4 w-4" />
+          Add Link
+        </button>
+      )}
+    </div>
+  )
+}

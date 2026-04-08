@@ -1,0 +1,218 @@
+import { supabase } from './supabase'
+
+// H-05: Validate that EXPO_PUBLIC_API_URL is set and uses HTTPS.
+// Falling back to an HTTP localhost URL in production would silently send
+// auth tokens over an unencrypted connection.  We fail fast at module load
+// time so the problem is immediately visible in dev/CI rather than only
+// appearing as a runtime network error in production.
+const _rawApiUrl = process.env.EXPO_PUBLIC_API_URL
+if (!_rawApiUrl) {
+  throw new Error(
+    'EXPO_PUBLIC_API_URL is not set. ' +
+    'Add it to your .env file (development) or EAS secrets (production).',
+  )
+}
+if (!_rawApiUrl.startsWith('https://') && process.env.NODE_ENV === 'production') {
+  throw new Error(
+    `EXPO_PUBLIC_API_URL must use HTTPS in production. Got: ${_rawApiUrl}`,
+  )
+}
+const API_URL = _rawApiUrl
+
+// H-08: Allowed image MIME types for upload endpoints.
+// Anything outside this list is rejected before hitting the network so that
+// the server cannot be confused by unexpected content types.
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function assertAllowedMimeType(mimeType: string, context: string): void {
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    throw new Error(
+      `${context}: unsupported MIME type "${mimeType}". ` +
+      `Allowed types: ${[...ALLOWED_MIME_TYPES].join(', ')}`,
+    )
+  }
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) return {}
+  return { Authorization: `Bearer ${session.access_token}` }
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = await getAuthHeaders()
+
+  // LOW-05: Set an explicit 15-second timeout on every API call.  Without this,
+  // a hung API server (deploy in progress, network drop) leaves the UI spinner
+  // running indefinitely with no user-visible error on React Native.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15_000)
+
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+        ...(options?.headers as Record<string, string> | undefined),
+      },
+    })
+    if (!res.ok) throw new Error(`API error ${res.status}`)
+    return res.json() as Promise<T>
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+interface ContactsResponse {
+  contacts: unknown[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface AnalyticsSummary {
+  totalViews: number
+  totalClicks: number
+  totalLeads: number
+  last7Days?: Array<{ type: string; createdAt: string }>
+}
+
+export const api = {
+  getCards: () => apiFetch<unknown[]>('/cards'),
+  getCard: (id: string) => apiFetch<unknown>(`/cards/${id}`),
+  getMe: () => apiFetch<unknown>('/users/me'),
+  getAnalyticsSummary: (id: string) => apiFetch<AnalyticsSummary>(`/cards/${id}/analytics/summary`),
+  getContacts: (page = 1, limit = 50) =>
+    apiFetch<ContactsResponse>(`/contacts?page=${page}&limit=${limit}`),
+  getContact: (id: string) => apiFetch<unknown>(`/contacts/${id}`),
+  updateContactStage: (id: string, stage: string) =>
+    apiFetch(`/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
+}
+
+// Card creation / editing functions
+
+export async function createCard(data: {
+  name: string
+  handle: string
+  template: string
+  tagline?: string
+  bio?: string
+  phone?: string
+  email?: string
+  website?: string
+}): Promise<unknown> {
+  return apiFetch('/cards', {
+    method: 'POST',
+    body: JSON.stringify({
+      handle: data.handle,
+      templateId: data.template,
+      fields: {
+        name: data.name,
+        bio: data.bio ?? '',
+        phone: data.phone ?? '',
+        email: data.email ?? '',
+        website: data.website ?? '',
+        title: data.tagline ?? '',
+      },
+    }),
+  })
+}
+
+export async function updateCard(id: string, data: Record<string, unknown>): Promise<unknown> {
+  return apiFetch(`/cards/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function checkHandleAvailable(
+  handle: string,
+): Promise<{ available: boolean | 'unknown' }> {
+  try {
+    const headers = await getAuthHeaders()
+    const res = await fetch(`${API_URL}/public/cards/${handle}`, {
+      headers: { 'Content-Type': 'application/json', ...headers },
+    })
+    // 200 = handle is taken, 404 = available
+    return { available: res.status === 404 }
+  } catch {
+    // H-07: Return 'unknown' instead of true on network error.
+    // Returning true would silently allow a user to proceed with a handle
+    // that might already be taken (the check just failed to reach the server).
+    // Callers must treat 'unknown' as "we don't know — block progression".
+    return { available: 'unknown' }
+  }
+}
+
+export async function uploadAvatar(
+  cardId: string,
+  base64: string,
+  mimeType: string,
+): Promise<{ url: string }> {
+  // H-08: Validate mimeType against allowlist before sending to server.
+  assertAllowedMimeType(mimeType, 'uploadAvatar')
+  return apiFetch<{ url: string }>(`/cards/${cardId}/avatar`, {
+    method: 'POST',
+    body: JSON.stringify({ base64, mimeType }),
+  })
+}
+
+export async function savePushToken(token: string): Promise<void> {
+  await apiFetch('/users/push-token', {
+    method: 'PATCH',
+    body: JSON.stringify({ pushToken: token }),
+  })
+}
+
+export interface ScannedContact {
+  name: string | null
+  email: string | null
+  phone: string | null
+  company: string | null
+  title: string | null
+  website: string | null
+  address: string | null
+}
+
+export async function scanBusinessCard(
+  base64: string,
+  mimeType: string,
+): Promise<ScannedContact> {
+  // H-08: Validate mimeType against allowlist before sending to server.
+  assertAllowedMimeType(mimeType, 'scanBusinessCard')
+  return apiFetch<ScannedContact>('/ai/scan-card', {
+    method: 'POST',
+    body: JSON.stringify({ base64Image: base64, mimeType }),
+  })
+}
+
+export async function createContact(
+  cardId: string,
+  data: {
+    name: string
+    email?: string | null
+    phone?: string | null
+    company?: string | null
+    title?: string | null
+    website?: string | null
+    address?: string | null
+  },
+): Promise<unknown> {
+  return apiFetch('/contacts', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: data.name,
+      email: data.email ?? undefined,
+      phone: data.phone ?? undefined,
+      company: data.company ?? undefined,
+      title: data.title ?? undefined,
+      website: data.website ?? undefined,
+      address: data.address ?? undefined,
+      sourceCardId: cardId,
+    }),
+  })
+}

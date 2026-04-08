@@ -1,0 +1,19 @@
+# Railway deployment configuration for the Dotly API (NestJS)
+# Docs: https://docs.railway.app/reference/config-as-code
+
+[build]
+# Use the Dockerfile for a reproducible, multi-stage build with a non-root user.
+# Comment this line out to fall back to Railway's Nixpacks auto-detection.
+builder = "DOCKERFILE"
+dockerfilePath = "apps/api/Dockerfile"
+
+[deploy]
+startCommand = "node dist/src/main"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Minimum 2 replicas in production for zero-downtime rolling deploys.
+# Override per-environment in Railway dashboard if needed.
+numReplicas = 2

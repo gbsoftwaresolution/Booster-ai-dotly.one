@@ -1,0 +1,16 @@
+# H-02: userlist.txt for PgBouncer scram-sha-256 authentication.
+#
+# Format: "username" "password"
+#
+# For scram-sha-256, the password field must be a SCRAM verifier produced by
+# PostgreSQL's pg_shadow / pg_authid, NOT a plain-text password.
+#
+# To generate a verifier:
+#   1. Connect to your Postgres instance as superuser.
+#   2. Run: SELECT rolname, rolpassword FROM pg_authid WHERE rolname = 'naveenprasath-p';
+#   3. Copy the value (it will start with "SCRAM-SHA-256$...").
+#   4. Replace the placeholder below with that value (keep the quotes).
+#
+# TODO: Replace the placeholder below with the real SCRAM-SHA-256 verifier
+#       from your Postgres instance before running in production.
+"naveenprasath-p" "TODO_REPLACE_WITH_SCRAM_SHA_256_VERIFIER_FROM_PG_AUTHID"

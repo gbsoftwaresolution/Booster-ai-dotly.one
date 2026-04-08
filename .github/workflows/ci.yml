@@ -1,0 +1,248 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_test
+  SUPABASE_JWT_SECRET: test-jwt-secret
+  REDIS_URL: redis://localhost:6379
+
+jobs:
+  # M-04: Scan git history for secrets on every push/PR.
+  # TruffleHog catches accidentally committed credentials before they reach main.
+  secret-scan:
+    name: Secret Scan (TruffleHog)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history needed for TruffleHog to scan all commits
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+  # M-05: Audit production dependencies for known high/critical CVEs.
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit for high/critical CVEs
+        run: pnpm audit --audit-level=high
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo typecheck
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dotly_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dotly/database exec prisma generate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - run: pnpm turbo build --filter=@dotly/api --filter=@dotly/web
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          SUPABASE_JWT_SECRET: ${{ env.SUPABASE_JWT_SECRET }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          # R2 / storage — placeholder values so the build succeeds without real credentials
+          R2_ACCOUNT_ID: placeholder
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET_NAME: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
+          # Email — placeholder values
+          MAILGUN_API_KEY: placeholder
+          MAILGUN_DOMAIN: placeholder.mailgun.org
+          MAILGUN_FROM: 'Dotly <no-reply@placeholder.mailgun.org>'
+          # OpenAI — placeholder value
+          OPENAI_API_KEY: placeholder
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Install LHCI
+        run: npm install -g @lhci/cli
+      - name: Run Lighthouse CI
+        run: lhci autorun
+        working-directory: apps/web
+        continue-on-error: true # Don't fail CI on lighthouse warnings
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dotly_one
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter @dotly/database exec prisma generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+      - name: Run DB migrations
+        run: pnpm --filter @dotly/database exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+      - name: Build Next.js app
+        run: pnpm turbo build --filter=@dotly/web
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          SUPABASE_JWT_SECRET: test-jwt-secret
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          R2_ACCOUNT_ID: placeholder
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET_NAME: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
+          MAILGUN_API_KEY: placeholder
+          MAILGUN_DOMAIN: placeholder.mailgun.org
+          MAILGUN_FROM: 'Dotly <no-reply@placeholder.mailgun.org>'
+          OPENAI_API_KEY: placeholder
+      - name: Start Next.js server
+        run: pnpm --filter @dotly/web start &
+        env:
+          PORT: 3000
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+      - name: Wait for Next.js to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Next.js is ready"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          echo "Next.js did not start in time"
+          exit 1
+      - name: Install Playwright browsers
+        run: pnpm --filter @dotly/web exec playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: pnpm --filter @dotly/web test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          CI: true

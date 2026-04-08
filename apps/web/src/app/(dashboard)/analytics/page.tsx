@@ -1,0 +1,427 @@
+'use client'
+
+import type { JSX } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { getAccessToken } from '@/lib/supabase/client'
+import { apiGet } from '@/lib/api'
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
+import { RefreshCw, Download, TrendingUp, Eye, MousePointerClick, Users, Percent, type LucideIcon } from 'lucide-react'
+
+interface CardSummary {
+  id: string
+  handle: string
+  fields: Record<string, string>
+}
+
+interface AnalyticsData {
+  summary: {
+    totalViews: number
+    totalClicks: number
+    totalLeads: number
+    uniqueVisitors: number
+    conversionRate: string
+  }
+  charts: {
+    viewsByDay: { date: string; count: number }[]
+    clicksByDay: { date: string; count: number }[]
+    deviceBreakdown: { name: string; value: number }[]
+    countryBreakdown: { name: string; value: number }[]
+    clicksByLink: { name: string; value: number }[]
+    referrers: { name: string; value: number }[]
+  }
+}
+
+const DEVICE_COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#10b981']
+const DATE_RANGE_OPTIONS = [
+  { label: '7D', days: 7 },
+  { label: '30D', days: 30 },
+  { label: '90D', days: 90 },
+]
+
+function SkeletonCard(): JSX.Element {
+  return <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string
+  value: number | string
+  icon: LucideIcon
+  color: string
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
+        <Icon className="h-5 w-5 text-white" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs text-gray-500">{label}</p>
+        <p className="text-xl font-bold text-gray-900">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+export default function AnalyticsPage(): JSX.Element {
+  const [cards, setCards] = useState<CardSummary[]>([])
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [dateRangeDays, setDateRangeDays] = useState(30)
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [cardsLoading, setCardsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load cards
+  useEffect(() => {
+    async function loadCards() {
+      try {
+        const token = await getAccessToken()
+        const data = await apiGet<CardSummary[]>('/cards', token)
+        setCards(data)
+        const first = data[0]
+        if (first) setSelectedCardId(first.id)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load cards')
+      } finally {
+        setCardsLoading(false)
+      }
+    }
+    void loadCards()
+  }, [])
+
+  // Load analytics when card or date range changes
+  const loadAnalytics = useCallback(async () => {
+    if (!selectedCardId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const token = await getAccessToken()
+      const to = new Date()
+      const from = new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000)
+      const data = await apiGet<AnalyticsData>(
+        `/cards/${selectedCardId}/analytics?from=${from.toISOString()}&to=${to.toISOString()}`,
+        token,
+      )
+      setAnalyticsData(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analytics')
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedCardId, dateRangeDays])
+
+  useEffect(() => {
+    void loadAnalytics()
+  }, [loadAnalytics])
+
+  const exportLeadsCSV = useCallback(() => {
+    window.open('/api/export/contacts', '_blank')
+  }, [])
+
+  if (cardsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-48 animate-pulse rounded bg-gray-100" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header row */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+          <p className="mt-1 text-sm text-gray-500">Insights into how your cards are performing.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Card selector */}
+          {cards.length > 0 && (
+            <select
+              value={selectedCardId ?? ''}
+              onChange={e => setSelectedCardId(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              {cards.map(card => (
+                <option key={card.id} value={card.id}>
+                  /{card.handle} {card.fields['name'] ? `— ${card.fields['name']}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Date range picker */}
+          <div className="flex rounded-lg border border-gray-300 bg-white shadow-sm">
+            {DATE_RANGE_OPTIONS.map(opt => (
+              <button
+                key={opt.days}
+                type="button"
+                onClick={() => setDateRangeDays(opt.days)}
+                className={[
+                  'px-3 py-2 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg',
+                  dateRangeDays === opt.days
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-50',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Retry/refresh */}
+          <button
+            type="button"
+            onClick={() => void loadAnalytics()}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void loadAnalytics()}
+            className="ml-4 font-semibold underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Empty card state */}
+      {cards.length === 0 && (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
+          <TrendingUp className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+          <p className="text-sm text-gray-500">Create a card and share it to see analytics here.</p>
+        </div>
+      )}
+
+      {/* Stats summary */}
+      {(loading && !analyticsData) ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+        </div>
+      ) : analyticsData ? (
+        analyticsData.summary.totalViews === 0 &&
+        analyticsData.summary.totalClicks === 0 &&
+        analyticsData.summary.totalLeads === 0 ? (
+          <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
+            <TrendingUp className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+            <p className="text-sm font-medium text-gray-700">No data yet for this period</p>
+            <p className="mt-1 text-sm text-gray-400">
+              Share your card link to start collecting views and clicks.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-5">
+            <StatCard label="Total Views" value={analyticsData.summary.totalViews} icon={Eye} color="bg-indigo-500" />
+            <StatCard label="Unique Visitors" value={analyticsData.summary.uniqueVisitors} icon={Users} color="bg-cyan-500" />
+            <StatCard label="Total Clicks" value={analyticsData.summary.totalClicks} icon={MousePointerClick} color="bg-amber-500" />
+            <StatCard label="Total Leads" value={analyticsData.summary.totalLeads} icon={TrendingUp} color="bg-emerald-500" />
+            <StatCard label="Conversion Rate" value={`${analyticsData.summary.conversionRate}%`} icon={Percent} color="bg-violet-500" />
+          </div>
+        )
+      ) : null}
+
+      {/* Views over time line chart */}
+      {analyticsData && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-base font-semibold text-gray-900">Views over time</h2>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={analyticsData.charts.viewsByDay} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11 }}
+                tickFormatter={d => {
+                  const parts = (d as string).split('-')
+                  return `${parts[1]}/${parts[2]}`
+                }}
+              />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip labelFormatter={d => String(d)} />
+              <Legend />
+              <Line type="monotone" dataKey="count" name="Views" stroke="#6366f1" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Clicks by platform + Device donut */}
+      {analyticsData && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Clicks by platform */}
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks by platform</h2>
+            {analyticsData.charts.clicksByLink.length === 0 ? (
+              <p className="py-8 text-center text-sm text-gray-400">No click data yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={analyticsData.charts.clicksByLink} layout={analyticsData.charts.clicksByLink.length > 6 ? 'vertical' : 'horizontal'}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  {analyticsData.charts.clicksByLink.length > 6 ? (
+                    <>
+                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
+                    </>
+                  ) : (
+                    <>
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                    </>
+                  )}
+                  <Tooltip />
+                  <Bar dataKey="value" name="Clicks" fill="#6366f1" radius={[4,4,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Device breakdown donut */}
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-gray-900">Device breakdown</h2>
+            {analyticsData.charts.deviceBreakdown.length === 0 ? (
+              <p className="py-8 text-center text-sm text-gray-400">No device data yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={analyticsData.charts.deviceBreakdown}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    label={({ name, percent }) => `${String(name)} ${(Number(percent) * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {analyticsData.charts.deviceBreakdown.map((_, idx) => (
+                      <Cell key={idx} fill={DEVICE_COLORS[idx % DEVICE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Countries + Referrers */}
+      {analyticsData && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Top countries */}
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-gray-900">Top countries</h2>
+            {analyticsData.charts.countryBreakdown.length === 0 ? (
+              <p className="text-sm text-gray-400">No country data yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="pb-2 font-medium">Country</th>
+                    <th className="pb-2 text-right font-medium">Views</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {analyticsData.charts.countryBreakdown.map(item => (
+                    <tr key={item.name}>
+                      <td className="py-2 text-gray-700">{item.name}</td>
+                      <td className="py-2 text-right font-medium text-gray-900">{item.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Top referrers */}
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-gray-900">Top referrers</h2>
+            {analyticsData.charts.referrers.length === 0 ? (
+              <p className="text-sm text-gray-400">No referrer data yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="pb-2 font-medium">Referrer</th>
+                    <th className="pb-2 text-right font-medium">Count</th>
+                    <th className="pb-2 text-right font-medium">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(() => {
+                    const total = analyticsData.charts.referrers.reduce((s, r) => s + r.value, 0)
+                    return analyticsData.charts.referrers.map(item => (
+                      <tr key={item.name}>
+                        <td className="py-2 text-gray-700 truncate max-w-[160px]">{item.name}</td>
+                        <td className="py-2 text-right font-medium text-gray-900">{item.value}</td>
+                        <td className="py-2 text-right text-gray-500">
+                          {total > 0 ? ((item.value / total) * 100).toFixed(1) : '0'}%
+                        </td>
+                      </tr>
+                    ))
+                  })()}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Leads table */}
+      {analyticsData && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">Leads</h2>
+            <button
+              type="button"
+              onClick={exportLeadsCSV}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </button>
+          </div>
+          <p className="text-sm text-gray-500">
+            {analyticsData.summary.totalLeads > 0
+              ? `${analyticsData.summary.totalLeads} leads captured in this period.`
+              : 'No leads yet — share your card to start capturing contacts.'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}

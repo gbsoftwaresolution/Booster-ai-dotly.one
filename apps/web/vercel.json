@@ -1,0 +1,55 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=web",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@dotly-api-url",
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "NEXT_PUBLIC_WEB_URL": "@dotly-web-url",
+    "NEXT_PUBLIC_DOTLY_CONTRACT_ADDRESS": "@dotly-contract-address",
+    "NEXT_PUBLIC_SENTRY_DSN": "@dotly-sentry-dsn",
+    "NEXT_PUBLIC_POSTHOG_KEY": "@dotly-posthog-key",
+    "NEXT_PUBLIC_POSTHOG_HOST": "@dotly-posthog-host",
+    "R2_PUBLIC_HOSTNAME": "@dotly-r2-hostname",
+    "SENTRY_ORG": "@dotly-sentry-org",
+    "SENTRY_PROJECT": "@dotly-sentry-project"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://app.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.dotly.one https://*.supabase.co wss://*.supabase.co https://sentry.io https://app.posthog.com https://*.r2.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+        }
+      ]
+    },
+    {
+      "source": "/card/:handle",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, s-maxage=60, stale-while-revalidate=300" },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN",
+          "comment": "Card pages are embeddable in same-origin iframes (e.g. preview panel). Override the global DENY."
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/health",
+      "destination": "https://api.dotly.one/health"
+    }
+  ]
+}

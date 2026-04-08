@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    ports:
+      # H-03: Bind only to loopback so PgBouncer is not reachable from other
+      # hosts on the same network.  Change to 0.0.0.0 only if you need
+      # cross-host access (e.g. a separate app container), and protect it
+      # with firewall rules / Docker network isolation.
+      - "127.0.0.1:6432:6432"
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    restart: unless-stopped
+    # H-04: Health check — pgbouncer answers psql connections on its port.
+    # Using pg_isready from the postgres client image is not available here,
+    # so we do a TCP check via /dev/tcp.  Replace with a proper pg_isready
+    # check if you add the postgres client to this image.
+    healthcheck:
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/6432 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "128M"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      # H-01: Bind only to loopback — Redis must not be publicly accessible.
+      # Set REDIS_PASSWORD in your local .env or shell before starting.
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    # H-01: Require password authentication and enable persistence.
+    # REDIS_PASSWORD must be set in the environment before running docker compose.
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    restart: unless-stopped
+    # H-04: Health check using redis-cli with the password from the environment.
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
+
+volumes:
+  redis_data:

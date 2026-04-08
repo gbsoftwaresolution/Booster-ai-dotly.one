@@ -1,0 +1,67 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging-${{ github.ref }}
+  cancel-in-progress: true # Cancel in-progress staging deploys on new push
+
+jobs:
+  ci-gate:
+    uses: ./.github/workflows/ci.yml
+
+  deploy-api-staging:
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run database migrations (staging)
+        run: |
+          npm install -g prisma
+          prisma migrate deploy
+        working-directory: packages/database
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Deploy API to Railway (staging)
+        uses: bervProject/railway-deploy@main
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: dotly-api-staging
+
+  deploy-web-staging:
+    needs: [ci-gate, deploy-api-staging]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy web to Vercel (staging/preview)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '' # No --prod flag → creates a preview deployment
+          working-directory: apps/web
+
+  smoke-test-staging:
+    needs: [deploy-api-staging, deploy-web-staging]
+    runs-on: ubuntu-latest
+    steps:
+      - name: API health check (staging)
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api-staging.dotly.one/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Staging API is healthy"
+              exit 0
+            fi
+            echo "Attempt $i: Status $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "Staging API health check failed after 5 attempts"
+          exit 1

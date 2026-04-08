@@ -1,0 +1,400 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+  AGENCY
+  ENTERPRISE
+}
+
+enum BillingDuration {
+  MONTHLY
+  SIX_MONTHS
+  ANNUAL
+}
+
+enum CardTemplate {
+  MINIMAL
+  BOLD
+  CREATIVE
+  CORPORATE
+}
+
+enum ContactStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CLOSED
+  LOST
+}
+
+enum AnalyticsEventType {
+  VIEW
+  CLICK
+  SAVE
+  LEAD_SUBMIT
+}
+
+enum SocialPlatform {
+  LINKEDIN
+  TWITTER
+  INSTAGRAM
+  GITHUB
+  YOUTUBE
+  TIKTOK
+  WHATSAPP
+  FACEBOOK
+  CALENDLY
+  CALCOM
+  CUSTOM
+}
+
+enum MediaBlockType {
+  VIDEO
+  IMAGE
+}
+
+enum TeamRole {
+  ADMIN
+  MEMBER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+}
+
+enum DomainStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String  @id @default(cuid())
+  email         String  @unique
+  name          String?
+  avatarUrl     String?
+  plan          Plan    @default(FREE)
+  walletAddress String? @unique // crypto billing
+  supabaseId    String? @unique // Supabase Auth user ID
+  pushToken     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cards           Card[]
+  contacts        Contact[]
+  subscription    Subscription?
+  customDomains   CustomDomain[]
+  ownedTeams      Team[]       @relation("TeamOwner")
+  teamMemberships TeamMember[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Card {
+  id         String       @id @default(cuid())
+  userId     String
+  handle     String       @unique
+  templateId CardTemplate @default(MINIMAL)
+  fields     Json         @default("{}")
+  isActive   Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme       CardTheme?
+  socialLinks SocialLink[]
+  mediaBlocks MediaBlock[]
+  qrCode      QrCode?
+  analytics   AnalyticsEvent[]
+  contacts    Contact[]        @relation("ContactSourceCard")
+  customDomains CustomDomain[]
+
+  @@index([userId])
+  @@map("cards")
+}
+
+model CardTheme {
+  id             String  @id @default(cuid())
+  cardId         String  @unique
+  primaryColor   String  @default("#000000")
+  secondaryColor String  @default("#ffffff")
+  fontFamily     String  @default("Inter")
+  backgroundUrl  String?
+  logoUrl        String?
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@map("card_themes")
+}
+
+model SocialLink {
+  id           String         @id @default(cuid())
+  cardId       String
+  platform     SocialPlatform
+  url          String
+  displayOrder Int            @default(0)
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@map("social_links")
+}
+
+model MediaBlock {
+  id           String         @id @default(cuid())
+  cardId       String
+  type         MediaBlockType
+  url          String
+  caption      String?
+  displayOrder Int            @default(0)
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@map("media_blocks")
+}
+
+model QrCode {
+  id          String @id @default(cuid())
+  cardId      String @unique
+  styleConfig Json   @default("{}")
+  shortUrl    String
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@map("qr_codes")
+}
+
+model AnalyticsEvent {
+  id        String             @id @default(cuid())
+  cardId    String
+  type      AnalyticsEventType
+  metadata  Json               @default("{}")
+  ipHash    String?
+  country   String?
+  device    String?
+  referrer  String?
+  createdAt DateTime           @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([cardId, type])
+  @@index([cardId, createdAt])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
+
+model Contact {
+  id           String   @id @default(cuid())
+  ownerUserId  String
+  name         String
+  email        String?
+  phone        String?
+  company      String?
+  title        String?
+  website      String?
+  address      String?
+  notes        String?
+  tags         String[]
+  sourceCardId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // AI Enrichment fields
+  inferredIndustry    String?
+  inferredCompanySize String?
+  inferredSeniority   String?
+  inferredLinkedIn    String?
+  enrichmentScore     Int?
+  enrichmentSummary   String?
+  enrichedAt          DateTime?
+
+  ownerUser   User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sourceCard  Card?             @relation("ContactSourceCard", fields: [sourceCardId], references: [id], onDelete: SetNull)
+  crmPipeline CrmPipeline?
+  emails      ContactEmail[]
+  timeline    ContactTimeline[]
+
+  @@unique([ownerUserId, email])
+  @@index([ownerUserId])
+  @@map("contacts")
+}
+
+model CrmPipeline {
+  id          String       @id @default(cuid())
+  contactId   String       @unique
+  stage       ContactStage @default(NEW)
+  notes       String?
+  tags        String[]
+  ownerUserId String
+  updatedAt   DateTime     @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, stage])
+  @@map("crm_pipeline")
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  userId                 String             @unique
+  plan                   Plan               @default(FREE)
+  status                 SubscriptionStatus @default(TRIALING)
+  contractSubscriptionId String? // on-chain subscription ID
+  txHash                 String? // on-chain activation transaction hash
+  chainId                Int? // 137 = Polygon, 8453 = Base
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+
+  // BoosterAI affiliate billing integration
+  // Set when the subscription was purchased via BoosterAI's PaymentVault.
+  // boosterAiOrderId  — the orderId returned by BoosterAI's POST /v1/orders
+  // boosterAiPartnerId — the affiliate partner who referred this user (nullable
+  //                      when the user purchased directly with no referral)
+  boosterAiOrderId   String? @unique // BoosterAI ord_xxx order ID
+  boosterAiPartnerId String? // numeric partnerId as string (BigInt safe)
+  billingDuration    BillingDuration? // MONTHLY | SIX_MONTHS | ANNUAL
+  amountUsdt         String? // exact USDT amount charged, e.g. "20.00"
+
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([boosterAiOrderId])
+  @@map("subscriptions")
+}
+
+model CustomDomain {
+  id                String       @id @default(cuid())
+  userId            String
+  cardId            String?
+  domain            String       @unique
+  status            DomainStatus @default(PENDING)
+  verificationToken String
+  isVerified        Boolean      @default(false)
+  sslStatus         String       @default("pending")
+  txtRecord         String       @default("")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([domain])
+  @@map("custom_domains")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique // URL-safe lowercase slug derived from name
+  ownerUserId String
+  brandConfig Json     @default("{}")
+  brandLock   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner   User         @relation("TeamOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members TeamMember[]
+  invites TeamInvite[]
+
+  @@index([ownerUserId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  role     TeamRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  action       String
+  resource     String   @default("")
+  resourceId   String?
+  metadata     Json     @default("{}")
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model ContactEmail {
+  id        String   @id @default(cuid())
+  contactId String
+  subject   String   @db.VarChar(998)
+  body      String   @db.VarChar(5000)
+  sentAt    DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_emails")
+}
+
+model ContactTimeline {
+  id        String   @id @default(cuid())
+  contactId String
+  event     String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_timeline")
+}
+
+model TeamInvite {
+  id        String    @id @default(cuid())
+  teamId    String
+  email     String
+  role      TeamRole  @default(MEMBER)
+  token     String    @unique
+  accepted  Boolean   @default(false)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([email])
+  @@map("team_invites")
+}
