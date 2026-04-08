@@ -42,6 +42,10 @@ interface RawCard {
     altText?: string
     linkUrl?: string
     displayOrder: number
+    mimeType?: string | null
+    fileSize?: number | null
+    groupId?: string | null
+    groupName?: string | null
   }>
   teamBrand?: TeamBrand | null
 }
@@ -199,6 +203,10 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
       altText?: string
       linkUrl?: string
       displayOrder: number
+      mimeType?: string | null
+      fileSize?: number | null
+      groupId?: string | null
+      groupName?: string | null
     }) => ({
       id: b.id,
       type: b.type as MediaBlockType,
@@ -207,6 +215,10 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
       altText: b.altText,
       linkUrl: b.linkUrl,
       displayOrder: b.displayOrder,
+      mimeType: b.mimeType ?? undefined,
+      fileSize: b.fileSize ?? undefined,
+      groupId: b.groupId ?? undefined,
+      groupName: b.groupName ?? undefined,
     }),
   )
 

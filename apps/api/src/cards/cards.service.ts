@@ -342,6 +342,10 @@ export class CardsService {
           altText: b.altText,
           linkUrl: b.linkUrl,
           displayOrder: b.displayOrder,
+          mimeType: b.mimeType,
+          fileSize: b.fileSize,
+          groupId: b.groupId,
+          groupName: b.groupName,
         })),
       })
     })
@@ -408,6 +412,10 @@ export class CardsService {
             altText: mb.altText,
             linkUrl: mb.linkUrl,
             displayOrder: mb.displayOrder,
+            mimeType: (mb as { mimeType?: string }).mimeType,
+            fileSize: (mb as { fileSize?: number }).fileSize,
+            groupId: (mb as { groupId?: string }).groupId,
+            groupName: (mb as { groupName?: string }).groupName,
           })),
         },
       },

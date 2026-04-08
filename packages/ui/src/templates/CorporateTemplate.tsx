@@ -35,28 +35,89 @@ function SidebarContactRow({
       rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
       style={{
         display: 'flex',
-        alignItems: 'flex-start',
-        gap: 8,
+        alignItems: 'center',
+        gap: 10,
         textDecoration: 'none',
-        color: 'rgba(255,255,255,0.75)',
+        color: 'rgba(255,255,255,0.9)',
         fontSize: 12,
+        fontWeight: 500,
         lineHeight: 1.4,
-        wordBreak: 'break-all',
-        padding: '4px 0',
+        padding: '6px 8px',
+        margin: '0 -8px',
+        borderRadius: 6,
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
       }}
     >
       <span
         style={{
           flexShrink: 0,
-          marginTop: 1,
-          color: 'rgba(255,255,255,0.5)',
+          color: 'rgba(255,255,255,0.7)',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
+          width: 16,
         }}
       >
         {icon}
       </span>
-      <span>{label}</span>
+      <span style={{ wordBreak: 'break-word', letterSpacing: '-0.01em' }}>{label}</span>
+    </a>
+  )
+}
+
+function QuickActionButton({
+  href,
+  iconNode,
+  label,
+  primary,
+}: {
+  href: string
+  iconNode: React.ReactNode
+  label: string
+  primary: string
+}) {
+  return (
+    <a
+      href={href}
+      target={href.startsWith('http') ? '_blank' : undefined}
+      rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8,
+        textDecoration: 'none',
+        transition: 'all 0.2s cubic-bezier(0.25, 1, 0.5, 1)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-3px)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: '50%',
+          background: '#ffffff',
+          border: '1px solid rgba(0,0,0,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02)',
+        }}
+      >
+        {iconNode}
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>{label}</span>
     </a>
   )
 }
@@ -77,86 +138,84 @@ export function CorporateTemplate({
   return (
     <div
       style={{
-        fontFamily: theme.fontFamily || 'Inter, sans-serif',
+        fontFamily: theme.fontFamily || '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         background: '#ffffff',
         width: '100%',
-        color: '#1a1a1a',
+        color: '#0f172a',
         minHeight: 300,
         overflow: 'hidden',
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
       }}
     >
       {/* ── Top accent bar ── */}
       <div
         style={{
-          height: 5,
-          background: `linear-gradient(90deg, ${primary} 0%, ${primary}99 100%)`,
+          height: 6,
+          background: `linear-gradient(90deg, ${primary} 0%, ${primary}CC 100%)`,
         }}
       />
 
       {/* ── Two-column header ── */}
-      <div style={{ display: 'flex', minHeight: 180 }}>
+      <div style={{ display: 'flex', minHeight: 200, background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
         {/* LEFT — colored sidebar */}
         <div
           style={{
             width: 140,
             flexShrink: 0,
-            background: primary,
+            background: `linear-gradient(160deg, ${primary} 0%, ${primary}E6 100%)`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            padding: '28px 12px 24px',
-            gap: 16,
+            padding: '32px 16px 28px',
+            gap: 20,
             position: 'relative',
             overflow: 'hidden',
+            boxShadow: 'inset -2px 0 10px rgba(0,0,0,0.1)',
           }}
         >
           {/* Subtle radial highlight */}
           <div
             style={{
               position: 'absolute',
-              top: -40,
-              left: -40,
-              width: 160,
-              height: 160,
+              top: -60,
+              left: -60,
+              width: 200,
+              height: 200,
               borderRadius: '50%',
-              background: 'rgba(255,255,255,0.07)',
+              background: 'rgba(255,255,255,0.08)',
               pointerEvents: 'none',
+              filter: 'blur(20px)',
             }}
           />
 
           {/* Avatar with white ring */}
           <div
             style={{
-              padding: 3,
-              background: 'rgba(255,255,255,0.2)',
+              padding: 4,
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)',
               borderRadius: '50%',
               position: 'relative',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
             }}
           >
             <AvatarBlock
               avatarUrl={fields.avatarUrl}
               name={fields.name || 'User'}
-              size={72}
+              size={80}
               primaryColor={primary}
             />
           </div>
-
-          {/* Sidebar divider */}
-          <div
-            style={{
-              width: '80%',
-              height: 1,
-              background: 'rgba(255,255,255,0.15)',
-            }}
-          />
 
           {/* Contact details */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 8,
+              gap: 4,
               width: '100%',
+              marginTop: 8,
             }}
           >
             {fields.phone && (
@@ -265,11 +324,11 @@ export function CorporateTemplate({
         <div
           style={{
             flex: 1,
-            padding: '22px 20px 20px',
+            padding: '40px 32px 32px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            borderBottom: '1px solid #f1f5f9',
+            background: '#ffffff',
           }}
         >
           {/* Company logo */}
@@ -278,8 +337,8 @@ export function CorporateTemplate({
               src={theme.logoUrl}
               alt="company logo"
               style={{
-                height: 28,
-                marginBottom: 10,
+                height: 36,
+                marginBottom: 20,
                 objectFit: 'contain',
                 alignSelf: 'flex-start',
               }}
@@ -290,13 +349,13 @@ export function CorporateTemplate({
           {fields.company && (
             <p
               style={{
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 700,
                 color: primary,
                 textTransform: 'uppercase',
-                letterSpacing: 1.2,
-                margin: '0 0 6px',
-                opacity: 0.7,
+                letterSpacing: 1.5,
+                margin: '0 0 10px',
+                opacity: 0.8,
               }}
             >
               {fields.company}
@@ -305,12 +364,12 @@ export function CorporateTemplate({
 
           <h1
             style={{
-              fontSize: 22,
+              fontSize: 28,
               fontWeight: 800,
-              color: primary,
-              margin: '0 0 4px',
-              lineHeight: 1.2,
-              letterSpacing: '-0.3px',
+              color: '#0f172a',
+              margin: '0 0 8px',
+              lineHeight: 1.15,
+              letterSpacing: '-0.02em',
             }}
           >
             {fields.name || 'Your Name'}
@@ -319,10 +378,11 @@ export function CorporateTemplate({
           {fields.title && (
             <p
               style={{
-                fontSize: 13,
+                fontSize: 15,
                 color: '#64748b',
-                margin: '0 0 16px',
+                margin: '0 0 24px',
                 fontWeight: 500,
+                letterSpacing: '-0.01em',
               }}
             >
               {fields.title}
@@ -342,30 +402,62 @@ export function CorporateTemplate({
       </div>
 
       {/* ── Bottom section ── */}
-      <div style={{ padding: '20px 20px 24px' }}>
+      <div style={{ padding: '36px 32px 40px', background: '#f8fafc' }}>
         {/* Bio */}
         {fields.bio && (
           <p
             style={{
-              fontSize: 14,
-              color: '#374151',
-              lineHeight: 1.75,
-              margin: '0 0 20px',
+              fontSize: 15,
+              color: '#475569',
+              lineHeight: 1.6,
+              margin: '0 0 32px',
+              letterSpacing: '-0.01em',
+              fontWeight: 400,
             }}
           >
             {fields.bio}
           </p>
         )}
 
+        {/* Quick Actions (Call, Chat, Email) */}
+        {(fields.phone || fields.whatsapp || fields.email) && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginBottom: 36 }}>
+            {fields.phone && (
+              <QuickActionButton
+                href={`tel:${fields.phone}`}
+                iconNode={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6.53 6.53l1.62-1.62a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>}
+                label="Call"
+                primary={primary}
+              />
+            )}
+            {fields.whatsapp && (
+              <QuickActionButton
+                href={`https://wa.me/${fields.whatsapp.replace(/\D/g, '')}`}
+                iconNode={<svg width="22" height="22" viewBox="0 0 24 24" fill={primary}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.556 4.116 1.527 5.845L.057 23.428a.75.75 0 0 0 .914.915l5.648-1.473A11.93 11.93 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.725 9.725 0 0 1-4.97-1.365l-.355-.21-3.685.96.983-3.596-.232-.371A9.718 9.718 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/></svg>}
+                label="Chat"
+                primary={primary}
+              />
+            )}
+            {fields.email && (
+              <QuickActionButton
+                href={`mailto:${fields.email}`}
+                iconNode={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6" /></svg>}
+                label="Email"
+                primary={primary}
+              />
+            )}
+          </div>
+        )}
+
         {/* Media blocks */}
         {mediaBlocks && mediaBlocks.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 32 }}>
             <MediaBlockList blocks={mediaBlocks} accentColor={primary} darkBackground={false} />
           </div>
         )}
 
         {/* CTA buttons — side by side */}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 16 }}>
           <div style={{ flex: 1 }}>
             <LeadCaptureButton
               onLeadCapture={onLeadCapture}
@@ -385,7 +477,7 @@ export function CorporateTemplate({
           </div>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', marginTop: 18 }}>
+        <p style={{ textAlign: 'center', fontSize: 12, fontWeight: 500, color: '#94a3b8', marginTop: 24, letterSpacing: 0.5 }}>
           dotly.one/{card.handle}
         </p>
       </div>

@@ -8,6 +8,7 @@ import {
   IsUrl,
   MaxLength,
   Min,
+  Max,
   ValidateNested,
   ArrayMaxSize,
 } from 'class-validator'
@@ -51,15 +52,38 @@ export class MediaBlockItemDto {
   @IsInt()
   @Min(0)
   displayOrder!: number
+
+  @ApiPropertyOptional({ example: 'application/pdf' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  mimeType?: string
+
+  @ApiPropertyOptional({ example: 2457600 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(104857600) // 100 MB hard cap
+  fileSize?: number
+
+  @ApiPropertyOptional({ example: 'cuid_abc123' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  groupId?: string
+
+  @ApiPropertyOptional({ example: 'Portfolio' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  groupName?: string
 }
 
 export class UpsertMediaBlocksDto {
-  // HIGH-09: Cap the array at 10 items.
-  // Media blocks are heavier than social links (each has a URL to a video/image),
-  // so a lower cap (10) is appropriate.
+  // Cap: 20 total blocks (10 media + 10 documents can coexist)
   @ApiProperty({ type: [MediaBlockItemDto] })
   @IsArray()
-  @ArrayMaxSize(10, { message: 'A card may have at most 10 media blocks' })
+  @ArrayMaxSize(20, { message: 'A card may have at most 20 media blocks' })
   @ValidateNested({ each: true })
   @Type(() => MediaBlockItemDto)
   blocks!: MediaBlockItemDto[]

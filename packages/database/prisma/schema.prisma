@@ -184,6 +184,10 @@ model MediaBlock {
   altText      String?
   linkUrl      String?
   displayOrder Int            @default(0)
+  mimeType     String?
+  fileSize     Int?
+  groupId      String?
+  groupName    String?
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
 

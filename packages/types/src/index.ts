@@ -175,6 +175,14 @@ export interface MediaBlockData {
   altText?: string
   linkUrl?: string
   displayOrder: number
+  /** MIME type stored at upload time (e.g. "application/pdf", "image/webp") */
+  mimeType?: string
+  /** File size in bytes, stored at upload time for locally-uploaded files */
+  fileSize?: number
+  /** Shared identifier for all blocks belonging to the same group */
+  groupId?: string
+  /** Display name of the group (e.g. "Portfolio", "Downloads") */
+  groupName?: string
 }
 
 export interface CardRendererProps {

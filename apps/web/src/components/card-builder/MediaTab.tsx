@@ -24,7 +24,10 @@ import {
   Film,
   FileAudio,
   FileImage,
-  Heading2,
+  FolderOpen,
+  Pencil,
+  ChevronDown,
+  Download,
 } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/cn'
@@ -33,7 +36,11 @@ import { apiPost } from '@/lib/api'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_BLOCKS = 10
+const MAX_MEDIA = 10
+const MAX_DOCS = 10
+const DEFAULT_GROUP_ID = '__default__'
+const DEFAULT_GROUP_NAME = 'General'
+const DOCS_GROUP_ID = '__docs__'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +50,13 @@ interface MediaTabProps {
   onChange: (blocks: MediaBlockData[]) => void
 }
 
-type AddMode = 'url' | 'upload' | 'heading'
+type AddMode = 'url' | 'upload'
+
+interface Group {
+  id: string
+  name: string
+  blocks: MediaBlockData[]
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +69,7 @@ function isValidUrl(url: string): boolean {
   }
 }
 
-function guessType(url: string): MediaBlockData['type'] {
+function guessMediaType(url: string): MediaBlockData['type'] {
   const lower = url.toLowerCase()
   if (
     lower.includes('youtube.com') ||
@@ -75,15 +88,27 @@ function guessType(url: string): MediaBlockData['type'] {
     lower.endsWith('.m4a')
   )
     return MediaBlockType.AUDIO
-  if (
+  return MediaBlockType.IMAGE
+}
+
+function guessDocType(url: string): boolean {
+  const lower = url.toLowerCase()
+  return (
     lower.endsWith('.pdf') ||
+    lower.endsWith('.doc') ||
+    lower.endsWith('.docx') ||
+    lower.endsWith('.xls') ||
+    lower.endsWith('.xlsx') ||
+    lower.endsWith('.ppt') ||
+    lower.endsWith('.pptx') ||
+    lower.endsWith('.csv') ||
+    lower.endsWith('.zip') ||
+    lower.endsWith('.txt') ||
     lower.includes('docs.google.com') ||
     lower.includes('docsend.com') ||
     lower.includes('slideshare.net') ||
     lower.includes('scribd.com')
   )
-    return MediaBlockType.DOCUMENT
-  return MediaBlockType.IMAGE
 }
 
 function youtubeId(url: string): string | null {
@@ -97,76 +122,91 @@ function youtubeId(url: string): string | null {
   return null
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** Split blocks into media groups and document group */
+function splitBlocks(blocks: MediaBlockData[]): {
+  mediaGroups: Group[]
+  docBlocks: MediaBlockData[]
+} {
+  const docBlocks: MediaBlockData[] = []
+  const groupMap = new Map<string, Group>()
+  const groupOrder: string[] = []
+
+  for (const b of [...blocks].sort((a, c) => a.displayOrder - c.displayOrder)) {
+    if (b.type === MediaBlockType.DOCUMENT) {
+      docBlocks.push(b)
+      continue
+    }
+    const gid = b.groupId ?? DEFAULT_GROUP_ID
+    const gname = b.groupName ?? DEFAULT_GROUP_NAME
+    if (!groupMap.has(gid)) {
+      groupMap.set(gid, { id: gid, name: gname, blocks: [] })
+      groupOrder.push(gid)
+    }
+    groupMap.get(gid)!.blocks.push(b)
+  }
+
+  return {
+    mediaGroups: groupOrder.map((gid) => groupMap.get(gid)!),
+    docBlocks,
+  }
+}
+
 // ─── Type config ──────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<
-  MediaBlockType,
+  Exclude<MediaBlockType, 'HEADING'>,
   {
     label: string
-    desc: string
     accent: string
     accentBg: string
     accentText: string
     Icon: React.FC<{ className?: string }>
     PreviewIcon: React.FC<{ className?: string }>
-    gradient: string
   }
 > = {
   [MediaBlockType.IMAGE]: {
     label: 'Image',
-    desc: 'Photo or graphic',
     accent: '#3b82f6',
     accentBg: 'bg-blue-50',
     accentText: 'text-blue-600',
     Icon: ({ className }) => <ImageIcon className={className} />,
     PreviewIcon: ({ className }) => <FileImage className={className} />,
-    gradient: 'from-blue-500/10 to-blue-600/5',
   },
   [MediaBlockType.VIDEO]: {
     label: 'Video',
-    desc: 'YouTube, Vimeo or direct',
     accent: '#8b5cf6',
     accentBg: 'bg-purple-50',
     accentText: 'text-purple-600',
     Icon: ({ className }) => <PlayCircle className={className} />,
     PreviewIcon: ({ className }) => <Film className={className} />,
-    gradient: 'from-purple-500/10 to-purple-600/5',
   },
   [MediaBlockType.AUDIO]: {
     label: 'Audio',
-    desc: 'Spotify, SoundCloud or MP3',
     accent: '#10b981',
     accentBg: 'bg-emerald-50',
     accentText: 'text-emerald-600',
     Icon: ({ className }) => <Music2 className={className} />,
     PreviewIcon: ({ className }) => <FileAudio className={className} />,
-    gradient: 'from-emerald-500/10 to-emerald-600/5',
   },
   [MediaBlockType.DOCUMENT]: {
     label: 'Document',
-    desc: 'PDF, Google Docs, SlideShare',
     accent: '#f59e0b',
     accentBg: 'bg-amber-50',
     accentText: 'text-amber-600',
     Icon: ({ className }) => <FileText className={className} />,
     PreviewIcon: ({ className }) => <FileText className={className} />,
-    gradient: 'from-amber-500/10 to-amber-600/5',
-  },
-  [MediaBlockType.HEADING]: {
-    label: 'Heading',
-    desc: 'Section title or label',
-    accent: '#6366f1',
-    accentBg: 'bg-indigo-50',
-    accentText: 'text-indigo-600',
-    Icon: ({ className }) => <Heading2 className={className} />,
-    PreviewIcon: ({ className }) => <Heading2 className={className} />,
-    gradient: 'from-indigo-500/10 to-indigo-600/5',
   },
 }
 
 // ─── Type pill badge ──────────────────────────────────────────────────────────
 
-function TypePill({ type }: { type: MediaBlockType }) {
+function TypePill({ type }: { type: Exclude<MediaBlockType, 'HEADING'> }) {
   const m = TYPE_META[type]
   return (
     <span
@@ -182,29 +222,16 @@ function TypePill({ type }: { type: MediaBlockType }) {
   )
 }
 
-// ─── Detected-type hint banner ────────────────────────────────────────────────
-
-function DetectedTypeBanner({ type }: { type: MediaBlockType }) {
-  const m = TYPE_META[type]
-  return (
-    <div className={cn('flex items-center gap-2 rounded-xl px-3 py-2', m.accentBg)}>
-      <m.Icon className={cn('h-3.5 w-3.5 shrink-0', m.accentText)} />
-      <p className={cn('text-xs font-semibold', m.accentText)}>
-        Detected as <span className="font-bold">{m.label}</span> — {m.desc}
-      </p>
-    </div>
-  )
-}
-
-// ─── Block preview ────────────────────────────────────────────────────────────
+// ─── Block thumbnail ──────────────────────────────────────────────────────────
 
 function BlockThumb({ block }: { block: MediaBlockData }) {
-  const m = TYPE_META[block.type]
+  const type = block.type as Exclude<MediaBlockType, 'HEADING'>
+  const m = TYPE_META[type]
   const ytId = block.type === MediaBlockType.VIDEO ? youtubeId(block.url ?? '') : null
 
   if (block.type === MediaBlockType.IMAGE && block.url) {
     return (
-      <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0">
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-100 shrink-0">
         <Image
           src={block.url}
           alt={block.altText ?? block.caption ?? ''}
@@ -221,7 +248,7 @@ function BlockThumb({ block }: { block: MediaBlockData }) {
 
   if (block.type === MediaBlockType.VIDEO && ytId) {
     return (
-      <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-gray-900 shrink-0">
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-900 shrink-0">
         <Image
           src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`}
           alt={block.caption ?? 'video'}
@@ -230,37 +257,34 @@ function BlockThumb({ block }: { block: MediaBlockData }) {
           className="object-cover opacity-80"
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
-            <PlayCircle className="h-4 w-4 text-white" />
+          <div className="w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+            <PlayCircle className="h-3.5 w-3.5 text-white" />
           </div>
         </div>
       </div>
     )
   }
 
-  if (block.type === MediaBlockType.HEADING) {
-    return (
-      <div className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center bg-indigo-50 border border-indigo-100">
-        <Heading2 className="h-7 w-7 text-indigo-400" />
-      </div>
-    )
-  }
-
   return (
     <div
-      className={cn('w-16 h-16 rounded-xl shrink-0 flex items-center justify-center', m.accentBg)}
+      className={cn(
+        'w-14 h-14 rounded-xl shrink-0 flex items-center justify-center',
+        m?.accentBg ?? 'bg-gray-100',
+      )}
     >
-      <m.PreviewIcon className={cn('h-7 w-7', m.accentText)} />
+      {m ? (
+        <m.PreviewIcon className={cn('h-6 w-6', m.accentText)} />
+      ) : (
+        <FileText className="h-6 w-6 text-gray-400" />
+      )}
     </div>
   )
 }
 
-// ─── Inline editable block card ───────────────────────────────────────────────
+// ─── Block card (inline editable) ─────────────────────────────────────────────
 
 interface BlockCardProps {
   block: MediaBlockData
-  index: number
-  total: number
   dragOver: boolean
   onDragStart: () => void
   onDragOver: (e: React.DragEvent) => void
@@ -281,7 +305,8 @@ function BlockCard({
   onUpdate,
 }: BlockCardProps) {
   const [expanded, setExpanded] = useState(false)
-  const m = TYPE_META[block.type]
+  const type = block.type as Exclude<MediaBlockType, 'HEADING'>
+  const m = TYPE_META[type]
 
   return (
     <div
@@ -291,15 +316,13 @@ function BlockCard({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-        'group rounded-2xl border bg-white transition-all duration-200',
+        'group rounded-xl border bg-white transition-all duration-150',
         dragOver
-          ? 'border-brand-400 ring-2 ring-brand-500/20 shadow-lg shadow-brand-500/10 scale-[1.01]'
+          ? 'border-brand-400 ring-2 ring-brand-500/20 shadow-md scale-[1.01]'
           : 'border-gray-100 hover:border-gray-200 hover:shadow-sm',
       )}
     >
-      {/* ── Main row ── */}
-      <div className="flex items-center gap-3 p-3">
-        {/* Drag handle */}
+      <div className="flex items-center gap-2.5 p-2.5">
         <button
           type="button"
           className="shrink-0 cursor-grab active:cursor-grabbing text-gray-200 hover:text-gray-400 transition-colors touch-none"
@@ -308,50 +331,22 @@ function BlockCard({
           <GripVertical className="h-4 w-4" />
         </button>
 
-        {/* Thumbnail */}
         <BlockThumb block={block} />
 
-        {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <TypePill type={block.type} />
-            {block.linkUrl && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400 font-medium">
-                <ExternalLink className="h-2.5 w-2.5" />
-                linked
-              </span>
-            )}
-          </div>
-          {block.type === MediaBlockType.HEADING ? (
-            <p className="text-xs font-semibold text-gray-700 truncate leading-tight">
-              {block.caption || <span className="text-gray-300 italic">Untitled heading</span>}
-            </p>
-          ) : (
-            <>
-              <p className="text-xs text-gray-500 truncate leading-tight">
-                {block.caption || block.url}
-              </p>
-              {block.caption && (
-                <p className="text-[10px] text-gray-300 truncate leading-tight mt-0.5">
-                  {block.url}
-                </p>
-              )}
-            </>
+          <div className="flex items-center gap-1.5 mb-0.5">{m && <TypePill type={type} />}</div>
+          <p className="text-xs text-gray-600 truncate leading-tight font-medium">
+            {block.caption || block.url}
+          </p>
+          {block.caption && block.url && (
+            <p className="text-[10px] text-gray-300 truncate leading-tight mt-0.5">{block.url}</p>
+          )}
+          {block.fileSize && (
+            <p className="text-[10px] text-gray-400 mt-0.5">{formatFileSize(block.fileSize)}</p>
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex shrink-0 items-center gap-1">
-          {block.linkUrl && (
-            <a
-              href={block.linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg p-1.5 text-gray-300 hover:bg-gray-100 hover:text-gray-500 transition-colors"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          )}
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
@@ -376,107 +371,82 @@ function BlockCard({
         </div>
       </div>
 
-      {/* ── Expanded edit panel ── */}
       {expanded && (
-        <div
-          className={cn(
-            'border-t border-gray-50 p-3 space-y-2.5 bg-gradient-to-b',
-            `${m.gradient} from-gray-50/80`,
-          )}
-        >
-          {block.type === MediaBlockType.HEADING ? (
-            /* Heading: only the text matters */
+        <div className="border-t border-gray-50 p-3 space-y-2.5 bg-gray-50/60">
+          {/* Media URL */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              URL
+            </label>
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
+              <Link2 className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+              <input
+                type="url"
+                value={block.url ?? ''}
+                onChange={(e) => onUpdate('url', e.target.value)}
+                placeholder="https://…"
+                className="flex-1 bg-transparent text-xs text-gray-800 placeholder:text-gray-300 outline-none"
+              />
+              {block.url && isValidUrl(block.url) && (
+                <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              )}
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Caption / Title
+            </label>
+            <input
+              type="text"
+              value={block.caption ?? ''}
+              onChange={(e) => onUpdate('caption', e.target.value)}
+              placeholder="Add a caption…"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 transition-all"
+            />
+          </div>
+
+          {block.type === MediaBlockType.IMAGE && (
             <div>
               <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                Heading Text
+                Alt Text
+                <span className="ml-1 normal-case font-normal tracking-normal text-gray-300">
+                  (accessibility & SEO)
+                </span>
               </label>
               <input
                 type="text"
-                value={block.caption ?? ''}
-                onChange={(e) => onUpdate('caption', e.target.value)}
-                placeholder="e.g. Portfolio, Previous Works…"
+                value={block.altText ?? ''}
+                onChange={(e) => onUpdate('altText', e.target.value)}
+                placeholder="Describe the image…"
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 transition-all"
               />
             </div>
-          ) : (
-            <>
-              {/* Media URL */}
-              <div className="group/field">
-                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  Media URL
-                </label>
-                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
-                  <Link2 className="h-3.5 w-3.5 shrink-0 text-gray-300" />
-                  <input
-                    type="url"
-                    value={block.url ?? ''}
-                    onChange={(e) => onUpdate('url', e.target.value)}
-                    placeholder="https://…"
-                    className="flex-1 bg-transparent text-xs text-gray-800 placeholder:text-gray-300 outline-none"
-                  />
-                  {block.url && isValidUrl(block.url) && (
-                    <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  )}
-                </div>
-              </div>
-
-              {/* Caption */}
-              <div className="group/field">
-                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  Caption
-                </label>
-                <input
-                  type="text"
-                  value={block.caption ?? ''}
-                  onChange={(e) => onUpdate('caption', e.target.value)}
-                  placeholder="Add a caption…"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 transition-all"
-                />
-              </div>
-
-              {/* Alt text — images only */}
-              {block.type === MediaBlockType.IMAGE && (
-                <div>
-                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                    Alt Text
-                    <span className="ml-1 normal-case font-normal tracking-normal text-gray-300">
-                      (accessibility & SEO)
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={block.altText ?? ''}
-                    onChange={(e) => onUpdate('altText', e.target.value)}
-                    placeholder="Describe the image…"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 transition-all"
-                  />
-                </div>
-              )}
-
-              {/* Link URL */}
-              <div>
-                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  Click Destination
-                  <span className="ml-1 normal-case font-normal tracking-normal text-gray-300">
-                    (optional)
-                  </span>
-                </label>
-                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-300" />
-                  <input
-                    type="url"
-                    value={block.linkUrl ?? ''}
-                    onChange={(e) => onUpdate('linkUrl', e.target.value)}
-                    placeholder="https://example.com"
-                    className="flex-1 bg-transparent text-xs text-gray-800 placeholder:text-gray-300 outline-none"
-                  />
-                  {block.linkUrl && isValidUrl(block.linkUrl) && (
-                    <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  )}
-                </div>
-              </div>
-            </>
           )}
+
+          {/* Link URL */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Click Destination
+              <span className="ml-1 normal-case font-normal tracking-normal text-gray-300">
+                (optional)
+              </span>
+            </label>
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+              <input
+                type="url"
+                value={block.linkUrl ?? ''}
+                onChange={(e) => onUpdate('linkUrl', e.target.value)}
+                placeholder="https://example.com"
+                className="flex-1 bg-transparent text-xs text-gray-800 placeholder:text-gray-300 outline-none"
+              />
+              {block.linkUrl && isValidUrl(block.linkUrl) && (
+                <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -487,19 +457,31 @@ function BlockCard({
 
 interface AddSheetProps {
   cardId: string
+  groupId: string
+  groupName: string
+  isDoc: boolean
   blockCount: number
+  maxBlocks: number
   onAdd: (block: MediaBlockData) => void
   onClose: () => void
 }
 
-function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
+function AddSheet({
+  cardId,
+  groupId,
+  groupName,
+  isDoc,
+  blockCount,
+  maxBlocks,
+  onAdd,
+  onClose,
+}: AddSheetProps): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<AddMode>('url')
   const [url, setUrl] = useState('')
   const [caption, setCaption] = useState('')
   const [altText, setAltText] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
-  const [headingText, setHeadingText] = useState('')
   const [urlError, setUrlError] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -507,22 +489,11 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
   const [dragActive, setDragActive] = useState(false)
   const idCounterRef = useRef(Date.now())
 
-  const detectedType = url ? guessType(url) : null
-  const canAdd = mode === 'heading' ? headingText.trim().length > 0 : url.trim().length > 0
+  const detectedType = url ? (isDoc ? MediaBlockType.DOCUMENT : guessMediaType(url)) : null
+
+  const canAdd = url.trim().length > 0
 
   const commit = useCallback(() => {
-    if (mode === 'heading') {
-      if (!headingText.trim()) return
-      const block: MediaBlockData = {
-        id: `new-${idCounterRef.current++}`,
-        type: MediaBlockType.HEADING,
-        url: '',
-        caption: headingText.trim(),
-        displayOrder: blockCount,
-      }
-      onAdd(block)
-      return
-    }
     if (!url.trim()) return
     if (!isValidUrl(url)) {
       setUrlError('Enter a valid URL (https://…)')
@@ -532,27 +503,47 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
       setLinkError('Enter a valid URL (https://…)')
       return
     }
+    const type = isDoc
+      ? MediaBlockType.DOCUMENT
+      : guessDocType(url)
+        ? MediaBlockType.DOCUMENT
+        : guessMediaType(url)
     const block: MediaBlockData = {
       id: `new-${idCounterRef.current++}`,
-      type: guessType(url),
+      type,
       url,
       caption: caption.trim() || undefined,
       altText: altText.trim() || undefined,
       linkUrl: linkUrl.trim() || undefined,
       displayOrder: blockCount,
+      groupId: isDoc ? DOCS_GROUP_ID : groupId,
+      groupName: isDoc ? 'Downloads' : groupName,
     }
     onAdd(block)
-  }, [mode, headingText, url, caption, altText, linkUrl, blockCount, onAdd])
+  }, [isDoc, url, caption, altText, linkUrl, blockCount, groupId, groupName, onAdd])
 
   const processFile = useCallback(
     async (file: File) => {
-      let blockType: MediaBlockData['type'] = MediaBlockType.IMAGE
-      if (file.type.startsWith('video/')) blockType = MediaBlockType.VIDEO
-      else if (file.type.startsWith('audio/')) blockType = MediaBlockType.AUDIO
-      else if (file.type === 'application/pdf') blockType = MediaBlockType.DOCUMENT
+      const isImage = file.type.startsWith('image/')
+      const isVideo = file.type.startsWith('video/')
+      const isAudio = file.type.startsWith('audio/')
+      const isPdf = file.type === 'application/pdf'
+      const isOtherDoc =
+        file.type.includes('word') ||
+        file.type.includes('excel') ||
+        file.type.includes('spreadsheet') ||
+        file.type.includes('presentation') ||
+        file.type.includes('powerpoint') ||
+        file.type === 'text/csv' ||
+        file.type === 'text/plain' ||
+        file.type === 'application/zip'
 
-      const ALLOWED_IMAGE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-      const isImage = ALLOWED_IMAGE.includes(file.type)
+      let blockType: MediaBlockData['type'] = MediaBlockType.IMAGE
+      if (isVideo) blockType = MediaBlockType.VIDEO
+      else if (isAudio) blockType = MediaBlockType.AUDIO
+      else if (isPdf || isOtherDoc || isDoc) blockType = MediaBlockType.DOCUMENT
+
+      const shouldConvert = isImage && file.type !== 'image/gif' && !isDoc
 
       setUploading(true)
       setUploadError(null)
@@ -561,11 +552,76 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
         let publicUrl = ''
         if (isImage) {
           const token = await getAccessToken()
-          const safe = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+
+          let uploadBlob: Blob = file
+          let uploadMime = file.type
+          let uploadFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+
+          if (shouldConvert) {
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.onerror = reject
+              reader.readAsDataURL(file)
+            })
+            const webpBlob = await new Promise<Blob>((resolve, reject) => {
+              const img = new window.Image()
+              img.onload = () => {
+                const canvas = document.createElement('canvas')
+                canvas.width = img.naturalWidth
+                canvas.height = img.naturalHeight
+                const ctx = canvas.getContext('2d')
+                if (!ctx) {
+                  reject(new Error('Canvas not supported'))
+                  return
+                }
+                ctx.drawImage(img, 0, 0)
+                canvas.toBlob(
+                  (blob) => {
+                    if (!blob) {
+                      reject(new Error('Conversion failed'))
+                      return
+                    }
+                    resolve(blob)
+                  },
+                  'image/webp',
+                  0.92,
+                )
+              }
+              img.onerror = reject
+              img.src = dataUrl
+            })
+            uploadBlob = webpBlob
+            uploadMime = 'image/webp'
+            uploadFilename = uploadFilename.replace(/\.[^.]+$/, '') + '.webp'
+          }
+
           const { uploadUrl, publicUrl: pub } = await apiPost<{
             uploadUrl: string
             publicUrl: string
-          }>(`/cards/${cardId}/upload-url`, { filename: safe, contentType: file.type }, token)
+          }>(
+            `/cards/${cardId}/upload-url`,
+            { filename: uploadFilename, contentType: uploadMime },
+            token,
+          )
+          const res = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: uploadBlob,
+            headers: { 'Content-Type': uploadMime },
+          })
+          if (!res.ok) throw new Error('Upload failed — please try again')
+          publicUrl = pub
+        } else if (isPdf || isOtherDoc) {
+          const token = await getAccessToken()
+          const uploadFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+          const { uploadUrl, publicUrl: pub } = await apiPost<{
+            uploadUrl: string
+            publicUrl: string
+          }>(
+            `/cards/${cardId}/upload-url`,
+            { filename: uploadFilename, contentType: file.type },
+            token,
+          )
           const res = await fetch(uploadUrl, {
             method: 'PUT',
             body: file,
@@ -582,8 +638,12 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
           type: blockType,
           url: publicUrl,
           caption: file.name.replace(/\.[^.]+$/, ''),
-          altText: file.name,
+          altText: isImage ? file.name : undefined,
           displayOrder: blockCount,
+          mimeType: file.type || undefined,
+          fileSize: file.size || undefined,
+          groupId: blockType === MediaBlockType.DOCUMENT ? DOCS_GROUP_ID : groupId,
+          groupName: blockType === MediaBlockType.DOCUMENT ? 'Downloads' : groupName,
         }
         onAdd(block)
       } catch (err) {
@@ -592,7 +652,7 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
         setUploading(false)
       }
     },
-    [cardId, blockCount, onAdd],
+    [cardId, blockCount, groupId, groupName, isDoc, onAdd],
   )
 
   const handleFileChange = useCallback(
@@ -614,14 +674,20 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
     [processFile],
   )
 
+  const acceptAttr = isDoc
+    ? 'application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.zip'
+    : 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,audio/mpeg,audio/wav,audio/ogg,audio/m4a,application/pdf'
+
   return (
     <div className="rounded-2xl border border-brand-100 bg-white shadow-sm overflow-hidden">
       {/* Sheet header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
         <div>
-          <p className="text-xs font-bold text-gray-800 uppercase tracking-widest">Add Media</p>
+          <p className="text-xs font-bold text-gray-800 uppercase tracking-widest">
+            {isDoc ? 'Add Document' : `Add to "${groupName}"`}
+          </p>
           <p className="text-[10px] text-gray-400 mt-0.5">
-            {blockCount}/{MAX_BLOCKS} blocks used
+            {blockCount}/{maxBlocks} used
           </p>
         </div>
         <button
@@ -635,7 +701,7 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
 
       {/* Mode tabs */}
       <div className="flex border-b border-gray-50 bg-gray-50/50">
-        {(['url', 'heading', 'upload'] as AddMode[]).map((m) => (
+        {(['url', 'upload'] as AddMode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -652,15 +718,10 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
                 <Link2 className="h-3.5 w-3.5" />
                 Paste URL
               </>
-            ) : m === 'heading' ? (
-              <>
-                <Heading2 className="h-3.5 w-3.5" />
-                Heading
-              </>
             ) : (
               <>
                 <Upload className="h-3.5 w-3.5" />
-                Upload
+                Upload File
               </>
             )}
           </button>
@@ -668,35 +729,7 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
       </div>
 
       <div className="p-4 space-y-3">
-        {mode === 'heading' ? (
-          <>
-            {/* Heading text input */}
-            <div className="flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-3 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
-              <Heading2 className="h-4 w-4 shrink-0 text-indigo-400" />
-              <input
-                type="text"
-                value={headingText}
-                onChange={(e) => setHeadingText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && commit()}
-                placeholder="e.g. Portfolio, Previous Works, Gallery…"
-                autoFocus
-                className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
-              />
-            </div>
-            <p className="px-1 text-[11px] text-gray-400">
-              Headings appear as bold section labels above your media blocks.
-            </p>
-            <button
-              type="button"
-              onClick={commit}
-              disabled={!canAdd}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-500/25 hover:bg-indigo-600 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              Add Heading
-            </button>
-          </>
-        ) : mode === 'url' ? (
+        {mode === 'url' ? (
           <>
             {/* URL input */}
             <div>
@@ -716,7 +749,9 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
                     setUrlError(null)
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && commit()}
-                  placeholder="YouTube, Spotify, image URL, PDF…"
+                  placeholder={
+                    isDoc ? 'PDF, Google Docs, SlideShare…' : 'YouTube, Spotify, image URL…'
+                  }
                   autoFocus
                   className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
                 />
@@ -729,13 +764,36 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
                 </p>
               ) : (
                 <p className="mt-1.5 px-1 text-[11px] text-gray-400">
-                  Supports YouTube · Vimeo · Spotify · SoundCloud · PDFs · any image URL
+                  {isDoc
+                    ? 'Supports PDF · Google Docs · SlideShare · DocSend'
+                    : 'Supports YouTube · Vimeo · Spotify · SoundCloud · any image URL'}
                 </p>
               )}
             </div>
 
-            {/* Detected type */}
-            {detectedType && <DetectedTypeBanner type={detectedType} />}
+            {/* Detected type badge */}
+            {detectedType && !isDoc && (
+              <div
+                className={cn(
+                  'flex items-center gap-2 rounded-xl px-3 py-2',
+                  TYPE_META[detectedType as Exclude<MediaBlockType, 'HEADING'>]?.accentBg ??
+                    'bg-gray-50',
+                )}
+              >
+                {(() => {
+                  const m = TYPE_META[detectedType as Exclude<MediaBlockType, 'HEADING'>]
+                  if (!m) return null
+                  return (
+                    <>
+                      <m.Icon className={cn('h-3.5 w-3.5 shrink-0', m.accentText)} />
+                      <p className={cn('text-xs font-semibold', m.accentText)}>
+                        Detected as <span className="font-bold">{m.label}</span>
+                      </p>
+                    </>
+                  )
+                })()}
+              </div>
+            )}
 
             {/* Caption */}
             <div
@@ -749,12 +807,12 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
                 type="text"
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
-                placeholder="Caption (optional)"
+                placeholder={isDoc ? 'Document title (optional)' : 'Caption (optional)'}
                 className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
               />
             </div>
 
-            {/* Advanced: alt text + link url */}
+            {/* Alt text for images */}
             {detectedType === MediaBlockType.IMAGE && (
               <div
                 className={cn(
@@ -773,6 +831,7 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
               </div>
             )}
 
+            {/* Link URL */}
             <div>
               <div
                 className={cn(
@@ -804,7 +863,6 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
               )}
             </div>
 
-            {/* CTA */}
             <button
               type="button"
               onClick={commit}
@@ -812,7 +870,7 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               <Plus className="h-4 w-4" />
-              Add to Card
+              {isDoc ? 'Add Document' : 'Add to Group'}
             </button>
           </>
         ) : (
@@ -822,7 +880,7 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
               ref={fileInputRef}
               type="file"
               className="hidden"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,audio/mpeg,audio/wav,audio/ogg,audio/m4a,application/pdf"
+              accept={acceptAttr}
               onChange={handleFileChange}
             />
             <button
@@ -880,7 +938,9 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
                       {dragActive ? 'Drop to upload' : 'Drop a file or click to browse'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      JPG · PNG · WebP · GIF · PDF · MP3 · MP4
+                      {isDoc
+                        ? 'PDF · Word · Excel · PowerPoint · CSV · TXT · ZIP'
+                        : 'JPG · PNG · WebP · GIF · PDF · MP3 · MP4'}
                     </p>
                   </div>
                 </>
@@ -899,77 +959,339 @@ function AddSheet({ cardId, blockCount, onAdd, onClose }: AddSheetProps) {
   )
 }
 
-// ─── Quick-add type picker ─────────────────────────────────────────────────────
+// ─── Group card ────────────────────────────────────────────────────────────────
 
-const QUICK_TYPES: { label: string; hint: string; icon: React.FC<{ className?: string }> }[] = [
-  {
-    label: 'Image',
-    hint: 'Photo or graphic',
-    icon: ({ className }) => <ImageIcon className={className} />,
-  },
-  {
-    label: 'Video',
-    hint: 'YouTube · Vimeo',
-    icon: ({ className }) => <PlayCircle className={className} />,
-  },
-  {
-    label: 'Audio',
-    hint: 'Spotify · MP3',
-    icon: ({ className }) => <Music2 className={className} />,
-  },
-  {
-    label: 'Document',
-    hint: 'PDF · Slides',
-    icon: ({ className }) => <FileText className={className} />,
-  },
-]
+interface GroupCardProps {
+  group: Group
+  totalMediaCount: number
+  dragOverIndex: number | null
+  dragIndexRef: React.MutableRefObject<number | null>
+  onRemoveBlock: (id: string) => void
+  onUpdateBlock: (id: string, field: keyof MediaBlockData, value: string) => void
+  onDrop: (e: React.DragEvent, dropIndex: number) => void
+  onDragEnd: () => void
+  setDragOver: (i: number | null) => void
+  onRenameGroup: (groupId: string, newName: string) => void
+  onDeleteGroup: (groupId: string) => void
+  onAddToGroup: (groupId: string) => void
+  cardId: string
+  mediaBlocksAll: MediaBlockData[]
+  onAddBlock: (block: MediaBlockData) => void
+  showAddSheet: boolean
+  onToggleAddSheet: () => void
+}
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
+function GroupCard({
+  group,
+  totalMediaCount,
+  dragOverIndex,
+  dragIndexRef,
+  onRemoveBlock,
+  onUpdateBlock,
+  onDrop,
+  onDragEnd,
+  setDragOver,
+  onRenameGroup,
+  onDeleteGroup,
+  cardId,
+  mediaBlocksAll,
+  onAddBlock,
+  showAddSheet,
+  onToggleAddSheet,
+}: GroupCardProps) {
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(group.name)
+  const [collapsed, setCollapsed] = useState(false)
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+  const isDefault = group.id === DEFAULT_GROUP_ID
+  const atLimit = totalMediaCount >= MAX_MEDIA
+
+  const commitRename = () => {
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== group.name) {
+      onRenameGroup(group.id, trimmed)
+    } else {
+      setNameValue(group.name)
+    }
+    setEditingName(false)
+  }
+
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-gradient-to-b from-gray-50 to-white overflow-hidden">
-      {/* Icon header */}
-      <div className="flex flex-col items-center gap-3 py-8 px-6 text-center">
-        <div className="flex -space-x-2">
-          {([ImageIcon, PlayCircle, Music2, FileText] as React.FC<{ className?: string }>[]).map(
-            (Icon, i) => (
-              <div
-                key={i}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-gray-100 shadow-sm"
-                style={{ zIndex: 4 - i }}
+    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+      {/* Group header */}
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50/80 border-b border-gray-100">
+        <FolderOpen className="h-4 w-4 text-brand-400 shrink-0" />
+        {editingName ? (
+          <input
+            autoFocus
+            type="text"
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename()
+              if (e.key === 'Escape') {
+                setNameValue(group.name)
+                setEditingName(false)
+              }
+            }}
+            className="flex-1 bg-white rounded-lg border border-brand-300 px-2 py-0.5 text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-brand-500/20"
+          />
+        ) : (
+          <p className="flex-1 text-sm font-bold text-gray-700 truncate">{group.name}</p>
+        )}
+
+        <div className="flex items-center gap-0.5 shrink-0">
+          <span className="text-[10px] text-gray-400 font-medium mr-1">
+            {group.blocks.length} block{group.blocks.length !== 1 ? 's' : ''}
+          </span>
+          {!isDefault && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingName(true)
+                  setNameValue(group.name)
+                }}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                title="Rename group"
               >
-                <Icon className="h-4 w-4 text-gray-400" />
-              </div>
-            ),
+                <Pencil className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteGroup(group.id)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                title="Delete group"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </>
           )}
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+            title={collapsed ? 'Expand' : 'Collapse'}
+          >
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 transition-transform', collapsed && '-rotate-90')}
+            />
+          </button>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-700">No media yet</p>
-          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-            Showcase your work with images, videos,
-            <br />
-            audio tracks and documents.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-95 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Add first block
-        </button>
       </div>
 
-      {/* Type grid hint */}
-      <div className="grid grid-cols-4 border-t border-gray-100">
-        {QUICK_TYPES.map((t) => (
-          <div key={t.label} className="flex flex-col items-center gap-1 py-3 px-2">
-            <t.icon className="h-4 w-4 text-gray-300" />
-            <p className="text-[9px] font-bold text-gray-300 uppercase tracking-wide">{t.label}</p>
+      {!collapsed && (
+        <div className="p-3 space-y-2">
+          {/* Block list */}
+          {group.blocks.length > 0 && (
+            <div className="space-y-2">
+              {group.blocks.map((block, index) => {
+                const globalIndex = mediaBlocksAll
+                  .filter((b) => b.type !== MediaBlockType.DOCUMENT)
+                  .findIndex((b) => b.id === block.id)
+                return (
+                  <BlockCard
+                    key={block.id}
+                    block={block}
+                    dragOver={dragOverIndex === globalIndex}
+                    onDragStart={() => {
+                      dragIndexRef.current = globalIndex
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setDragOver(globalIndex)
+                    }}
+                    onDrop={(e) => onDrop(e, globalIndex)}
+                    onDragEnd={onDragEnd}
+                    onRemove={() => onRemoveBlock(block.id)}
+                    onUpdate={(field, value) => onUpdateBlock(block.id, field, value)}
+                  />
+                )
+              })}
+            </div>
+          )}
+
+          {/* Add to group / sheet */}
+          {showAddSheet && !atLimit ? (
+            <AddSheet
+              cardId={cardId}
+              groupId={group.id}
+              groupName={group.name}
+              isDoc={false}
+              blockCount={totalMediaCount}
+              maxBlocks={MAX_MEDIA}
+              onAdd={onAddBlock}
+              onClose={onToggleAddSheet}
+            />
+          ) : atLimit && showAddSheet ? null : (
+            <button
+              type="button"
+              onClick={onToggleAddSheet}
+              disabled={atLimit}
+              className={cn(
+                'group flex w-full items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 transition-all',
+                atLimit
+                  ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
+                  : 'border-gray-200 bg-white hover:border-brand-300 hover:bg-brand-50/40 active:scale-[0.99]',
+              )}
+            >
+              <div
+                className={cn(
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors',
+                  atLimit ? 'bg-gray-100' : 'bg-gray-100 group-hover:bg-brand-100',
+                )}
+              >
+                <Plus
+                  className={cn(
+                    'h-3.5 w-3.5 transition-colors',
+                    atLimit ? 'text-gray-300' : 'text-gray-400 group-hover:text-brand-500',
+                  )}
+                />
+              </div>
+              <p
+                className={cn(
+                  'text-xs font-semibold transition-colors',
+                  atLimit ? 'text-gray-300' : 'text-gray-500 group-hover:text-brand-600',
+                )}
+              >
+                {atLimit ? `Limit reached (${MAX_MEDIA})` : 'Add media to this group'}
+              </p>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Document section ─────────────────────────────────────────────────────────
+
+interface DocSectionProps {
+  cardId: string
+  docBlocks: MediaBlockData[]
+  allBlocks: MediaBlockData[]
+  dragOverIndex: number | null
+  dragIndexRef: React.MutableRefObject<number | null>
+  onRemoveBlock: (id: string) => void
+  onUpdateBlock: (id: string, field: keyof MediaBlockData, value: string) => void
+  onDrop: (e: React.DragEvent, dropIndex: number) => void
+  onDragEnd: () => void
+  setDragOver: (i: number | null) => void
+  onAddBlock: (block: MediaBlockData) => void
+  showAddSheet: boolean
+  onToggleAddSheet: () => void
+}
+
+function DocSection({
+  cardId,
+  docBlocks,
+  allBlocks,
+  dragOverIndex,
+  dragIndexRef,
+  onRemoveBlock,
+  onUpdateBlock,
+  onDrop,
+  onDragEnd,
+  setDragOver,
+  onAddBlock,
+  showAddSheet,
+  onToggleAddSheet,
+}: DocSectionProps) {
+  const atLimit = docBlocks.length >= MAX_DOCS
+
+  return (
+    <div className="rounded-2xl border border-amber-100 bg-white overflow-hidden shadow-sm">
+      {/* Section header */}
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50/60 border-b border-amber-100">
+        <Download className="h-4 w-4 text-amber-500 shrink-0" />
+        <p className="flex-1 text-sm font-bold text-amber-700">Downloads</p>
+        <span className="text-[10px] text-amber-500 font-medium">
+          {docBlocks.length}/{MAX_DOCS}
+        </span>
+      </div>
+
+      <div className="p-3 space-y-2">
+        {/* Document blocks */}
+        {docBlocks.length > 0 && (
+          <div className="space-y-2">
+            {docBlocks.map((block) => {
+              const globalIndex = allBlocks.findIndex((b) => b.id === block.id)
+              return (
+                <BlockCard
+                  key={block.id}
+                  block={block}
+                  dragOver={dragOverIndex === globalIndex}
+                  onDragStart={() => {
+                    dragIndexRef.current = globalIndex
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragOver(globalIndex)
+                  }}
+                  onDrop={(e) => onDrop(e, globalIndex)}
+                  onDragEnd={onDragEnd}
+                  onRemove={() => onRemoveBlock(block.id)}
+                  onUpdate={(field, value) => onUpdateBlock(block.id, field, value)}
+                />
+              )
+            })}
           </div>
-        ))}
+        )}
+
+        {/* Add document */}
+        {showAddSheet && !atLimit ? (
+          <AddSheet
+            cardId={cardId}
+            groupId={DOCS_GROUP_ID}
+            groupName="Downloads"
+            isDoc={true}
+            blockCount={docBlocks.length}
+            maxBlocks={MAX_DOCS}
+            onAdd={onAddBlock}
+            onClose={onToggleAddSheet}
+          />
+        ) : atLimit && showAddSheet ? null : (
+          <button
+            type="button"
+            onClick={onToggleAddSheet}
+            disabled={atLimit}
+            className={cn(
+              'group flex w-full items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 transition-all',
+              atLimit
+                ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
+                : 'border-amber-200 bg-white hover:border-amber-400 hover:bg-amber-50/40 active:scale-[0.99]',
+            )}
+          >
+            <div
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors',
+                atLimit ? 'bg-gray-100' : 'bg-amber-50 group-hover:bg-amber-100',
+              )}
+            >
+              <Plus
+                className={cn(
+                  'h-3.5 w-3.5 transition-colors',
+                  atLimit ? 'text-gray-300' : 'text-amber-400 group-hover:text-amber-600',
+                )}
+              />
+            </div>
+            <p
+              className={cn(
+                'text-xs font-semibold transition-colors',
+                atLimit ? 'text-gray-300' : 'text-amber-600 group-hover:text-amber-700',
+              )}
+            >
+              {atLimit ? `Limit reached (${MAX_DOCS})` : 'Add document'}
+            </p>
+          </button>
+        )}
+
+        {docBlocks.length === 0 && !showAddSheet && (
+          <p className="text-center text-xs text-gray-400 py-2">
+            PDFs, Word, Excel, PowerPoint and more
+          </p>
+        )}
       </div>
     </div>
   )
@@ -978,44 +1300,84 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.Element {
-  const [showAdd, setShowAdd] = useState(mediaBlocks.length === 0)
   const dragIndexRef = useRef<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
+  // activeAddSheet: groupId that currently has its add sheet open, or null
+  const [activeAddSheet, setActiveAddSheet] = useState<string | null>(null)
+  // showDocSheet: whether the doc section's add sheet is open
+  const [showDocSheet, setShowDocSheet] = useState(false)
+  // new group name prompt
+  const [showNewGroupPrompt, setShowNewGroupPrompt] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
 
   const sorted = [...mediaBlocks].sort((a, b) => a.displayOrder - b.displayOrder)
-  const atLimit = mediaBlocks.length >= MAX_BLOCKS
+  const { mediaGroups, docBlocks } = splitBlocks(sorted)
+  const mediaOnlyBlocks = sorted.filter((b) => b.type !== MediaBlockType.DOCUMENT)
+  const mediaCount = mediaOnlyBlocks.length
+  const docCount = docBlocks.length
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
-  const handleAdd = useCallback(
+  const handleAddBlock = useCallback(
     (block: MediaBlockData) => {
       onChange([...mediaBlocks, block])
-      setShowAdd(false)
+      setActiveAddSheet(null)
+      setShowDocSheet(false)
     },
     [mediaBlocks, onChange],
   )
 
-  const handleRemove = useCallback(
+  const handleRemoveBlock = useCallback(
     (id: string) => {
       onChange(mediaBlocks.filter((b) => b.id !== id).map((b, i) => ({ ...b, displayOrder: i })))
     },
     [mediaBlocks, onChange],
   )
 
-  const handleUpdate = useCallback(
+  const handleUpdateBlock = useCallback(
     (id: string, field: keyof MediaBlockData, value: string) => {
       onChange(mediaBlocks.map((b) => (b.id === id ? { ...b, [field]: value || undefined } : b)))
     },
     [mediaBlocks, onChange],
   )
 
+  const handleRenameGroup = useCallback(
+    (groupId: string, newName: string) => {
+      onChange(mediaBlocks.map((b) => (b.groupId === groupId ? { ...b, groupName: newName } : b)))
+    },
+    [mediaBlocks, onChange],
+  )
+
+  const handleDeleteGroup = useCallback(
+    (groupId: string) => {
+      // Remove all blocks in the group
+      onChange(
+        mediaBlocks.filter((b) => b.groupId !== groupId).map((b, i) => ({ ...b, displayOrder: i })),
+      )
+    },
+    [mediaBlocks, onChange],
+  )
+
+  const handleCreateGroup = useCallback(() => {
+    const name = newGroupName.trim() || 'New Group'
+    const groupId = `grp-${Date.now()}`
+    // No blocks yet — just open the add sheet for this new group
+    // We'll mark it active so user can immediately add to it
+    // We need to at least register the group in the state somehow.
+    // Since groups are derived from blocks, we'll create a placeholder
+    // HEADING block with this groupId — but wait, the plan says no HEADING blocks.
+    // Instead we'll just track "pending groups" via UI state.
+    // The group appears once its first block is added.
+    setPendingGroup({ id: groupId, name })
+    setNewGroupName('')
+    setShowNewGroupPrompt(false)
+    setActiveAddSheet(groupId)
+  }, [newGroupName])
+
+  const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string } | null>(null)
+
   const handleDragStart = (index: number) => {
     dragIndexRef.current = index
-  }
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    setDragOver(index)
   }
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
@@ -1039,91 +1401,209 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
     setDragOver(null)
   }
 
+  // Combine real groups with pending group (if any and not yet in real groups)
+  const pendingExists = pendingGroup && !mediaGroups.find((g) => g.id === pendingGroup.id)
+  const allGroups: Group[] = [
+    ...mediaGroups,
+    ...(pendingExists ? [{ id: pendingGroup!.id, name: pendingGroup!.name, blocks: [] }] : []),
+  ]
+
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const hasAnything = mediaBlocks.length > 0 || pendingExists
+
   return (
-    <div className="space-y-3">
-      {/* ── Section header (when blocks exist) ── */}
-      {sorted.length > 0 && (
-        <div className="flex items-center gap-3">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
-            Media
+    <div className="space-y-4">
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Media & Files</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {mediaCount}/{MAX_MEDIA} media · {docCount}/{MAX_DOCS} docs
           </p>
-          <div className="h-px flex-1 bg-gray-100" />
-          <span className="text-[10px] font-semibold text-gray-300">
-            {sorted.length}/{MAX_BLOCKS}
-          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowNewGroupPrompt(true)
+            setNewGroupName('')
+          }}
+          disabled={mediaCount >= MAX_MEDIA}
+          className={cn(
+            'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all',
+            mediaCount >= MAX_MEDIA
+              ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+              : 'bg-brand-500 text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-95',
+          )}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Group
+        </button>
+      </div>
+
+      {/* ── New group prompt ── */}
+      {showNewGroupPrompt && (
+        <div className="rounded-2xl border border-brand-100 bg-white shadow-sm p-4 space-y-3">
+          <p className="text-xs font-bold text-gray-700 uppercase tracking-widest">Create Group</p>
+          <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3 focus-within:bg-white focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
+            <FolderOpen className="h-4 w-4 shrink-0 text-gray-400" />
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateGroup()
+                if (e.key === 'Escape') setShowNewGroupPrompt(false)
+              }}
+              placeholder="e.g. Portfolio, Gallery, Works…"
+              autoFocus
+              className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCreateGroup}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-500 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-[0.98] transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNewGroupPrompt(false)}
+              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── Block list ── */}
-      {sorted.length > 0 && (
-        <div className="space-y-2">
-          {sorted.map((block, index) => (
-            <BlockCard
-              key={block.id}
-              block={block}
-              index={index}
-              total={sorted.length}
-              dragOver={dragOver === index}
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDrop={(e) => handleDrop(e, index)}
+      {/* ── Empty state ── */}
+      {!hasAnything && (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gradient-to-b from-gray-50 to-white p-8 text-center space-y-3">
+          <div className="flex justify-center -space-x-2">
+            {([ImageIcon, PlayCircle, Music2, FileText] as React.FC<{ className?: string }>[]).map(
+              (Icon, i) => (
+                <div
+                  key={i}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-gray-100 shadow-sm"
+                  style={{ zIndex: 4 - i }}
+                >
+                  <Icon className="h-4 w-4 text-gray-400" />
+                </div>
+              ),
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-700">No media yet</p>
+            <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+              Create a group to add images, videos, audio,
+              <br />
+              or add documents to the Downloads section.
+            </p>
+          </div>
+          <div className="flex justify-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewGroupPrompt(true)
+                setNewGroupName('')
+              }}
+              className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-95 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              New Group
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDocSheet(true)}
+              className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 active:scale-95 transition-all"
+            >
+              <Download className="h-4 w-4" />
+              Add Document
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Media groups ── */}
+      {allGroups.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+              Media Groups
+            </p>
+            <div className="h-px flex-1 bg-gray-100" />
+          </div>
+          {allGroups.map((group) => (
+            <GroupCard
+              key={group.id}
+              group={group}
+              totalMediaCount={mediaCount}
+              dragOverIndex={dragOver}
+              dragIndexRef={dragIndexRef}
+              onRemoveBlock={handleRemoveBlock}
+              onUpdateBlock={handleUpdateBlock}
+              onDrop={handleDrop}
               onDragEnd={handleDragEnd}
-              onRemove={() => handleRemove(block.id)}
-              onUpdate={(field, value) => handleUpdate(block.id, field, value)}
+              setDragOver={setDragOver}
+              onRenameGroup={handleRenameGroup}
+              onDeleteGroup={(gid) => {
+                handleDeleteGroup(gid)
+                if (pendingGroup?.id === gid) setPendingGroup(null)
+              }}
+              onAddToGroup={() => setActiveAddSheet(group.id)}
+              cardId={cardId}
+              mediaBlocksAll={mediaBlocks}
+              onAddBlock={(block) => {
+                handleAddBlock(block)
+                if (pendingGroup?.id === group.id) setPendingGroup(null)
+              }}
+              showAddSheet={activeAddSheet === group.id}
+              onToggleAddSheet={() =>
+                setActiveAddSheet((prev) => (prev === group.id ? null : group.id))
+              }
             />
           ))}
         </div>
       )}
 
-      {/* ── Drag hint ── */}
-      {sorted.length > 1 && !showAdd && (
-        <p className="flex items-center justify-center gap-1.5 text-[10px] text-gray-300">
-          <GripVertical className="h-3 w-3" />
-          Drag blocks to reorder
-        </p>
+      {/* ── Documents section ── */}
+      {(docBlocks.length > 0 || hasAnything) && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+              Documents
+            </p>
+            <div className="h-px flex-1 bg-gray-100" />
+          </div>
+          <DocSection
+            cardId={cardId}
+            docBlocks={docBlocks}
+            allBlocks={sorted}
+            dragOverIndex={dragOver}
+            dragIndexRef={dragIndexRef}
+            onRemoveBlock={handleRemoveBlock}
+            onUpdateBlock={handleUpdateBlock}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            setDragOver={setDragOver}
+            onAddBlock={handleAddBlock}
+            showAddSheet={showDocSheet}
+            onToggleAddSheet={() => setShowDocSheet((v) => !v)}
+          />
+        </div>
       )}
 
-      {/* ── Empty state ── */}
-      {mediaBlocks.length === 0 && !showAdd && <EmptyState onAdd={() => setShowAdd(true)} />}
-
-      {/* ── Add sheet ── */}
-      {showAdd && !atLimit ? (
-        <AddSheet
-          cardId={cardId}
-          blockCount={mediaBlocks.length}
-          onAdd={handleAdd}
-          onClose={() => setShowAdd(false)}
-        />
-      ) : showAdd && atLimit ? null : null}
-
-      {/* ── Add button (when blocks exist and sheet is closed) ── */}
-      {!showAdd &&
-        sorted.length > 0 &&
-        (atLimit ? (
-          <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-3 text-xs text-gray-400">
-            <AlertCircle className="h-3.5 w-3.5" />
-            Maximum {MAX_BLOCKS} blocks reached
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowAdd(true)}
-            className="group flex w-full items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-3 transition-all hover:border-brand-300 hover:bg-brand-50/40 active:scale-[0.99]"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gray-100 group-hover:bg-brand-100 transition-colors">
-              <Plus className="h-4 w-4 text-gray-400 group-hover:text-brand-500 transition-colors" />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-semibold text-gray-600 group-hover:text-brand-600 transition-colors">
-                Add media block
-              </p>
-              <p className="text-xs text-gray-400">Image, video, audio or document</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-brand-400 transition-colors" />
-          </button>
-        ))}
+      {/* ── Drag hint ── */}
+      {mediaBlocks.length > 1 && (
+        <p className="flex items-center justify-center gap-1.5 text-[10px] text-gray-300">
+          <GripVertical className="h-3 w-3" />
+          Drag blocks within or between groups to reorder
+        </p>
+      )}
     </div>
   )
 }
