@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bull'
+import { randomBytes } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AnalyticsService } from '../analytics/analytics.service'
 import { EmailService } from '../email/email.service'
@@ -49,6 +50,8 @@ interface CreateContactDto {
   website?: string
   sourceCardId?: string
   stage?: string
+  notes?: string
+  tags?: string[]
 }
 
 interface UpdateContactDto {
@@ -308,6 +311,8 @@ export class ContactsService {
             title: dto.title,
             website: dto.website,
             sourceCardId: dto.sourceCardId,
+            notes: dto.notes,
+            tags: dto.tags ?? [],
           },
         })
 
@@ -403,6 +408,10 @@ export class ContactsService {
         crmPipeline: true,
         sourceCard: { select: { handle: true } },
         timeline: { orderBy: { createdAt: 'desc' }, take: 20 },
+        contactNotes: { orderBy: { createdAt: 'desc' }, take: 50 },
+        deals: { orderBy: { createdAt: 'desc' } },
+        tasks: { orderBy: [{ completed: 'asc' }, { dueAt: 'asc' }] },
+        customFieldValues: { include: { field: true } },
       },
     })
     if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
@@ -632,8 +641,17 @@ export class ContactsService {
 
     const fromName = contact.ownerUser?.name ?? 'Dotly User'
 
-    // Send the email
-    await this.emailService.sendDirectCrmEmail(contact.email, subject, body, fromName)
+    // Generate tracking token BEFORE sending so it can be embedded in the email pixel.
+    const trackingToken = randomBytes(16).toString('hex')
+
+    // Send the email (with tracking pixel)
+    await this.emailService.sendDirectCrmEmail(
+      contact.email,
+      subject,
+      body,
+      fromName,
+      trackingToken,
+    )
 
     // M10: Wrap timeline + ContactEmail writes in a single transaction so
     // both are created atomically — or neither is, on failure.
@@ -646,7 +664,7 @@ export class ContactsService {
         },
       }),
       this.prisma.contactEmail.create({
-        data: { contactId, subject, body },
+        data: { contactId, subject, body, trackingToken },
       }),
     ])
 
@@ -790,6 +808,737 @@ export class ContactsService {
       total,
       page: params.page ?? 1,
       limit,
+    }
+  }
+
+  // ─── Gap 1: Threaded Notes ───────────────────────────────────────────────────
+
+  async createNote(contactId: string, userId: string, content: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+
+    const note = await this.prisma.contactNote.create({
+      data: { contactId, ownerUserId: userId, content },
+    })
+
+    await this.prisma.contactTimeline.create({
+      data: { contactId, event: 'NOTE_ADDED', metadata: { noteId: note.id, content } },
+    })
+
+    void this.webhooksService
+      .fanOut(userId, 'contact.note_added', { contactId, noteId: note.id })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.note_added)', err))
+
+    return note
+  }
+
+  async getNotes(contactId: string, userId: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactNote.findMany({
+      where: { contactId },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    })
+  }
+
+  async updateNote(noteId: string, userId: string, content: string) {
+    const note = await this.prisma.contactNote.findUnique({ where: { id: noteId } })
+    if (!note || note.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactNote.update({ where: { id: noteId }, data: { content } })
+  }
+
+  async deleteNote(noteId: string, userId: string) {
+    const note = await this.prisma.contactNote.findUnique({ where: { id: noteId } })
+    if (!note || note.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.contactNote.delete({ where: { id: noteId } })
+    return { deleted: true }
+  }
+
+  // ─── Gap 2: Custom Fields ────────────────────────────────────────────────────
+
+  async getCustomFields(userId: string) {
+    return this.prisma.contactCustomField.findMany({
+      where: { ownerUserId: userId },
+      orderBy: { displayOrder: 'asc' },
+    })
+  }
+
+  async createCustomField(
+    userId: string,
+    dto: { label: string; fieldType?: string; options?: string[]; displayOrder?: number },
+  ) {
+    const validTypes = ['TEXT', 'NUMBER', 'DATE', 'URL', 'SELECT'] as const
+    type FieldType = (typeof validTypes)[number]
+    const fieldType: FieldType =
+      dto.fieldType && (validTypes as readonly string[]).includes(dto.fieldType)
+        ? (dto.fieldType as FieldType)
+        : 'TEXT'
+    return this.prisma.contactCustomField.create({
+      data: {
+        ownerUserId: userId,
+        label: dto.label,
+        fieldType,
+        options: dto.options ?? [],
+        displayOrder: dto.displayOrder ?? 0,
+      },
+    })
+  }
+
+  async updateCustomField(
+    fieldId: string,
+    userId: string,
+    dto: { label?: string; options?: string[]; displayOrder?: number },
+  ) {
+    const field = await this.prisma.contactCustomField.findUnique({ where: { id: fieldId } })
+    if (!field || field.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactCustomField.update({ where: { id: fieldId }, data: dto })
+  }
+
+  async deleteCustomField(fieldId: string, userId: string) {
+    const field = await this.prisma.contactCustomField.findUnique({ where: { id: fieldId } })
+    if (!field || field.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.contactCustomField.delete({ where: { id: fieldId } })
+    return { deleted: true }
+  }
+
+  async setCustomFieldValue(contactId: string, userId: string, fieldId: string, value: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactCustomFieldValue.upsert({
+      where: { contactId_fieldId: { contactId, fieldId } },
+      create: { contactId, fieldId, value },
+      update: { value },
+    })
+  }
+
+  // ─── Gap 3 + 13: Deals ───────────────────────────────────────────────────────
+
+  async createDeal(
+    contactId: string,
+    userId: string,
+    dto: {
+      title: string
+      value?: number
+      currency?: string
+      stage?: string
+      probability?: number
+      closeDate?: string
+      notes?: string
+    },
+  ) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+
+    const validDealStages = ['PROSPECT', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST']
+    const stage =
+      dto.stage && validDealStages.includes(dto.stage)
+        ? (dto.stage as 'PROSPECT' | 'PROPOSAL' | 'NEGOTIATION' | 'CLOSED_WON' | 'CLOSED_LOST')
+        : ('PROSPECT' as const)
+
+    const deal = await this.prisma.deal.create({
+      data: {
+        contactId,
+        ownerUserId: userId,
+        title: dto.title,
+        value: dto.value ?? null,
+        currency: dto.currency ?? 'USD',
+        stage,
+        probability: dto.probability ?? null,
+        closeDate: dto.closeDate ? new Date(dto.closeDate) : null,
+        notes: dto.notes ?? null,
+      },
+    })
+
+    await this.prisma.contactTimeline.create({
+      data: { contactId, event: 'DEAL_CREATED', metadata: { dealId: deal.id, title: dto.title } },
+    })
+
+    return deal
+  }
+
+  async getDeals(contactId: string, userId: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.deal.findMany({
+      where: { contactId },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  async getAllDeals(userId: string) {
+    return this.prisma.deal.findMany({
+      where: { ownerUserId: userId },
+      include: { contact: { select: { id: true, name: true, email: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 500,
+    })
+  }
+
+  async updateDeal(
+    dealId: string,
+    userId: string,
+    dto: {
+      title?: string
+      value?: number | null
+      currency?: string
+      stage?: string
+      probability?: number | null
+      closeDate?: string | null
+      notes?: string
+    },
+  ) {
+    const deal = await this.prisma.deal.findUnique({ where: { id: dealId } })
+    if (!deal || deal.ownerUserId !== userId) throw new ForbiddenException()
+
+    const validDealStages = ['PROSPECT', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST']
+    return this.prisma.deal.update({
+      where: { id: dealId },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.value !== undefined && { value: dto.value }),
+        ...(dto.currency !== undefined && { currency: dto.currency }),
+        ...(dto.stage !== undefined &&
+          validDealStages.includes(dto.stage) && {
+            stage: dto.stage as
+              | 'PROSPECT'
+              | 'PROPOSAL'
+              | 'NEGOTIATION'
+              | 'CLOSED_WON'
+              | 'CLOSED_LOST',
+          }),
+        ...(dto.probability !== undefined && { probability: dto.probability }),
+        ...(dto.closeDate !== undefined && {
+          closeDate: dto.closeDate ? new Date(dto.closeDate) : null,
+        }),
+        ...(dto.notes !== undefined && { notes: dto.notes }),
+      },
+    })
+  }
+
+  async deleteDeal(dealId: string, userId: string) {
+    const deal = await this.prisma.deal.findUnique({ where: { id: dealId } })
+    if (!deal || deal.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.deal.delete({ where: { id: dealId } })
+    return { deleted: true }
+  }
+
+  // ─── Gap 4: CSV Import ───────────────────────────────────────────────────────
+
+  async importContacts(userId: string, rows: Record<string, string>[]) {
+    const results = { created: 0, skipped: 0, errors: 0 }
+
+    for (const row of rows) {
+      const name = (row['name'] ?? row['Name'] ?? row['full_name'] ?? '').trim()
+      if (!name) {
+        results.skipped++
+        continue
+      }
+
+      const email = (row['email'] ?? row['Email'] ?? '').trim() || undefined
+      const phone = (row['phone'] ?? row['Phone'] ?? row['mobile'] ?? '').trim() || undefined
+      const company =
+        (row['company'] ?? row['Company'] ?? row['organization'] ?? '').trim() || undefined
+      const title = (row['title'] ?? row['Title'] ?? row['job_title'] ?? '').trim() || undefined
+      const website = (row['website'] ?? row['Website'] ?? '').trim() || undefined
+      const address = (row['address'] ?? row['Address'] ?? '').trim() || undefined
+
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const c = await tx.contact.create({
+            data: { ownerUserId: userId, name, email, phone, company, title, website, address },
+          })
+          await tx.crmPipeline.create({
+            data: { contactId: c.id, stage: 'NEW', ownerUserId: userId },
+          })
+          await tx.contactTimeline.create({
+            data: { contactId: c.id, event: 'LEAD_CAPTURED', metadata: { source: 'csv_import' } },
+          })
+        })
+        results.created++
+      } catch (err: unknown) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          results.skipped++
+        } else {
+          results.errors++
+          this.logger.warn(`CSV import row error: ${String(err)}`)
+        }
+      }
+    }
+
+    return results
+  }
+
+  // ─── Gap 6: Email Templates ──────────────────────────────────────────────────
+
+  async createEmailTemplate(userId: string, dto: { name: string; subject: string; body: string }) {
+    return this.prisma.emailTemplate.create({
+      data: { ownerUserId: userId, name: dto.name, subject: dto.subject, body: dto.body },
+    })
+  }
+
+  async getEmailTemplates(userId: string) {
+    return this.prisma.emailTemplate.findMany({
+      where: { ownerUserId: userId },
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
+
+  async updateEmailTemplate(
+    templateId: string,
+    userId: string,
+    dto: { name?: string; subject?: string; body?: string },
+  ) {
+    const tpl = await this.prisma.emailTemplate.findUnique({ where: { id: templateId } })
+    if (!tpl || tpl.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.emailTemplate.update({ where: { id: templateId }, data: dto })
+  }
+
+  async deleteEmailTemplate(templateId: string, userId: string) {
+    const tpl = await this.prisma.emailTemplate.findUnique({ where: { id: templateId } })
+    if (!tpl || tpl.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.emailTemplate.delete({ where: { id: templateId } })
+    return { deleted: true }
+  }
+
+  // ─── Gap 7: Tasks ────────────────────────────────────────────────────────────
+
+  async createTask(contactId: string, userId: string, dto: { title: string; dueAt?: string }) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+
+    const task = await this.prisma.contactTask.create({
+      data: {
+        contactId,
+        ownerUserId: userId,
+        title: dto.title,
+        dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
+      },
+    })
+
+    await this.prisma.contactTimeline.create({
+      data: { contactId, event: 'TASK_CREATED', metadata: { taskId: task.id, title: dto.title } },
+    })
+
+    return task
+  }
+
+  async getTasks(contactId: string, userId: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactTask.findMany({
+      where: { contactId },
+      orderBy: [{ completed: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+    })
+  }
+
+  async getAllTasks(userId: string, params?: { completed?: boolean }) {
+    const where: { ownerUserId: string; completed?: boolean } = { ownerUserId: userId }
+    if (params?.completed !== undefined) where.completed = params.completed
+    return this.prisma.contactTask.findMany({
+      where,
+      include: { contact: { select: { id: true, name: true } } },
+      orderBy: [{ completed: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
+    })
+  }
+
+  async updateTask(
+    taskId: string,
+    userId: string,
+    dto: { title?: string; dueAt?: string | null; completed?: boolean },
+  ) {
+    const task = await this.prisma.contactTask.findUnique({ where: { id: taskId } })
+    if (!task || task.ownerUserId !== userId) throw new ForbiddenException()
+
+    const data: {
+      title?: string
+      dueAt?: Date | null
+      completed?: boolean
+      completedAt?: Date | null
+    } = {}
+    if (dto.title !== undefined) data.title = dto.title
+    if (dto.dueAt !== undefined) data.dueAt = dto.dueAt ? new Date(dto.dueAt) : null
+    if (dto.completed !== undefined) {
+      data.completed = dto.completed
+      data.completedAt = dto.completed ? new Date() : null
+    }
+
+    const updated = await this.prisma.contactTask.update({ where: { id: taskId }, data })
+
+    if (dto.completed) {
+      await this.prisma.contactTimeline.create({
+        data: {
+          contactId: task.contactId,
+          event: 'TASK_COMPLETED',
+          metadata: { taskId, title: task.title },
+        },
+      })
+    }
+
+    return updated
+  }
+
+  async deleteTask(taskId: string, userId: string) {
+    const task = await this.prisma.contactTask.findUnique({ where: { id: taskId } })
+    if (!task || task.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.contactTask.delete({ where: { id: taskId } })
+    return { deleted: true }
+  }
+
+  // ─── Gap 9: Duplicate Merge ──────────────────────────────────────────────────
+
+  async mergeContacts(primaryId: string, duplicateId: string, userId: string) {
+    const [primary, duplicate] = await Promise.all([
+      this.prisma.contact.findUnique({ where: { id: primaryId } }),
+      this.prisma.contact.findUnique({ where: { id: duplicateId } }),
+    ])
+    if (!primary || primary.ownerUserId !== userId) throw new ForbiddenException()
+    if (!duplicate || duplicate.ownerUserId !== userId) throw new ForbiddenException()
+    if (primaryId === duplicateId)
+      throw new BadRequestException('Cannot merge a contact with itself')
+
+    await this.prisma.$transaction(async (tx) => {
+      // Transfer notes
+      await tx.contactNote.updateMany({
+        where: { contactId: duplicateId },
+        data: { contactId: primaryId },
+      })
+      // Transfer timeline
+      await tx.contactTimeline.updateMany({
+        where: { contactId: duplicateId },
+        data: { contactId: primaryId },
+      })
+      // Transfer emails
+      await tx.contactEmail.updateMany({
+        where: { contactId: duplicateId },
+        data: { contactId: primaryId },
+      })
+      // Transfer deals
+      await tx.deal.updateMany({
+        where: { contactId: duplicateId },
+        data: { contactId: primaryId },
+      })
+      // Transfer tasks
+      await tx.contactTask.updateMany({
+        where: { contactId: duplicateId },
+        data: { contactId: primaryId },
+      })
+      // Transfer custom field values — only copy fields that primary does NOT already have a value for
+      const existingFieldIds = (
+        await tx.contactCustomFieldValue.findMany({
+          where: { contactId: primaryId },
+          select: { fieldId: true },
+        })
+      ).map((v) => v.fieldId)
+      await tx.contactCustomFieldValue.updateMany({
+        where: { contactId: duplicateId, fieldId: { notIn: existingFieldIds } },
+        data: { contactId: primaryId },
+      })
+      // Delete duplicate's custom field values that would conflict (primary already has values)
+      await tx.contactCustomFieldValue.deleteMany({
+        where: { contactId: duplicateId },
+      })
+      // Transfer pipeline assignment — if primary has no pipeline assignment, copy duplicate's
+      const primaryPipeline = await tx.crmPipeline.findUnique({ where: { contactId: primaryId } })
+      const duplicatePipeline = await tx.crmPipeline.findUnique({
+        where: { contactId: duplicateId },
+      })
+      if (primaryPipeline && duplicatePipeline) {
+        // Primary already has pipeline — only copy pipelineId if primary has none
+        if (!primaryPipeline.pipelineId && duplicatePipeline.pipelineId) {
+          await tx.crmPipeline.update({
+            where: { contactId: primaryId },
+            data: { pipelineId: duplicatePipeline.pipelineId },
+          })
+        }
+      }
+      // Merge tags (union)
+      const mergedTags = Array.from(new Set([...primary.tags, ...duplicate.tags]))
+      // Fill missing fields from duplicate into primary
+      const patch: Record<string, unknown> = { tags: mergedTags }
+      if (!primary.email && duplicate.email) patch.email = duplicate.email
+      if (!primary.phone && duplicate.phone) patch.phone = duplicate.phone
+      if (!primary.company && duplicate.company) patch.company = duplicate.company
+      if (!primary.title && duplicate.title) patch.title = duplicate.title
+      if (!primary.website && duplicate.website) patch.website = duplicate.website
+      if (!primary.address && duplicate.address) patch.address = duplicate.address
+      if (!primary.notes && duplicate.notes) patch.notes = duplicate.notes
+      await tx.contact.update({ where: { id: primaryId }, data: patch })
+      // Record merge event
+      await tx.contactTimeline.create({
+        data: {
+          contactId: primaryId,
+          event: 'CONTACTS_MERGED',
+          metadata: { duplicateId, duplicateName: duplicate.name },
+        },
+      })
+      // Delete duplicate (cascade removes crmPipeline, remaining orphans)
+      await tx.contact.delete({ where: { id: duplicateId } })
+    })
+
+    return this.prisma.contact.findUnique({
+      where: { id: primaryId },
+      include: { crmPipeline: true, contactNotes: { orderBy: { createdAt: 'desc' }, take: 50 } },
+    })
+  }
+
+  async findDuplicates(userId: string) {
+    // Group contacts by normalised email and name similarity
+    const contacts = await this.prisma.contact.findMany({
+      where: { ownerUserId: userId },
+      select: { id: true, name: true, email: true, company: true },
+      take: 1000,
+    })
+
+    const groups: Array<{ contacts: typeof contacts; reason: string }> = []
+
+    // Email duplicates (exact normalised match)
+    const emailMap = new Map<string, typeof contacts>()
+    for (const c of contacts) {
+      if (!c.email) continue
+      const key = c.email.toLowerCase().trim()
+      const existing = emailMap.get(key) ?? []
+      existing.push(c)
+      emailMap.set(key, existing)
+    }
+    for (const [, group] of emailMap) {
+      if (group.length > 1) groups.push({ contacts: group, reason: 'duplicate_email' })
+    }
+
+    // Name duplicates (normalised lowercase)
+    const nameMap = new Map<string, typeof contacts>()
+    for (const c of contacts) {
+      const key = c.name.toLowerCase().trim()
+      const existing = nameMap.get(key) ?? []
+      existing.push(c)
+      nameMap.set(key, existing)
+    }
+    for (const [, group] of nameMap) {
+      if (group.length > 1) groups.push({ contacts: group, reason: 'duplicate_name' })
+    }
+
+    return groups
+  }
+
+  // ─── Gap 10: Stage Conversion Analytics ──────────────────────────────────────
+
+  async getFunnelAnalytics(userId: string) {
+    const stages = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
+    const counts = await this.prisma.crmPipeline.groupBy({
+      by: ['stage'],
+      where: { ownerUserId: userId },
+      _count: { id: true },
+    })
+
+    const countMap = new Map(counts.map((c) => [c.stage, c._count.id]))
+    const stageCounts = stages.map((stage) => ({
+      stage,
+      count: countMap.get(stage) ?? 0,
+    }))
+
+    // Conversion rates between consecutive stages
+    const conversions = []
+    for (let i = 0; i < stages.length - 1; i++) {
+      const from = stageCounts[i]
+      const to = stageCounts[i + 1]
+      const rate = from && to && from.count > 0 ? Math.round((to.count / from.count) * 100) : 0
+      conversions.push({ from: stages[i], to: stages[i + 1], rate })
+    }
+
+    const totalActive = stageCounts
+      .filter((s) => s.stage !== 'LOST')
+      .reduce((sum, s) => sum + s.count, 0)
+
+    return { stages: stageCounts, conversions, totalActive }
+  }
+
+  // ─── Gap 12: Bulk Edit Arbitrary Fields ──────────────────────────────────────
+
+  async bulkUpdateFields(
+    userId: string,
+    ids: string[],
+    fields: { company?: string; tags?: string[]; tagsAdd?: string[]; tagsRemove?: string[] },
+  ) {
+    // Verify all contacts belong to this user
+    const owned = await this.prisma.contact.findMany({
+      where: { id: { in: ids }, ownerUserId: userId },
+      select: { id: true, tags: true },
+    })
+    const ownedIds = owned.map((c) => c.id)
+    if (ownedIds.length === 0) throw new ForbiddenException()
+
+    if (fields.company !== undefined) {
+      await this.prisma.contact.updateMany({
+        where: { id: { in: ownedIds } },
+        data: { company: fields.company },
+      })
+    }
+
+    // Handle tag mutations per-contact (add/remove)
+    if (fields.tagsAdd?.length || fields.tagsRemove?.length || fields.tags !== undefined) {
+      for (const contact of owned) {
+        let newTags: string[]
+        if (fields.tags !== undefined) {
+          newTags = fields.tags
+        } else {
+          newTags = [...contact.tags]
+          if (fields.tagsAdd) newTags = Array.from(new Set([...newTags, ...fields.tagsAdd]))
+          if (fields.tagsRemove) newTags = newTags.filter((t) => !fields.tagsRemove!.includes(t))
+        }
+        await this.prisma.contact.update({
+          where: { id: contact.id },
+          data: { tags: newTags },
+        })
+      }
+    }
+
+    return { updated: ownedIds.length }
+  }
+
+  // ─── Gap 11: Multi-Pipeline Support ─────────────────────────────────────────
+
+  async getPipelines(userId: string) {
+    return this.prisma.pipeline.findMany({
+      where: { ownerUserId: userId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  async createPipeline(
+    userId: string,
+    dto: { name: string; stages?: string[]; isDefault?: boolean },
+  ) {
+    if (!dto.name?.trim()) throw new BadRequestException('Pipeline name is required')
+    const stages =
+      dto.stages && dto.stages.length > 0
+        ? dto.stages.map((s) => s.trim()).filter(Boolean)
+        : ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST']
+
+    // If this is being set as default, un-default any existing default pipeline
+    if (dto.isDefault) {
+      await this.prisma.pipeline.updateMany({
+        where: { ownerUserId: userId, isDefault: true },
+        data: { isDefault: false },
+      })
+    }
+
+    return this.prisma.pipeline.create({
+      data: {
+        ownerUserId: userId,
+        name: dto.name.trim(),
+        stages,
+        isDefault: dto.isDefault ?? false,
+      },
+    })
+  }
+
+  async updatePipeline(
+    pipelineId: string,
+    userId: string,
+    dto: { name?: string; stages?: string[]; isDefault?: boolean },
+  ) {
+    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
+    if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+
+    if (dto.isDefault) {
+      await this.prisma.pipeline.updateMany({
+        where: { ownerUserId: userId, isDefault: true, id: { not: pipelineId } },
+        data: { isDefault: false },
+      })
+    }
+
+    const data: Record<string, unknown> = {}
+    if (dto.name !== undefined) data['name'] = dto.name.trim()
+    if (dto.stages !== undefined) data['stages'] = dto.stages.map((s) => s.trim()).filter(Boolean)
+    if (dto.isDefault !== undefined) data['isDefault'] = dto.isDefault
+
+    return this.prisma.pipeline.update({ where: { id: pipelineId }, data })
+  }
+
+  async deletePipeline(pipelineId: string, userId: string) {
+    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
+    if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.pipeline.delete({ where: { id: pipelineId } })
+    return { deleted: true }
+  }
+
+  /** Assign a contact's CRM record to a specific pipeline (and optionally set a stage) */
+  async assignContactToPipeline(
+    contactId: string,
+    userId: string,
+    pipelineId: string | null,
+    stage?: string,
+  ) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+
+    if (pipelineId !== null) {
+      const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
+      if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+    }
+
+    const existing = await this.prisma.crmPipeline.findUnique({ where: { contactId } })
+    const stageValue = stage ?? existing?.stage ?? 'NEW'
+    if (existing) {
+      return this.prisma.crmPipeline.update({
+        where: { contactId },
+        data: { pipelineId, stage: stageValue },
+      })
+    }
+    return this.prisma.crmPipeline.create({
+      data: { contactId, ownerUserId: userId, pipelineId, stage: stageValue },
+    })
+  }
+
+  /** Get all contacts currently in a given pipeline */
+  async getPipelineContacts(pipelineId: string, userId: string) {
+    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
+    if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+
+    return this.prisma.contact.findMany({
+      where: {
+        ownerUserId: userId,
+        crmPipeline: { pipelineId },
+      },
+      include: { crmPipeline: true },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  // ─── Gap 5: Email Tracking ────────────────────────────────────────────────────
+
+  async recordEmailOpen(trackingToken: string) {
+    const email = await this.prisma.contactEmail.findUnique({ where: { trackingToken } })
+    if (!email || email.openedAt) return // already recorded or not found
+    await this.prisma.contactEmail.update({
+      where: { trackingToken },
+      data: { openedAt: new Date() },
+    })
+    await this.prisma.contactTimeline.create({
+      data: {
+        contactId: email.contactId,
+        event: 'EMAIL_OPENED',
+        metadata: { subject: email.subject, trackingToken },
+      },
+    })
+  }
+
+  async recordEmailClick(trackingToken: string) {
+    const email = await this.prisma.contactEmail.findUnique({ where: { trackingToken } })
+    if (!email) return
+    await this.prisma.contactEmail.update({
+      where: { trackingToken },
+      data: { clickedAt: new Date() },
+    })
+    if (!email.clickedAt) {
+      await this.prisma.contactTimeline.create({
+        data: {
+          contactId: email.contactId,
+          event: 'EMAIL_LINK_CLICKED',
+          metadata: { subject: email.subject, trackingToken },
+        },
+      })
     }
   }
 }

@@ -29,6 +29,10 @@ enum CardTemplate {
   BOLD
   CREATIVE
   CORPORATE
+  ELEGANT
+  DARK
+  NEON
+  RETRO
 }
 
 enum ContactStage {
@@ -93,6 +97,22 @@ enum LeadFieldType {
   URL
   TEXTAREA
   SELECT
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  URL
+  SELECT
+}
+
+enum DealStage {
+  PROSPECT
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
 }
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -257,6 +277,10 @@ model Contact {
   emails          ContactEmail[]
   timeline        ContactTimeline[]
   leadSubmissions LeadSubmission[]
+  contactNotes    ContactNote[]
+  deals           Deal[]
+  tasks           ContactTask[]
+  customFieldValues ContactCustomFieldValue[]
 
   @@unique([ownerUserId, email])
   @@index([ownerUserId])
@@ -264,15 +288,18 @@ model Contact {
 }
 
 model CrmPipeline {
-  id          String       @id @default(cuid())
-  contactId   String       @unique
-  stage       ContactStage @default(NEW)
+  id          String   @id @default(cuid())
+  contactId   String   @unique
+  stage       String   @default("NEW")
   ownerUserId String
-  updatedAt   DateTime     @updatedAt
+  pipelineId  String?      // nullable — null means "default pipeline"
+  updatedAt   DateTime @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact  Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  pipeline Pipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, stage])
+  @@index([pipelineId])
   @@map("crm_pipeline")
 }
 
@@ -379,11 +406,14 @@ model AuditLog {
 }
 
 model ContactEmail {
-  id        String   @id @default(cuid())
-  contactId String
-  subject   String   @db.VarChar(998)
-  body      String   @db.VarChar(5000)
-  sentAt    DateTime @default(now())
+  id             String    @id @default(cuid())
+  contactId      String
+  subject        String    @db.VarChar(998)
+  body           String    @db.VarChar(5000)
+  sentAt         DateTime  @default(now())
+  trackingToken  String?   @unique
+  openedAt       DateTime?
+  clickedAt      DateTime?
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -532,4 +562,127 @@ model WalletPass {
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@map("wallet_passes")
+}
+
+// ─── Multi-Pipeline (Gap 11) ──────────────────────────────────────────────────
+
+// A named pipeline owned by a user with custom stage definitions.
+// The stages field is a JSON array of stage name strings, e.g.
+// ["Lead In", "Qualified", "Proposal Sent", "Closed Won", "Closed Lost"]
+model Pipeline {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  name        String   @db.VarChar(200)
+  stages      Json     @default("[\"NEW\",\"CONTACTED\",\"QUALIFIED\",\"CLOSED\",\"LOST\"]")
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  pipelineContacts CrmPipeline[]
+
+  @@index([ownerUserId])
+  @@map("pipelines")
+}
+
+// ─── CRM Extensions ───────────────────────────────────────────────────────────
+
+// Threaded notes per contact (Gap 1)
+model ContactNote {
+  id          String   @id @default(cuid())
+  contactId   String
+  ownerUserId String
+  content     String   @db.VarChar(10000)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_notes")
+}
+
+// Custom field definitions per user (Gap 2)
+model ContactCustomField {
+  id           String          @id @default(cuid())
+  ownerUserId  String
+  label        String          @db.VarChar(100)
+  fieldType    CustomFieldType @default(TEXT)
+  options      Json            @default("[]")
+  displayOrder Int             @default(0)
+  createdAt    DateTime        @default(now())
+
+  values ContactCustomFieldValue[]
+
+  @@index([ownerUserId])
+  @@map("contact_custom_fields")
+}
+
+// Custom field values per contact (Gap 2)
+model ContactCustomFieldValue {
+  id      String @id @default(cuid())
+  contactId String
+  fieldId   String
+  value     String @db.VarChar(2000)
+
+  contact Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  field   ContactCustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, fieldId])
+  @@index([contactId])
+  @@map("contact_custom_field_values")
+}
+
+// Deals / opportunities (Gap 3 + 13)
+model Deal {
+  id          String    @id @default(cuid())
+  contactId   String
+  ownerUserId String
+  title       String    @db.VarChar(300)
+  value       Decimal?  @db.Decimal(18, 2)
+  currency    String    @default("USD") @db.VarChar(3)
+  stage       DealStage @default(PROSPECT)
+  probability Int?
+  closeDate   DateTime?
+  notes       String?   @db.VarChar(5000)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([ownerUserId])
+  @@map("deals")
+}
+
+// Email templates (Gap 6)
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  name        String   @db.VarChar(200)
+  subject     String   @db.VarChar(998)
+  body        String   @db.VarChar(50000)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@map("email_templates")
+}
+
+// Tasks / reminders (Gap 7)
+model ContactTask {
+  id          String    @id @default(cuid())
+  contactId   String
+  ownerUserId String
+  title       String    @db.VarChar(500)
+  dueAt       DateTime?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([ownerUserId, completed])
+  @@map("contact_tasks")
 }

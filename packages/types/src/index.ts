@@ -19,6 +19,10 @@ export enum CardTemplate {
   BOLD = 'BOLD',
   CREATIVE = 'CREATIVE',
   CORPORATE = 'CORPORATE',
+  ELEGANT = 'ELEGANT',
+  DARK = 'DARK',
+  NEON = 'NEON',
+  RETRO = 'RETRO',
 }
 
 export enum ContactStage {

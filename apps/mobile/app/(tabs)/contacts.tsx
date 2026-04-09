@@ -4,6 +4,7 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
+  Pressable,
   RefreshControl,
   ActivityIndicator,
   Linking,
@@ -28,6 +29,7 @@ interface Contact {
   email?: string
   phone?: string
   company?: string
+  enrichmentScore?: number | null
   sourceCard?: { handle: string }
   crmPipeline?: CrmPipeline
 }
@@ -38,6 +40,13 @@ const STAGE_COLORS: Record<string, { bg: string; text: string }> = {
   QUALIFIED: { bg: '#f3e8ff', text: '#7c3aed' },
   CLOSED: { bg: '#dcfce7', text: '#15803d' },
   LOST: { bg: '#fee2e2', text: '#b91c1c' },
+}
+
+// Returns a background colour for the enrichment score badge based on score tier.
+function scoreBadgeColors(score: number): { bg: string; text: string } {
+  if (score >= 75) return { bg: '#dcfce7', text: '#15803d' }
+  if (score >= 50) return { bg: '#fef9c3', text: '#a16207' }
+  return { bg: '#fee2e2', text: '#b91c1c' }
 }
 
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
@@ -81,6 +90,11 @@ function CreateContactModal({
   const [phone, setPhone] = useState('')
   const [company, setCompany] = useState('')
   const [title, setTitle] = useState('')
+  const [website, setWebsite] = useState('')
+  const [address, setAddress] = useState('')
+  const [notes, setNotes] = useState('')
+  const [tags, setTags] = useState('')
+  const [stage, setStage] = useState<(typeof STAGES)[number]>('NEW')
   const [submitting, setSubmitting] = useState(false)
 
   const reset = () => {
@@ -89,6 +103,11 @@ function CreateContactModal({
     setPhone('')
     setCompany('')
     setTitle('')
+    setWebsite('')
+    setAddress('')
+    setNotes('')
+    setTags('')
+    setStage('NEW')
   }
 
   const handleCreate = async () => {
@@ -104,6 +123,14 @@ function CreateContactModal({
         phone: phone.trim() || undefined,
         company: company.trim() || undefined,
         title: title.trim() || undefined,
+        website: website.trim() || undefined,
+        address: address.trim() || undefined,
+        notes: notes.trim() || undefined,
+        tags: tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        stage,
       })
       reset()
       onCreated()
@@ -124,6 +151,14 @@ function CreateContactModal({
     color: '#0f172a',
     backgroundColor: '#f8fafc',
     marginBottom: 10,
+  }
+
+  const labelStyle = {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginBottom: 4,
+    fontWeight: '600' as const,
+    letterSpacing: 0.5,
   }
 
   return (
@@ -173,17 +208,7 @@ function CreateContactModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginBottom: 4,
-                fontWeight: '600',
-                letterSpacing: 0.5,
-              }}
-            >
-              FULL NAME *
-            </Text>
+            <Text style={labelStyle}>FULL NAME *</Text>
             <TextInput
               value={name}
               onChangeText={setName}
@@ -193,17 +218,7 @@ function CreateContactModal({
               style={inputStyle}
             />
 
-            <Text
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginBottom: 4,
-                fontWeight: '600',
-                letterSpacing: 0.5,
-              }}
-            >
-              EMAIL
-            </Text>
+            <Text style={labelStyle}>EMAIL</Text>
             <TextInput
               value={email}
               onChangeText={setEmail}
@@ -214,17 +229,7 @@ function CreateContactModal({
               style={inputStyle}
             />
 
-            <Text
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginBottom: 4,
-                fontWeight: '600',
-                letterSpacing: 0.5,
-              }}
-            >
-              PHONE
-            </Text>
+            <Text style={labelStyle}>PHONE</Text>
             <TextInput
               value={phone}
               onChangeText={setPhone}
@@ -234,17 +239,7 @@ function CreateContactModal({
               style={inputStyle}
             />
 
-            <Text
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginBottom: 4,
-                fontWeight: '600',
-                letterSpacing: 0.5,
-              }}
-            >
-              COMPANY
-            </Text>
+            <Text style={labelStyle}>COMPANY</Text>
             <TextInput
               value={company}
               onChangeText={setCompany}
@@ -253,23 +248,91 @@ function CreateContactModal({
               style={inputStyle}
             />
 
-            <Text
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginBottom: 4,
-                fontWeight: '600',
-                letterSpacing: 0.5,
-              }}
-            >
-              JOB TITLE
-            </Text>
+            <Text style={labelStyle}>JOB TITLE</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
               placeholder="CEO"
               placeholderTextColor="#94a3b8"
               style={inputStyle}
+            />
+
+            <Text style={labelStyle}>WEBSITE</Text>
+            <TextInput
+              value={website}
+              onChangeText={setWebsite}
+              placeholder="https://example.com"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              style={inputStyle}
+            />
+
+            <Text style={labelStyle}>ADDRESS</Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              placeholder="123 Main St, New York"
+              placeholderTextColor="#94a3b8"
+              style={inputStyle}
+            />
+
+            <Text style={labelStyle}>TAGS</Text>
+            <TextInput
+              value={tags}
+              onChangeText={setTags}
+              placeholder="sales, vip"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              style={inputStyle}
+            />
+
+            <Text style={labelStyle}>STAGE</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingBottom: 10 }}
+              style={{ marginBottom: 10 }}
+            >
+              {STAGES.map((stageOption) => {
+                const colors = STAGE_COLORS[stageOption] ?? { bg: '#f1f5f9', text: '#475569' }
+                const selected = stage === stageOption
+                return (
+                  <Pressable
+                    key={stageOption}
+                    onPress={() => setStage(stageOption)}
+                    style={{
+                      borderRadius: 12,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      backgroundColor: colors.bg,
+                      borderWidth: 1,
+                      borderColor: selected ? colors.text : 'transparent',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontSize: 11,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {stageOption}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+
+            <Text style={labelStyle}>NOTES</Text>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Add context for this contact"
+              placeholderTextColor="#94a3b8"
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              style={[inputStyle, { minHeight: 110, paddingTop: 12, marginBottom: 24 }]}
             />
           </ScrollView>
         </View>
@@ -281,6 +344,7 @@ function CreateContactModal({
 export default function ContactsTab() {
   const router = useRouter()
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -346,6 +410,22 @@ export default function ContactsTab() {
   useEffect(() => {
     if (page > 1) void fetchContacts(false, page)
   }, [page, fetchContacts])
+
+  const contactsByStage = STAGES.reduce<Record<(typeof STAGES)[number], Contact[]>>(
+    (acc, stage) => {
+      acc[stage] = []
+      return acc
+    },
+    {} as Record<(typeof STAGES)[number], Contact[]>,
+  )
+
+  contacts.forEach((contact) => {
+    const stage = contact.crmPipeline?.stage ?? 'NEW'
+    const normalizedStage = STAGES.includes(stage as (typeof STAGES)[number])
+      ? (stage as (typeof STAGES)[number])
+      : 'NEW'
+    contactsByStage[normalizedStage].push(contact)
+  })
 
   // M6: Server-side search with 350ms debounce
   const handleSearchChange = (text: string) => {
@@ -457,6 +537,43 @@ export default function ContactsTab() {
             color: '#0f172a',
           }}
         />
+
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: '#f1f5f9',
+            borderRadius: 12,
+            padding: 4,
+            marginTop: 12,
+          }}
+        >
+          {(['list', 'board'] as const).map((mode) => {
+            const active = viewMode === mode
+            return (
+              <Pressable
+                key={mode}
+                onPress={() => setViewMode(mode)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: active ? '#ffffff' : 'transparent',
+                }}
+              >
+                <Text
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 14,
+                    fontWeight: '700',
+                    color: active ? '#0f172a' : '#64748b',
+                  }}
+                >
+                  {mode === 'list' ? 'List' : 'Board'}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
       </View>
 
       {/* Error banner */}
@@ -482,115 +599,281 @@ export default function ContactsTab() {
         </View>
       )}
 
-      <FlatList
-        data={contacts}
-        keyExtractor={(item) => item.id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.3}
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#0ea5e9" />
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          loading ? (
-            <View style={{ paddingVertical: 80, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#0ea5e9" />
-            </View>
-          ) : (
-            <View style={{ paddingVertical: 80, paddingHorizontal: 32, alignItems: 'center' }}>
-              <Text style={{ color: '#94a3b8', textAlign: 'center', fontSize: 15, lineHeight: 24 }}>
-                {search
-                  ? `No contacts match "${search}"`
-                  : 'Your leads will appear here\nafter someone scans your card'}
-              </Text>
-            </View>
-          )
-        }
-        contentContainerStyle={{ paddingVertical: 8 }}
-        renderItem={({ item }) => {
-          const stage = item.crmPipeline?.stage || 'NEW'
-          return (
-            <TouchableOpacity
-              onPress={() => router.push(`/contact/${item.id}` as never)}
-              style={{
-                marginHorizontal: 16,
-                marginVertical: 4,
-                backgroundColor: '#ffffff',
-                borderRadius: 14,
-                padding: 14,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.06,
-                shadowRadius: 4,
-                elevation: 2,
-                borderWidth: 1,
-                borderColor: '#f1f5f9',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <Avatar name={item.name} id={item.id} />
-              <View style={{ flex: 1, minWidth: 0 }}>
+      {viewMode === 'list' ? (
+        <FlatList
+          data={contacts}
+          keyExtractor={(item) => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#0ea5e9" />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            loading ? (
+              <View style={{ paddingVertical: 80, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#0ea5e9" />
+              </View>
+            ) : (
+              <View style={{ paddingVertical: 80, paddingHorizontal: 32, alignItems: 'center' }}>
                 <Text
-                  style={{ fontWeight: '700', color: '#0f172a', fontSize: 15 }}
-                  numberOfLines={1}
+                  style={{ color: '#94a3b8', textAlign: 'center', fontSize: 15, lineHeight: 24 }}
                 >
-                  {item.name}
+                  {search
+                    ? `No contacts match "${search}"`
+                    : 'Your leads will appear here\nafter someone scans your card'}
                 </Text>
-                {item.email ? (
-                  <Text style={{ color: '#64748b', fontSize: 13, marginTop: 1 }} numberOfLines={1}>
-                    {item.email}
+              </View>
+            )
+          }
+          contentContainerStyle={{ paddingVertical: 8 }}
+          renderItem={({ item }) => {
+            const stage = item.crmPipeline?.stage || 'NEW'
+            return (
+              <TouchableOpacity
+                onPress={() => router.push(`/contact/${item.id}` as never)}
+                style={{
+                  marginHorizontal: 16,
+                  marginVertical: 4,
+                  backgroundColor: '#ffffff',
+                  borderRadius: 14,
+                  padding: 14,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 4,
+                  elevation: 2,
+                  borderWidth: 1,
+                  borderColor: '#f1f5f9',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <Avatar name={item.name} id={item.id} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    style={{ fontWeight: '700', color: '#0f172a', fontSize: 15 }}
+                    numberOfLines={1}
+                  >
+                    {item.name}
                   </Text>
-                ) : null}
-                {item.company ? (
-                  <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 1 }} numberOfLines={1}>
-                    {item.company}
-                  </Text>
-                ) : null}
-                {item.sourceCard ? (
+                  {item.email ? (
+                    <Text
+                      style={{ color: '#64748b', fontSize: 13, marginTop: 1 }}
+                      numberOfLines={1}
+                    >
+                      {item.email}
+                    </Text>
+                  ) : null}
+                  {item.company ? (
+                    <Text
+                      style={{ color: '#94a3b8', fontSize: 12, marginTop: 1 }}
+                      numberOfLines={1}
+                    >
+                      {item.company}
+                    </Text>
+                  ) : null}
+                  {item.sourceCard ? (
+                    <View
+                      style={{
+                        marginTop: 4,
+                        alignSelf: 'flex-start',
+                        backgroundColor: '#e0f2fe',
+                        borderRadius: 6,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <Text style={{ color: '#0369a1', fontSize: 11, fontWeight: '600' }}>
+                        @{item.sourceCard.handle}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                {/* Right-side badges: score + stage */}
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  {item.enrichmentScore != null && (
+                    <View
+                      style={{
+                        borderRadius: 10,
+                        paddingHorizontal: 7,
+                        paddingVertical: 3,
+                        backgroundColor: scoreBadgeColors(item.enrichmentScore).bg,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: scoreBadgeColors(item.enrichmentScore).text,
+                          fontSize: 10,
+                          fontWeight: '700',
+                        }}
+                      >
+                        AI {item.enrichmentScore}
+                      </Text>
+                    </View>
+                  )}
                   <View
                     style={{
-                      marginTop: 4,
-                      alignSelf: 'flex-start',
-                      backgroundColor: '#e0f2fe',
-                      borderRadius: 6,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
+                      borderRadius: 12,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      backgroundColor: STAGE_COLORS[stage]?.bg ?? '#f1f5f9',
                     }}
                   >
-                    <Text style={{ color: '#0369a1', fontSize: 11, fontWeight: '600' }}>
-                      @{item.sourceCard.handle}
+                    <Text
+                      style={{
+                        color: STAGE_COLORS[stage]?.text ?? '#475569',
+                        fontSize: 11,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {stage}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )
+          }}
+        />
+      ) : contacts.length === 0 ? (
+        <View style={{ paddingVertical: 80, paddingHorizontal: 32, alignItems: 'center' }}>
+          <Text style={{ color: '#94a3b8', textAlign: 'center', fontSize: 15, lineHeight: 24 }}>
+            {search
+              ? `No contacts match "${search}"`
+              : 'Your leads will appear here\nafter someone scans your card'}
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 16 }}
+        >
+          {STAGES.map((stage) => {
+            const stageContacts = contactsByStage[stage]
+            const colors = STAGE_COLORS[stage] ?? { bg: '#f1f5f9', text: '#475569' }
+
+            return (
+              <View
+                key={stage}
+                style={{
+                  width: 250,
+                  marginHorizontal: 8,
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>{stage}</Text>
+                  <View
+                    style={{
+                      borderRadius: 999,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      backgroundColor: colors.bg,
+                    }}
+                  >
+                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }}>
+                      {stageContacts.length}
+                    </Text>
+                  </View>
+                </View>
+
+                {stageContacts.map((contact) => (
+                  <Pressable
+                    key={contact.id}
+                    onPress={() => router.push(`/contact/${contact.id}` as never)}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: 14,
+                      padding: 14,
+                      marginBottom: 10,
+                      borderWidth: 1,
+                      borderColor: '#e2e8f0',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 4,
+                      elevation: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                  >
+                    <Avatar name={contact.name} id={contact.id} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}
+                        numberOfLines={1}
+                      >
+                        {contact.name}
+                      </Text>
+                      {contact.company ? (
+                        <Text
+                          style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}
+                          numberOfLines={1}
+                        >
+                          {contact.company}
+                        </Text>
+                      ) : null}
+                      {contact.enrichmentScore != null && (
+                        <View
+                          style={{
+                            marginTop: 4,
+                            alignSelf: 'flex-start',
+                            borderRadius: 8,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            backgroundColor: scoreBadgeColors(contact.enrichmentScore).bg,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: scoreBadgeColors(contact.enrichmentScore).text,
+                              fontSize: 10,
+                              fontWeight: '700',
+                            }}
+                          >
+                            AI {contact.enrichmentScore}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </Pressable>
+                ))}
+
+                {stageContacts.length === 0 ? (
+                  <View
+                    style={{
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderStyle: 'dashed',
+                      borderColor: '#cbd5e1',
+                      padding: 16,
+                      backgroundColor: '#ffffff',
+                    }}
+                  >
+                    <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
+                      No contacts
                     </Text>
                   </View>
                 ) : null}
               </View>
-              <View
-                style={{
-                  borderRadius: 12,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  backgroundColor: STAGE_COLORS[stage]?.bg ?? '#f1f5f9',
-                }}
-              >
-                <Text
-                  style={{
-                    color: STAGE_COLORS[stage]?.text ?? '#475569',
-                    fontSize: 11,
-                    fontWeight: '700',
-                  }}
-                >
-                  {stage}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )
-        }}
-      />
+            )
+          })}
+        </ScrollView>
+      )}
 
       {/* Scan Business Card FAB */}
       <ScanCardButton

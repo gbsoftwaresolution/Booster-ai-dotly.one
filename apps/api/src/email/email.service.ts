@@ -253,14 +253,32 @@ export class EmailService {
     subject: string,
     htmlBody: string,
     fromName: string,
+    trackingToken?: string,
   ): Promise<void> {
-    // Strip all HTML tags from user-supplied body to prevent stored XSS / HTML injection
-    const safeText = htmlBody.replace(/<[^>]+>/g, '')
-    const safeHtml = safeText
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n/g, '<br />')
+    // Step 1: Strip all HTML tags from user-supplied body to prevent stored XSS / HTML injection.
+    // This converts the body to plain text.
+    const plainText = htmlBody.replace(/<[^>]+>/g, '')
+
+    // Step 2: HTML-escape the plain text so it is safe to embed in HTML.
+    const escapedText = plainText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    // Step 3: Auto-link plain-text URLs so that click tracking works.
+    // After stripping HTML tags above, any URLs the user typed are plain text
+    // (e.g. "https://example.com"). We convert them to <a href="..."> elements
+    // — either pointing directly at the destination or through the click-tracking
+    // redirect when a tracking token is provided.
+    const linkedHtml = escapedText.replace(/(https?:\/\/[^\s<>"]+)/g, (url) => {
+      const dest = trackingToken
+        ? `${this.webUrl}/api/track/click/${trackingToken}?url=${encodeURIComponent(url)}`
+        : url
+      return `<a href="${dest}" style="color:#0ea5e9">${url}</a>`
+    })
+
+    // Step 4: Convert newlines to <br /> for HTML rendering.
+    const safeHtml = linkedHtml.replace(/\n/g, '<br />')
+
+    // wrappedHtml is now the fully sanitised + link-tracked HTML body.
+    const wrappedHtml = safeHtml
 
     // Sanitise fromName for use inside a quoted RFC 5321 display name.
     // Strip double-quotes to prevent display-name injection such as:
@@ -272,11 +290,20 @@ export class EmailService {
       .replace(/"/g, '') // no quote escape / injection
 
     const from = `"${safeFromName} via Dotly" <${this.fromEmail}>`
+
+    // Gap 5: Inject a 1×1 tracking pixel at the bottom of the email body.
+    // The pixel hits the public /track/open/:token endpoint to record the open event.
+    // Only injected when a trackingToken is provided (CRM direct emails).
+    const trackingPixelHtml = trackingToken
+      ? `<img src="${this.webUrl}/api/track/open/${trackingToken}" width="1" height="1" style="display:block;border:0;outline:0" alt="" />`
+      : ''
+
     const html = `
       <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
-        ${safeHtml}
+        ${wrappedHtml}
         <hr style="border:none;border-top:1px solid #e5e7eb;margin-top:32px" />
         <p style="color:#9ca3af;font-size:12px;margin-top:12px">This email was sent via Dotly CRM. Dotly.one — Tap. Share. Convert.</p>
+        ${trackingPixelHtml}
       </div>
     `
     // H-04: strip CR/LF from caller-supplied subject to prevent header injection

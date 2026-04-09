@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -14,6 +15,7 @@ import {
   AlertTriangle,
   Tag,
   ArrowUpDown,
+  Upload,
 } from 'lucide-react'
 
 interface ContactRow {
@@ -22,6 +24,7 @@ interface ContactRow {
   email?: string | null
   phone?: string | null
   company?: string | null
+  enrichmentScore?: number | null
   tags?: string[]
   createdAt: string
   crmPipeline?: { stage: string } | null
@@ -40,6 +43,11 @@ interface CardSummary {
   handle: string
 }
 
+interface ImportContactsResponse {
+  created: number
+  skipped: number
+}
+
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 type Stage = (typeof STAGES)[number]
 
@@ -49,6 +57,13 @@ const STAGE_BADGE: Record<Stage, string> = {
   QUALIFIED: 'bg-yellow-100 text-yellow-700',
   CLOSED: 'bg-green-100 text-green-700',
   LOST: 'bg-red-100 text-red-700',
+}
+
+function getScoreBadgeClass(score?: number | null): string {
+  if (score == null) return 'bg-gray-50 text-gray-400'
+  if (score >= 75) return 'bg-green-100 text-green-700'
+  if (score >= 50) return 'bg-yellow-100 text-yellow-700'
+  return 'bg-gray-100 text-gray-700'
 }
 
 function getInitials(name: string): string {
@@ -70,11 +85,14 @@ export default function ContactsPage(): JSX.Element {
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('ALL')
   const [tagFilter, setTagFilter] = useState<string>('')
-  const [sortBy, setSortBy] = useState<'date' | 'name' | 'stage'>('date')
+  const [sortBy, setSortBy] = useState<'date' | 'name' | 'stage' | 'score'>('date')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkStage, setBulkStage] = useState<string>('')
+  const [bulkEditMode, setBulkEditMode] = useState<'company' | 'tagsAdd' | 'tagsRemove' | ''>('')
+  const [bulkEditValue, setBulkEditValue] = useState('')
 
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
 
   // Confirmation dialog state
@@ -101,6 +119,12 @@ export default function ContactsPage(): JSX.Element {
         const aStage = (a.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
         const bStage = (b.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
         return (stageOrder[aStage] ?? 0) - (stageOrder[bStage] ?? 0)
+      }
+      if (sortBy === 'score') {
+        if (a.enrichmentScore == null && b.enrichmentScore == null) return 0
+        if (a.enrichmentScore == null) return 1
+        if (b.enrichmentScore == null) return -1
+        return b.enrichmentScore - a.enrichmentScore
       }
       // default: date desc (server already sorts this way)
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -220,6 +244,45 @@ export default function ContactsPage(): JSX.Element {
     })
   }, [selectedIds, loadContacts, page])
 
+  const handleBulkEdit = useCallback(async () => {
+    if (!bulkEditMode || selectedIds.size === 0) return
+
+    const trimmedValue = bulkEditValue.trim()
+    if (!trimmedValue) return
+
+    try {
+      const token = await getAccessToken()
+      const payload: {
+        ids: string[]
+        company?: string
+        tagsAdd?: string[]
+        tagsRemove?: string[]
+      } = { ids: [...selectedIds] }
+
+      if (bulkEditMode === 'company') {
+        payload.company = trimmedValue
+      } else {
+        const parsedTags = trimmedValue
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+
+        if (parsedTags.length === 0) return
+
+        if (bulkEditMode === 'tagsAdd') payload.tagsAdd = parsedTags
+        if (bulkEditMode === 'tagsRemove') payload.tagsRemove = parsedTags
+      }
+
+      await apiPatch('/contacts/bulk-update', payload, token)
+      setSelectedIds(new Set())
+      setBulkEditMode('')
+      setBulkEditValue('')
+      void loadContacts(page)
+    } catch {
+      setError('Failed to update selected contacts. Please try again.')
+    }
+  }, [bulkEditMode, bulkEditValue, selectedIds, loadContacts, page])
+
   const handleDelete = useCallback(
     async (id: string) => {
       setConfirmDialog({
@@ -243,6 +306,15 @@ export default function ContactsPage(): JSX.Element {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
           <p className="mt-1 text-sm text-gray-500">Manage your leads and connections.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+            <span>{total} total contacts</span>
+            <Link
+              href="/crm/analytics"
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              View Funnel Analytics
+            </Link>
+          </div>
         </div>
         <div className="flex gap-2">
           <a
@@ -252,6 +324,14 @@ export default function ContactsPage(): JSX.Element {
             <Download className="h-4 w-4" />
             Export CSV
           </a>
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Upload className="h-4 w-4" />
+            Import CSV
+          </button>
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
@@ -301,12 +381,13 @@ export default function ContactsPage(): JSX.Element {
           <ArrowUpDown className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'stage')}
+            onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'stage' | 'score')}
             className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
           >
             <option value="date">Newest first</option>
             <option value="name">Name A–Z</option>
             <option value="stage">By stage</option>
+            <option value="score">Sort by Score</option>
           </select>
         </div>
 
@@ -354,6 +435,37 @@ export default function ContactsPage(): JSX.Element {
             >
               Apply
             </button>
+          )}
+          <select
+            value={bulkEditMode}
+            onChange={(e) => {
+              setBulkEditMode(e.target.value as 'company' | 'tagsAdd' | 'tagsRemove' | '')
+              setBulkEditValue('')
+            }}
+            className="rounded-md border border-indigo-300 bg-white px-2 py-1.5 text-sm text-gray-700"
+          >
+            <option value="">Bulk Edit...</option>
+            <option value="company">Set Company</option>
+            <option value="tagsAdd">Add Tags</option>
+            <option value="tagsRemove">Remove Tags</option>
+          </select>
+          {bulkEditMode && (
+            <>
+              <input
+                type="text"
+                value={bulkEditValue}
+                onChange={(e) => setBulkEditValue(e.target.value)}
+                placeholder={bulkEditMode === 'company' ? 'Company name' : 'Tags (comma-separated)'}
+                className="rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+              />
+              <button
+                type="button"
+                onClick={() => void handleBulkEdit()}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Confirm
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -424,6 +536,9 @@ export default function ContactsPage(): JSX.Element {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Stage
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Score
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -483,6 +598,13 @@ export default function ContactsPage(): JSX.Element {
                       {contact.crmPipeline?.stage ?? 'NEW'}
                     </span>
                   </td>
+                  <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}
+                    >
+                      {contact.enrichmentScore ?? '—'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
@@ -533,6 +655,15 @@ export default function ContactsPage(): JSX.Element {
           onClose={() => setShowAddModal(false)}
           onCreated={() => {
             setShowAddModal(false)
+            void loadContacts(1)
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportCsvModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => {
             void loadContacts(1)
           }}
         />
@@ -770,6 +901,85 @@ function AddContactModal({
             </button>
           </div>
         </form>
+      </div>
+    </>
+  )
+}
+
+function ImportCsvModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void
+  onImported: () => void
+}): JSX.Element {
+  const [csv, setCsv] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<ImportContactsResponse | null>(null)
+
+  const handleImport = async () => {
+    if (!csv.trim()) return
+
+    setSubmitting(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      const token = await getAccessToken()
+      const response = await apiPost<ImportContactsResponse>('/contacts/import', { csv }, token)
+      setResult(response)
+      onImported()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import contacts')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-lg -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+        <h2 className="text-lg font-semibold text-gray-900">Import CSV</h2>
+        <div className="mt-4 space-y-3">
+          <label className="block text-sm font-medium text-gray-700" htmlFor="contacts-import-csv">
+            Paste CSV content
+          </label>
+          <textarea
+            id="contacts-import-csv"
+            rows={10}
+            value={csv}
+            onChange={(e) => setCsv(e.target.value)}
+            placeholder={
+              'name,email,phone,company,title,website,address\nJane Doe,jane@example.com,+1-555-0100,Acme,Founder,https://acme.com,New York'
+            }
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {result && (
+            <p className="text-sm text-green-700">
+              Created {result.created} contacts, skipped {result.skipped} duplicates
+            </p>
+          )}
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={submitting || !csv.trim()}
+              onClick={() => void handleImport()}
+              className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {submitting ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </div>
       </div>
     </>
   )

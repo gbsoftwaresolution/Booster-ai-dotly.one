@@ -2,15 +2,22 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useRef } from 'react'
-import { X, Send, Mail } from 'lucide-react'
+import { X, Send, Mail, ChevronDown } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiPost } from '@/lib/api'
+import { apiPost, apiGet } from '@/lib/api'
 
 interface ComposeEmailModalProps {
   contactId: string
   contactName: string
   contactEmail: string
   onClose: () => void
+}
+
+interface EmailTemplate {
+  id: string
+  name: string
+  subject: string
+  body: string
 }
 
 async function getToken(): Promise<string | undefined> {
@@ -28,11 +35,26 @@ export function ComposeEmailModal({
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [showTemplates, setShowTemplates] = useState(false)
   const subjectRef = useRef<HTMLInputElement>(null)
 
   // Auto-focus subject on open
   useEffect(() => {
     subjectRef.current?.focus()
+  }, [])
+
+  // Load email templates
+  useEffect(() => {
+    void (async () => {
+      try {
+        const token = await getToken()
+        const data = await apiGet<EmailTemplate[]>('/email-templates', token)
+        setTemplates(data)
+      } catch {
+        // Non-critical — templates just won't show
+      }
+    })()
   }, [])
 
   // Auto-close after success
@@ -52,6 +74,12 @@ export function ComposeEmailModal({
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const applyTemplate = (tpl: EmailTemplate) => {
+    setSubject(tpl.subject)
+    setBody(tpl.body)
+    setShowTemplates(false)
+  }
+
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) {
       setError('Subject and body are required.')
@@ -61,7 +89,11 @@ export function ComposeEmailModal({
     setError(null)
     try {
       const token = await getToken()
-      await apiPost(`/contacts/${contactId}/send-email`, { subject: subject.trim(), body: body.trim() }, token)
+      await apiPost(
+        `/contacts/${contactId}/send-email`,
+        { subject: subject.trim(), body: body.trim() },
+        token,
+      )
       setSent(true)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send email'
@@ -78,11 +110,7 @@ export function ComposeEmailModal({
   return (
     <>
       {/* Overlay */}
-      <div
-        className="fixed inset-0 z-60 bg-black/50"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 z-60 bg-black/50" onClick={onClose} aria-hidden="true" />
 
       {/* Modal */}
       <div
@@ -119,9 +147,41 @@ export function ComposeEmailModal({
             </div>
           </div>
 
+          {/* Template picker */}
+          {templates.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTemplates((v) => !v)}
+                className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Use template
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {showTemplates && (
+                <div className="absolute left-0 top-full z-10 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {templates.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => applyTemplate(tpl)}
+                      className="block w-full px-4 py-2.5 text-left hover:bg-gray-50"
+                    >
+                      <p className="text-sm font-medium text-gray-800">{tpl.name}</p>
+                      <p className="truncate text-xs text-gray-500">{tpl.subject}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Subject */}
           <div>
-            <label htmlFor="compose-subject" className="mb-1 block text-xs font-medium text-gray-500">
+            <label
+              htmlFor="compose-subject"
+              className="mb-1 block text-xs font-medium text-gray-500"
+            >
               Subject
             </label>
             <input
@@ -130,7 +190,7 @@ export function ComposeEmailModal({
               type="text"
               maxLength={200}
               value={subject}
-              onChange={e => setSubject(e.target.value)}
+              onChange={(e) => setSubject(e.target.value)}
               placeholder="Enter subject..."
               disabled={sending || sent}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-50 disabled:text-gray-500"
@@ -147,7 +207,7 @@ export function ComposeEmailModal({
               rows={5}
               maxLength={5000}
               value={body}
-              onChange={e => setBody(e.target.value)}
+              onChange={(e) => setBody(e.target.value)}
               placeholder="Write your message..."
               disabled={sending || sent}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-50 disabled:text-gray-500"
@@ -157,9 +217,7 @@ export function ComposeEmailModal({
 
           {/* Error */}
           {error && (
-            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
           )}
 
           {/* Success */}

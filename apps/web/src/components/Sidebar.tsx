@@ -16,6 +16,12 @@ import {
   LogOut,
   Webhook,
   Inbox,
+  CheckSquare,
+  Mail,
+  DollarSign,
+  GitBranch,
+  SlidersHorizontal,
+  TrendingUp,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -25,7 +31,13 @@ const navItems = [
   { href: '/cards', label: 'My Cards', icon: CreditCard },
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/leads', label: 'Lead Submissions', icon: Inbox },
+  { href: '/deals', label: 'Deals', icon: DollarSign },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/crm', label: 'CRM', icon: Kanban },
+  { href: '/pipelines', label: 'Pipelines', icon: GitBranch },
+  { href: '/crm/custom-fields', label: 'Custom Fields', icon: SlidersHorizontal },
+  { href: '/crm/analytics', label: 'CRM Analytics', icon: TrendingUp },
+  { href: '/email-templates', label: 'Email Templates', icon: Mail },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/email-signature', label: 'Signature', icon: FileSignature },
   { href: '/team', label: 'Team', icon: UsersRound },

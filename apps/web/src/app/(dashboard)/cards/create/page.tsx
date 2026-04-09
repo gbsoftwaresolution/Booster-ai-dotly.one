@@ -124,6 +124,91 @@ const TEMPLATES: {
       </div>
     ),
   },
+  {
+    id: CardTemplate.ELEGANT,
+    label: 'Elegant',
+    description: 'Luxury design, muted tones and serif typography — for a refined presence.',
+    tags: ['Luxury', 'Premium'],
+    preview: (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#FDFAF6] p-3 border border-[#E8E4DF]">
+        <div className="h-10 w-10 rounded-full border border-gray-300 bg-[#FFFFFF] shadow-sm flex items-center justify-center">
+            <div className="h-8 w-8 rounded-full bg-[#9A7B4F] opacity-70" />
+        </div>
+        <div className="h-1.5 w-20 rounded-none bg-[#1A1817]" />
+        <div className="h-1 w-16 rounded-none bg-[#6E6B68]" />
+        <div className="mt-2 w-full border-t border-[#E8E4DF] pt-2 flex flex-col gap-1 items-center">
+            <div className="h-1 w-24 rounded-none bg-[#2C2B29] opacity-80" />
+            <div className="h-1 w-16 rounded-none bg-[#2C2B29] opacity-60" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: CardTemplate.DARK,
+    label: 'Dark',
+    description: 'Dark-mode first design with neon highlights — futuristic and striking.',
+    tags: ['Neon', 'Future'],
+    preview: (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#050505] p-3 relative overflow-hidden">
+        {/* Glow effect */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-[#00E5FF] rounded-full blur-[24px] opacity-20"></div>
+        <div className="h-9 w-9 rounded-full border border-[#00E5FF] bg-[#121212] z-10 shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
+        <div className="h-2 w-16 bg-[#F4F4F5] z-10" />
+        <div className="h-1.5 w-12 bg-[#00E5FF] z-10 opacity-90" />
+        <div className="mt-2 flex w-full flex-col gap-1 z-10">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-3 w-full rounded border border-[#27272A] bg-[#121212]" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: CardTemplate.NEON,
+    label: 'Neon',
+    description: 'Vibrant, glow effects — ideal for nightlife/entertainment.',
+    tags: ['Nightlife', 'Vibrant'],
+    preview: (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#0A0A0A] p-3 relative overflow-hidden">
+        {/* Extreme glowing backgrounds */}
+        <div className="absolute top-0 right-0 w-16 h-16 bg-[#FF00FF] rounded-full blur-[30px] opacity-30"></div>
+        <div className="absolute bottom-0 left-0 w-16 h-16 bg-[#00FFFF] rounded-full blur-[30px] opacity-20"></div>
+        
+        {/* Avatar area */}
+        <div className="h-9 w-9 rounded-full border-2 border-[#FF00FF] bg-[#141414] z-10 shadow-[0_0_12px_rgba(255,0,255,0.6)]" />
+        <div className="h-2 w-16 bg-[#FFFFFF] z-10 shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
+        <div className="h-1.5 w-12 bg-[#00FFFF] z-10 opacity-90 shadow-[0_0_4px_rgba(0,255,255,0.5)]" />
+        
+        <div className="mt-2 flex w-full flex-col gap-1.5 z-10">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-4 w-full rounded-md border border-[#FF00FF] bg-black/40 shadow-[0_0_8px_rgba(255,0,255,0.2)]" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: CardTemplate.RETRO,
+    label: 'Retro',
+    description: 'Vintage or Y2K aesthetic.',
+    tags: ['Y2K', 'Vintage', 'Fun'],
+    preview: (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#F1F5F9] p-3 relative overflow-hidden border-4 border-[#FF90E8]">
+        <div className="absolute top-0 left-0 right-0 h-4 bg-[#FF90E8] border-b-2 border-black flex items-center px-1">
+           <div className="h-1.5 w-1.5 bg-white border border-black"></div>
+        </div>
+        <div className="h-9 w-9 rounded-none border-2 border-black bg-white z-10 shadow-[2px_2px_0_black] mt-3" />
+        <div className="h-2 w-16 bg-black z-10" />
+        <div className="h-1.5 w-12 bg-black z-10 opacity-70" />
+        
+        <div className="mt-2 flex w-full flex-col gap-1.5 z-10">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-4 w-full border-2 border-black bg-white shadow-[2px_2px_0_black]" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────

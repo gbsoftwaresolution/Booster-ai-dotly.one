@@ -93,8 +93,29 @@ export const api = {
   getContact: (id: string) => apiFetch<unknown>(`/contacts/${id}`),
   updateContactStage: (id: string, stage: string) =>
     apiFetch(`/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
-  addNote: (id: string, content: string) =>
+  getContactNotes: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/notes`),
+  createNote: (id: string, content: string) =>
     apiFetch(`/contacts/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
+  deleteNote: (noteId: string, contactId: string) =>
+    apiFetch(`/contacts/${contactId}/notes/${noteId}`, { method: 'DELETE' }),
+  getContactTasks: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/tasks`),
+  createTask: (id: string, title: string, dueAt?: string) =>
+    apiFetch(`/contacts/${id}/tasks`, { method: 'POST', body: JSON.stringify({ title, dueAt }) }),
+  updateTask: (taskId: string, data: { completed?: boolean; title?: string }) =>
+    apiFetch(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteTask: (taskId: string) => apiFetch(`/tasks/${taskId}`, { method: 'DELETE' }),
+  getDeals: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/deals`),
+  createDeal: (
+    id: string,
+    data: { title: string; value?: number; stage?: string; closeDate?: string },
+  ) => apiFetch(`/contacts/${id}/deals`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteDeal: (dealId: string) => apiFetch(`/deals/${dealId}`, { method: 'DELETE' }),
+  updateDealStage: (dealId: string, stage: string) =>
+    apiFetch(`/deals/${dealId}`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
+  getEmailTemplates: () => apiFetch<unknown[]>('/email-templates'),
+  getFunnel: () => apiFetch<unknown>('/crm/analytics/funnel'),
+  importContacts: (csv: string) =>
+    apiFetch('/contacts/import', { method: 'POST', body: JSON.stringify({ csv }) }),
   sendEmail: (id: string, subject: string, body: string) =>
     apiFetch(`/contacts/${id}/send-email`, {
       method: 'POST',
@@ -128,6 +149,9 @@ export const api = {
     title?: string
     website?: string
     address?: string
+    stage?: string
+    notes?: string
+    tags?: string[]
   }) => apiFetch('/contacts', { method: 'POST', body: JSON.stringify(data) }),
 }
 
@@ -235,6 +259,9 @@ export async function createContact(
     title?: string | null
     website?: string | null
     address?: string | null
+    stage?: string | null
+    notes?: string | null
+    tags?: string[] | null
   },
 ): Promise<unknown> {
   return apiFetch('/contacts', {
@@ -247,6 +274,9 @@ export async function createContact(
       title: data.title ?? undefined,
       website: data.website ?? undefined,
       address: data.address ?? undefined,
+      stage: data.stage ?? undefined,
+      notes: data.notes ?? undefined,
+      tags: data.tags ?? undefined,
       sourceCardId: cardId,
     }),
   })

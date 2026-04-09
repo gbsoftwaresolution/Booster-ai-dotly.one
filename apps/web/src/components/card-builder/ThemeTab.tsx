@@ -52,6 +52,37 @@ const TEMPLATES: {
     accent: 'bg-slate-700',
     textColor: 'text-slate-900',
   },
+  {
+    id: CardTemplate.ELEGANT,
+    label: 'Elegant',
+    description: 'Luxury serif',
+    bg: 'bg-[#FDFAF6]',
+    accent: 'bg-[#9A7B4F]',
+    textColor: 'text-[#1A1410]',
+  },  {
+    id: CardTemplate.DARK,
+    label: 'Dark',
+    description: 'Neon highlights',
+    bg: 'bg-[#050505]',
+    accent: 'bg-[#00E5FF]',
+    textColor: 'text-[#F4F4F5]',
+  },
+  {
+    id: CardTemplate.NEON,
+    label: 'Neon',
+    description: 'Vibrant & glowing',
+    bg: 'bg-[#0A0A0A]',
+    accent: 'bg-[#FF00FF]',
+    textColor: 'text-[#FFFFFF]',
+  },
+  {
+    id: CardTemplate.RETRO,
+    label: 'Retro',
+    description: 'Vintage Y2K style',
+    bg: 'bg-[#F1F5F9]',
+    accent: 'bg-[#FF90E8]',
+    textColor: 'text-[#000000]',
+  },
 ]
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Playfair Display', 'Space Grotesk', 'Lato', 'Montserrat']

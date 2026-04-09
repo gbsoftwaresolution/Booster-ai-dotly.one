@@ -90,7 +90,7 @@ export default function TermsPage() {
                 access is maintained until then.
               </li>
               <li>
-                We reserve the right to change pricing with 30 days' notice to registered users.
+                We reserve the right to change pricing with 30 days&apos; notice to registered users.
               </li>
             </ul>
 

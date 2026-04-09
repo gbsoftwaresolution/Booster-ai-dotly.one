@@ -22,6 +22,31 @@ interface TimelineEvent {
   createdAt: string
 }
 
+interface ContactNote {
+  id: string
+  content: string
+  createdAt: string
+}
+
+interface ContactTask {
+  id: string
+  title: string
+  dueAt: string | null
+  completed: boolean
+  completedAt: string | null
+  createdAt: string
+}
+
+interface ContactDeal {
+  id: string
+  title: string
+  value: number
+  currency: string
+  stage: string
+  probability: number
+  closeDate: string | null
+}
+
 interface ContactDetail {
   id: string
   name: string
@@ -386,9 +411,21 @@ export default function ContactDetailScreen() {
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false)
 
-  // Notes state
+  // Threaded notes state (Gap 1)
+  const [notes, setNotes] = useState<ContactNote[]>([])
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
+
+  // Tasks state (Gap 7)
+  const [tasks, setTasks] = useState<ContactTask[]>([])
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [taskSaving, setTaskSaving] = useState(false)
+
+  // Deals state
+  const [deals, setDeals] = useState<ContactDeal[]>([])
+  const [newDealTitle, setNewDealTitle] = useState('')
+  const [newDealValue, setNewDealValue] = useState('')
+  const [dealSaving, setDealSaving] = useState(false)
 
   // Email compose state
   const [emailModalOpen, setEmailModalOpen] = useState(false)
@@ -410,8 +447,16 @@ export default function ContactDetailScreen() {
     if (!id) return
     void (async () => {
       try {
-        const data = await api.getContact(id)
+        const [data, notesData, tasksData, dealsData] = await Promise.all([
+          api.getContact(id),
+          api.getContactNotes(id),
+          api.getContactTasks(id),
+          api.getDeals(id),
+        ])
         setContact(data as ContactDetail)
+        setNotes(notesData as ContactNote[])
+        setTasks(tasksData as ContactTask[])
+        setDeals(dealsData as ContactDeal[])
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load contact')
       } finally {
@@ -462,17 +507,110 @@ export default function ContactDetailScreen() {
     if (!id || !noteText.trim()) return
     setNoteSaving(true)
     try {
-      await api.addNote(id, noteText.trim())
+      await api.createNote(id, noteText.trim())
       setNoteText('')
-      // Refresh contact to get updated timeline
-      const data = await api.getContact(id)
-      setContact(data as ContactDetail)
+      // Refresh notes list
+      const notesData = await api.getContactNotes(id)
+      setNotes(notesData as ContactNote[])
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add note')
     } finally {
       setNoteSaving(false)
     }
   }, [id, noteText])
+
+  const handleDeleteNote = useCallback(
+    async (noteId: string) => {
+      if (!id) return
+      try {
+        await api.deleteNote(noteId, id)
+        setNotes((prev) => prev.filter((n) => n.id !== noteId))
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete note')
+      }
+    },
+    [id],
+  )
+
+  const handleCreateTask = useCallback(async () => {
+    if (!id || !newTaskTitle.trim()) return
+    setTaskSaving(true)
+    try {
+      await api.createTask(id, newTaskTitle.trim())
+      setNewTaskTitle('')
+      const tasksData = await api.getContactTasks(id)
+      setTasks(tasksData as ContactTask[])
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create task')
+    } finally {
+      setTaskSaving(false)
+    }
+  }, [id, newTaskTitle])
+
+  const handleToggleTask = useCallback(async (task: ContactTask) => {
+    try {
+      await api.updateTask(task.id, { completed: !task.completed })
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t)),
+      )
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update task')
+    }
+  }, [])
+
+  const handleDeleteTask = useCallback((taskId: string) => {
+    Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteTask(taskId)
+            setTasks((prev) => prev.filter((t) => t.id !== taskId))
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete task')
+          }
+        },
+      },
+    ])
+  }, [])
+
+  const handleCreateDeal = useCallback(async () => {
+    if (!id || !newDealTitle.trim()) return
+    setDealSaving(true)
+    try {
+      const body: { title: string; value?: number } = { title: newDealTitle.trim() }
+      if (newDealValue.trim()) body.value = parseFloat(newDealValue)
+      await api.createDeal(id, body)
+      setNewDealTitle('')
+      setNewDealValue('')
+      const dealsData = await api.getDeals(id)
+      setDeals(dealsData as ContactDeal[])
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create deal')
+    } finally {
+      setDealSaving(false)
+    }
+  }, [id, newDealTitle, newDealValue])
+
+  const handleDeleteDeal = useCallback((dealId: string) => {
+    Alert.alert('Delete Deal', 'Are you sure you want to delete this deal?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteDeal(dealId)
+            setDeals((prev) => prev.filter((d) => d.id !== dealId))
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete deal')
+          }
+        },
+      },
+    ])
+  }, [])
 
   const handleSendEmail = useCallback(async () => {
     if (!id || !emailSubject.trim() || !emailBody.trim()) return
@@ -791,16 +929,50 @@ export default function ContactDetailScreen() {
           </View>
         </View>
 
-        {/* Notes */}
+        {/* Threaded Notes (Gap 1) */}
         <View style={cardStyle}>
           <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 8 }}>
             Notes
           </Text>
-          {contact.notes ? (
-            <Text style={{ color: '#475569', fontSize: 14, lineHeight: 22, marginBottom: 12 }}>
-              {contact.notes}
-            </Text>
-          ) : (
+          {/* Existing notes list */}
+          {notes.length > 0 && (
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              {notes.map((note) => (
+                <View
+                  key={note.id}
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderRadius: 10,
+                    padding: 10,
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
+                    {note.content}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: 6,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: '#94a3b8' }}>
+                      {relativeTime(note.createdAt)}
+                    </Text>
+                    <TouchableOpacity onPress={() => void handleDeleteNote(note.id)}>
+                      <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+          {notes.length === 0 && (
             <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic', marginBottom: 12 }}>
               No notes yet.
             </Text>
@@ -852,7 +1024,287 @@ export default function ContactDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Tags */}
+        {/* Tasks (Gap 7) */}
+        <View style={cardStyle}>
+          <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 8 }}>
+            Tasks
+          </Text>
+          {tasks.length > 0 && (
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              {tasks.map((task) => (
+                <View
+                  key={task.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    backgroundColor: task.completed ? '#f0fdf4' : '#f8fafc',
+                    borderRadius: 10,
+                    padding: 10,
+                    borderWidth: 1,
+                    borderColor: task.completed ? '#bbf7d0' : '#e2e8f0',
+                  }}
+                >
+                  {/* Tap checkbox area to toggle */}
+                  <TouchableOpacity
+                    onPress={() => void handleToggleTask(task)}
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      borderWidth: 2,
+                      borderColor: task.completed ? '#16a34a' : '#94a3b8',
+                      backgroundColor: task.completed ? '#16a34a' : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {task.completed && (
+                      <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: task.completed ? '#6b7280' : '#0f172a',
+                        textDecorationLine: task.completed ? 'line-through' : 'none',
+                        lineHeight: 20,
+                      }}
+                    >
+                      {task.title}
+                    </Text>
+                    {task.dueAt && (
+                      <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                        Due {new Date(task.dueAt).toLocaleDateString()}
+                      </Text>
+                    )}
+                  </View>
+                  {/* Delete button */}
+                  <TouchableOpacity
+                    onPress={() => handleDeleteTask(task.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{ paddingLeft: 4, marginTop: 1 }}
+                  >
+                    <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                      Delete
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          {tasks.length === 0 && (
+            <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic', marginBottom: 12 }}>
+              No tasks yet.
+            </Text>
+          )}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              placeholder="Add a task..."
+              placeholderTextColor="#94a3b8"
+              maxLength={500}
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                borderRadius: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                fontSize: 13,
+                color: '#0f172a',
+                backgroundColor: '#f8fafc',
+              }}
+              onSubmitEditing={() => void handleCreateTask()}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              onPress={() => void handleCreateTask()}
+              disabled={taskSaving || !newTaskTitle.trim()}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 10,
+                backgroundColor: newTaskTitle.trim() ? '#0ea5e9' : '#e2e8f0',
+                justifyContent: 'center',
+              }}
+            >
+              {taskSaving ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text
+                  style={{
+                    color: newTaskTitle.trim() ? '#ffffff' : '#94a3b8',
+                    fontWeight: '700',
+                    fontSize: 13,
+                  }}
+                >
+                  Add
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Deals */}
+        <View style={cardStyle}>
+          <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 8 }}>
+            Deals
+          </Text>
+          {deals.length > 0 && (
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              {deals.map((deal) => (
+                <View
+                  key={deal.id}
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderRadius: 10,
+                    padding: 10,
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a', flex: 1 }}>
+                      {deal.title}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteDeal(deal.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}
+                  >
+                    {deal.value > 0 && (
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a' }}>
+                        {new Intl.NumberFormat(undefined, {
+                          style: 'currency',
+                          currency: deal.currency || 'USD',
+                          maximumFractionDigits: 0,
+                        }).format(deal.value)}
+                      </Text>
+                    )}
+                    <View
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 20,
+                        backgroundColor:
+                          deal.stage === 'CLOSED_WON'
+                            ? '#dcfce7'
+                            : deal.stage === 'CLOSED_LOST'
+                              ? '#fee2e2'
+                              : '#eff6ff',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '700',
+                          color:
+                            deal.stage === 'CLOSED_WON'
+                              ? '#15803d'
+                              : deal.stage === 'CLOSED_LOST'
+                                ? '#b91c1c'
+                                : '#1d4ed8',
+                        }}
+                      >
+                        {deal.stage.replace('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+          {deals.length === 0 && (
+            <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic', marginBottom: 12 }}>
+              No deals yet.
+            </Text>
+          )}
+          {/* Quick add deal */}
+          <View style={{ gap: 8 }}>
+            <TextInput
+              value={newDealTitle}
+              onChangeText={setNewDealTitle}
+              placeholder="Deal title..."
+              placeholderTextColor="#94a3b8"
+              maxLength={300}
+              style={{
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                borderRadius: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                fontSize: 13,
+                color: '#0f172a',
+                backgroundColor: '#f8fafc',
+              }}
+            />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                value={newDealValue}
+                onChangeText={setNewDealValue}
+                placeholder="Value (optional)"
+                placeholderTextColor="#94a3b8"
+                keyboardType="decimal-pad"
+                maxLength={20}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  borderRadius: 10,
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  fontSize: 13,
+                  color: '#0f172a',
+                  backgroundColor: '#f8fafc',
+                }}
+              />
+              <TouchableOpacity
+                onPress={() => void handleCreateDeal()}
+                disabled={dealSaving || !newDealTitle.trim()}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 10,
+                  backgroundColor: newDealTitle.trim() ? '#16a34a' : '#e2e8f0',
+                  justifyContent: 'center',
+                }}
+              >
+                {dealSaving ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text
+                    style={{
+                      color: newDealTitle.trim() ? '#ffffff' : '#94a3b8',
+                      fontWeight: '700',
+                      fontSize: 13,
+                    }}
+                  >
+                    Add
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
         <View style={cardStyle}>
           <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 10 }}>
             Tags
