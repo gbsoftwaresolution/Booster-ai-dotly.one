@@ -33,6 +33,8 @@ interface CreateLeadDto {
   phone?: string
   cardId: string
   sourceHandle?: string
+  /** Custom lead form field values — accepted but not yet persisted (LeadSubmission TODO) */
+  fields?: Record<string, string>
 }
 
 interface CreateContactDto {
@@ -153,6 +155,23 @@ export class ContactsService {
           },
         })
 
+        // Persist custom lead form field answers if provided and a LeadForm exists
+        if (dto.fields && Object.keys(dto.fields).length > 0) {
+          const leadForm = await tx.leadForm.findUnique({
+            where: { cardId: dto.cardId },
+            select: { id: true },
+          })
+          if (leadForm) {
+            await tx.leadSubmission.create({
+              data: {
+                leadFormId: leadForm.id,
+                contactId: c.id,
+                answers: dto.fields,
+              },
+            })
+          }
+        }
+
         return c
       })
     } catch (err) {
@@ -224,44 +243,64 @@ export class ContactsService {
     // failure (OOM kill, DB blip, deploy).
     const stage: CrmStage = dto.stage ? assertValidStage(dto.stage) : 'NEW'
 
-    const contact = await this.prisma.$transaction(async (tx) => {
-      const c = await tx.contact.create({
-        data: {
-          ownerUserId: userId,
-          name: dto.name,
-          email: dto.email,
-          phone: dto.phone,
-          address: dto.address,
-          company: dto.company,
-          title: dto.title,
-          website: dto.website,
-          sourceCardId: dto.sourceCardId,
-        },
-      })
+    let contact: Awaited<ReturnType<typeof this.prisma.contact.create>>
+    try {
+      contact = await this.prisma.$transaction(async (tx) => {
+        const c = await tx.contact.create({
+          data: {
+            ownerUserId: userId,
+            name: dto.name,
+            email: dto.email,
+            phone: dto.phone,
+            address: dto.address,
+            company: dto.company,
+            title: dto.title,
+            website: dto.website,
+            sourceCardId: dto.sourceCardId,
+          },
+        })
 
-      await tx.crmPipeline.create({
-        data: {
-          contactId: c.id,
-          stage,
-          ownerUserId: userId,
-        },
-      })
+        await tx.crmPipeline.create({
+          data: {
+            contactId: c.id,
+            stage,
+            ownerUserId: userId,
+          },
+        })
 
-      await tx.contactTimeline.create({
-        data: {
-          contactId: c.id,
-          event: 'LEAD_CAPTURED',
-          metadata: { manual: true },
-        },
-      })
+        await tx.contactTimeline.create({
+          data: {
+            contactId: c.id,
+            event: 'LEAD_CAPTURED',
+            metadata: { manual: true },
+          },
+        })
 
-      return c
-    })
+        return c
+      })
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new HttpException(
+          'A contact with this email address already exists',
+          HttpStatus.CONFLICT,
+        )
+      }
+      throw err
+    }
 
     // Queue async AI enrichment with 5s delay
     void this.enrichmentQueue
       .add('enrich', { contactId: contact.id }, { delay: 5000 })
       .catch((err: unknown) => this.logger.warn('Enrichment queue push failed', err))
+
+    // Fire-and-forget webhook: contact.created
+    void this.webhooksService
+      .fanOut(userId, 'contact.created', {
+        contactId: contact.id,
+        name: contact.name,
+        email: contact.email ?? null,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.created)', err))
 
     return this.prisma.contact.findUnique({
       where: { id: contact.id },
@@ -353,6 +392,19 @@ export class ContactsService {
         metadata: { from: oldStage, to: stage },
       },
     })
+
+    // Fire-and-forget webhook fan-out for contact.stage_changed
+    void this.webhooksService
+      .fanOut(userId, 'contact.stage_changed', {
+        contactId,
+        name: contact.name,
+        email: contact.email ?? null,
+        from: oldStage,
+        to: validatedStage,
+      })
+      .catch((err: unknown) =>
+        this.logger.warn('Webhook fan-out failed (contact.stage_changed)', err),
+      )
 
     return result
   }

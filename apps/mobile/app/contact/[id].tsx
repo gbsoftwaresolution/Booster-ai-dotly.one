@@ -3,11 +3,15 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   Linking,
   Alert,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 
@@ -26,6 +30,14 @@ interface ContactDetail {
   company?: string
   title?: string
   notes?: string
+  tags?: string[]
+  enrichedAt?: string | null
+  enrichmentScore?: number | null
+  enrichmentSummary?: string | null
+  inferredIndustry?: string | null
+  inferredSeniority?: string | null
+  inferredCompanySize?: string | null
+  inferredLinkedIn?: string | null
   sourceCard?: { handle: string }
   crmPipeline?: { stage: string }
   timeline?: TimelineEvent[]
@@ -34,8 +46,6 @@ interface ContactDetail {
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 
 // Allowlist-based URL openers — validate scheme before handing to the OS.
-// Passing an arbitrary string to Linking.openURL can open non-mailto/tel URLs
-// (e.g. javascript:, intent:) if contact data is tampered with server-side.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^\+?[\d\s\-().]{5,20}$/
 
@@ -103,13 +113,45 @@ function eventLabel(event: TimelineEvent): string {
   }
 }
 
+// ─── Card style reused across sections ───────────────────────────────────────
+const cardStyle = {
+  backgroundColor: '#ffffff',
+  borderRadius: 16,
+  padding: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.06,
+  shadowRadius: 4,
+  elevation: 2,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+} as const
+
 export default function ContactDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [stageLoading, setStageLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Notes state
+  const [noteText, setNoteText] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+
+  // Email compose state
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailBody, setEmailBody] = useState('')
+  const [emailSending, setEmailSending] = useState(false)
+
+  // Tags state
+  const [newTag, setNewTag] = useState('')
+  const [tagSaving, setTagSaving] = useState(false)
+
+  // Enrichment state
+  const [enriching, setEnriching] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -137,6 +179,103 @@ export default function ContactDetailScreen() {
       setStageLoading(false)
     }
   }
+
+  const handleAddNote = useCallback(async () => {
+    if (!id || !noteText.trim()) return
+    setNoteSaving(true)
+    try {
+      await api.addNote(id, noteText.trim())
+      setNoteText('')
+      // Refresh contact to get updated timeline
+      const data = await api.getContact(id)
+      setContact(data as ContactDetail)
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add note')
+    } finally {
+      setNoteSaving(false)
+    }
+  }, [id, noteText])
+
+  const handleSendEmail = useCallback(async () => {
+    if (!id || !emailSubject.trim() || !emailBody.trim()) return
+    setEmailSending(true)
+    try {
+      await api.sendEmail(id, emailSubject.trim(), emailBody.trim())
+      setEmailModalOpen(false)
+      setEmailSubject('')
+      setEmailBody('')
+      Alert.alert('Sent', 'Email sent successfully.')
+      // Refresh timeline
+      const data = await api.getContact(id)
+      setContact(data as ContactDetail)
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to send email')
+    } finally {
+      setEmailSending(false)
+    }
+  }, [id, emailSubject, emailBody])
+
+  const handleAddTag = useCallback(async () => {
+    if (!id || !contact || !newTag.trim()) return
+    const trimmed = newTag.trim().toLowerCase()
+    if ((contact.tags ?? []).includes(trimmed)) {
+      setNewTag('')
+      return
+    }
+    const updatedTags = [...(contact.tags ?? []), trimmed]
+    setTagSaving(true)
+    try {
+      await api.updateTags(id, updatedTags)
+      setContact((prev) => (prev ? { ...prev, tags: updatedTags } : prev))
+      setNewTag('')
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update tags')
+    } finally {
+      setTagSaving(false)
+    }
+  }, [id, contact, newTag])
+
+  const handleRemoveTag = useCallback(
+    async (tag: string) => {
+      if (!id || !contact) return
+      const updatedTags = (contact.tags ?? []).filter((t) => t !== tag)
+      setTagSaving(true)
+      try {
+        await api.updateTags(id, updatedTags)
+        setContact((prev) => (prev ? { ...prev, tags: updatedTags } : prev))
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to remove tag')
+      } finally {
+        setTagSaving(false)
+      }
+    },
+    [id, contact],
+  )
+
+  const handleEnrich = useCallback(async () => {
+    if (!id) return
+    setEnriching(true)
+    try {
+      await api.triggerEnrich(id)
+      // Poll for up to 30s until enrichedAt changes
+      const previousEnrichedAt = contact?.enrichedAt ?? null
+      const deadline = Date.now() + 30_000
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000))
+        const refreshed = (await api.getContact(id)) as ContactDetail
+        if (refreshed.enrichedAt !== previousEnrichedAt) {
+          setContact(refreshed)
+          break
+        }
+      }
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to start enrichment')
+    } finally {
+      setEnriching(false)
+    }
+  }, [id, contact])
+
+  // ─── Loading / error states ────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -205,21 +344,7 @@ export default function ContactDetailScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         {/* Header card */}
-        <View
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 16,
-            padding: 20,
-            alignItems: 'center',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-            elevation: 2,
-            borderWidth: 1,
-            borderColor: '#f1f5f9',
-          }}
-        >
+        <View style={{ ...cardStyle, alignItems: 'center' }}>
           <View
             style={{
               width: 72,
@@ -264,21 +389,7 @@ export default function ContactDetailScreen() {
         </View>
 
         {/* Contact info */}
-        <View
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-            elevation: 2,
-            borderWidth: 1,
-            borderColor: '#f1f5f9',
-            gap: 12,
-          }}
-        >
+        <View style={{ ...cardStyle, gap: 12 }}>
           <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 4 }}>
             Contact Info
           </Text>
@@ -306,23 +417,25 @@ export default function ContactDetailScreen() {
               <Text style={{ color: '#475569', fontSize: 14 }}>@{contact.sourceCard.handle}</Text>
             </View>
           )}
+          {/* Send Email action */}
+          {contact.email && (
+            <TouchableOpacity
+              onPress={() => setEmailModalOpen(true)}
+              style={{
+                marginTop: 4,
+                paddingVertical: 9,
+                borderRadius: 10,
+                backgroundColor: '#eff6ff',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 13 }}>Send Email</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Stage selector */}
-        <View
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-            elevation: 2,
-            borderWidth: 1,
-            borderColor: '#f1f5f9',
-          }}
-        >
+        <View style={cardStyle}>
           <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 12 }}>
             Stage
           </Text>
@@ -358,52 +471,283 @@ export default function ContactDetailScreen() {
           </View>
         </View>
 
-        {/* Notes (read-only) */}
-        <View
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-            elevation: 2,
-            borderWidth: 1,
-            borderColor: '#f1f5f9',
-          }}
-        >
+        {/* Notes */}
+        <View style={cardStyle}>
           <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 8 }}>
             Notes
           </Text>
           {contact.notes ? (
-            <Text style={{ color: '#475569', fontSize: 14, lineHeight: 22 }}>{contact.notes}</Text>
+            <Text style={{ color: '#475569', fontSize: 14, lineHeight: 22, marginBottom: 12 }}>
+              {contact.notes}
+            </Text>
           ) : (
-            <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic' }}>
+            <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic', marginBottom: 12 }}>
               No notes yet.
             </Text>
           )}
-          <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 10, fontStyle: 'italic' }}>
-            Notes editing coming soon
+          <TextInput
+            value={noteText}
+            onChangeText={setNoteText}
+            placeholder="Add a note..."
+            placeholderTextColor="#94a3b8"
+            multiline
+            numberOfLines={3}
+            maxLength={5000}
+            style={{
+              borderWidth: 1,
+              borderColor: '#e2e8f0',
+              borderRadius: 10,
+              padding: 10,
+              fontSize: 13,
+              color: '#0f172a',
+              minHeight: 72,
+              textAlignVertical: 'top',
+              backgroundColor: '#f8fafc',
+            }}
+          />
+          <TouchableOpacity
+            onPress={() => void handleAddNote()}
+            disabled={noteSaving || !noteText.trim()}
+            style={{
+              marginTop: 8,
+              paddingVertical: 9,
+              borderRadius: 10,
+              backgroundColor: noteText.trim() ? '#0ea5e9' : '#e2e8f0',
+              alignItems: 'center',
+            }}
+          >
+            {noteSaving ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text
+                style={{
+                  color: noteText.trim() ? '#ffffff' : '#94a3b8',
+                  fontWeight: '700',
+                  fontSize: 13,
+                }}
+              >
+                Save Note
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Tags */}
+        <View style={cardStyle}>
+          <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 10 }}>
+            Tags
           </Text>
+          {(contact.tags ?? []).length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {(contact.tags ?? []).map((tag) => (
+                <TouchableOpacity
+                  key={tag}
+                  onPress={() => void handleRemoveTag(tag)}
+                  disabled={tagSaving}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 20,
+                    backgroundColor: '#ede9fe',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#6d28d9', fontSize: 12, fontWeight: '600' }}>{tag}</Text>
+                  <Text style={{ color: '#6d28d9', fontSize: 12 }}>×</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={newTag}
+              onChangeText={setNewTag}
+              placeholder="Add tag..."
+              placeholderTextColor="#94a3b8"
+              maxLength={100}
+              autoCapitalize="none"
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                borderRadius: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                fontSize: 13,
+                color: '#0f172a',
+                backgroundColor: '#f8fafc',
+              }}
+              onSubmitEditing={() => void handleAddTag()}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              onPress={() => void handleAddTag()}
+              disabled={tagSaving || !newTag.trim()}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 10,
+                backgroundColor: newTag.trim() ? '#8b5cf6' : '#e2e8f0',
+                justifyContent: 'center',
+              }}
+            >
+              {tagSaving ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text
+                  style={{
+                    color: newTag.trim() ? '#ffffff' : '#94a3b8',
+                    fontWeight: '700',
+                    fontSize: 13,
+                  }}
+                >
+                  Add
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* AI Enrichment */}
+        <View style={cardStyle}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15 }}>AI Enrichment</Text>
+            <TouchableOpacity
+              onPress={() => void handleEnrich()}
+              disabled={enriching}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 8,
+                backgroundColor: '#eff6ff',
+              }}
+            >
+              {enriching ? (
+                <ActivityIndicator size="small" color="#2563eb" />
+              ) : (
+                <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 12 }}>
+                  {contact.enrichedAt ? 'Re-enrich' : 'Enrich with AI'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {contact.enrichedAt ? (
+            <View style={{ gap: 8 }}>
+              {contact.enrichmentScore != null && (
+                <View>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#64748b' }}>Confidence</Text>
+                    <Text style={{ fontSize: 12, color: '#0f172a', fontWeight: '600' }}>
+                      {contact.enrichmentScore}/100
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      height: 6,
+                      backgroundColor: '#e2e8f0',
+                      borderRadius: 3,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: 6,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 3,
+                        width: `${contact.enrichmentScore}%`,
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
+              {contact.enrichmentSummary && (
+                <Text
+                  style={{ fontSize: 13, color: '#475569', fontStyle: 'italic', lineHeight: 20 }}
+                >
+                  {contact.enrichmentSummary}
+                </Text>
+              )}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {contact.inferredIndustry && (
+                  <View
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 20,
+                      backgroundColor: '#dbeafe',
+                    }}
+                  >
+                    <Text style={{ color: '#1d4ed8', fontSize: 12, fontWeight: '600' }}>
+                      {contact.inferredIndustry}
+                    </Text>
+                  </View>
+                )}
+                {contact.inferredSeniority && (
+                  <View
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 20,
+                      backgroundColor: '#ede9fe',
+                    }}
+                  >
+                    <Text style={{ color: '#6d28d9', fontSize: 12, fontWeight: '600' }}>
+                      {contact.inferredSeniority}
+                    </Text>
+                  </View>
+                )}
+                {contact.inferredCompanySize && (
+                  <View
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 20,
+                      backgroundColor: '#fef9c3',
+                    }}
+                  >
+                    <Text style={{ color: '#a16207', fontSize: 12, fontWeight: '600' }}>
+                      {contact.inferredCompanySize} employees
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {contact.inferredLinkedIn &&
+                /^https:\/\/(www\.)?linkedin\.com\//.test(contact.inferredLinkedIn) && (
+                  <TouchableOpacity onPress={() => void Linking.openURL(contact.inferredLinkedIn!)}>
+                    <Text
+                      style={{ color: '#2563eb', fontSize: 12, textDecorationLine: 'underline' }}
+                    >
+                      Inferred LinkedIn
+                    </Text>
+                  </TouchableOpacity>
+                )}
+            </View>
+          ) : (
+            <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
+              No enrichment data yet. Tap "Enrich with AI" to analyse this contact.
+            </Text>
+          )}
         </View>
 
         {/* Timeline */}
         {contact.timeline && contact.timeline.length > 0 && (
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: 16,
-              padding: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.06,
-              shadowRadius: 4,
-              elevation: 2,
-              borderWidth: 1,
-              borderColor: '#f1f5f9',
-            }}
-          >
+          <View style={cardStyle}>
             <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 12 }}>
               Timeline
             </Text>
@@ -437,6 +781,106 @@ export default function ContactDetailScreen() {
         {/* Bottom padding */}
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {/* Send Email Modal */}
+      <Modal
+        visible={emailModalOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEmailModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: '#ffffff',
+              paddingTop: Platform.OS === 'ios' ? 56 : 32,
+              paddingHorizontal: 20,
+            }}
+          >
+            {/* Modal header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 20,
+              }}
+            >
+              <TouchableOpacity onPress={() => setEmailModalOpen(false)}>
+                <Text style={{ color: '#64748b', fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={{ fontWeight: '800', fontSize: 16, color: '#0f172a' }}>Send Email</Text>
+              <TouchableOpacity
+                onPress={() => void handleSendEmail()}
+                disabled={emailSending || !emailSubject.trim() || !emailBody.trim()}
+              >
+                {emailSending ? (
+                  <ActivityIndicator size="small" color="#0ea5e9" />
+                ) : (
+                  <Text
+                    style={{
+                      color: emailSubject.trim() && emailBody.trim() ? '#0ea5e9' : '#94a3b8',
+                      fontWeight: '700',
+                      fontSize: 15,
+                    }}
+                  >
+                    Send
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>To</Text>
+            <Text style={{ fontSize: 14, color: '#0f172a', marginBottom: 16 }}>
+              {contact.email}
+            </Text>
+
+            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Subject</Text>
+            <TextInput
+              value={emailSubject}
+              onChangeText={setEmailSubject}
+              placeholder="Subject"
+              placeholderTextColor="#94a3b8"
+              maxLength={200}
+              style={{
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                borderRadius: 10,
+                padding: 10,
+                fontSize: 14,
+                color: '#0f172a',
+                marginBottom: 16,
+                backgroundColor: '#f8fafc',
+              }}
+            />
+
+            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Message</Text>
+            <TextInput
+              value={emailBody}
+              onChangeText={setEmailBody}
+              placeholder="Write your message..."
+              placeholderTextColor="#94a3b8"
+              multiline
+              maxLength={5000}
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                borderRadius: 10,
+                padding: 10,
+                fontSize: 14,
+                color: '#0f172a',
+                textAlignVertical: 'top',
+                backgroundColor: '#f8fafc',
+              }}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   )
 }

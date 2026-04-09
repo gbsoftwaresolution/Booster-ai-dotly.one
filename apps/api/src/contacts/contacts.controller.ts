@@ -1,10 +1,34 @@
-import { Controller, Post, Get, Put, Delete, Patch, Param, Body, Query, UseGuards } from '@nestjs/common'
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { ContactsService } from './contacts.service'
-import { IsString, IsOptional, IsEmail, IsArray, IsInt, Min, Max, MaxLength, ArrayMaxSize, IsUrl, IsIn } from 'class-validator'
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  IsArray,
+  IsInt,
+  Min,
+  Max,
+  MaxLength,
+  ArrayMaxSize,
+  IsUrl,
+  IsIn,
+  IsObject,
+} from 'class-validator'
 import { Type } from 'class-transformer'
 import { SendEmailDto } from './dto/send-email.dto'
 
@@ -32,6 +56,13 @@ class CreateLeadDto {
   @IsString()
   @MaxLength(50)
   sourceHandle?: string
+
+  // Custom lead form field values keyed by normalised label.
+  // Accepted and forwarded to the service but not persisted until
+  // LeadSubmission storage is implemented (see schema.prisma TODO).
+  @IsOptional()
+  @IsObject()
+  fields?: Record<string, string>
 }
 
 class CreateContactDto {
@@ -63,6 +94,11 @@ class CreateContactDto {
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   @MaxLength(500)
   website?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string
 
   @IsOptional()
   @IsString()
@@ -104,6 +140,11 @@ class UpdateContactDto {
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   @MaxLength(500)
   website?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string
 
   // MED-04: Cap notes to prevent multi-megabyte note storage per contact.
   @IsOptional()
@@ -233,11 +274,7 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('contacts/:id/notes')
   @ApiOperation({ summary: 'Add a note to a contact' })
-  addNote(
-    @Param('id') id: string,
-    @CurrentUser() user: { id: string },
-    @Body() dto: AddNoteDto,
-  ) {
+  addNote(@Param('id') id: string, @CurrentUser() user: { id: string }, @Body() dto: AddNoteDto) {
     return this.contactsService.addNote(id, user.id, dto.content)
   }
 

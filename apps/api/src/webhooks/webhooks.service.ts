@@ -16,8 +16,13 @@ export const WEBHOOK_EVENTS = [
   'lead.created',
   'card.viewed',
   'card.click',
+  'contact.created',
+  'contact.updated',
+  'contact.deleted',
   'contact.stage_changed',
   'contact.enriched',
+  'contact.note_added',
+  'contact.email_sent',
 ] as const
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number]

@@ -9,13 +9,11 @@ const _rawApiUrl = process.env.EXPO_PUBLIC_API_URL
 if (!_rawApiUrl) {
   throw new Error(
     'EXPO_PUBLIC_API_URL is not set. ' +
-    'Add it to your .env file (development) or EAS secrets (production).',
+      'Add it to your .env file (development) or EAS secrets (production).',
   )
 }
 if (!_rawApiUrl.startsWith('https://') && process.env.NODE_ENV === 'production') {
-  throw new Error(
-    `EXPO_PUBLIC_API_URL must use HTTPS in production. Got: ${_rawApiUrl}`,
-  )
+  throw new Error(`EXPO_PUBLIC_API_URL must use HTTPS in production. Got: ${_rawApiUrl}`)
 }
 const API_URL = _rawApiUrl
 
@@ -28,7 +26,7 @@ function assertAllowedMimeType(mimeType: string, context: string): void {
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new Error(
       `${context}: unsupported MIME type "${mimeType}". ` +
-      `Allowed types: ${[...ALLOWED_MIME_TYPES].join(', ')}`,
+        `Allowed types: ${[...ALLOWED_MIME_TYPES].join(', ')}`,
     )
   }
 }
@@ -91,6 +89,16 @@ export const api = {
   getContact: (id: string) => apiFetch<unknown>(`/contacts/${id}`),
   updateContactStage: (id: string, stage: string) =>
     apiFetch(`/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
+  addNote: (id: string, content: string) =>
+    apiFetch(`/contacts/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
+  sendEmail: (id: string, subject: string, body: string) =>
+    apiFetch(`/contacts/${id}/send-email`, {
+      method: 'POST',
+      body: JSON.stringify({ subject, body }),
+    }),
+  updateTags: (id: string, tags: string[]) =>
+    apiFetch(`/contacts/${id}`, { method: 'PUT', body: JSON.stringify({ tags }) }),
+  triggerEnrich: (id: string) => apiFetch(`/contacts/${id}/enrich`, { method: 'POST' }),
 }
 
 // Card creation / editing functions
@@ -178,10 +186,7 @@ export interface ScannedContact {
   address: string | null
 }
 
-export async function scanBusinessCard(
-  base64: string,
-  mimeType: string,
-): Promise<ScannedContact> {
+export async function scanBusinessCard(base64: string, mimeType: string): Promise<ScannedContact> {
   // H-08: Validate mimeType against allowlist before sending to server.
   assertAllowedMimeType(mimeType, 'scanBusinessCard')
   return apiFetch<ScannedContact>('/ai/scan-card', {

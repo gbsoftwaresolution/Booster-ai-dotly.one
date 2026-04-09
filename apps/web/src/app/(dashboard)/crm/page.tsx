@@ -30,8 +30,14 @@ interface PipelineContact {
 
 type PipelineData = Record<string, PipelineContact[]>
 
+interface PipelineResponse {
+  pipeline: PipelineData
+  truncated: boolean
+  visibleCount: number
+}
+
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
-type Stage = typeof STAGES[number]
+type Stage = (typeof STAGES)[number]
 
 const STAGE_LABELS: Record<Stage, string> = {
   NEW: 'New',
@@ -54,7 +60,12 @@ async function getToken(): Promise<string | undefined> {
 }
 
 function getInitials(name: string): string {
-  return name.split(' ').map(p => p[0] ?? '').slice(0, 2).join('').toUpperCase()
+  return name
+    .split(' ')
+    .map((p) => p[0] ?? '')
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 }
 
 function timeAgo(dateStr: string): string {
@@ -90,15 +101,16 @@ function KanbanCard({
         <div className="min-w-0 flex-1">
           <button
             type="button"
-            onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onOpen() }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
             className="block w-full text-left text-sm font-semibold text-gray-900 hover:text-indigo-600 truncate"
           >
             {contact.name}
           </button>
-          {contact.company && (
-            <p className="truncate text-xs text-gray-500">{contact.company}</p>
-          )}
+          {contact.company && <p className="truncate text-xs text-gray-500">{contact.company}</p>}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {contact.sourceCard && (
               <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-700">
@@ -149,7 +161,7 @@ function DroppableColumn({
         {contacts.length === 0 ? (
           <p className="py-4 text-center text-xs text-gray-400">Drop cards here</p>
         ) : (
-          contacts.map(contact => (
+          contacts.map((contact) => (
             <KanbanCard
               key={contact.id}
               contact={contact}
@@ -164,23 +176,23 @@ function DroppableColumn({
 
 export default function CrmPage(): JSX.Element {
   const [pipeline, setPipeline] = useState<PipelineData>({})
+  const [truncated, setTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const loadPipeline = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const token = await getToken()
-      const data = await apiGet<PipelineData>('/crm/pipeline', token)
-      setPipeline(data)
+      const data = await apiGet<PipelineResponse>('/crm/pipeline', token)
+      setPipeline(data.pipeline)
+      setTruncated(data.truncated)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load pipeline')
     } finally {
@@ -194,15 +206,20 @@ export default function CrmPage(): JSX.Element {
 
   // Find the active contact for drag overlay
   const activeContact = activeId
-    ? Object.values(pipeline).flat().find(c => c.id === activeId) ?? null
+    ? (Object.values(pipeline)
+        .flat()
+        .find((c) => c.id === activeId) ?? null)
     : null
 
-  const findContactStage = useCallback((contactId: string): Stage | null => {
-    for (const stage of STAGES) {
-      if ((pipeline[stage] ?? []).some(c => c.id === contactId)) return stage
-    }
-    return null
-  }, [pipeline])
+  const findContactStage = useCallback(
+    (contactId: string): Stage | null => {
+      for (const stage of STAGES) {
+        if ((pipeline[stage] ?? []).some((c) => c.id === contactId)) return stage
+      }
+      return null
+    },
+    [pipeline],
+  )
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
@@ -212,81 +229,104 @@ export default function CrmPage(): JSX.Element {
     // Could implement live preview here; keeping it simple for now
   }
 
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    setActiveId(null)
-    const { active, over } = event
-    if (!over) return
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      setActiveId(null)
+      const { active, over } = event
+      if (!over) return
 
-    const contactId = String(active.id)
-    const targetStage = String(over.id) as Stage
+      const contactId = String(active.id)
+      const targetStage = String(over.id) as Stage
 
-    const sourceStage = findContactStage(contactId)
-    if (!sourceStage || sourceStage === targetStage) return
+      const sourceStage = findContactStage(contactId)
+      if (!sourceStage || sourceStage === targetStage) return
 
-    // Optimistic UI
-    const contact = (pipeline[sourceStage] ?? []).find(c => c.id === contactId)
-    if (!contact) return
+      // Optimistic UI
+      const contact = (pipeline[sourceStage] ?? []).find((c) => c.id === contactId)
+      if (!contact) return
 
-    setPipeline(prev => {
-      const next = { ...prev }
-      next[sourceStage] = (next[sourceStage] ?? []).filter(c => c.id !== contactId)
-      next[targetStage] = [
-        { ...contact, crmPipeline: { ...contact.crmPipeline, stage: targetStage } },
-        ...(next[targetStage] ?? []),
-      ]
-      return next
-    })
-
-    try {
-      const token = await getToken()
-      await apiPatch(`/contacts/${contactId}/stage`, { stage: targetStage }, token)
-    } catch {
-      // Revert
-      setPipeline(prev => {
+      setPipeline((prev) => {
         const next = { ...prev }
-        next[targetStage] = (next[targetStage] ?? []).filter(c => c.id !== contactId)
-        next[sourceStage] = [contact, ...(next[sourceStage] ?? [])]
+        next[sourceStage] = (next[sourceStage] ?? []).filter((c) => c.id !== contactId)
+        next[targetStage] = [
+          { ...contact, crmPipeline: { ...contact.crmPipeline, stage: targetStage } },
+          ...(next[targetStage] ?? []),
+        ]
         return next
       })
-      setToast('Failed to update stage. Change reverted.')
-      setTimeout(() => setToast(null), 4000)
-    }
-  }, [pipeline, findContactStage])
+
+      try {
+        const token = await getToken()
+        await apiPatch(`/contacts/${contactId}/stage`, { stage: targetStage }, token)
+      } catch {
+        // Revert
+        setPipeline((prev) => {
+          const next = { ...prev }
+          next[targetStage] = (next[targetStage] ?? []).filter((c) => c.id !== contactId)
+          next[sourceStage] = [contact, ...(next[sourceStage] ?? [])]
+          return next
+        })
+        setToast('Failed to update stage. Change reverted.')
+        setTimeout(() => setToast(null), 4000)
+      }
+    },
+    [pipeline, findContactStage],
+  )
 
   const handleCloseDrawer = useCallback(() => setDrawerContactId(null), [])
 
-  const handleDrawerUpdate = useCallback((updated: import('@/components/crm/ContactDetailDrawer').ContactDetail) => {
-    // Reflect stage change in pipeline
-    if (updated.crmPipeline) {
-      void loadPipeline()
-    }
-  }, [loadPipeline])
+  const handleDrawerUpdate = useCallback(
+    (updated: import('@/components/crm/ContactDetailDrawer').ContactDetail) => {
+      // Reflect stage change in pipeline
+      if (updated.crmPipeline) {
+        void loadPipeline()
+      }
+    },
+    [loadPipeline],
+  )
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">CRM Pipeline</h1>
-        <p className="mt-1 text-sm text-gray-500">Drag contacts between stages to update their pipeline status.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Drag contacts between stages to update their pipeline status.
+        </p>
       </div>
 
       {/* Error */}
       {error && (
         <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           <span>{error}</span>
-          <button type="button" onClick={() => void loadPipeline()} className="font-semibold underline">Retry</button>
+          <button
+            type="button"
+            onClick={() => void loadPipeline()}
+            className="font-semibold underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Truncation warning */}
+      {truncated && !loading && (
+        <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
+          Showing the first 200 contacts. Use the{' '}
+          <a href="/contacts" className="font-semibold underline">
+            Contacts page
+          </a>{' '}
+          to view and filter all contacts.
         </div>
       )}
 
       {/* Toast */}
-      {toast && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{toast}</div>
-      )}
+      {toast && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{toast}</div>}
 
       {/* Loading skeleton */}
       {loading ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {STAGES.map(s => (
+          {STAGES.map((s) => (
             <div key={s} className="h-64 w-64 shrink-0 animate-pulse rounded-xl bg-gray-100" />
           ))}
         </div>
@@ -295,10 +335,10 @@ export default function CrmPage(): JSX.Element {
           sensors={sensors}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
-          onDragEnd={e => void handleDragEnd(e)}
+          onDragEnd={(e) => void handleDragEnd(e)}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STAGES.map(stage => (
+            {STAGES.map((stage) => (
               <DroppableColumn
                 key={stage}
                 stage={stage}
@@ -317,8 +357,12 @@ export default function CrmPage(): JSX.Element {
                     {getInitials(activeContact.name)}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 truncate">{activeContact.name}</p>
-                    {activeContact.company && <p className="text-xs text-gray-500 truncate">{activeContact.company}</p>}
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {activeContact.name}
+                    </p>
+                    {activeContact.company && (
+                      <p className="text-xs text-gray-500 truncate">{activeContact.company}</p>
+                    )}
                   </div>
                 </div>
               </div>

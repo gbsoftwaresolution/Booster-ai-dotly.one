@@ -27,11 +27,30 @@ const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'imag
 
 const ALLOWED_MIME_TYPES = [
   ...ALLOWED_IMAGE_MIME_TYPES,
+  // Audio
   'audio/mpeg',
   'audio/wav',
   'audio/ogg',
   'audio/mp4',
+  'audio/m4a',
+  'audio/x-m4a',
+  // PDF
   'application/pdf',
+  // Word
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  // Excel
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  // PowerPoint
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  // CSV / text
+  'text/csv',
+  'text/plain',
+  // ZIP
+  'application/zip',
+  'application/x-zip-compressed',
 ] as const
 
 class UploadUrlDto {

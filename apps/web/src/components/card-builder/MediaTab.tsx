@@ -20,7 +20,6 @@ import {
   AlertCircle,
   Loader2,
   Eye,
-  ChevronRight,
   Film,
   FileAudio,
   FileImage,
@@ -111,6 +110,11 @@ function guessDocType(url: string): boolean {
   )
 }
 
+/** Returns true only for PDF URLs — used to restrict doc detection in media groups. */
+function isPdfUrl(url: string): boolean {
+  return url.toLowerCase().endsWith('.pdf')
+}
+
 function youtubeId(url: string): string | null {
   try {
     const u = new URL(url)
@@ -128,7 +132,10 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/** Split blocks into media groups and document group */
+/** Split blocks into media groups and the downloads-only document group.
+ *  A DOCUMENT block belongs to "Downloads" only when groupId === DOCS_GROUP_ID.
+ *  DOCUMENT blocks with a regular groupId (PDF added to a media group) stay in mediaGroups.
+ */
 function splitBlocks(blocks: MediaBlockData[]): {
   mediaGroups: Group[]
   docBlocks: MediaBlockData[]
@@ -138,7 +145,8 @@ function splitBlocks(blocks: MediaBlockData[]): {
   const groupOrder: string[] = []
 
   for (const b of [...blocks].sort((a, c) => a.displayOrder - c.displayOrder)) {
-    if (b.type === MediaBlockType.DOCUMENT) {
+    // Only route to downloads if explicitly assigned there
+    if (b.type === MediaBlockType.DOCUMENT && b.groupId === DOCS_GROUP_ID) {
       docBlocks.push(b)
       continue
     }
@@ -222,6 +230,58 @@ function TypePill({ type }: { type: Exclude<MediaBlockType, 'HEADING'> }) {
   )
 }
 
+// ─── PDF thumbnail (renders first page via scaled iframe) ────────────────────
+
+function PdfThumb({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed || !url) {
+    return (
+      <div className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center bg-red-50">
+        <div className="flex flex-col items-center gap-0.5">
+          <svg width="24" height="28" viewBox="0 0 24 28" fill="none" aria-hidden>
+            <rect width="24" height="28" rx="3" fill="#ef4444" />
+            <rect x="3" y="3" width="18" height="22" rx="2" fill="white" />
+            <text
+              x="12"
+              y="18"
+              textAnchor="middle"
+              fontSize="7"
+              fontWeight="900"
+              fill="#ef4444"
+              fontFamily="system-ui,sans-serif"
+              letterSpacing="0.5"
+            >
+              PDF
+            </text>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-14 h-14 rounded-xl shrink-0 overflow-hidden bg-gray-100 relative">
+      {/* Overlay to block pointer events so the iframe doesn't capture clicks */}
+      <div className="absolute inset-0 z-10" />
+      <iframe
+        src={`${url}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+        title="PDF preview"
+        scrolling="no"
+        onError={() => setFailed(true)}
+        style={{
+          width: 560,
+          height: 560,
+          transform: 'scale(0.1)',
+          transformOrigin: '0 0',
+          border: 'none',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  )
+}
+
 // ─── Block thumbnail ──────────────────────────────────────────────────────────
 
 function BlockThumb({ block }: { block: MediaBlockData }) {
@@ -263,6 +323,11 @@ function BlockThumb({ block }: { block: MediaBlockData }) {
         </div>
       </div>
     )
+  }
+
+  // PDF in a media group — render first page as thumbnail
+  if (block.type === MediaBlockType.DOCUMENT && block.groupId !== DOCS_GROUP_ID) {
+    return <PdfThumb url={block.url ?? ''} />
   }
 
   return (
@@ -307,6 +372,7 @@ function BlockCard({
   const [expanded, setExpanded] = useState(false)
   const type = block.type as Exclude<MediaBlockType, 'HEADING'>
   const m = TYPE_META[type]
+  const isDownloadDoc = block.type === MediaBlockType.DOCUMENT && block.groupId === DOCS_GROUP_ID
 
   return (
     <div
@@ -371,6 +437,25 @@ function BlockCard({
         </div>
       </div>
 
+      {/* Inline title field for download docs — always visible, no expand needed */}
+      {isDownloadDoc && (
+        <div className="border-t border-gray-50 px-3 py-2.5 bg-amber-50/40">
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-amber-600">
+            Title
+            <span className="ml-1 normal-case font-normal tracking-normal text-amber-400">
+              (shown on the download card)
+            </span>
+          </label>
+          <input
+            type="text"
+            value={block.caption ?? ''}
+            onChange={(e) => onUpdate('caption', e.target.value)}
+            placeholder="e.g. Company Profile, Product Brochure…"
+            className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all"
+          />
+        </div>
+      )}
+
       {expanded && (
         <div className="border-t border-gray-50 p-3 space-y-2.5 bg-gray-50/60">
           {/* Media URL */}
@@ -393,19 +478,21 @@ function BlockCard({
             </div>
           </div>
 
-          {/* Caption */}
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Caption / Title
-            </label>
-            <input
-              type="text"
-              value={block.caption ?? ''}
-              onChange={(e) => onUpdate('caption', e.target.value)}
-              placeholder="Add a caption…"
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 transition-all"
-            />
-          </div>
+          {/* Caption — hidden for download docs since they have the inline Title field */}
+          {!isDownloadDoc && (
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                Caption / Title
+              </label>
+              <input
+                type="text"
+                value={block.caption ?? ''}
+                onChange={(e) => onUpdate('caption', e.target.value)}
+                placeholder="Add a caption…"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 placeholder:text-gray-300 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 transition-all"
+              />
+            </div>
+          )}
 
           {block.type === MediaBlockType.IMAGE && (
             <div>
@@ -489,7 +576,15 @@ function AddSheet({
   const [dragActive, setDragActive] = useState(false)
   const idCounterRef = useRef(Date.now())
 
-  const detectedType = url ? (isDoc ? MediaBlockType.DOCUMENT : guessMediaType(url)) : null
+  // For URL mode: detect type for the hint banner
+  // When isDoc=false, only PDF URLs are treated as DOCUMENT (inline embed); Word/Excel/etc. not allowed in media groups
+  const detectedType = url
+    ? isDoc
+      ? MediaBlockType.DOCUMENT
+      : isPdfUrl(url)
+        ? MediaBlockType.DOCUMENT
+        : guessMediaType(url)
+    : null
 
   const canAdd = url.trim().length > 0
 
@@ -503,9 +598,16 @@ function AddSheet({
       setLinkError('Enter a valid URL (https://…)')
       return
     }
+    // For media groups: only PDF is allowed as a document URL; block Word/Excel/etc.
+    if (!isDoc && guessDocType(url) && !isPdfUrl(url)) {
+      setUrlError(
+        'Only PDF links are allowed in media groups. Use the Downloads section for other document types.',
+      )
+      return
+    }
     const type = isDoc
       ? MediaBlockType.DOCUMENT
-      : guessDocType(url)
+      : isPdfUrl(url)
         ? MediaBlockType.DOCUMENT
         : guessMediaType(url)
     const block: MediaBlockData = {
@@ -524,26 +626,49 @@ function AddSheet({
 
   const processFile = useCallback(
     async (file: File) => {
-      const isImage = file.type.startsWith('image/')
-      const isVideo = file.type.startsWith('video/')
-      const isAudio = file.type.startsWith('audio/')
-      const isPdf = file.type === 'application/pdf'
+      // Some browsers report empty type for .doc, .zip, etc — fall back to extension map
+      const EXT_MIME: Record<string, string> = {
+        pdf: 'application/pdf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt: 'application/vnd.ms-powerpoint',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        csv: 'text/csv',
+        txt: 'text/plain',
+        zip: 'application/zip',
+        mp3: 'audio/mpeg',
+        wav: 'audio/wav',
+        ogg: 'audio/ogg',
+        m4a: 'audio/mp4',
+        mp4: 'video/mp4',
+        webm: 'video/webm',
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+      const resolvedType = file.type || EXT_MIME[ext] || 'application/octet-stream'
+
+      const isImage = resolvedType.startsWith('image/')
+      const isVideo = resolvedType.startsWith('video/')
+      const isAudio = resolvedType.startsWith('audio/')
+      const isPdf = resolvedType === 'application/pdf'
       const isOtherDoc =
-        file.type.includes('word') ||
-        file.type.includes('excel') ||
-        file.type.includes('spreadsheet') ||
-        file.type.includes('presentation') ||
-        file.type.includes('powerpoint') ||
-        file.type === 'text/csv' ||
-        file.type === 'text/plain' ||
-        file.type === 'application/zip'
+        resolvedType.includes('word') ||
+        resolvedType.includes('excel') ||
+        resolvedType.includes('spreadsheet') ||
+        resolvedType.includes('presentation') ||
+        resolvedType.includes('powerpoint') ||
+        resolvedType === 'text/csv' ||
+        resolvedType === 'text/plain' ||
+        resolvedType === 'application/zip' ||
+        resolvedType === 'application/x-zip-compressed'
 
       let blockType: MediaBlockData['type'] = MediaBlockType.IMAGE
       if (isVideo) blockType = MediaBlockType.VIDEO
       else if (isAudio) blockType = MediaBlockType.AUDIO
       else if (isPdf || isOtherDoc || isDoc) blockType = MediaBlockType.DOCUMENT
 
-      const shouldConvert = isImage && file.type !== 'image/gif' && !isDoc
+      const shouldConvert = isImage && resolvedType !== 'image/gif' && !isDoc
 
       setUploading(true)
       setUploadError(null)
@@ -554,7 +679,7 @@ function AddSheet({
           const token = await getAccessToken()
 
           let uploadBlob: Blob = file
-          let uploadMime = file.type
+          let uploadMime = resolvedType
           let uploadFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
 
           if (shouldConvert) {
@@ -611,7 +736,7 @@ function AddSheet({
           })
           if (!res.ok) throw new Error('Upload failed — please try again')
           publicUrl = pub
-        } else if (isPdf || isOtherDoc) {
+        } else if (isPdf || isOtherDoc || isDoc) {
           const token = await getAccessToken()
           const uploadFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
           const { uploadUrl, publicUrl: pub } = await apiPost<{
@@ -619,16 +744,19 @@ function AddSheet({
             publicUrl: string
           }>(
             `/cards/${cardId}/upload-url`,
-            { filename: uploadFilename, contentType: file.type },
+            { filename: uploadFilename, contentType: resolvedType },
             token,
           )
           const res = await fetch(uploadUrl, {
             method: 'PUT',
             body: file,
-            headers: { 'Content-Type': file.type },
+            headers: { 'Content-Type': resolvedType },
           })
           if (!res.ok) throw new Error('Upload failed — please try again')
           publicUrl = pub
+        } else if (isVideo || isAudio) {
+          // Video/audio: use object URL (not uploaded to R2)
+          publicUrl = URL.createObjectURL(file)
         } else {
           publicUrl = URL.createObjectURL(file)
         }
@@ -640,10 +768,10 @@ function AddSheet({
           caption: file.name.replace(/\.[^.]+$/, ''),
           altText: isImage ? file.name : undefined,
           displayOrder: blockCount,
-          mimeType: file.type || undefined,
+          mimeType: resolvedType !== 'application/octet-stream' ? resolvedType : undefined,
           fileSize: file.size || undefined,
-          groupId: blockType === MediaBlockType.DOCUMENT ? DOCS_GROUP_ID : groupId,
-          groupName: blockType === MediaBlockType.DOCUMENT ? 'Downloads' : groupName,
+          groupId: isDoc ? DOCS_GROUP_ID : groupId,
+          groupName: isDoc ? 'Downloads' : groupName,
         }
         onAdd(block)
       } catch (err) {
@@ -750,7 +878,7 @@ function AddSheet({
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && commit()}
                   placeholder={
-                    isDoc ? 'PDF, Google Docs, SlideShare…' : 'YouTube, Spotify, image URL…'
+                    isDoc ? 'PDF, Google Docs, SlideShare…' : 'YouTube, Spotify, image or PDF URL…'
                   }
                   autoFocus
                   className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
@@ -766,7 +894,7 @@ function AddSheet({
                 <p className="mt-1.5 px-1 text-[11px] text-gray-400">
                   {isDoc
                     ? 'Supports PDF · Google Docs · SlideShare · DocSend'
-                    : 'Supports YouTube · Vimeo · Spotify · SoundCloud · any image URL'}
+                    : 'Supports YouTube · Vimeo · Spotify · SoundCloud · images · PDF'}
                 </p>
               )}
             </div>
@@ -940,7 +1068,7 @@ function AddSheet({
                     <p className="text-xs text-gray-400 mt-1">
                       {isDoc
                         ? 'PDF · Word · Excel · PowerPoint · CSV · TXT · ZIP'
-                        : 'JPG · PNG · WebP · GIF · PDF · MP3 · MP4'}
+                        : 'JPG · PNG · WebP · GIF · MP4 · MP3 · PDF'}
                     </p>
                   </div>
                 </>
@@ -1087,9 +1215,7 @@ function GroupCard({
           {group.blocks.length > 0 && (
             <div className="space-y-2">
               {group.blocks.map((block, index) => {
-                const globalIndex = mediaBlocksAll
-                  .filter((b) => b.type !== MediaBlockType.DOCUMENT)
-                  .findIndex((b) => b.id === block.id)
+                const globalIndex = mediaBlocksAll.findIndex((b) => b.id === block.id)
                 return (
                   <BlockCard
                     key={block.id}
@@ -1312,8 +1438,9 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
 
   const sorted = [...mediaBlocks].sort((a, b) => a.displayOrder - b.displayOrder)
   const { mediaGroups, docBlocks } = splitBlocks(sorted)
-  const mediaOnlyBlocks = sorted.filter((b) => b.type !== MediaBlockType.DOCUMENT)
-  const mediaCount = mediaOnlyBlocks.length
+  // mediaCount = all blocks that are NOT in the downloads section (__docs__)
+  // This includes group PDFs (DOCUMENT blocks with a named groupId).
+  const mediaCount = sorted.filter((b) => b.groupId !== DOCS_GROUP_ID).length
   const docCount = docBlocks.length
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -1375,10 +1502,6 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
   }, [newGroupName])
 
   const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string } | null>(null)
-
-  const handleDragStart = (index: number) => {
-    dragIndexRef.current = index
-  }
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault()
@@ -1571,7 +1694,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
       )}
 
       {/* ── Documents section ── */}
-      {(docBlocks.length > 0 || hasAnything) && (
+      {(docBlocks.length > 0 || allGroups.length > 0) && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">

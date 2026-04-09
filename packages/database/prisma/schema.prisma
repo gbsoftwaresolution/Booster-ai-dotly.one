@@ -434,8 +434,9 @@ model LeadForm {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  card   Card        @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  fields LeadField[]
+  card        Card          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  fields      LeadField[]
+  submissions LeadSubmission[]
 
   @@map("lead_forms")
 }
@@ -456,6 +457,25 @@ model LeadField {
 
   @@index([leadFormId])
   @@map("lead_fields")
+}
+
+// One row per public lead form submission — stores the raw field answers.
+// contactId links back to the Contact created at submission time (nullable
+// for cases where the contact could not be created, e.g. duplicate email).
+model LeadSubmission {
+  id         String   @id @default(cuid())
+  leadFormId String
+  contactId  String?
+  // JSON object mapping normalised field label → submitted value
+  // e.g. { "name": "Jane", "company": "Acme", "interest": "Sales" }
+  answers    Json     @default("{}")
+  submittedAt DateTime @default(now())
+
+  leadForm LeadForm @relation(fields: [leadFormId], references: [id], onDelete: Cascade)
+
+  @@index([leadFormId])
+  @@index([contactId])
+  @@map("lead_submissions")
 }
 
 // ─── Outbound Webhooks (P0.2) ─────────────────────────────────────────────────

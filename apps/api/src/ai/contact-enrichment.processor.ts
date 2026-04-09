@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common'
 import { Job } from 'bull'
 import { PrismaService } from '../prisma/prisma.service'
 import { AiService } from './ai.service'
+import { WebhooksService } from '../webhooks/webhooks.service'
 
 interface EnrichmentJobData {
   contactId: string
@@ -15,6 +16,7 @@ export class ContactEnrichmentProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
+    private readonly webhooksService: WebhooksService,
   ) {}
 
   @Process('enrich')
@@ -45,10 +47,9 @@ export class ContactEnrichmentProcessor {
         // M-06: Only store a LinkedIn URL if it starts with the canonical
         // linkedin.com prefix. GPT can hallucinate arbitrary URLs; storing
         // them could enable open redirects or stored XSS via the UI.
-        inferredLinkedIn:
-          result.inferredLinkedIn?.startsWith('https://www.linkedin.com/')
-            ? result.inferredLinkedIn
-            : null,
+        inferredLinkedIn: result.inferredLinkedIn?.startsWith('https://www.linkedin.com/')
+          ? result.inferredLinkedIn
+          : null,
         enrichmentScore: result.enrichmentScore,
         enrichmentSummary: result.summary,
         enrichedAt: new Date(),
@@ -56,5 +57,17 @@ export class ContactEnrichmentProcessor {
     })
 
     this.logger.log(`Contact ${contactId} enriched (score: ${result.enrichmentScore})`)
+
+    // Fire-and-forget webhook fan-out for contact.enriched
+    void this.webhooksService
+      .fanOut(contact.ownerUserId, 'contact.enriched', {
+        contactId,
+        name: contact.name,
+        email: contact.email ?? null,
+        enrichmentScore: result.enrichmentScore,
+        inferredIndustry: result.inferredIndustry ?? null,
+        inferredSeniority: result.inferredSeniority ?? null,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.enriched)', err))
   }
 }

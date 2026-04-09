@@ -45,7 +45,7 @@ interface ContactDetailDrawerProps {
 }
 
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
-type Stage = typeof STAGES[number]
+type Stage = (typeof STAGES)[number]
 
 const STAGE_COLORS: Record<Stage, string> = {
   NEW: 'bg-gray-100 text-gray-700 border-gray-300',
@@ -81,7 +81,7 @@ function timeAgo(dateStr: string): string {
 function getInitials(name: string): string {
   return name
     .split(' ')
-    .map(p => p[0] ?? '')
+    .map((p) => p[0] ?? '')
     .slice(0, 2)
     .join('')
     .toUpperCase()
@@ -92,7 +92,8 @@ function TimelineItem({ event }: { event: TimelineEvent }): JSX.Element {
 
   let label = event.event
   if (event.event === 'LEAD_CAPTURED') label = 'Lead captured'
-  else if (event.event === 'STAGE_CHANGED') label = `Stage: ${String(meta.from ?? '')} → ${String(meta.to ?? '')}`
+  else if (event.event === 'STAGE_CHANGED')
+    label = `Stage: ${String(meta.from ?? '')} → ${String(meta.to ?? '')}`
   else if (event.event === 'NOTE_ADDED') label = 'Note added'
   else if (event.event === 'EMAIL_SENT') label = 'Email sent'
 
@@ -110,7 +111,11 @@ function TimelineItem({ event }: { event: TimelineEvent }): JSX.Element {
   )
 }
 
-export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDetailDrawerProps): JSX.Element | null {
+export function ContactDetailDrawer({
+  contactId,
+  onClose,
+  onUpdate,
+}: ContactDetailDrawerProps): JSX.Element | null {
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
@@ -152,44 +157,59 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const saveField = useCallback(async (field: string, value: string) => {
-    if (!contact) return
-    try {
-      const token = await getToken()
-      const updated = await apiPut<ContactDetail>(`/contacts/${contact.id}`, { [field]: value }, token)
-      setContact(prev => prev ? { ...prev, ...updated } : prev)
-      onUpdate?.(updated)
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to save field')
-    }
-  }, [contact, onUpdate])
-
-  const handleStageChange = useCallback(async (stage: Stage) => {
-    if (!contact) return
-    try {
-      const token = await getToken()
-      await apiPatch(`/contacts/${contact.id}/stage`, { stage }, token)
-      setContact(prev => prev ? { ...prev, crmPipeline: { ...prev.crmPipeline, stage } } : prev)
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to update stage')
-    }
-  }, [contact])
-
-  const handleNoteChange = useCallback((value: string) => {
-    setNoteText(value)
-    setNoteSaved(false)
-    if (noteDebounceRef.current) clearTimeout(noteDebounceRef.current)
-    noteDebounceRef.current = setTimeout(async () => {
+  const saveField = useCallback(
+    async (field: string, value: string) => {
       if (!contact) return
       try {
         const token = await getToken()
-        await apiPost(`/contacts/${contact.id}/notes`, { content: value }, token)
-        setNoteSaved(true)
+        const updated = await apiPut<ContactDetail>(
+          `/contacts/${contact.id}`,
+          { [field]: value },
+          token,
+        )
+        setContact((prev) => (prev ? { ...prev, ...updated } : prev))
+        onUpdate?.(updated)
       } catch (err) {
-        setDrawerError(err instanceof Error ? err.message : 'Failed to save note')
+        setDrawerError(err instanceof Error ? err.message : 'Failed to save field')
       }
-    }, 500)
-  }, [contact])
+    },
+    [contact, onUpdate],
+  )
+
+  const handleStageChange = useCallback(
+    async (stage: Stage) => {
+      if (!contact) return
+      try {
+        const token = await getToken()
+        await apiPatch(`/contacts/${contact.id}/stage`, { stage }, token)
+        setContact((prev) =>
+          prev ? { ...prev, crmPipeline: { ...prev.crmPipeline, stage } } : prev,
+        )
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to update stage')
+      }
+    },
+    [contact],
+  )
+
+  const handleNoteChange = useCallback(
+    (value: string) => {
+      setNoteText(value)
+      setNoteSaved(false)
+      if (noteDebounceRef.current) clearTimeout(noteDebounceRef.current)
+      noteDebounceRef.current = setTimeout(async () => {
+        if (!contact) return
+        try {
+          const token = await getToken()
+          await apiPost(`/contacts/${contact.id}/notes`, { content: value }, token)
+          setNoteSaved(true)
+        } catch (err) {
+          setDrawerError(err instanceof Error ? err.message : 'Failed to save note')
+        }
+      }, 500)
+    },
+    [contact],
+  )
 
   const addTag = useCallback(async () => {
     if (!contact || !newTag.trim()) return
@@ -197,24 +217,27 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
     try {
       const token = await getToken()
       await apiPut(`/contacts/${contact.id}`, { tags }, token)
-      setContact(prev => prev ? { ...prev, tags } : prev)
+      setContact((prev) => (prev ? { ...prev, tags } : prev))
       setNewTag('')
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Failed to add tag')
     }
   }, [contact, newTag])
 
-  const removeTag = useCallback(async (tag: string) => {
-    if (!contact) return
-    const tags = contact.tags.filter(t => t !== tag)
-    try {
-      const token = await getToken()
-      await apiPut(`/contacts/${contact.id}`, { tags }, token)
-      setContact(prev => prev ? { ...prev, tags } : prev)
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to remove tag')
-    }
-  }, [contact])
+  const removeTag = useCallback(
+    async (tag: string) => {
+      if (!contact) return
+      const tags = contact.tags.filter((t) => t !== tag)
+      try {
+        const token = await getToken()
+        await apiPut(`/contacts/${contact.id}`, { tags }, token)
+        setContact((prev) => (prev ? { ...prev, tags } : prev))
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to remove tag')
+      }
+    },
+    [contact],
+  )
 
   const handleReenrich = useCallback(async () => {
     if (!contact) return
@@ -236,7 +259,9 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
             setReenriching(false)
             return
           }
-        } catch { /* ignore poll errors */ }
+        } catch {
+          /* ignore poll errors */
+        }
         if (attempts < 15) {
           setTimeout(() => void poll(), 2000)
         } else {
@@ -257,10 +282,7 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
   return (
     <>
       {/* Overlay */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
 
       {/* Drawer */}
       <div
@@ -282,26 +304,33 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
                 autoFocus
                 className="w-full rounded border border-indigo-300 px-2 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={editName}
-                onChange={e => setEditName(e.target.value)}
+                onChange={(e) => setEditName(e.target.value)}
                 onBlur={async () => {
                   setEditingName(false)
                   if (editName.trim() && editName !== contact.name) {
                     await saveField('name', editName.trim())
                   }
                 }}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                }}
               />
             ) : (
               <button
                 type="button"
-                onClick={() => { setEditingName(true); setEditName(contact?.name ?? '') }}
+                onClick={() => {
+                  setEditingName(true)
+                  setEditName(contact?.name ?? '')
+                }}
                 className="block truncate text-left text-base font-semibold text-gray-900 hover:text-indigo-600"
               >
                 {loading ? 'Loading...' : (contact?.name ?? '')}
               </button>
             )}
             {contact?.crmPipeline && (
-              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[contact.crmPipeline.stage as Stage] ?? ''}`}>
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[contact.crmPipeline.stage as Stage] ?? ''}`}
+              >
                 {contact.crmPipeline.stage}
               </span>
             )}
@@ -334,7 +363,9 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
           )}
           {loading && (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-8 animate-pulse rounded bg-gray-100" />)}
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-8 animate-pulse rounded bg-gray-100" />
+              ))}
             </div>
           )}
 
@@ -342,7 +373,9 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
             <>
               {/* Contact info */}
               <section>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Contact Info</h3>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Contact Info
+                </h3>
                 <div className="space-y-2">
                   {[
                     { field: 'email', label: 'Email', icon: Mail, value: contact.email },
@@ -355,7 +388,7 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
                       label={label}
                       icon={Icon}
                       value={value ?? ''}
-                      onSave={v => saveField(field, v)}
+                      onSave={(v) => saveField(field, v)}
                     />
                   ))}
                   {contact.sourceCard && (
@@ -372,9 +405,11 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
 
               {/* Stage selector */}
               <section>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Stage</h3>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Stage
+                </h3>
                 <div className="flex flex-wrap gap-2">
-                  {STAGES.map(stage => {
+                  {STAGES.map((stage) => {
                     const isActive = contact.crmPipeline?.stage === stage
                     return (
                       <button
@@ -395,10 +430,15 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
 
               {/* Tags */}
               <section>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Tags</h3>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Tags
+                </h3>
                 <div className="flex flex-wrap gap-2">
-                  {contact.tags.map(tag => (
-                    <span key={tag} className="flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700">
+                  {contact.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700"
+                    >
                       {tag}
                       <button
                         type="button"
@@ -413,8 +453,10 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
                     type="text"
                     placeholder="Add tag..."
                     value={newTag}
-                    onChange={e => setNewTag(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') void addTag() }}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void addTag()
+                    }}
                     className="rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs text-gray-500 focus:border-indigo-400 focus:outline-none"
                   />
                 </div>
@@ -423,7 +465,9 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
               {/* Notes */}
               <section>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Notes</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Notes
+                  </h3>
                   {noteSaved && <span className="text-xs text-green-500">Saved</span>}
                 </div>
                 <textarea
@@ -431,7 +475,7 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
                   className="w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                   placeholder="Add a note..."
                   value={noteText}
-                  onChange={e => handleNoteChange(e.target.value)}
+                  onChange={(e) => handleNoteChange(e.target.value)}
                 />
               </section>
 
@@ -443,7 +487,7 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
                     Timeline
                   </h3>
                   <div className="divide-y divide-gray-100">
-                    {contact.timeline.map(event => (
+                    {contact.timeline.map((event) => (
                       <TimelineItem key={event.id} event={event} />
                     ))}
                   </div>
@@ -451,26 +495,34 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
               )}
 
               {/* AI Enrichment */}
-              {contact.enrichedAt && (
-                <section>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">AI Enrichment</h3>
-                    <button
-                      type="button"
-                      onClick={() => void handleReenrich()}
-                      disabled={reenriching}
-                      className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-100 disabled:opacity-50"
-                    >
-                      {reenriching ? 'Queuing...' : 'Re-enrich'}
-                    </button>
-                  </div>
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    AI Enrichment
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => void handleReenrich()}
+                    disabled={reenriching}
+                    className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-100 disabled:opacity-50"
+                  >
+                    {reenriching
+                      ? 'Queuing...'
+                      : contact.enrichedAt
+                        ? 'Re-enrich'
+                        : 'Enrich with AI'}
+                  </button>
+                </div>
+                {contact.enrichedAt ? (
                   <div className="space-y-3">
                     {/* Score bar */}
                     {contact.enrichmentScore != null && (
                       <div>
                         <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
                           <span>Confidence</span>
-                          <span className="font-medium text-gray-700">{contact.enrichmentScore}/100</span>
+                          <span className="font-medium text-gray-700">
+                            {contact.enrichmentScore}/100
+                          </span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
                           <div
@@ -505,19 +557,25 @@ export function ContactDetailDrawer({ contactId, onClose, onUpdate }: ContactDet
                       )}
                     </div>
                     {/* LinkedIn guess */}
-                    {contact.inferredLinkedIn && /^https:\/\/(www\.)?linkedin\.com\//.test(contact.inferredLinkedIn) && (
-                      <a
-                        href={contact.inferredLinkedIn}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-indigo-600 hover:underline"
-                      >
-                        Inferred LinkedIn: {contact.inferredLinkedIn}
-                      </a>
-                    )}
+                    {contact.inferredLinkedIn &&
+                      /^https:\/\/(www\.)?linkedin\.com\//.test(contact.inferredLinkedIn) && (
+                        <a
+                          href={contact.inferredLinkedIn}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-indigo-600 hover:underline"
+                        >
+                          Inferred LinkedIn: {contact.inferredLinkedIn}
+                        </a>
+                      )}
                   </div>
-                </section>
-              )}
+                ) : (
+                  <p className="text-xs text-gray-400">
+                    No enrichment data yet. Click &ldquo;Enrich with AI&rdquo; to analyse this
+                    contact.
+                  </p>
+                )}
+              </section>
             </>
           )}
         </div>
@@ -564,7 +622,9 @@ function EditableField({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
 
-  useEffect(() => { setDraft(value) }, [value])
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
 
   if (editing) {
     return (
@@ -574,12 +634,14 @@ function EditableField({
           autoFocus
           className="flex-1 rounded border border-indigo-300 px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           value={draft}
-          onChange={e => setDraft(e.target.value)}
+          onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
             setEditing(false)
             onSave(draft)
           }}
-          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
           placeholder={label}
         />
       </div>
