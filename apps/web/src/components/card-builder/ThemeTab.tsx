@@ -83,6 +83,14 @@ const TEMPLATES: {
     accent: 'bg-[#FF90E8]',
     textColor: 'text-[#000000]',
   },
+  {
+    id: CardTemplate.GLASSMORPHISM,
+    label: 'Glass',
+    description: 'Deep frosted blur',
+    bg: 'bg-[#0b0f19]',
+    accent: 'bg-white/5 border border-white/10 backdrop-blur-xl',
+    textColor: 'text-white',
+  },
 ]
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Playfair Display', 'Space Grotesk', 'Lato', 'Montserrat']

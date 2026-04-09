@@ -209,6 +209,28 @@ const TEMPLATES: {
       </div>
     ),
   },
+  {
+    id: CardTemplate.GLASSMORPHISM,
+    label: 'Glassmorphism',
+    description: 'Frosted-glass cards with blur/transparency effects.',
+    tags: ['Modern', 'Blur', 'Clean'],
+    preview: (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 p-3 relative overflow-hidden">
+        <div className="absolute -top-4 -left-4 w-16 h-16 bg-[#6366F1] rounded-full blur-[20px] opacity-60"></div>
+        <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-[#EC4899] rounded-full blur-[20px] opacity-60"></div>
+        
+        <div className="h-9 w-9 rounded-full border border-white/40 bg-white/20 backdrop-blur-md z-10 shadow-lg" />
+        <div className="h-2 w-16 bg-white z-10 rounded-full opacity-90 shadow-sm" />
+        <div className="h-1.5 w-12 bg-white/70 z-10 rounded-full" />
+        
+        <div className="mt-2 flex w-full flex-col gap-1.5 z-10">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-4 w-full rounded-md border border-white/20 bg-white/10 backdrop-blur-md shadow-sm" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────

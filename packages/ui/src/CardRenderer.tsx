@@ -9,6 +9,7 @@ import { ElegantTemplate } from './templates/ElegantTemplate'
 import { DarkTemplate } from './templates/DarkTemplate'
 import { NeonTemplate } from './templates/NeonTemplate'
 import { RetroTemplate } from './templates/RetroTemplate'
+import { GlassmorphismTemplate } from './templates/GlassmorphismTemplate'
 
 export function CardRenderer(props: CardRendererProps) {
   switch (props.card.templateId) {
@@ -24,6 +25,8 @@ export function CardRenderer(props: CardRendererProps) {
       return <ElegantTemplate {...props} />
     case CardTemplate.DARK:
       return <DarkTemplate {...props} />
+    case CardTemplate.GLASSMORPHISM:
+      return <GlassmorphismTemplate {...props} />
     case CardTemplate.RETRO:
       return <RetroTemplate {...props} />
     case CardTemplate.NEON:

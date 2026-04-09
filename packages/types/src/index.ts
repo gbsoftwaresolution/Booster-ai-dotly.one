@@ -23,6 +23,7 @@ export enum CardTemplate {
   DARK = 'DARK',
   NEON = 'NEON',
   RETRO = 'RETRO',
+  GLASSMORPHISM = 'GLASSMORPHISM',
 }
 
 export enum ContactStage {

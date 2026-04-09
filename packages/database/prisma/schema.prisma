@@ -33,6 +33,7 @@ enum CardTemplate {
   DARK
   NEON
   RETRO
+  GLASSMORPHISM
 }
 
 enum ContactStage {
