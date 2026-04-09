@@ -1,74 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import type { JSX } from 'react'
 import { cn } from '@/lib/cn'
-import {
-  LayoutDashboard,
-  CreditCard,
-  Users,
-  Kanban,
-  BarChart3,
-  Settings,
-  UsersRound,
-  FileSignature,
-  LogOut,
-  Webhook,
-  Inbox,
-  CheckSquare,
-  Mail,
-  DollarSign,
-  GitBranch,
-  SlidersHorizontal,
-  TrendingUp,
-} from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/cards', label: 'My Cards', icon: CreditCard },
-  { href: '/contacts', label: 'Contacts', icon: Users },
-  { href: '/leads', label: 'Lead Submissions', icon: Inbox },
-  { href: '/deals', label: 'Deals', icon: DollarSign },
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { href: '/crm', label: 'CRM', icon: Kanban },
-  { href: '/pipelines', label: 'Pipelines', icon: GitBranch },
-  { href: '/crm/custom-fields', label: 'Custom Fields', icon: SlidersHorizontal },
-  { href: '/crm/analytics', label: 'CRM Analytics', icon: TrendingUp },
-  { href: '/email-templates', label: 'Email Templates', icon: Mail },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/email-signature', label: 'Signature', icon: FileSignature },
-  { href: '/team', label: 'Team', icon: UsersRound },
-  { href: '/settings/webhooks', label: 'Webhooks', icon: Webhook },
-  { href: '/settings', label: 'Settings', icon: Settings },
-]
-
-// Five primary destinations surfaced in the mobile bottom tab bar.
-const bottomTabs = [
-  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/cards', label: 'Cards', icon: CreditCard },
-  { href: '/contacts', label: 'Contacts', icon: Users },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/settings', label: 'Settings', icon: Settings },
-]
-
-function useSignOut() {
-  const router = useRouter()
-  const [signingOut, setSigningOut] = useState(false)
-  const handleSignOut = async () => {
-    setSigningOut(true)
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.push('/auth')
-    } finally {
-      setSigningOut(false)
-    }
-  }
-  return { signingOut, handleSignOut }
-}
+import {
+  dashboardBottomTabs,
+  dashboardMoreSections,
+  dashboardNavSections,
+} from '@/components/navigation/dashboard-nav'
+import { useSignOut } from '@/hooks/useSignOut'
 
 // ─── Desktop sidebar ──────────────────────────────────────────────────────────
 
@@ -103,39 +46,46 @@ function DesktopSidebar(): JSX.Element {
           </span>
         </div>
 
-        {/* Nav items */}
-        <ul className="flex-1 space-y-0.5">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/')
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={cn(
-                    'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
-                    isActive
-                      ? 'bg-brand-50 text-brand-600'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
-                  )}
-                >
-                  {/* Active accent line */}
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand-500" />
-                  )}
-                  <Icon
-                    className={cn(
-                      'h-4 w-4 shrink-0 transition-colors',
-                      isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600',
-                    )}
-                    aria-hidden="true"
-                  />
-                  {label}
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+        <div className="flex-1 overflow-y-auto pr-1">
+          {dashboardNavSections.map((section) => (
+            <div key={section.title} className="mb-5 last:mb-0">
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                {section.title}
+              </p>
+              <ul className="space-y-0.5">
+                {section.items.map(({ href, label, icon: Icon }) => {
+                  const isActive = pathname === href || pathname.startsWith(href + '/')
+                  return (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(
+                          'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                          isActive
+                            ? 'bg-brand-50 text-brand-600'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
+                        )}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand-500" />
+                        )}
+                        <Icon
+                          className={cn(
+                            'h-4 w-4 shrink-0 transition-colors',
+                            isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600',
+                          )}
+                          aria-hidden="true"
+                        />
+                        {label}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
 
         {/* Sign out */}
         <div className="border-t border-gray-100 pt-3">
@@ -158,55 +108,159 @@ function DesktopSidebar(): JSX.Element {
 
 function MobileBottomNav(): JSX.Element {
   const pathname = usePathname()
+  const { signingOut, handleSignOut } = useSignOut()
+  const [moreOpen, setMoreOpen] = useState(false)
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden"
-      aria-label="Mobile navigation"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      {/* Frosted glass backing — same as iOS tab bar */}
-      <div
-        className="flex items-stretch border-t border-gray-200/70 bg-white/85"
-        style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+    <>
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 lg:hidden"
+        aria-label="Mobile navigation"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        {bottomTabs.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={isActive ? 'page' : undefined}
-              className="flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
-            >
-              {/* Pill highlight behind icon when active */}
-              <span
-                className={cn(
-                  'flex h-7 w-12 items-center justify-center rounded-full transition-all duration-200',
-                  isActive ? 'bg-brand-500' : 'bg-transparent',
-                )}
+        {/* Frosted glass backing — same as iOS tab bar */}
+        <div
+          className="flex items-stretch border-t border-gray-200/70 bg-white/85"
+          style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+        >
+          {dashboardBottomTabs.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href || pathname.startsWith(href + '/')
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={isActive ? 'page' : undefined}
+                className="flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
               >
-                <Icon
+                <span
                   className={cn(
-                    'h-[18px] w-[18px] transition-colors duration-200',
-                    isActive ? 'text-white' : 'text-gray-400',
+                    'flex h-7 w-12 items-center justify-center rounded-full transition-all duration-200',
+                    isActive ? 'bg-brand-500' : 'bg-transparent',
                   )}
-                  aria-hidden="true"
-                />
-              </span>
-              <span
-                className={cn(
-                  'text-[10px] font-medium leading-none tracking-wide transition-colors duration-200',
-                  isActive ? 'text-brand-600' : 'text-gray-400',
-                )}
+                >
+                  <Icon
+                    className={cn(
+                      'h-[18px] w-[18px] transition-colors duration-200',
+                      isActive ? 'text-white' : 'text-gray-400',
+                    )}
+                    aria-hidden="true"
+                  />
+                </span>
+                <span
+                  className={cn(
+                    'text-[10px] font-medium leading-none tracking-wide transition-colors duration-200',
+                    isActive ? 'text-brand-600' : 'text-gray-400',
+                  )}
+                >
+                  {label}
+                </span>
+              </Link>
+            )
+          })}
+
+          {/* More tab */}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className="flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
+            aria-label="More navigation options"
+          >
+            <span className="flex h-7 w-12 items-center justify-center rounded-full">
+              <svg
+                className="h-[18px] w-[18px] text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
               >
-                {label}
-              </span>
-            </Link>
-          )
-        })}
-      </div>
-    </nav>
+                <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="text-[10px] font-medium leading-none tracking-wide text-gray-400">
+              More
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      {/* More drawer */}
+      {moreOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/40 lg:hidden"
+            aria-hidden="true"
+            onClick={() => setMoreOpen(false)}
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white pb-safe lg:hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+              <span className="text-sm font-semibold text-gray-900">More</span>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(false)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <nav className="max-h-[60vh] overflow-y-auto px-3 py-3">
+              {dashboardMoreSections.map((section) => (
+                <div key={section.title} className="mb-4 last:mb-0">
+                  <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+                    {section.title}
+                  </p>
+                  <ul className="space-y-0.5">
+                    {section.items.map(({ href, label, icon: Icon }) => {
+                      const isActive = pathname === href || pathname.startsWith(href + '/')
+                      return (
+                        <li key={href}>
+                          <Link
+                            href={href}
+                            onClick={() => setMoreOpen(false)}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={cn(
+                              'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
+                              isActive
+                                ? 'bg-brand-50 text-brand-600'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                            )}
+                          >
+                            <Icon
+                              className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-500' : 'text-gray-400')}
+                              aria-hidden="true"
+                            />
+                            {label}
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => { setMoreOpen(false); void handleSignOut() }}
+                  disabled={signingOut}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                >
+                  <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {signingOut ? 'Signing out…' : 'Sign out'}
+                </button>
+              </div>
+            </nav>
+          </div>
+        </>
+      )}
+    </>
   )
 }
 

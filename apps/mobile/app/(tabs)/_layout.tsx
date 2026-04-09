@@ -23,17 +23,29 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Cards',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="credit-card" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Feather name="credit-card" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="contacts"
         options={{
           title: 'Contacts',
+          tabBarIcon: ({ color, size }) => <Feather name="users" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="deals"
+        options={{
+          title: 'Deals',
+          tabBarIcon: ({ color, size }) => <Feather name="trending-up" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tasks"
+        options={{
+          title: 'Tasks',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="users" size={size} color={color} />
+            <Feather name="check-square" size={size} color={color} />
           ),
         }}
       />
@@ -41,18 +53,21 @@ export default function TabsLayout() {
         name="analytics"
         options={{
           title: 'Analytics',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="bar-chart-2" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Feather name="bar-chart-2" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="scheduling"
+        options={{
+          title: 'Schedule',
+          tabBarIcon: ({ color, size }) => <Feather name="calendar" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="settings" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Feather name="settings" size={size} color={color} />,
         }}
       />
       {/* create-card is not a visible tab — navigated via FAB */}

@@ -1,0 +1,305 @@
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+} from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { api } from '../../lib/api'
+import { formatDate, getUserTimezone } from '../../lib/tz'
+
+interface Deal {
+  id: string
+  title: string
+  value: number | string
+  currency: string
+  stage: string
+  probability: number | string
+  closeDate: string | null
+  contact?: { id: string; name: string }
+}
+
+const STAGE_ORDER = ['PROSPECT', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'] as const
+
+const STAGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  PROSPECT: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+  PROPOSAL: { bg: '#fef9c3', text: '#a16207', border: '#fde68a' },
+  NEGOTIATION: { bg: '#f3e8ff', text: '#7c3aed', border: '#ddd6fe' },
+  CLOSED_WON: { bg: '#dcfce7', text: '#15803d', border: '#bbf7d0' },
+  CLOSED_LOST: { bg: '#fee2e2', text: '#b91c1c', border: '#fecaca' },
+}
+
+function stageLabel(stage: string): string {
+  return stage.replace('_', ' ')
+}
+
+function formatValue(value: number | string, currency: string): string {
+  const num = Number(value)
+  if (!num) return ''
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency || 'USD',
+      maximumFractionDigits: 0,
+    }).format(num)
+  } catch {
+    return `$${num}`
+  }
+}
+
+export default function DealsScreen() {
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [userTz, setUserTz] = useState<string | null>(null)
+
+  const loadDeals = useCallback(async () => {
+    try {
+      const [data, tz] = await Promise.all([api.getAllDeals(), getUserTimezone()])
+      setDeals(data as Deal[])
+      setUserTz(tz)
+      setError(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load deals')
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadDeals().finally(() => setLoading(false))
+  }, [loadDeals])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadDeals()
+    setRefreshing(false)
+  }, [loadDeals])
+
+  const handleChangeStage = useCallback(async (deal: Deal) => {
+    const stages = STAGE_ORDER as readonly string[]
+    const currentIdx = stages.indexOf(deal.stage)
+    const nextStage = stages[(currentIdx + 1) % stages.length] ?? stages[0]!
+    try {
+      await api.updateDealStage(deal.id, nextStage)
+      setDeals((prev) => prev.map((d) => (d.id === deal.id ? { ...d, stage: nextStage } : d)))
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update stage')
+    }
+  }, [])
+
+  const handleDelete = useCallback((dealId: string) => {
+    Alert.alert('Delete Deal', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteDeal(dealId)
+            setDeals((prev) => prev.filter((d) => d.id !== dealId))
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete deal')
+          }
+        },
+      },
+    ])
+  }, [])
+
+  // Group deals by stage
+  const grouped = STAGE_ORDER.map((stage) => ({
+    stage,
+    items: deals.filter((d) => d.stage === stage),
+  }))
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#f8fafc',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" color="#0ea5e9" />
+      </View>
+    )
+  }
+
+  if (error) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#f8fafc',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 32,
+        }}
+      >
+        <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
+        <TouchableOpacity onPress={() => void loadDeals()} style={{ marginTop: 16, padding: 12 }}>
+          <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      {/* Header */}
+      <View
+        style={{
+          backgroundColor: '#ffffff',
+          paddingTop: 56,
+          paddingBottom: 12,
+          paddingHorizontal: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: '#e2e8f0',
+        }}
+      >
+        <Text style={{ fontSize: 22, fontWeight: '800', color: '#0f172a' }}>Deals</Text>
+        <Text style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
+          {deals.length} deal{deals.length !== 1 ? 's' : ''} total
+        </Text>
+      </View>
+
+      <FlatList
+        data={grouped}
+        keyExtractor={(item) => item.stage}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor="#0ea5e9"
+          />
+        }
+        contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 32 }}
+        renderItem={({ item: group }) => {
+          const colors = STAGE_COLORS[group.stage] ?? STAGE_COLORS.PROSPECT!
+          return (
+            <View
+              style={{
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: '#ffffff',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Stage header */}
+              <View
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  backgroundColor: colors.bg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Text style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>
+                  {stageLabel(group.stage)}
+                </Text>
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 20,
+                    backgroundColor: colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                    {group.items.length}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Deals in this stage */}
+              {group.items.length === 0 ? (
+                <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic' }}>
+                    No deals in this stage
+                  </Text>
+                </View>
+              ) : (
+                group.items.map((deal, idx) => (
+                  <View
+                    key={deal.id}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      borderTopWidth: idx === 0 ? 1 : 1,
+                      borderTopColor: '#f1f5f9',
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a' }}>
+                          {deal.title}
+                        </Text>
+                        {deal.contact && (
+                          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
+                            {deal.contact.name}
+                          </Text>
+                        )}
+                        {Number(deal.value) > 0 && (
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: '700',
+                              color: '#16a34a',
+                              marginTop: 4,
+                            }}
+                          >
+                            {formatValue(deal.value, deal.currency)}
+                          </Text>
+                        )}
+                        {deal.closeDate && (
+                          <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                            Close: {formatDate(deal.closeDate, userTz)}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={{ gap: 6, alignItems: 'flex-end' }}>
+                        <TouchableOpacity
+                          onPress={() => void handleChangeStage(deal)}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 8,
+                            backgroundColor: colors.bg,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                            Next Stage ›
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDelete(deal.id)}>
+                          <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                            Delete
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          )
+        }}
+      />
+    </View>
+  )
+}

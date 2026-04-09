@@ -5,6 +5,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 type FieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'URL' | 'SELECT'
 
@@ -151,6 +166,27 @@ export default function CustomFieldsPage(): JSX.Element {
     }
   }
 
+  async function handleReorder(activeId: string, overId: string) {
+    const oldIndex = fields.findIndex((f) => f.id === activeId)
+    const newIndex = fields.findIndex((f) => f.id === overId)
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+    const reordered = arrayMove(fields, oldIndex, newIndex)
+    // Optimistic update
+    setFields(reordered)
+    try {
+      const token = await getAccessToken()
+      await Promise.all(
+        reordered.map((f, idx) =>
+          apiPatch(`/crm/custom-fields/${f.id}`, { displayOrder: idx }, token),
+        ),
+      )
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reorder fields')
+      await fetchFields() // revert on error
+    }
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -202,59 +238,15 @@ export default function CustomFieldsPage(): JSX.Element {
         </div>
       )}
 
-      {/* Field list */}
+      {/* Field list — sortable via drag-and-drop */}
       {!loading && fields.length > 0 && (
-        <div className="space-y-2">
-          {fields.map((field) => (
-            <div
-              key={field.id}
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl hover:shadow-sm transition-shadow"
-            >
-              <GripVertical size={16} className="text-gray-300 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900 truncate">{field.label}</span>
-                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
-                    {FIELD_TYPE_LABELS[field.fieldType]}
-                  </span>
-                </div>
-                {field.fieldType === 'SELECT' && field.options.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {field.options.map((opt) => (
-                      <span
-                        key={opt}
-                        className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded"
-                      >
-                        {opt}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => openEdit(field)}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                  title="Edit"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => void handleDelete(field.id)}
-                  disabled={deletingId === field.id}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                  title="Delete"
-                >
-                  {deletingId === field.id ? (
-                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-500" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <SortableFieldList
+          fields={fields}
+          deletingId={deletingId}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          onReorder={handleReorder}
+        />
       )}
 
       {/* Create / Edit Modal */}
@@ -354,5 +346,128 @@ export default function CustomFieldsPage(): JSX.Element {
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Sortable list ────────────────────────────────────────────────────────────
+
+function SortableFieldRow({
+  field,
+  deletingId,
+  onEdit,
+  onDelete,
+}: {
+  field: CustomField
+  deletingId: string | null
+  onEdit: (f: CustomField) => void
+  onDelete: (id: string) => void
+}): JSX.Element {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: field.id,
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl hover:shadow-sm transition-shadow"
+    >
+      {/* Drag handle */}
+      <button
+        type="button"
+        {...listeners}
+        {...attributes}
+        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 flex-shrink-0 focus:outline-none"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical size={16} />
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-900 truncate">{field.label}</span>
+          <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
+            {FIELD_TYPE_LABELS[field.fieldType]}
+          </span>
+        </div>
+        {field.fieldType === 'SELECT' && field.options.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {field.options.map((opt) => (
+              <span key={opt} className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+                {opt}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={() => onEdit(field)}
+          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+          title="Edit"
+        >
+          <Pencil size={14} />
+        </button>
+        <button
+          onClick={() => onDelete(field.id)}
+          disabled={deletingId === field.id}
+          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+          title="Delete"
+        >
+          {deletingId === field.id ? (
+            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-500" />
+          ) : (
+            <Trash2 size={14} />
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SortableFieldList({
+  fields,
+  deletingId,
+  onEdit,
+  onDelete,
+  onReorder,
+}: {
+  fields: CustomField[]
+  deletingId: string | null
+  onEdit: (f: CustomField) => void
+  onDelete: (id: string) => void
+  onReorder: (activeId: string, overId: string) => void
+}): JSX.Element {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      onReorder(String(active.id), String(over.id))
+    }
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2">
+          {fields.map((field) => (
+            <SortableFieldRow
+              key={field.id}
+              field={field}
+              deletingId={deletingId}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
   )
 }

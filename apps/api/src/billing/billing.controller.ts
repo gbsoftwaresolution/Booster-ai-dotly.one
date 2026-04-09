@@ -2,8 +2,13 @@ import { Controller, Get, Post, Body, Patch, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import {
-  IsEthereumAddress, IsString, IsInt, Min, Max, Matches,
-  IsEnum, IsOptional,
+  IsEthereumAddress,
+  IsString,
+  IsInt,
+  Matches,
+  IsEnum,
+  IsOptional,
+  IsIn,
 } from 'class-validator'
 import { BillingService } from './billing.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -18,13 +23,14 @@ class VerifySubscriptionDto {
   walletAddress!: string
 
   @IsString()
-  @Matches(/^0x[a-fA-F0-9]{64}$/, { message: 'txHash must be a valid 32-byte hex transaction hash prefixed with 0x' })
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'txHash must be a valid 32-byte hex transaction hash prefixed with 0x',
+  })
   txHash!: string
 
-  /** chainId: 137 = Polygon, 8453 = Base */
+  /** chainId: 137 = Polygon, 8453 = Base. Only these two chains are supported. */
   @IsInt()
-  @Min(1)
-  @Max(999999)
+  @IsIn([137, 8453], { message: 'chainId must be 137 (Polygon) or 8453 (Base)' })
   chainId!: number
 }
 
@@ -44,11 +50,13 @@ class CreateBoosterAiOrderDto {
   walletAddress!: string
 
   /** Referral/partner code from ?ref=p_xxxxx */
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   ref?: string
 
   /** ISO 3166-1 alpha-2 country code, e.g. "US". Defaults to BOOSTERAI_COUNTRY_CODE env var. */
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   countryCode?: string
 }
 
@@ -75,10 +83,7 @@ export class BillingController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('verify')
-  verify(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: VerifySubscriptionDto,
-  ) {
+  verify(@CurrentUser() user: AuthUser, @Body() dto: VerifySubscriptionDto) {
     return this.billingService.verifyAndSyncSubscription(
       user.id,
       dto.walletAddress,
@@ -105,23 +110,20 @@ export class BillingController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('boosterai/order')
-  createBoosterAiOrder(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: CreateBoosterAiOrderDto,
-  ) {
+  createBoosterAiOrder(@CurrentUser() user: AuthUser, @Body() dto: CreateBoosterAiOrderDto) {
     const planMap: Record<string, Plan> = {
-      STARTER:    Plan.STARTER,
-      PRO:        Plan.PRO,
-      BUSINESS:   Plan.BUSINESS,
-      AGENCY:     Plan.AGENCY,
+      STARTER: Plan.STARTER,
+      PRO: Plan.PRO,
+      BUSINESS: Plan.BUSINESS,
+      AGENCY: Plan.AGENCY,
       ENTERPRISE: Plan.ENTERPRISE,
     }
     return this.billingService.createBoosterAiOrder(user.id, {
-      plan:          planMap[dto.plan]!,
-      duration:      dto.duration,
+      plan: planMap[dto.plan]!,
+      duration: dto.duration,
       walletAddress: dto.walletAddress,
-      ref:           dto.ref,
-      countryCode:   dto.countryCode,
+      ref: dto.ref,
+      countryCode: dto.countryCode,
     })
   }
 
@@ -133,10 +135,7 @@ export class BillingController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('boosterai/activate')
-  activateBoosterAiOrder(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: ActivateBoosterAiOrderDto,
-  ) {
+  activateBoosterAiOrder(@CurrentUser() user: AuthUser, @Body() dto: ActivateBoosterAiOrderDto) {
     return this.billingService.activateBoosterAiOrder(user.id, dto.orderId)
   }
 }

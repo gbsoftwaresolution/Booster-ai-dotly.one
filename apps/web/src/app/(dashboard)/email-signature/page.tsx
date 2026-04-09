@@ -53,11 +53,34 @@ export default function EmailSignaturePage(): JSX.Element {
     void load()
   }, [])
 
-  const selectedCard = cards.find(c => c.id === selectedCardId) ?? null
+  // Fetch the actual QR image data URL when the selected card changes and QR is enabled
+  useEffect(() => {
+    if (!selectedCardId || !options.showQr) return
 
-  const signatureHtml = selectedCard
-    ? generateSignatureHtml(selectedCard, style, options)
-    : ''
+    async function fetchQrImage() {
+      try {
+        const token = await getToken()
+        const data = await apiGet<{ pngDataUrl?: string; svgData?: string }>(
+          `/cards/${selectedCardId}/qr`,
+          token,
+        )
+        // Prefer pngDataUrl; fall back to an SVG data URL constructed from svgData
+        const imageUrl =
+          data.pngDataUrl ??
+          (data.svgData ? `data:image/svg+xml;base64,${btoa(data.svgData)}` : null)
+        setCards((prev) =>
+          prev.map((c) => (c.id === selectedCardId ? { ...c, qrImageUrl: imageUrl } : c)),
+        )
+      } catch {
+        // QR not yet generated for this card — leave qrImageUrl as null, QR cell is hidden
+      }
+    }
+    void fetchQrImage()
+  }, [selectedCardId, options.showQr])
+
+  const selectedCard = cards.find((c) => c.id === selectedCardId) ?? null
+
+  const signatureHtml = selectedCard ? generateSignatureHtml(selectedCard, style, options) : ''
 
   const showToast = useCallback((type: 'html' | 'gmail') => {
     setCopyToast(type)
@@ -117,9 +140,7 @@ export default function EmailSignaturePage(): JSX.Element {
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {copyError && (
         <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">{copyError}</div>
@@ -128,7 +149,9 @@ export default function EmailSignaturePage(): JSX.Element {
       {cards.length === 0 && !error ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
           <Mail className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-          <p className="text-sm text-gray-500">Create a card first to generate an email signature.</p>
+          <p className="text-sm text-gray-500">
+            Create a card first to generate an email signature.
+          </p>
         </div>
       ) : (
         <div className="grid gap-8 lg:grid-cols-[320px,1fr]">
@@ -139,10 +162,10 @@ export default function EmailSignaturePage(): JSX.Element {
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Card</h2>
               <select
                 value={selectedCardId ?? ''}
-                onChange={e => setSelectedCardId(e.target.value)}
+                onChange={(e) => setSelectedCardId(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                {cards.map(card => (
+                {cards.map((card) => (
                   <option key={card.id} value={card.id}>
                     /{card.handle}
                     {card.fields['name'] ? ` — ${card.fields['name']}` : ''}
@@ -155,7 +178,7 @@ export default function EmailSignaturePage(): JSX.Element {
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Style</h2>
               <div className="space-y-2">
-                {STYLES.map(s => (
+                {STYLES.map((s) => (
                   <button
                     key={s.value}
                     type="button"
@@ -189,15 +212,18 @@ export default function EmailSignaturePage(): JSX.Element {
                     <input
                       type="checkbox"
                       checked={options[key]}
-                      onChange={e =>
-                        setOptions(prev => ({ ...prev, [key]: e.target.checked }))
-                      }
+                      onChange={(e) => setOptions((prev) => ({ ...prev, [key]: e.target.checked }))}
                       className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700">{label}</span>
                   </label>
                 ))}
               </div>
+              {options.showQr && selectedCard && !selectedCard.qrImageUrl && (
+                <p className="mt-3 text-xs text-amber-600">
+                  No QR code found for this card. Generate one from the card editor first.
+                </p>
+              )}
             </div>
 
             {/* Copy buttons */}

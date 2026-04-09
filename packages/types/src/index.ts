@@ -75,6 +75,14 @@ export enum SubscriptionStatus {
   TRIALING = 'TRIALING',
 }
 
+export interface UpdateProfileDto {
+  name?: string
+  /** ISO 3166-1 alpha-2 country code, e.g. "US", "GB", "IN" */
+  country?: string | null
+  /** IANA timezone identifier, e.g. "America/New_York", "Asia/Kolkata" */
+  timezone?: string | null
+}
+
 // DTOs
 export interface CreateCardDto {
   handle?: string

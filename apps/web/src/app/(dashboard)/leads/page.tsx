@@ -1,10 +1,21 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet } from '@/lib/api'
-import { Inbox, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { apiGet, apiDelete } from '@/lib/api'
+import {
+  Inbox,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Search,
+  Download,
+  Trash2,
+} from 'lucide-react'
+import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
+import { formatDate } from '@/lib/tz'
+import { useUserTimezone } from '@/hooks/useUserLocale'
 
 interface SubmissionContact {
   id: string
@@ -36,7 +47,7 @@ interface CardSummary {
   handle: string
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, tz?: string | null): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
@@ -45,29 +56,36 @@ function timeAgo(dateStr: string): string {
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
   if (days < 30) return `${days}d ago`
-  return new Date(dateStr).toLocaleDateString()
+  return formatDate(dateStr, tz ?? undefined)
 }
 
 export default function LeadsPage(): JSX.Element {
+  const userTz = useUserTimezone()
   const [submissions, setSubmissions] = useState<LeadSubmission[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
 
   const [cards, setCards] = useState<CardSummary[]>([])
   const [cardFilter, setCardFilter] = useState<string>('')
+  const [search, setSearch] = useState('')
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const LIMIT = 20
 
   const loadSubmissions = useCallback(
-    async (p = 1, cardId = cardFilter) => {
+    async (p = 1, cardId = cardFilter, s = search) => {
       setLoading(true)
       setError(null)
       try {
         const token = await getAccessToken()
         const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) })
         if (cardId) params.set('cardId', cardId)
+        if (s) params.set('search', s)
         const data = await apiGet<LeadSubmissionsResponse>(
           `/lead-submissions?${params.toString()}`,
           token,
@@ -81,6 +99,7 @@ export default function LeadsPage(): JSX.Element {
         setLoading(false)
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [cardFilter],
   )
 
@@ -97,6 +116,80 @@ export default function LeadsPage(): JSX.Element {
     })()
   }, [loadSubmissions])
 
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearch(value)
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+      searchDebounceRef.current = setTimeout(() => {
+        void loadSubmissions(1, cardFilter, value)
+      }, 300)
+    },
+    [loadSubmissions, cardFilter],
+  )
+
+  const handleCardFilter = useCallback(
+    (cardId: string) => {
+      setCardFilter(cardId)
+      void loadSubmissions(1, cardId, search)
+    },
+    [loadSubmissions, search],
+  )
+
+  const handleExportCSV = useCallback(async () => {
+    try {
+      const token = await getAccessToken()
+      const params = new URLSearchParams()
+      if (cardFilter) params.set('cardId', cardFilter)
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token ?? ''}` } },
+      )
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      const csv = await res.text()
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed')
+    }
+  }, [cardFilter])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const selectAll = useCallback(() => {
+    if (selectedIds.size === submissions.length && submissions.length > 0) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(submissions.map((s) => s.id)))
+    }
+  }, [submissions, selectedIds.size])
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return
+    if (!window.confirm(`Delete ${selectedIds.size} submission(s)? This cannot be undone.`)) return
+    try {
+      const token = await getAccessToken()
+      await Promise.all([...selectedIds].map((id) => apiDelete(`/lead-submissions/${id}`, token)))
+      setSelectedIds(new Set())
+      void loadSubmissions(page, cardFilter, search)
+    } catch {
+      setError('Failed to delete one or more submissions.')
+    }
+  }, [selectedIds, loadSubmissions, page, cardFilter, search])
+
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
 
   return (
@@ -109,14 +202,11 @@ export default function LeadsPage(): JSX.Element {
             All form submissions from your public card pages.
           </p>
         </div>
-        {/* Card filter */}
-        <div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Card filter */}
           <select
             value={cardFilter}
-            onChange={(e) => {
-              setCardFilter(e.target.value)
-              void loadSubmissions(1, e.target.value)
-            }}
+            onChange={(e) => handleCardFilter(e.target.value)}
             className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
           >
             <option value="">All cards</option>
@@ -126,16 +216,54 @@ export default function LeadsPage(): JSX.Element {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => void handleExportCSV()}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
-        <p className="text-sm text-gray-500">
-          Total submissions:{' '}
-          <span className="font-semibold text-gray-900">{total.toLocaleString()}</span>
-        </p>
+      {/* Search + stats bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <span className="text-sm text-gray-500">{total.toLocaleString()} total</span>
       </div>
+
+      {/* Bulk actions */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} selected</span>
+          <button
+            type="button"
+            onClick={() => void handleBulkDelete()}
+            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete selected
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-gray-500 hover:underline"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Error */}
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -160,6 +288,14 @@ export default function LeadsPage(): JSX.Element {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === submissions.length && submissions.length > 0}
+                    onChange={selectAll}
+                    className="rounded border-gray-300"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Contact
                 </th>
@@ -180,6 +316,14 @@ export default function LeadsPage(): JSX.Element {
             <tbody className="divide-y divide-gray-100">
               {submissions.map((sub) => (
                 <tr key={sub.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(sub.id)}
+                      onChange={() => toggleSelect(sub.id)}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     {sub.contact ? (
                       <div>
@@ -224,17 +368,18 @@ export default function LeadsPage(): JSX.Element {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {timeAgo(sub.submittedAt)}
+                    {timeAgo(sub.submittedAt, userTz)}
                   </td>
                   <td className="px-4 py-3">
                     {sub.contact ? (
-                      <a
-                        href={`/contacts`}
+                      <button
+                        type="button"
+                        onClick={() => setDrawerContactId(sub.contact!.id)}
                         className="flex items-center gap-1 text-xs text-indigo-600 hover:underline"
                       >
                         View
                         <ExternalLink className="h-3 w-3" />
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-xs text-gray-300">—</span>
                     )}
@@ -274,6 +419,8 @@ export default function LeadsPage(): JSX.Element {
           </div>
         </div>
       )}
+
+      <ContactDetailDrawer contactId={drawerContactId} onClose={() => setDrawerContactId(null)} />
     </div>
   )
 }

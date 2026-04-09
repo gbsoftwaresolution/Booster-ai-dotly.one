@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRef, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Settings, LogOut } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useSignOut } from '@/hooks/useSignOut'
 
 interface TopBarAvatarProps {
   email: string | undefined
@@ -12,9 +11,8 @@ interface TopBarAvatarProps {
 }
 
 export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Element {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
+  const { signingOut, handleSignOut } = useSignOut()
   const ref = useRef<HTMLDivElement>(null)
 
   const initial = (name?.[0] ?? email?.[0] ?? 'U').toUpperCase()
@@ -35,17 +33,6 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
       document.removeEventListener('keydown', handleKey)
     }
   }, [])
-
-  const handleSignOut = async () => {
-    setSigningOut(true)
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.push('/auth')
-    } finally {
-      setSigningOut(false)
-    }
-  }
 
   return (
     <div ref={ref} className="relative">

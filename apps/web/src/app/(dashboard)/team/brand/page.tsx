@@ -38,20 +38,25 @@ export default function TeamBrandPage(): JSX.Element {
       try {
         const token = await getAccessToken()
         if (!token) return
-        // GET /teams returns the user's teams; use the first one
-        const teams = await apiGet<Array<{ id: string; brandConfig?: Record<string, unknown> }>>('/teams', token)
-        const first = teams[0]
-        if (!first) return
-        setTeamId(first.id)
-        // Pre-populate form from existing brand config
-        const cfg = first.brandConfig ?? {}
+        // GET /teams/mine returns the user's primary team with full fields including brandLock
+        const team = await apiGet<{
+          id: string
+          brandLock?: boolean
+          brandConfig?: Record<string, unknown>
+        } | null>('/teams/mine', token)
+        if (!team) return
+        setTeamId(team.id)
+        // Pre-populate form from existing brand config AND top-level brandLock
+        const cfg = team.brandConfig ?? {}
         setBrand((prev) => ({
           ...prev,
           logoUrl: (cfg['logoUrl'] as string | undefined) ?? prev.logoUrl,
           primaryColor: (cfg['primaryColor'] as string | undefined) ?? prev.primaryColor,
           secondaryColor: (cfg['secondaryColor'] as string | undefined) ?? prev.secondaryColor,
           fontFamily: (cfg['fontFamily'] as string | undefined) ?? prev.fontFamily,
-          hideDotlyBranding: (cfg['hideDotlyBranding'] as boolean | undefined) ?? prev.hideDotlyBranding,
+          hideDotlyBranding:
+            (cfg['hideDotlyBranding'] as boolean | undefined) ?? prev.hideDotlyBranding,
+          brandLock: team.brandLock ?? prev.brandLock,
         }))
       } catch {
         setLoadError('Could not load team settings.')
@@ -174,7 +179,9 @@ export default function TeamBrandPage(): JSX.Element {
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {FONT_OPTIONS.map((f) => (
-                <option key={f} value={f}>{f}</option>
+                <option key={f} value={f}>
+                  {f}
+                </option>
               ))}
             </select>
           </div>
@@ -212,7 +219,9 @@ export default function TeamBrandPage(): JSX.Element {
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-900 text-sm">Hide &quot;Powered by Dotly&quot;</p>
+                <p className="font-medium text-gray-900 text-sm">
+                  Hide &quot;Powered by Dotly&quot;
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Remove the Dotly branding footer from all team member public cards.
                 </p>
@@ -238,7 +247,13 @@ export default function TeamBrandPage(): JSX.Element {
             disabled={saving || !teamId}
             className="w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : saved ? 'Saved!' : !teamId ? 'Unavailable — team failed to load' : 'Save Brand Settings'}
+            {saving
+              ? 'Saving...'
+              : saved
+                ? 'Saved!'
+                : !teamId
+                  ? 'Unavailable — team failed to load'
+                  : 'Save Brand Settings'}
           </button>
         </div>
 
@@ -266,10 +281,7 @@ export default function TeamBrandPage(): JSX.Element {
                 className="h-12 w-24 rounded mb-4 flex items-center justify-center"
                 style={{ backgroundColor: brand.secondaryColor }}
               >
-                <span
-                  className="text-xs font-bold"
-                  style={{ color: brand.primaryColor }}
-                >
+                <span className="text-xs font-bold" style={{ color: brand.primaryColor }}>
                   Logo
                 </span>
               </div>
@@ -280,10 +292,7 @@ export default function TeamBrandPage(): JSX.Element {
             >
               Your Name
             </h4>
-            <p
-              className="text-sm mt-1 opacity-80"
-              style={{ color: brand.secondaryColor }}
-            >
+            <p className="text-sm mt-1 opacity-80" style={{ color: brand.secondaryColor }}>
               Your Title · Company
             </p>
             <div

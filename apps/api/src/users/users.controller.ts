@@ -1,6 +1,15 @@
-import { Controller, Get, Patch, Delete, Body, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common'
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger'
-import { IsString, MaxLength, IsOptional } from 'class-validator'
+import { IsString, MaxLength, IsOptional, Matches, Length, IsBoolean } from 'class-validator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { UsersService } from './users.service'
 
@@ -15,6 +24,31 @@ class UpdateProfileDto {
   @IsOptional()
   @MaxLength(200)
   name?: string
+
+  /** ISO 3166-1 alpha-2 country code, e.g. "US", "GB" */
+  @IsString()
+  @IsOptional()
+  @Length(2, 2)
+  @Matches(/^[A-Z]{2}$/, { message: 'country must be an ISO 3166-1 alpha-2 code (e.g. "US")' })
+  country?: string
+
+  /** IANA timezone identifier, e.g. "America/New_York" */
+  @IsString()
+  @IsOptional()
+  @MaxLength(64)
+  timezone?: string
+
+  @IsBoolean()
+  @IsOptional()
+  notifLeadCaptured?: boolean
+
+  @IsBoolean()
+  @IsOptional()
+  notifWeeklyDigest?: boolean
+
+  @IsBoolean()
+  @IsOptional()
+  notifProductUpdates?: boolean
 }
 
 // HIGH-07: Require the user to explicitly confirm the irreversible deletion by
@@ -41,14 +75,27 @@ export class UsersController {
     return this.usersService.findById(user.id)
   }
 
-  @ApiOperation({ summary: 'Update display name' })
+  @ApiOperation({ summary: 'Update display name, country, timezone and notification preferences' })
   @Patch('me')
-  async updateMe(
-    @CurrentUser() user: { id: string },
-    @Body() body: UpdateProfileDto,
-  ) {
-    if (body.name !== undefined) {
-      return this.usersService.updateProfile(user.id, body.name)
+  async updateMe(@CurrentUser() user: { id: string }, @Body() body: UpdateProfileDto) {
+    const { name, country, timezone, notifLeadCaptured, notifWeeklyDigest, notifProductUpdates } =
+      body
+    if (
+      name !== undefined ||
+      country !== undefined ||
+      timezone !== undefined ||
+      notifLeadCaptured !== undefined ||
+      notifWeeklyDigest !== undefined ||
+      notifProductUpdates !== undefined
+    ) {
+      return this.usersService.updateProfile(user.id, {
+        name,
+        country,
+        timezone,
+        notifLeadCaptured,
+        notifWeeklyDigest,
+        notifProductUpdates,
+      })
     }
     return this.usersService.findById(user.id)
   }

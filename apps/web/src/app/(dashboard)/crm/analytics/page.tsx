@@ -23,6 +23,7 @@ interface FunnelAnalyticsResponse {
   stages: FunnelStage[]
   conversions: FunnelConversion[]
   totalActive: number
+  sourceBreakdown?: Array<{ source: string; count: number }>
 }
 
 interface Deal {
@@ -100,24 +101,33 @@ export default function CrmAnalyticsPage(): JSX.Element {
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const token = await getAccessToken()
-      const [funnel, dealsData] = await Promise.all([
-        apiGet<FunnelAnalyticsResponse>('/crm/analytics/funnel', token),
-        apiGet<Deal[]>('/deals', token),
-      ])
-      setFunnelData(funnel)
-      setDeals(dealsData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load analytics')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const loadData = useCallback(
+    async (from = dateFrom, to = dateTo) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = await getAccessToken()
+        const funnelParams = new URLSearchParams()
+        if (from) funnelParams.set('dateFrom', from)
+        if (to) funnelParams.set('dateTo', to)
+        const funnelUrl = `/crm/analytics/funnel${funnelParams.toString() ? `?${funnelParams.toString()}` : ''}`
+        const [funnel, dealsData] = await Promise.all([
+          apiGet<FunnelAnalyticsResponse>(funnelUrl, token),
+          apiGet<Deal[]>('/deals', token),
+        ])
+        setFunnelData(funnel)
+        setDeals(dealsData)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load analytics')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [dateFrom, dateTo],
+  )
 
   useEffect(() => {
     void loadData()
@@ -177,11 +187,51 @@ export default function CrmAnalyticsPage(): JSX.Element {
             Contact funnel performance and deal revenue metrics.
           </p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 text-right shadow-sm">
-          <p className="text-sm text-gray-500">Total active contacts</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {loading ? '...' : (funnelData?.totalActive ?? 0).toLocaleString()}
-          </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Date range filter */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
+            <label className="text-xs font-medium text-gray-500">From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-sm text-gray-700 focus:outline-none"
+            />
+            <label className="text-xs font-medium text-gray-500">To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-sm text-gray-700 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => void loadData(dateFrom, dateTo)}
+              disabled={loading}
+              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Apply
+            </button>
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                  void loadData('', '')
+                }}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 text-right shadow-sm">
+            <p className="text-sm text-gray-500">Total active contacts</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">
+              {loading ? '...' : (funnelData?.totalActive ?? 0).toLocaleString()}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -396,6 +446,47 @@ export default function CrmAnalyticsPage(): JSX.Element {
           </table>
         )}
       </section>
+
+      {/* ── Source Breakdown ── */}
+      {funnelData?.sourceBreakdown && funnelData.sourceBreakdown.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-200 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-indigo-600" />
+              <h2 className="text-base font-semibold text-gray-900">Contact source breakdown</h2>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              How contacts were acquired (by card handle or direct creation).
+            </p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {funnelData.sourceBreakdown
+              .sort((a, b) => b.count - a.count)
+              .map((row) => {
+                const total = funnelData.sourceBreakdown!.reduce((s, r) => s + r.count, 0)
+                const pct = total > 0 ? Math.round((row.count / total) * 100) : 0
+                return (
+                  <div key={row.source} className="flex items-center gap-4 px-5 py-3">
+                    <div className="w-32 shrink-0 truncate text-sm font-medium text-gray-700">
+                      {row.source}
+                    </div>
+                    <div className="flex-1">
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-2 rounded-full bg-indigo-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="w-16 shrink-0 text-right text-sm text-gray-500">
+                      {row.count} ({pct}%)
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

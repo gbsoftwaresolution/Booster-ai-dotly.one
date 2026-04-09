@@ -36,7 +36,7 @@ interface CreateLeadDto {
   phone?: string
   cardId: string
   sourceHandle?: string
-  /** Custom lead form field values — accepted but not yet persisted (LeadSubmission TODO) */
+  /** Custom lead form field values — persisted as LeadSubmissionAnswer rows when a matching LeadForm exists */
   fields?: Record<string, string>
 }
 
@@ -366,10 +366,11 @@ export class ContactsService {
 
   async findAll(
     userId: string,
-    params: { stage?: string; search?: string; page?: number; limit?: number },
+    params: { stage?: string; search?: string; page?: number; limit?: number; tag?: string },
   ) {
     const where: Prisma.ContactWhereInput = { ownerUserId: userId }
     if (params.stage) where.crmPipeline = { stage: params.stage as CrmStage }
+    if (params.tag) where.tags = { has: params.tag }
     if (params.search)
       where.OR = [
         { name: { contains: params.search, mode: 'insensitive' } },
@@ -387,6 +388,18 @@ export class ContactsService {
       this.prisma.contact.count({ where }),
     ])
     return { contacts, total, page: params.page || 1, limit: params.limit || 20 }
+  }
+
+  async getAllTags(userId: string): Promise<string[]> {
+    // Use a raw query to unnest the PostgreSQL tags array and return distinct values.
+    const rows = await this.prisma.$queryRaw<{ tag: string }[]>`
+      SELECT DISTINCT unnest(tags) AS tag
+      FROM "Contact"
+      WHERE "ownerUserId" = ${userId}
+        AND array_length(tags, 1) > 0
+      ORDER BY tag ASC
+    `
+    return rows.map((r) => r.tag)
   }
 
   async findAllByUser(userId: string) {
@@ -641,14 +654,26 @@ export class ContactsService {
 
     const fromName = contact.ownerUser?.name ?? 'Dotly User'
 
+    // Substitute merge tags in subject and body before sending.
+    // Supported tags: {{contact.name}}, {{contact.email}}, {{contact.company}}, {{contact.title}}
+    const substituteMergeTags = (text: string): string =>
+      text
+        .replace(/\{\{contact\.name\}\}/g, contact.name ?? '')
+        .replace(/\{\{contact\.email\}\}/g, contact.email ?? '')
+        .replace(/\{\{contact\.company\}\}/g, contact.company ?? '')
+        .replace(/\{\{contact\.title\}\}/g, contact.title ?? '')
+
+    const resolvedSubject = substituteMergeTags(subject)
+    const resolvedBody = substituteMergeTags(body)
+
     // Generate tracking token BEFORE sending so it can be embedded in the email pixel.
     const trackingToken = randomBytes(16).toString('hex')
 
     // Send the email (with tracking pixel)
     await this.emailService.sendDirectCrmEmail(
       contact.email,
-      subject,
-      body,
+      resolvedSubject,
+      resolvedBody,
       fromName,
       trackingToken,
     )
@@ -702,22 +727,27 @@ export class ContactsService {
     const ownedIds = owned.map((c) => c.id)
     if (ownedIds.length === 0) throw new ForbiddenException()
 
-    await this.prisma.$transaction([
-      this.prisma.crmPipeline.updateMany({
+    // Use an interactive transaction so we can capture the updateMany result
+    // and return the *actual* number of rows changed, rather than ownedIds.length
+    // which counts contacts that may not yet have a crmPipeline row and would be
+    // silently skipped by updateMany.
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.crmPipeline.updateMany({
         where: { contactId: { in: ownedIds } },
         data: { stage: validatedStage },
-      }),
+      })
       // Create a STAGE_CHANGED timeline entry for each contact
-      this.prisma.contactTimeline.createMany({
+      await tx.contactTimeline.createMany({
         data: ownedIds.map((contactId) => ({
           contactId,
           event: 'STAGE_CHANGED',
           metadata: { to: validatedStage, bulk: true } as unknown as Prisma.InputJsonValue,
         })),
-      }),
-    ])
+      })
+      return updateResult
+    })
 
-    return { updated: ownedIds.length }
+    return { updated: result.count }
   }
 
   // M1: Bulk delete — removes all specified contacts in one prisma.deleteMany
@@ -748,7 +778,7 @@ export class ContactsService {
   async getLeadSubmissions(
     userId: string,
     cardId: string | undefined,
-    params: { page?: number; limit?: number },
+    params: { page?: number; limit?: number; search?: string },
   ) {
     if (cardId) {
       // Verify the card belongs to the requesting user
@@ -770,15 +800,38 @@ export class ContactsService {
     const leadFormIds = leadForms.map((f) => f.id)
     const leadFormMap = new Map(leadForms.map((f) => [f.id, f]))
 
+    // Build submission where clause — optionally filter by contact name/email (via join)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let submissionWhere: Record<string, any> = { leadFormId: { in: leadFormIds } }
+
+    if (params.search) {
+      // Filter by contact name or email
+      const matchingContacts = await this.prisma.contact.findMany({
+        where: {
+          ownerUserId: userId,
+          OR: [
+            { name: { contains: params.search, mode: 'insensitive' } },
+            { email: { contains: params.search, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      })
+      const contactIds = matchingContacts.map((c) => c.id)
+      submissionWhere = {
+        leadFormId: { in: leadFormIds },
+        contactId: { in: contactIds },
+      }
+    }
+
     const [submissions, total] = await Promise.all([
       this.prisma.leadSubmission.findMany({
-        where: { leadFormId: { in: leadFormIds } },
+        where: submissionWhere,
         orderBy: { submittedAt: 'desc' },
         skip,
         take: limit,
       }),
       this.prisma.leadSubmission.count({
-        where: { leadFormId: { in: leadFormIds } },
+        where: submissionWhere,
       }),
     ])
 
@@ -811,7 +864,15 @@ export class ContactsService {
     }
   }
 
-  // ─── Gap 1: Threaded Notes ───────────────────────────────────────────────────
+  async deleteLeadSubmission(submissionId: string, userId: string) {
+    const submission = await this.prisma.leadSubmission.findUnique({
+      where: { id: submissionId },
+      include: { leadForm: { select: { card: { select: { userId: true } } } } },
+    })
+    if (!submission || submission.leadForm?.card?.userId !== userId) throw new ForbiddenException()
+    await this.prisma.leadSubmission.delete({ where: { id: submissionId } })
+    return { deleted: true }
+  }
 
   async createNote(contactId: string, userId: string, content: string) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
@@ -905,6 +966,13 @@ export class ContactsService {
   async setCustomFieldValue(contactId: string, userId: string, fieldId: string, value: string) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+
+    // Verify the custom field also belongs to this user — without this check an
+    // authenticated user could write values into another user's custom fields by
+    // supplying a foreign fieldId with their own contactId.
+    const field = await this.prisma.contactCustomField.findUnique({ where: { id: fieldId } })
+    if (!field || field.ownerUserId !== userId) throw new ForbiddenException()
+
     return this.prisma.contactCustomFieldValue.upsert({
       where: { contactId_fieldId: { contactId, fieldId } },
       create: { contactId, fieldId, value },
@@ -1103,7 +1171,11 @@ export class ContactsService {
 
   // ─── Gap 7: Tasks ────────────────────────────────────────────────────────────
 
-  async createTask(contactId: string, userId: string, dto: { title: string; dueAt?: string }) {
+  async createTask(
+    contactId: string,
+    userId: string,
+    dto: { title: string; dueAt?: string; priority?: string; type?: string },
+  ) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
 
@@ -1113,6 +1185,9 @@ export class ContactsService {
         ownerUserId: userId,
         title: dto.title,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
+        priority: (dto.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | undefined) ?? 'MEDIUM',
+        type:
+          (dto.type as 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP' | undefined) ?? 'TODO',
       },
     })
 
@@ -1146,7 +1221,13 @@ export class ContactsService {
   async updateTask(
     taskId: string,
     userId: string,
-    dto: { title?: string; dueAt?: string | null; completed?: boolean },
+    dto: {
+      title?: string
+      dueAt?: string | null
+      completed?: boolean
+      priority?: string
+      type?: string
+    },
   ) {
     const task = await this.prisma.contactTask.findUnique({ where: { id: taskId } })
     if (!task || task.ownerUserId !== userId) throw new ForbiddenException()
@@ -1156,6 +1237,8 @@ export class ContactsService {
       dueAt?: Date | null
       completed?: boolean
       completedAt?: Date | null
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+      type?: 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
     } = {}
     if (dto.title !== undefined) data.title = dto.title
     if (dto.dueAt !== undefined) data.dueAt = dto.dueAt ? new Date(dto.dueAt) : null
@@ -1163,6 +1246,10 @@ export class ContactsService {
       data.completed = dto.completed
       data.completedAt = dto.completed ? new Date() : null
     }
+    if (dto.priority !== undefined)
+      data.priority = dto.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+    if (dto.type !== undefined)
+      data.type = dto.type as 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
 
     const updated = await this.prisma.contactTask.update({ where: { id: taskId }, data })
 
@@ -1245,13 +1332,20 @@ export class ContactsService {
         where: { contactId: duplicateId },
       })
       if (primaryPipeline && duplicatePipeline) {
-        // Primary already has pipeline — only copy pipelineId if primary has none
+        // Primary already has a pipeline row — only inherit pipelineId if primary has none set
         if (!primaryPipeline.pipelineId && duplicatePipeline.pipelineId) {
           await tx.crmPipeline.update({
             where: { contactId: primaryId },
             data: { pipelineId: duplicatePipeline.pipelineId },
           })
         }
+      } else if (!primaryPipeline && duplicatePipeline) {
+        // Primary has no pipeline row at all — re-parent duplicate's row to primary instead of
+        // letting it be cascade-deleted when the duplicate contact is removed below.
+        await tx.crmPipeline.update({
+          where: { contactId: duplicateId },
+          data: { contactId: primaryId, ownerUserId: primary.ownerUserId },
+        })
       }
       // Merge tags (union)
       const mergedTags = Array.from(new Set([...primary.tags, ...duplicate.tags]))
@@ -1323,13 +1417,43 @@ export class ContactsService {
 
   // ─── Gap 10: Stage Conversion Analytics ──────────────────────────────────────
 
-  async getFunnelAnalytics(userId: string) {
+  async getFunnelAnalytics(userId: string, opts?: { dateFrom?: string; dateTo?: string }) {
     const stages = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
+
+    // Build optional date filter for the contact's createdAt via the contact relation
+    const dateFilter: { gte?: Date; lte?: Date } = {}
+    if (opts?.dateFrom) dateFilter.gte = new Date(opts.dateFrom)
+    if (opts?.dateTo) dateFilter.lte = new Date(opts.dateTo)
+    const hasDateFilter = Object.keys(dateFilter).length > 0
+
+    const where = {
+      ownerUserId: userId,
+      ...(hasDateFilter ? { contact: { createdAt: dateFilter } } : {}),
+    }
+
     const counts = await this.prisma.crmPipeline.groupBy({
       by: ['stage'],
-      where: { ownerUserId: userId },
+      where,
       _count: { id: true },
     })
+
+    // Source breakdown: count contacts by sourceCard handle
+    const sourceContacts = await this.prisma.contact.findMany({
+      where: {
+        ownerUserId: userId,
+        ...(hasDateFilter ? { createdAt: dateFilter } : {}),
+      },
+      select: { sourceCard: { select: { handle: true } } },
+    })
+    const sourceMap = new Map<string, number>()
+    for (const c of sourceContacts) {
+      const handle = c.sourceCard?.handle ?? 'direct'
+      sourceMap.set(handle, (sourceMap.get(handle) ?? 0) + 1)
+    }
+    const sourceBreakdown = Array.from(sourceMap.entries()).map(([source, count]) => ({
+      source,
+      count,
+    }))
 
     const countMap = new Map(counts.map((c) => [c.stage, c._count.id]))
     const stageCounts = stages.map((stage) => ({
@@ -1350,7 +1474,52 @@ export class ContactsService {
       .filter((s) => s.stage !== 'LOST')
       .reduce((sum, s) => sum + s.count, 0)
 
-    return { stages: stageCounts, conversions, totalActive }
+    return { stages: stageCounts, conversions, totalActive, sourceBreakdown }
+  }
+
+  async exportContacts(userId: string): Promise<string> {
+    const contacts = await this.prisma.contact.findMany({
+      where: { ownerUserId: userId },
+      include: { crmPipeline: { select: { stage: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 10000,
+    })
+
+    const csvHeader = 'name,email,phone,company,title,website,address,stage,tags,createdAt'
+    const escapeField = (value: string | null | undefined): string => {
+      if (!value) return ''
+      // Wrap in quotes if the value contains commas, quotes, or newlines
+      if (/[,"\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+      return value
+    }
+
+    const rows = contacts.map((c) => {
+      const fields = [
+        escapeField(c.name),
+        escapeField(c.email),
+        escapeField(c.phone),
+        escapeField(c.company),
+        escapeField(c.title),
+        escapeField(c.website),
+        escapeField(c.address),
+        escapeField(c.crmPipeline?.stage ?? 'NEW'),
+        escapeField(c.tags.join('|')),
+        escapeField(c.createdAt.toISOString()),
+      ]
+      return fields.join(',')
+    })
+
+    return [csvHeader, ...rows].join('\n')
+  }
+
+  async getContactEmails(contactId: string, userId: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactEmail.findMany({
+      where: { contactId },
+      orderBy: { sentAt: 'desc' },
+      select: { id: true, subject: true, sentAt: true, openedAt: true, clickedAt: true },
+    })
   }
 
   // ─── Gap 12: Bulk Edit Arbitrary Fields ──────────────────────────────────────
@@ -1436,7 +1605,12 @@ export class ContactsService {
   async updatePipeline(
     pipelineId: string,
     userId: string,
-    dto: { name?: string; stages?: string[]; isDefault?: boolean },
+    dto: {
+      name?: string
+      stages?: string[]
+      isDefault?: boolean
+      stageColors?: Record<string, string>
+    },
   ) {
     const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
     if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
@@ -1452,6 +1626,7 @@ export class ContactsService {
     if (dto.name !== undefined) data['name'] = dto.name.trim()
     if (dto.stages !== undefined) data['stages'] = dto.stages.map((s) => s.trim()).filter(Boolean)
     if (dto.isDefault !== undefined) data['isDefault'] = dto.isDefault
+    if (dto.stageColors !== undefined) data['stageColors'] = dto.stageColors
 
     return this.prisma.pipeline.update({ where: { id: pipelineId }, data })
   }
@@ -1476,6 +1651,19 @@ export class ContactsService {
     if (pipelineId !== null) {
       const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
       if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+
+      // Validate that the requested stage is one of the pipeline's defined stages.
+      // A pipeline's `stages` field is a string[] stored as JSON; if the caller
+      // passes a stage that doesn't exist in that pipeline the write is rejected
+      // rather than persisting a value that the UI has no column to display.
+      if (stage !== undefined) {
+        const pipelineStages = pipeline.stages as string[]
+        if (pipelineStages.length > 0 && !pipelineStages.includes(stage)) {
+          throw new BadRequestException(
+            `Stage "${stage}" is not valid for this pipeline. Valid stages: ${pipelineStages.join(', ')}`,
+          )
+        }
+      }
     }
 
     const existing = await this.prisma.crmPipeline.findUnique({ where: { contactId } })

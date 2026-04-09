@@ -16,11 +16,11 @@ export function getServerApiUrl(): string {
   const url = process.env.API_URL ?? process.env.INTERNAL_API_URL
   if (!url) {
     if (process.env.NODE_ENV === 'production') {
-      console.warn(
+      process.stderr.write(
         '[server-api] WARNING: Neither API_URL nor INTERNAL_API_URL is set. ' +
-        'Server-side fetches will fall back to http://localhost:3001 which will ' +
-        'NOT work in production. Set API_URL to the private/internal address of ' +
-        'the NestJS API service.',
+          'Server-side fetches will fall back to http://localhost:3001 which will ' +
+          'NOT work in production. Set API_URL to the private/internal address of ' +
+          'the NestJS API service.\n',
       )
     }
     return 'http://localhost:3001'

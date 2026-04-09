@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
 import { AlertTriangle } from 'lucide-react'
+import { formatDate } from '@/lib/tz'
+import { useUserTimezone } from '@/hooks/useUserLocale'
 
 interface TeamMemberUser {
   id: string
@@ -82,6 +84,7 @@ function ConfirmDialog({
 }
 
 export default function TeamPage(): JSX.Element {
+  const userTz = useUserTimezone()
   const [team, setTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,17 +109,20 @@ export default function TeamPage(): JSX.Element {
   // Prevent concurrent action submissions
   const actionInFlightRef = useRef(false)
 
-  const loadTeam = useCallback(async (id?: string) => {
-    const resolvedId = id ?? teamId
-    if (!resolvedId) return
-    try {
-      const token = await getAccessToken()
-      const data = await apiGet<Team>(`/teams/${resolvedId}`, token)
-      setTeam(data)
-    } catch {
-      setError('Failed to load team')
-    }
-  }, [teamId])
+  const loadTeam = useCallback(
+    async (id?: string) => {
+      const resolvedId = id ?? teamId
+      if (!resolvedId) return
+      try {
+        const token = await getAccessToken()
+        const data = await apiGet<Team>(`/teams/${resolvedId}`, token)
+        setTeam(data)
+      } catch {
+        setError('Failed to load team')
+      }
+    },
+    [teamId],
+  )
 
   // On mount, fetch the current user's team from the API
   useEffect(() => {
@@ -175,26 +181,29 @@ export default function TeamPage(): JSX.Element {
     }
   }
 
-  const handleRemove = useCallback((userId: string) => {
-    if (!teamId) return
-    setConfirmDialog({
-      message: 'Remove this member from the team? This cannot be undone.',
-      onConfirm: async () => {
-        setConfirmDialog(null)
-        if (actionInFlightRef.current) return
-        actionInFlightRef.current = true
-        try {
-          const token = await getAccessToken()
-          await apiDelete(`/teams/${teamId}/members/${userId}`, token)
-          void loadTeam()
-        } catch {
-          setActionMsg('Failed to remove member')
-        } finally {
-          actionInFlightRef.current = false
-        }
-      },
-    })
-  }, [teamId, loadTeam])
+  const handleRemove = useCallback(
+    (userId: string) => {
+      if (!teamId) return
+      setConfirmDialog({
+        message: 'Remove this member from the team? This cannot be undone.',
+        onConfirm: async () => {
+          setConfirmDialog(null)
+          if (actionInFlightRef.current) return
+          actionInFlightRef.current = true
+          try {
+            const token = await getAccessToken()
+            await apiDelete(`/teams/${teamId}/members/${userId}`, token)
+            void loadTeam()
+          } catch {
+            setActionMsg('Failed to remove member')
+          } finally {
+            actionInFlightRef.current = false
+          }
+        },
+      })
+    },
+    [teamId, loadTeam],
+  )
 
   const handleRoleChange = async (userId: string, role: 'ADMIN' | 'MEMBER') => {
     if (!teamId) return
@@ -207,19 +216,26 @@ export default function TeamPage(): JSX.Element {
     }
   }
 
-  const handleResend = useCallback(async (invite: TeamInvite) => {
-    if (!teamId || resendState[invite.id] === 'loading') return
-    setResendState(prev => ({ ...prev, [invite.id]: 'loading' }))
-    try {
-      const token = await getAccessToken()
-      await apiPost(`/teams/${teamId}/invite`, { email: invite.email, role: invite.role }, token)
-      setActionMsg(`Invite resent to ${invite.email}`)
-      setResendState(prev => ({ ...prev, [invite.id]: 'done' }))
-    } catch {
-      setActionMsg(`Failed to resend invite to ${invite.email}`)
-      setResendState(prev => { const next = { ...prev }; delete next[invite.id]; return next })
-    }
-  }, [teamId, resendState])
+  const handleResend = useCallback(
+    async (invite: TeamInvite) => {
+      if (!teamId || resendState[invite.id] === 'loading') return
+      setResendState((prev) => ({ ...prev, [invite.id]: 'loading' }))
+      try {
+        const token = await getAccessToken()
+        await apiPost(`/teams/${teamId}/invite`, { email: invite.email, role: invite.role }, token)
+        setActionMsg(`Invite resent to ${invite.email}`)
+        setResendState((prev) => ({ ...prev, [invite.id]: 'done' }))
+      } catch {
+        setActionMsg(`Failed to resend invite to ${invite.email}`)
+        setResendState((prev) => {
+          const next = { ...prev }
+          delete next[invite.id]
+          return next
+        })
+      }
+    },
+    [teamId, resendState],
+  )
 
   if (loading) {
     return (
@@ -250,7 +266,11 @@ export default function TeamPage(): JSX.Element {
       {actionMsg && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
           {actionMsg}
-          <button type="button" onClick={() => setActionMsg(null)} className="ml-3 text-blue-500 underline">
+          <button
+            type="button"
+            onClick={() => setActionMsg(null)}
+            className="ml-3 text-blue-500 underline"
+          >
             Dismiss
           </button>
         </div>
@@ -281,7 +301,9 @@ export default function TeamPage(): JSX.Element {
           {/* Team header */}
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">{team.name}</h2>
-            <p className="text-sm text-gray-500">{team.members.length} member{team.members.length !== 1 ? 's' : ''}</p>
+            <p className="text-sm text-gray-500">
+              {team.members.length} member{team.members.length !== 1 ? 's' : ''}
+            </p>
           </div>
 
           {/* Members table */}
@@ -293,10 +315,12 @@ export default function TeamPage(): JSX.Element {
               {team.members.map((member) => (
                 <div key={member.id} className="flex items-center gap-4 px-6 py-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-500 text-sm font-bold text-white">
-                     {(member.user.name ?? member.user.email).charAt(0).toUpperCase()}
+                    {(member.user.name ?? member.user.email).charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">{member.user.name || member.user.email}</p>
+                    <p className="font-medium text-gray-900">
+                      {member.user.name || member.user.email}
+                    </p>
                     <p className="text-sm text-gray-500">{member.user.email}</p>
                   </div>
                   <span
@@ -308,14 +332,22 @@ export default function TeamPage(): JSX.Element {
                   >
                     {member.role}
                   </span>
-                  <select
-                    value={member.role}
-                    onChange={(e) => void handleRoleChange(member.userId, e.target.value as 'ADMIN' | 'MEMBER')}
-                    className="rounded-md border border-gray-200 px-2 py-1 text-sm"
-                  >
-                    <option value="MEMBER">Member</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
+                  {member.userId !== team.ownerUserId ? (
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        void handleRoleChange(member.userId, e.target.value as 'ADMIN' | 'MEMBER')
+                      }
+                      className="rounded-md border border-gray-200 px-2 py-1 text-sm"
+                    >
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  ) : (
+                    <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-xs text-gray-400">
+                      Owner
+                    </span>
+                  )}
                   {member.userId !== team.ownerUserId && (
                     <button
                       type="button"
@@ -342,7 +374,7 @@ export default function TeamPage(): JSX.Element {
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{invite.email}</p>
                       <p className="text-xs text-gray-400">
-                        Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                        Expires {formatDate(invite.expiresAt, userTz)}
                       </p>
                     </div>
                     <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">

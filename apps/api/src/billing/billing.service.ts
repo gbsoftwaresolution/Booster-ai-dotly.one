@@ -22,8 +22,12 @@ const DOTLY_ABI = [
   },
 ] as const
 
-// Solidity enum: 0=FREE, 1=STARTER, 2=PRO, 3=BUSINESS, 4=AGENCY, 5=ENTERPRISE
-const PLAN_INDEX_MAP: Plan[] = [Plan.FREE, Plan.STARTER, Plan.PRO, Plan.BUSINESS, Plan.AGENCY, Plan.ENTERPRISE]
+// Map Solidity enum indices → app Plan values.
+// The deployed DotlySubscription.sol defines:
+//   enum Plan { FREE, PRO, BUSINESS, ENTERPRISE }  (indices 0-3)
+// STARTER and AGENCY are app-only plans with no on-chain counterpart.
+// Any index outside 0-3 is treated as FREE to avoid silent privilege escalation.
+const PLAN_INDEX_MAP: Plan[] = [Plan.FREE, Plan.PRO, Plan.BUSINESS, Plan.ENTERPRISE]
 
 @Injectable()
 export class BillingService {
@@ -76,12 +80,14 @@ export class BillingService {
 
     await this.prisma.user.update({ where: { id: userId }, data: { plan } })
 
-    void this.audit.log({
-      userId,
-      action: 'billing.subscribed',
-      resourceType: 'subscription',
-      metadata: { plan, txHash, chainId, walletAddress },
-    }).catch(() => void 0)
+    void this.audit
+      .log({
+        userId,
+        action: 'billing.subscribed',
+        resourceType: 'subscription',
+        metadata: { plan, txHash, chainId, walletAddress },
+      })
+      .catch(() => void 0)
 
     return { plan, status: 'ACTIVE' }
   }
@@ -108,16 +114,16 @@ export class BillingService {
         // would previously have been able to claim any on-chain plan without a
         // valid transaction.  Throwing BadRequestException aborts the subscription
         // update and surfaces a clear error to the caller.
-        throw new BadRequestException(
-          `Chain ${chainId} is not supported — RPC URL not configured`,
-        )
+        throw new BadRequestException(`Chain ${chainId} is not supported — RPC URL not configured`)
       }
 
       const client = createPublicClient({ chain, transport: http(rpcUrl) })
       const tx = await client.getTransaction({ hash: txHash as `0x${string}` })
 
       if (!tx) {
-        throw new BadRequestException('Transaction not found on chain — please wait for it to be mined')
+        throw new BadRequestException(
+          'Transaction not found on chain — please wait for it to be mined',
+        )
       }
 
       if (tx.from.toLowerCase() !== walletAddress.toLowerCase()) {
@@ -150,7 +156,9 @@ export class BillingService {
   ): Promise<{ plan: Plan; expiresAt: Date }> {
     const fallback = { plan: Plan.FREE, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
     try {
-      const contractAddress = this.config.get<string>('DOTLY_CONTRACT_ADDRESS') as Address | undefined
+      const contractAddress = this.config.get<string>('DOTLY_CONTRACT_ADDRESS') as
+        | Address
+        | undefined
       if (!contractAddress) {
         this.logger.warn('DOTLY_CONTRACT_ADDRESS not set — defaulting to FREE plan')
         return fallback
@@ -225,11 +233,11 @@ export class BillingService {
     let orderRes: Awaited<ReturnType<BoosterAiClient['createOrder']>>
     try {
       orderRes = await this.boosterAi.createOrder({
-        plan:         params.plan,
-        duration:     params.duration,
+        plan: params.plan,
+        duration: params.duration,
         walletAddress: params.walletAddress,
-        partnerCode:  params.ref,
-        countryCode:  params.countryCode,
+        partnerCode: params.ref,
+        countryCode: params.countryCode,
       })
     } catch (err) {
       this.logger.error('BoosterAI createOrder failed', err)
@@ -246,28 +254,28 @@ export class BillingService {
       where: { userId },
       create: {
         userId,
-        plan:               params.plan,
-        status:             'TRIALING',
-        boosterAiOrderId:   orderRes.orderId,
+        plan: params.plan,
+        status: 'TRIALING',
+        boosterAiOrderId: orderRes.orderId,
         boosterAiPartnerId: null,
-        billingDuration:    params.duration,
+        billingDuration: params.duration,
         amountUsdt,
       },
       update: {
-        plan:             params.plan,
+        plan: params.plan,
         boosterAiOrderId: orderRes.orderId,
-        billingDuration:  params.duration,
+        billingDuration: params.duration,
         amountUsdt,
       },
     })
 
     return {
-      orderId:              orderRes.orderId,
-      paymentVaultAddress:  orderRes.paymentVaultAddress,
-      usdtTokenAddress:     orderRes.usdtTokenAddress,
-      amountUsdt:           orderRes.amountUsdt,
-      paymentRef:           orderRes.paymentRef,
-      chainId:              orderRes.chainId,
+      orderId: orderRes.orderId,
+      paymentVaultAddress: orderRes.paymentVaultAddress,
+      usdtTokenAddress: orderRes.usdtTokenAddress,
+      amountUsdt: orderRes.amountUsdt,
+      paymentRef: orderRes.paymentRef,
+      chainId: orderRes.chainId,
     }
   }
 
@@ -289,9 +297,9 @@ export class BillingService {
 
     if (status.orderStatus === 'FINALIZED_ONCHAIN') {
       const paidAt = status.paidAt ? new Date(status.paidAt) : new Date()
-      const sub    = await this.prisma.subscription.findUnique({ where: { userId } })
-      const dur    = (sub?.billingDuration ?? 'MONTHLY') as BillingDuration
-      const days   = DURATION_DAYS[dur] ?? 30
+      const sub = await this.prisma.subscription.findUnique({ where: { userId } })
+      const dur = (sub?.billingDuration ?? 'MONTHLY') as BillingDuration
+      const days = DURATION_DAYS[dur] ?? 30
       const periodEnd = new Date(paidAt.getTime() + days * 24 * 60 * 60 * 1000)
 
       // Resolve the plan from the BoosterAI planId (reverse lookup)
@@ -308,21 +316,23 @@ export class BillingService {
         where: { userId },
         data: {
           plan,
-          status:             'ACTIVE',
+          status: 'ACTIVE',
           boosterAiPartnerId: status.partnerId ?? undefined,
-          currentPeriodEnd:   periodEnd,
-          cancelAtPeriodEnd:  false,
+          currentPeriodEnd: periodEnd,
+          cancelAtPeriodEnd: false,
         },
       })
 
       await this.prisma.user.update({ where: { id: userId }, data: { plan } })
 
-      void this.audit.log({
-        userId,
-        action: 'billing.boosterai.activated',
-        resourceType: 'subscription',
-        metadata: { orderId, plan, partnerId: status.partnerId },
-      }).catch(() => void 0)
+      void this.audit
+        .log({
+          userId,
+          action: 'billing.boosterai.activated',
+          resourceType: 'subscription',
+          metadata: { orderId, plan, partnerId: status.partnerId },
+        })
+        .catch(() => void 0)
 
       return { status: 'ACTIVE', plan, currentPeriodEnd: periodEnd }
     }
@@ -334,12 +344,14 @@ export class BillingService {
       })
       await this.prisma.user.update({ where: { id: userId }, data: { plan: Plan.FREE } })
 
-      void this.audit.log({
-        userId,
-        action: 'billing.boosterai.refunded',
-        resourceType: 'subscription',
-        metadata: { orderId },
-      }).catch(() => void 0)
+      void this.audit
+        .log({
+          userId,
+          action: 'billing.boosterai.refunded',
+          resourceType: 'subscription',
+          metadata: { orderId },
+        })
+        .catch(() => void 0)
 
       return { status: 'CANCELLED' }
     }
@@ -349,19 +361,58 @@ export class BillingService {
   }
 
   getPlanLimits(plan: Plan) {
-    const limits: Record<Plan, {
-      cards: number
-      analyticsDays: number
-      csvExport: boolean
-      customDomain: boolean
-      teamMembers: number
-    }> = {
-      [Plan.FREE]:       { cards: 1,  analyticsDays: 7,   csvExport: false, customDomain: false, teamMembers: 0 },
-      [Plan.STARTER]:    { cards: 1,  analyticsDays: 30,  csvExport: false, customDomain: false, teamMembers: 0 },
-      [Plan.PRO]:        { cards: 3,  analyticsDays: 90,  csvExport: true,  customDomain: false, teamMembers: 0 },
-      [Plan.BUSINESS]:   { cards: 10, analyticsDays: 365, csvExport: true,  customDomain: true,  teamMembers: 10 },
-      [Plan.AGENCY]:     { cards: 50, analyticsDays: 365, csvExport: true,  customDomain: true,  teamMembers: 50 },
-      [Plan.ENTERPRISE]: { cards: -1, analyticsDays: -1,  csvExport: true,  customDomain: true,  teamMembers: -1 },
+    const limits: Record<
+      Plan,
+      {
+        cards: number
+        analyticsDays: number
+        csvExport: boolean
+        customDomain: boolean
+        teamMembers: number
+      }
+    > = {
+      [Plan.FREE]: {
+        cards: 1,
+        analyticsDays: 7,
+        csvExport: false,
+        customDomain: false,
+        teamMembers: 0,
+      },
+      [Plan.STARTER]: {
+        cards: 1,
+        analyticsDays: 30,
+        csvExport: false,
+        customDomain: false,
+        teamMembers: 0,
+      },
+      [Plan.PRO]: {
+        cards: 3,
+        analyticsDays: 90,
+        csvExport: true,
+        customDomain: false,
+        teamMembers: 0,
+      },
+      [Plan.BUSINESS]: {
+        cards: 10,
+        analyticsDays: 365,
+        csvExport: true,
+        customDomain: true,
+        teamMembers: 10,
+      },
+      [Plan.AGENCY]: {
+        cards: 50,
+        analyticsDays: 365,
+        csvExport: true,
+        customDomain: true,
+        teamMembers: 50,
+      },
+      [Plan.ENTERPRISE]: {
+        cards: -1,
+        analyticsDays: -1,
+        csvExport: true,
+        customDomain: true,
+        teamMembers: -1,
+      },
     }
     return limits[plan]
   }

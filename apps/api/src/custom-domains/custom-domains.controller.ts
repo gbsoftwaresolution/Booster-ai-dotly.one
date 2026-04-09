@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -27,11 +28,18 @@ class AddDomainDto {
   cardId?: string
 }
 
+class UpdateDomainDto {
+  @IsOptional()
+  @IsString()
+  cardId?: string | null
+}
+
 // CRIT-04: Strict FQDN regex for the :hostname route param.
 // The @Param decorator does not run class-validator, so we validate manually.
 // This prevents enumeration via malformed hostnames and blocks any path-traversal
 // characters that could escape the query into the database layer.
-const FQDN_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
+const FQDN_REGEX =
+  /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
 
 @ApiTags('custom-domains')
 @Controller('custom-domains')
@@ -41,10 +49,7 @@ export class CustomDomainsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add a custom domain' })
   @Post()
-  addDomain(
-    @CurrentUser() user: { id: string },
-    @Body() dto: AddDomainDto,
-  ) {
+  addDomain(@CurrentUser() user: { id: string }, @Body() dto: AddDomainDto) {
     return this.svc.addDomain(user.id, dto.cardId ?? null, dto.domain)
   }
 
@@ -57,10 +62,7 @@ export class CustomDomainsController {
   // for legitimate DNS propagation checks while blocking abuse.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post(':id/verify')
-  verifyDomain(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ) {
+  verifyDomain(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.svc.verifyDomain(user.id, id)
   }
 
@@ -74,11 +76,19 @@ export class CustomDomainsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a custom domain' })
   @Delete(':id')
-  deleteDomain(
+  deleteDomain(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.svc.deleteDomain(user.id, id)
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a custom domain (e.g. assign/unassign a card)' })
+  @Patch(':id')
+  updateDomain(
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
+    @Body() dto: UpdateDomainDto,
   ) {
-    return this.svc.deleteDomain(user.id, id)
+    return this.svc.updateDomain(user.id, id, { cardId: dto.cardId })
   }
 
   // CRIT-04: This endpoint is @Public (called by the Next.js middleware) so it

@@ -81,6 +81,12 @@ export class CustomDomainsService {
       )
     }
 
+    // Mark the domain as verified and logically "SSL active".
+    // NOTE: sslStatus: 'active' is a logical flag stored in the DB — it does NOT
+    // trigger actual TLS certificate provisioning here.  Certificate issuance is
+    // handled at the CDN/edge layer (e.g. Vercel, Cloudflare) which automatically
+    // provisions a certificate once the domain's DNS points to the platform.
+    // This flag is consumed by the frontend to show the correct status badge.
     return this.prisma.customDomain.update({
       where: { id: domainId },
       data: {
@@ -111,6 +117,28 @@ export class CustomDomainsService {
     if (record.userId !== userId) throw new ForbiddenException('Access denied')
 
     return this.prisma.customDomain.delete({ where: { id: domainId } })
+  }
+
+  async updateDomain(
+    userId: string,
+    domainId: string,
+    updates: { cardId?: string | null },
+  ) {
+    const record = await this.prisma.customDomain.findUnique({ where: { id: domainId } })
+    if (!record) throw new NotFoundException('Domain not found')
+    if (record.userId !== userId) throw new ForbiddenException('Access denied')
+
+    if (updates.cardId) {
+      const card = await this.prisma.card.findUnique({ where: { id: updates.cardId } })
+      if (!card) throw new NotFoundException('Card not found')
+      if (card.userId !== userId) throw new ForbiddenException('Access denied')
+    }
+
+    return this.prisma.customDomain.update({
+      where: { id: domainId },
+      data: { cardId: updates.cardId !== undefined ? updates.cardId : record.cardId },
+      include: { card: { select: { id: true, handle: true } } },
+    })
   }
 
   async getCardByDomain(hostname: string) {

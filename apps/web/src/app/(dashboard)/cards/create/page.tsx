@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost } from '@/lib/api'
 import { CardTemplate } from '@dotly/types'
+import { CARD_TEMPLATES } from '@/lib/cardTemplates'
 import { cn } from '@/lib/cn'
 import { Check } from 'lucide-react'
 

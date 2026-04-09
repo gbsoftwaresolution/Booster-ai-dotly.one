@@ -93,16 +93,18 @@ export function PublishBar({
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          {/* View live */}
-          <a
-            href={`/card/${handle}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <ExternalLink className="h-4 w-4" />
-            <span className="hidden sm:inline">View</span>
-          </a>
+          {/* View live — only shown when the card is published */}
+          {isActive && (
+            <a
+              href={`/card/${handle}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="hidden sm:inline">View</span>
+            </a>
+          )}
 
           {/* Publish / Unpublish — full width */}
           <button

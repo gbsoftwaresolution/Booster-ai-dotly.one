@@ -2,10 +2,12 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BriefcaseBusiness, Plus, Trash2, X } from 'lucide-react'
+import { BriefcaseBusiness, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
+import { formatDate } from '@/lib/tz'
+import { useUserTimezone } from '@/hooks/useUserLocale'
 
 interface Deal {
   id: string
@@ -65,15 +67,6 @@ function formatCurrency(value: number, currency: string): string {
   } catch {
     return `$${value.toLocaleString()}`
   }
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return 'No close date'
-  return new Date(value).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
 }
 
 function normalizePercent(value: number): number {
@@ -137,7 +130,7 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
         currency,
       }
       if (value) body.value = parseFloat(value)
-      if (probability) body.probability = parseFloat(probability) / 100
+      if (probability) body.probability = parseFloat(probability)
       if (closeDate) body.closeDate = new Date(closeDate).toISOString()
       if (notes.trim()) body.notes = notes.trim()
 
@@ -341,17 +334,196 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
   )
 }
 
+// ─── Edit Deal Modal ──────────────────────────────────────────────────────────
+
+interface EditDealModalProps {
+  deal: Deal
+  onClose: () => void
+  onUpdated: (deal: Deal) => void
+}
+
+function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.Element {
+  const [title, setTitle] = useState(deal.title)
+  const [value, setValue] = useState(deal.value > 0 ? String(deal.value) : '')
+  const [currency, setCurrency] = useState(deal.currency || 'USD')
+  const [stage, setStage] = useState<DealStage>(deal.stage)
+  const [probability, setProbability] = useState(
+    deal.probability > 0 ? String(Math.round(normalizePercent(deal.probability))) : '',
+  )
+  const [closeDate, setCloseDate] = useState(deal.closeDate ? deal.closeDate.slice(0, 10) : '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit() {
+    if (!title.trim()) {
+      setError('Deal title is required')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const token = await getAccessToken()
+      const body: Record<string, unknown> = {
+        title: title.trim(),
+        stage,
+        currency,
+      }
+      body.value = value ? parseFloat(value) : 0
+      body.probability = probability ? parseFloat(probability) : 0
+      body.closeDate = closeDate ? new Date(closeDate).toISOString() : null
+
+      const updated = await apiPatch<Deal>(`/deals/${deal.id}`, body, token)
+      onUpdated(updated)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update deal')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <h2 className="text-lg font-bold text-gray-900">Edit Deal</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-4">
+          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Deal title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={300}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                {['USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD', 'JPY'].map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+            <select
+              value={stage}
+              onChange={(e) => setStage(e.target.value as DealStage)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              {DEAL_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {STAGE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Probability (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={probability}
+                onChange={(e) => setProbability(e.target.value)}
+                placeholder="50"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Close date</label>
+              <input
+                type="date"
+                value={closeDate}
+                onChange={(e) => setCloseDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {closeDate && (
+                <button
+                  type="button"
+                  onClick={() => setCloseDate('')}
+                  className="mt-1 text-xs text-gray-400 hover:text-red-500"
+                >
+                  Clear date
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 border-t border-gray-100 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+            className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DealsPage(): JSX.Element {
+  const userTz = useUserTimezone()
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyDealIds, setBusyDealIds] = useState<Set<string>>(new Set())
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null)
   const [stageFilter, setStageFilter] = useState<DealStage | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const loadDeals = useCallback(async () => {
     setLoading(true)
@@ -448,7 +620,11 @@ export default function DealsPage(): JSX.Element {
   }, [])
 
   const handleDelete = useCallback(async (dealId: string) => {
-    if (!window.confirm('Delete this deal? This cannot be undone.')) return
+    setConfirmDeleteId(dealId)
+  }, [])
+
+  const confirmDelete = useCallback(async (dealId: string) => {
+    setConfirmDeleteId(null)
     setBusy(dealId, true)
     setError(null)
     try {
@@ -618,15 +794,26 @@ export default function DealsPage(): JSX.Element {
                                 <p className="mt-1 text-sm text-gray-400">No contact</p>
                               )}
                             </div>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void handleDelete(deal.id)}
-                              className="rounded-lg border border-gray-300 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                              aria-label={`Delete ${deal.title}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setEditingDeal(deal)}
+                                className="rounded-lg border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                                aria-label={`Edit ${deal.title}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void handleDelete(deal.id)}
+                                className="rounded-lg border border-gray-300 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                aria-label={`Delete ${deal.title}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
 
                           <div className="mt-3 flex items-center justify-between">
@@ -641,7 +828,12 @@ export default function DealsPage(): JSX.Element {
                           </div>
 
                           <div className="mt-3 space-y-1 text-sm text-gray-500">
-                            <p>Close date: {formatDate(deal.closeDate)}</p>
+                            <p>
+                              Close date:{' '}
+                              {deal.closeDate
+                                ? formatDate(deal.closeDate, userTz)
+                                : 'No close date'}
+                            </p>
                             <p>Probability: {Math.round(normalizePercent(deal.probability))}%</p>
                             {deal.contact?.email && (
                               <p className="truncate">{deal.contact.email}</p>
@@ -680,7 +872,56 @@ export default function DealsPage(): JSX.Element {
         />
       )}
 
+      {editingDeal && (
+        <EditDealModal
+          deal={editingDeal}
+          onClose={() => setEditingDeal(null)}
+          onUpdated={(updated) => {
+            setDeals((prev) => prev.map((d) => (d.id === updated.id ? updated : d)))
+            setEditingDeal(null)
+          }}
+        />
+      )}
+
       <ContactDetailDrawer contactId={drawerContactId} onClose={() => setDrawerContactId(null)} />
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          message="Delete this deal? This cannot be undone."
+          onConfirm={() => { void confirmDelete(confirmDeleteId) }}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     </div>
+  )
+}
+
+// ─── ConfirmDialog ────────────────────────────────────────────────────────────
+
+function ConfirmDialog({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}): JSX.Element {
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} aria-hidden="true" />
+      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+        <h3 className="text-sm font-semibold text-gray-900">Confirm</h3>
+        <p className="mt-1 text-sm text-gray-500">{message}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+            Delete
+          </button>
+        </div>
+      </div>
+    </>
   )
 }

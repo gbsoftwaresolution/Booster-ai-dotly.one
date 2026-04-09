@@ -6,6 +6,8 @@ import { Plus, Trash2, RefreshCw, Play, ChevronDown, ChevronRight, Copy, Check }
 import { cn } from '@/lib/cn'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
+import { formatDateTime } from '@/lib/tz'
+import { useUserTimezone } from '@/hooks/useUserLocale'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -103,6 +105,7 @@ function StatusBadge({ success, code }: { success: boolean; code: number | null 
 }
 
 function DeliveryLog({ endpointId }: { endpointId: string }) {
+  const userTz = useUserTimezone()
   const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -138,14 +141,7 @@ function DeliveryLog({ endpointId }: { endpointId: string }) {
           {d.durationMs !== null && (
             <span className="text-[10px] text-gray-400">{d.durationMs}ms</span>
           )}
-          <span className="text-[10px] text-gray-300">
-            {new Date(d.createdAt).toLocaleString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
+          <span className="text-[10px] text-gray-300">{formatDateTime(d.createdAt, userTz)}</span>
         </div>
       ))}
     </div>
@@ -472,14 +468,15 @@ export default function WebhooksPage(): JSX.Element {
   const [endpoints, setEndpoints] = useState<WebhookEndpoint[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [pageError, setPageError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       const token = await getAccessToken()
       const data = await apiGet<WebhookEndpoint[]>('/webhooks', token)
       setEndpoints(data)
-    } catch {
-      //
+    } catch (e) {
+      setPageError(e instanceof Error ? e.message : 'Failed to load webhooks.')
     } finally {
       setLoading(false)
     }
@@ -494,8 +491,8 @@ export default function WebhooksPage(): JSX.Element {
       const token = await getAccessToken()
       const updated = await apiPut<WebhookEndpoint>(`/webhooks/${id}`, { enabled }, token)
       setEndpoints((prev) => prev.map((ep) => (ep.id === id ? updated : ep)))
-    } catch {
-      /* ignore */
+    } catch (e) {
+      setPageError(e instanceof Error ? e.message : 'Failed to toggle webhook.')
     }
   }
 
@@ -505,8 +502,8 @@ export default function WebhooksPage(): JSX.Element {
       const token = await getAccessToken()
       await apiDelete(`/webhooks/${id}`, token)
       setEndpoints((prev) => prev.filter((ep) => ep.id !== id))
-    } catch {
-      /* ignore */
+    } catch (e) {
+      setPageError(e instanceof Error ? e.message : 'Failed to delete webhook.')
     }
   }
 
@@ -523,6 +520,13 @@ export default function WebhooksPage(): JSX.Element {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
+      {/* Error banner */}
+      {pageError && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{pageError}</span>
+          <button type="button" onClick={() => setPageError(null)} className="ml-4 text-red-400 hover:text-red-600 font-bold">✕</button>
+        </div>
+      )}
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>

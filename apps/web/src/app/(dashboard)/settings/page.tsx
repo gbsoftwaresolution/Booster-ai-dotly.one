@@ -1,10 +1,423 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { JSX } from 'react'
 import { cn } from '@/lib/cn'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch } from '@/lib/api'
+
+// ── ISO 3166-1 alpha-2 country list ──────────────────────────────────────────
+
+const COUNTRIES: { code: string; name: string }[] = [
+  { code: 'AF', name: 'Afghanistan' },
+  { code: 'AL', name: 'Albania' },
+  { code: 'DZ', name: 'Algeria' },
+  { code: 'AD', name: 'Andorra' },
+  { code: 'AO', name: 'Angola' },
+  { code: 'AG', name: 'Antigua and Barbuda' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'AM', name: 'Armenia' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'AZ', name: 'Azerbaijan' },
+  { code: 'BS', name: 'Bahamas' },
+  { code: 'BH', name: 'Bahrain' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'BB', name: 'Barbados' },
+  { code: 'BY', name: 'Belarus' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'BZ', name: 'Belize' },
+  { code: 'BJ', name: 'Benin' },
+  { code: 'BT', name: 'Bhutan' },
+  { code: 'BO', name: 'Bolivia' },
+  { code: 'BA', name: 'Bosnia and Herzegovina' },
+  { code: 'BW', name: 'Botswana' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'BN', name: 'Brunei' },
+  { code: 'BG', name: 'Bulgaria' },
+  { code: 'BF', name: 'Burkina Faso' },
+  { code: 'BI', name: 'Burundi' },
+  { code: 'CV', name: 'Cabo Verde' },
+  { code: 'KH', name: 'Cambodia' },
+  { code: 'CM', name: 'Cameroon' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'CF', name: 'Central African Republic' },
+  { code: 'TD', name: 'Chad' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CN', name: 'China' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'KM', name: 'Comoros' },
+  { code: 'CG', name: 'Congo' },
+  { code: 'CD', name: 'Congo (DRC)' },
+  { code: 'CR', name: 'Costa Rica' },
+  { code: 'CI', name: "Côte d'Ivoire" },
+  { code: 'HR', name: 'Croatia' },
+  { code: 'CU', name: 'Cuba' },
+  { code: 'CY', name: 'Cyprus' },
+  { code: 'CZ', name: 'Czech Republic' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'DJ', name: 'Djibouti' },
+  { code: 'DM', name: 'Dominica' },
+  { code: 'DO', name: 'Dominican Republic' },
+  { code: 'EC', name: 'Ecuador' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'SV', name: 'El Salvador' },
+  { code: 'GQ', name: 'Equatorial Guinea' },
+  { code: 'ER', name: 'Eritrea' },
+  { code: 'EE', name: 'Estonia' },
+  { code: 'SZ', name: 'Eswatini' },
+  { code: 'ET', name: 'Ethiopia' },
+  { code: 'FJ', name: 'Fiji' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'France' },
+  { code: 'GA', name: 'Gabon' },
+  { code: 'GM', name: 'Gambia' },
+  { code: 'GE', name: 'Georgia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'GD', name: 'Grenada' },
+  { code: 'GT', name: 'Guatemala' },
+  { code: 'GN', name: 'Guinea' },
+  { code: 'GW', name: 'Guinea-Bissau' },
+  { code: 'GY', name: 'Guyana' },
+  { code: 'HT', name: 'Haiti' },
+  { code: 'HN', name: 'Honduras' },
+  { code: 'HU', name: 'Hungary' },
+  { code: 'IS', name: 'Iceland' },
+  { code: 'IN', name: 'India' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'IR', name: 'Iran' },
+  { code: 'IQ', name: 'Iraq' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'JM', name: 'Jamaica' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'JO', name: 'Jordan' },
+  { code: 'KZ', name: 'Kazakhstan' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'KI', name: 'Kiribati' },
+  { code: 'KP', name: 'Korea (North)' },
+  { code: 'KR', name: 'Korea (South)' },
+  { code: 'XK', name: 'Kosovo' },
+  { code: 'KW', name: 'Kuwait' },
+  { code: 'KG', name: 'Kyrgyzstan' },
+  { code: 'LA', name: 'Laos' },
+  { code: 'LV', name: 'Latvia' },
+  { code: 'LB', name: 'Lebanon' },
+  { code: 'LS', name: 'Lesotho' },
+  { code: 'LR', name: 'Liberia' },
+  { code: 'LY', name: 'Libya' },
+  { code: 'LI', name: 'Liechtenstein' },
+  { code: 'LT', name: 'Lithuania' },
+  { code: 'LU', name: 'Luxembourg' },
+  { code: 'MG', name: 'Madagascar' },
+  { code: 'MW', name: 'Malawi' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'MV', name: 'Maldives' },
+  { code: 'ML', name: 'Mali' },
+  { code: 'MT', name: 'Malta' },
+  { code: 'MH', name: 'Marshall Islands' },
+  { code: 'MR', name: 'Mauritania' },
+  { code: 'MU', name: 'Mauritius' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'FM', name: 'Micronesia' },
+  { code: 'MD', name: 'Moldova' },
+  { code: 'MC', name: 'Monaco' },
+  { code: 'MN', name: 'Mongolia' },
+  { code: 'ME', name: 'Montenegro' },
+  { code: 'MA', name: 'Morocco' },
+  { code: 'MZ', name: 'Mozambique' },
+  { code: 'MM', name: 'Myanmar' },
+  { code: 'NA', name: 'Namibia' },
+  { code: 'NR', name: 'Nauru' },
+  { code: 'NP', name: 'Nepal' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'NI', name: 'Nicaragua' },
+  { code: 'NE', name: 'Niger' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'MK', name: 'North Macedonia' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'OM', name: 'Oman' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'PW', name: 'Palau' },
+  { code: 'PA', name: 'Panama' },
+  { code: 'PG', name: 'Papua New Guinea' },
+  { code: 'PY', name: 'Paraguay' },
+  { code: 'PE', name: 'Peru' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'RW', name: 'Rwanda' },
+  { code: 'KN', name: 'Saint Kitts and Nevis' },
+  { code: 'LC', name: 'Saint Lucia' },
+  { code: 'VC', name: 'Saint Vincent and the Grenadines' },
+  { code: 'WS', name: 'Samoa' },
+  { code: 'SM', name: 'San Marino' },
+  { code: 'ST', name: 'São Tomé and Príncipe' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'SN', name: 'Senegal' },
+  { code: 'RS', name: 'Serbia' },
+  { code: 'SC', name: 'Seychelles' },
+  { code: 'SL', name: 'Sierra Leone' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'SK', name: 'Slovakia' },
+  { code: 'SI', name: 'Slovenia' },
+  { code: 'SB', name: 'Solomon Islands' },
+  { code: 'SO', name: 'Somalia' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'SS', name: 'South Sudan' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'LK', name: 'Sri Lanka' },
+  { code: 'SD', name: 'Sudan' },
+  { code: 'SR', name: 'Suriname' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'SY', name: 'Syria' },
+  { code: 'TW', name: 'Taiwan' },
+  { code: 'TJ', name: 'Tajikistan' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'TL', name: 'Timor-Leste' },
+  { code: 'TG', name: 'Togo' },
+  { code: 'TO', name: 'Tonga' },
+  { code: 'TT', name: 'Trinidad and Tobago' },
+  { code: 'TN', name: 'Tunisia' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'TM', name: 'Turkmenistan' },
+  { code: 'TV', name: 'Tuvalu' },
+  { code: 'UG', name: 'Uganda' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'US', name: 'United States' },
+  { code: 'UY', name: 'Uruguay' },
+  { code: 'UZ', name: 'Uzbekistan' },
+  { code: 'VU', name: 'Vanuatu' },
+  { code: 'VE', name: 'Venezuela' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'YE', name: 'Yemen' },
+  { code: 'ZM', name: 'Zambia' },
+  { code: 'ZW', name: 'Zimbabwe' },
+]
+
+// ── Searchable combobox component ─────────────────────────────────────────────
+
+interface ComboboxProps {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  placeholder?: string
+  hint?: string
+}
+
+function Combobox({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  hint,
+}: ComboboxProps): JSX.Element {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? ''
+
+  const filtered = query.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  function handleSelect(val: string) {
+    onChange(val)
+    setOpen(false)
+    setQuery('')
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <div
+        className={cn(
+          'mt-1 flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm cursor-pointer',
+          'focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500',
+          open && 'border-brand-500 ring-1 ring-brand-500',
+        )}
+        onClick={() => {
+          setOpen(true)
+          setTimeout(() => inputRef.current?.focus(), 0)
+        }}
+      >
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          value={open ? query : selectedLabel}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={open ? 'Search...' : (placeholder ?? 'Select...')}
+          className="flex-1 bg-transparent outline-none text-gray-900 placeholder:text-gray-400 min-w-0"
+          autoComplete="off"
+        />
+        <svg
+          className={cn(
+            'h-4 w-4 text-gray-400 shrink-0 transition-transform',
+            open && 'rotate-180',
+          )}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {open && (
+        <ul
+          role="listbox"
+          className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg text-sm"
+        >
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-gray-400">No results</li>
+          ) : (
+            filtered.map((o) => (
+              <li
+                key={o.value}
+                role="option"
+                aria-selected={o.value === value}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  handleSelect(o.value)
+                }}
+                className={cn(
+                  'cursor-pointer px-3 py-2 hover:bg-brand-50',
+                  o.value === value && 'bg-brand-50 font-medium text-brand-700',
+                )}
+              >
+                {o.label}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+    </div>
+  )
+}
+
+// ── Build timezone options from Intl ──────────────────────────────────────────
+
+function getTimezoneOptions(): { value: string; label: string }[] {
+  // Intl.supportedValuesOf is available in modern browsers and Node 18+
+  let zones: string[]
+  try {
+    zones = (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf(
+      'timeZone',
+    )
+  } catch {
+    // Fallback: a small curated list of common IANA zones
+    zones = [
+      'Africa/Abidjan',
+      'Africa/Cairo',
+      'Africa/Nairobi',
+      'Africa/Lagos',
+      'America/Anchorage',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/New_York',
+      'America/Sao_Paulo',
+      'America/Toronto',
+      'Asia/Bangkok',
+      'Asia/Colombo',
+      'Asia/Dubai',
+      'Asia/Hong_Kong',
+      'Asia/Jakarta',
+      'Asia/Karachi',
+      'Asia/Kolkata',
+      'Asia/Kuala_Lumpur',
+      'Asia/Seoul',
+      'Asia/Shanghai',
+      'Asia/Singapore',
+      'Asia/Tokyo',
+      'Australia/Melbourne',
+      'Australia/Sydney',
+      'Europe/Amsterdam',
+      'Europe/Berlin',
+      'Europe/Dublin',
+      'Europe/Istanbul',
+      'Europe/London',
+      'Europe/Madrid',
+      'Europe/Moscow',
+      'Europe/Paris',
+      'Europe/Rome',
+      'Europe/Warsaw',
+      'Europe/Zurich',
+      'Pacific/Auckland',
+      'Pacific/Honolulu',
+      'UTC',
+    ]
+  }
+  return zones.map((tz) => ({ value: tz, label: tz.replace(/_/g, ' ') }))
+}
+
+const TIMEZONE_OPTIONS = getTimezoneOptions()
+
+// ── Country options ───────────────────────────────────────────────────────────
+
+const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: `${c.name} (${c.code})` }))
+
+// ── Detect locale from browser ────────────────────────────────────────────────
+
+function detectBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return 'UTC'
+  }
+}
+
+function detectBrowserCountry(): string {
+  try {
+    const locale = navigator.language ?? 'en-US'
+    // BCP 47 region subtag — e.g. "en-US" → "US", "en-GB" → "GB"
+    const parts = locale.split('-')
+    const region = parts[parts.length - 1] ?? ''
+    if (/^[A-Z]{2}$/.test(region)) return region
+    return ''
+  } catch {
+    return ''
+  }
+}
 
 // ── Become a Partner card ─────────────────────────────────────────────────────
 
@@ -68,7 +481,9 @@ function BecomeAPartnerCard(): JSX.Element {
         <div className="mt-4 h-9 w-48 animate-pulse rounded-lg bg-gray-100" />
       ) : partnerId ? (
         <div className="mt-4 space-y-3">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Your referral link</div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Your referral link
+          </div>
           <div className="flex gap-2 items-center flex-wrap">
             <input
               type="text"
@@ -126,6 +541,17 @@ const DEFAULT_NOTIF_PREFS: NotifPrefs = {
   productUpdates: false,
 }
 
+interface BillingSubscription {
+  plan?: string | null
+  status?: string | null
+  currentPeriodEnd?: string | null
+  walletAddress?: string | null
+  user?: {
+    plan?: string | null
+    walletAddress?: string | null
+  } | null
+}
+
 async function getToken(): Promise<string | undefined> {
   return getAccessToken()
 }
@@ -137,6 +563,8 @@ export default function SettingsPage(): JSX.Element {
   const [profileLoading, setProfileLoading] = useState(true)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [country, setCountry] = useState('')
+  const [timezone, setTimezone] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileStatus, setProfileStatus] = useState<'idle' | 'saved' | 'error'>('idle')
 
@@ -145,15 +573,37 @@ export default function SettingsPage(): JSX.Element {
   const [notifSaving, setNotifSaving] = useState(false)
   const [notifSaved, setNotifSaved] = useState(false)
 
+  // ── Billing state ─────────────────────────────────────────────────────────
+  const [billing, setBilling] = useState<BillingSubscription | null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+
   // Load user profile on mount
   useEffect(() => {
     async function load() {
       try {
         const token = await getToken()
         if (!token) return
-        const user = await apiGet<{ name?: string; email?: string }>('/users/me', token)
+        const user = await apiGet<{
+          name?: string
+          email?: string
+          country?: string | null
+          timezone?: string | null
+          notifLeadCaptured?: boolean
+          notifWeeklyDigest?: boolean
+          notifProductUpdates?: boolean
+        }>('/users/me', token)
         setName(user.name ?? '')
         setEmail(user.email ?? '')
+        // If the user has no country saved yet, pre-fill from browser locale
+        setCountry(user.country ?? detectBrowserCountry())
+        // If the user has no timezone saved yet, pre-fill from browser
+        setTimezone(user.timezone ?? detectBrowserTimezone())
+        // Load notification prefs from server (fall back to localStorage then defaults)
+        setNotifPrefs({
+          leadCaptured: user.notifLeadCaptured ?? notifPrefs.leadCaptured,
+          weeklyDigest: user.notifWeeklyDigest ?? notifPrefs.weeklyDigest,
+          productUpdates: user.notifProductUpdates ?? notifPrefs.productUpdates,
+        })
       } catch {
         // H-4: Surface load errors so the user sees "error" rather than blank fields
         setProfileStatus('error')
@@ -162,7 +612,7 @@ export default function SettingsPage(): JSX.Element {
       }
     }
     void load()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load notification prefs from localStorage on mount
   useEffect(() => {
@@ -174,12 +624,35 @@ export default function SettingsPage(): JSX.Element {
     }
   }, [])
 
+  // Load billing when the Billing tab is active
+  useEffect(() => {
+    if (activeTab !== 'Billing') return
+    if (billing !== null) return // already loaded
+    setBillingLoading(true)
+    void (async () => {
+      try {
+        const token = await getToken()
+        if (!token) return
+        const data = await apiGet<BillingSubscription>('/billing', token)
+        setBilling(data)
+      } catch {
+        setBilling({}) // set to empty object so we know it loaded (just no subscription)
+      } finally {
+        setBillingLoading(false)
+      }
+    })()
+  }, [activeTab, billing])
+
   const handleProfileSave = useCallback(async () => {
     setProfileSaving(true)
     setProfileStatus('idle')
     try {
       const token = await getToken()
-      await apiPatch('/users/me', { name }, token)
+      await apiPatch(
+        '/users/me',
+        { name, country: country || null, timezone: timezone || null },
+        token,
+      )
       setProfileStatus('saved')
       setTimeout(() => setProfileStatus('idle'), 3000)
     } catch {
@@ -187,17 +660,34 @@ export default function SettingsPage(): JSX.Element {
     } finally {
       setProfileSaving(false)
     }
-  }, [name])
+  }, [name, country, timezone])
 
-  const handleNotifSave = useCallback(() => {
+  const handleNotifSave = useCallback(async () => {
+    setNotifSaving(true)
     try {
-      localStorage.setItem(NOTIF_KEY, JSON.stringify(notifPrefs))
+      const token = await getToken()
+      await apiPatch(
+        '/users/me',
+        {
+          notifLeadCaptured: notifPrefs.leadCaptured,
+          notifWeeklyDigest: notifPrefs.weeklyDigest,
+          notifProductUpdates: notifPrefs.productUpdates,
+        },
+        token,
+      )
+      // Also persist to localStorage as a fallback cache
+      try {
+        localStorage.setItem(NOTIF_KEY, JSON.stringify(notifPrefs))
+      } catch {
+        /* ignore */
+      }
       setNotifSaved(true)
       setTimeout(() => setNotifSaved(false), 3000)
     } catch {
-      // ignore localStorage errors (e.g. private browsing full)
+      // silent — show saved anyway since we'll retry on next open
+    } finally {
+      setNotifSaving(false)
     }
-    setNotifSaving(false)
   }, [notifPrefs])
 
   return (
@@ -238,6 +728,8 @@ export default function SettingsPage(): JSX.Element {
               <div className="space-y-3">
                 <div className="h-9 w-full animate-pulse rounded-lg bg-gray-100" />
                 <div className="h-9 w-full animate-pulse rounded-lg bg-gray-100" />
+                <div className="h-9 w-full animate-pulse rounded-lg bg-gray-100" />
+                <div className="h-9 w-full animate-pulse rounded-lg bg-gray-100" />
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -259,7 +751,35 @@ export default function SettingsPage(): JSX.Element {
                     readOnly
                     className="mt-1 block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
                   />
-                  <p className="mt-1 text-xs text-gray-400">Email is managed by your sign-in provider and cannot be changed here.</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Email is managed by your sign-in provider and cannot be changed here.
+                  </p>
+                </div>
+
+                {/* Country */}
+                <div>
+                  <Combobox
+                    id="country-select"
+                    label="Country"
+                    value={country}
+                    onChange={setCountry}
+                    options={COUNTRY_OPTIONS}
+                    placeholder="Select your country"
+                    hint="Auto-detected from your browser. You can change it."
+                  />
+                </div>
+
+                {/* Timezone */}
+                <div>
+                  <Combobox
+                    id="timezone-select"
+                    label="Timezone"
+                    value={timezone}
+                    onChange={setTimezone}
+                    options={TIMEZONE_OPTIONS}
+                    placeholder="Select your timezone"
+                    hint="Auto-detected from your browser. Used for scheduling and date display."
+                  />
                 </div>
               </div>
             )}
@@ -285,16 +805,63 @@ export default function SettingsPage(): JSX.Element {
         {activeTab === 'Billing' && (
           <div className="space-y-4">
             <h2 className="text-base font-semibold text-gray-900">Billing &amp; Plan</h2>
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-700">Current plan: <span className="text-brand-600">Free</span></p>
-              <p className="mt-1 text-sm text-gray-400">Upgrade to unlock more cards, analytics, and custom domains.</p>
-            </div>
-            <a
-              href="/settings/billing"
-              className="inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-            >
-              Manage billing
-            </a>
+
+            {billingLoading ? (
+              <div className="space-y-3">
+                <div className="h-20 animate-pulse rounded-lg bg-gray-100" />
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg bg-gray-50 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">Current plan</p>
+                    <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 uppercase">
+                      {billing?.user?.plan ?? 'FREE'}
+                    </span>
+                  </div>
+                  {billing?.status && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-500">Status</p>
+                      <span
+                        className={`text-sm font-medium ${
+                          billing.status === 'ACTIVE' ? 'text-green-600' : 'text-yellow-600'
+                        }`}
+                      >
+                        {billing.status}
+                      </span>
+                    </div>
+                  )}
+                  {billing?.currentPeriodEnd && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-500">Renews</p>
+                      <p className="text-sm text-gray-700">
+                        {new Date(billing.currentPeriodEnd).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  {billing?.user?.walletAddress && (
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-gray-500">Wallet</p>
+                      <p className="text-xs font-mono text-gray-600 truncate max-w-[180px]">
+                        {billing.user.walletAddress}
+                      </p>
+                    </div>
+                  )}
+                  {!billing?.status && (
+                    <p className="text-sm text-gray-400">
+                      Upgrade to unlock more cards, analytics, and custom domains.
+                    </p>
+                  )}
+                </div>
+
+                <a
+                  href="/pricing"
+                  className="inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                >
+                  {billing?.status === 'ACTIVE' ? 'Manage billing' : 'Upgrade plan'}
+                </a>
+              </>
+            )}
           </div>
         )}
 
@@ -324,20 +891,23 @@ export default function SettingsPage(): JSX.Element {
                 <input
                   type="checkbox"
                   checked={notifPrefs.productUpdates}
-                  onChange={(e) => setNotifPrefs((p) => ({ ...p, productUpdates: e.target.checked }))}
+                  onChange={(e) =>
+                    setNotifPrefs((p) => ({ ...p, productUpdates: e.target.checked }))
+                  }
                   className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                 />
                 Product updates and announcements
               </label>
             </div>
 
-            {notifSaved && (
-              <p className="text-sm text-green-600">Preferences saved.</p>
-            )}
+            {notifSaved && <p className="text-sm text-green-600">Preferences saved.</p>}
 
             <button
               type="button"
-              onClick={() => { setNotifSaving(true); handleNotifSave() }}
+              onClick={() => {
+                setNotifSaving(true)
+                void handleNotifSave()
+              }}
               disabled={notifSaving}
               className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50"
             >

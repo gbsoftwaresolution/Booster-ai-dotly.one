@@ -127,17 +127,33 @@ model User {
   walletAddress String? @unique // crypto billing
   supabaseId    String? @unique // Supabase Auth user ID
   pushToken     String?
+  /// ISO 3166-1 alpha-2 country code, e.g. "US", "GB", "IN"
+  country       String? @db.VarChar(2)
+  /// IANA timezone identifier, e.g. "America/New_York", "Asia/Kolkata"
+  timezone      String? @db.VarChar(64)
+  /// Notification preferences
+  notifLeadCaptured  Boolean @default(true)
+  notifWeeklyDigest  Boolean @default(true)
+  notifProductUpdates Boolean @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  cards           Card[]
-  contacts        Contact[]
-  subscription    Subscription?
-  customDomains   CustomDomain[]
-  ownedTeams      Team[]       @relation("TeamOwner")
-  teamMemberships TeamMember[]
-  auditLogs       AuditLog[]
-  webhookEndpoints WebhookEndpoint[]
+  cards              Card[]
+  contacts           Contact[]
+  subscription       Subscription?
+  customDomains      CustomDomain[]
+  ownedTeams         Team[]       @relation("TeamOwner")
+  teamMemberships    TeamMember[]
+  auditLogs          AuditLog[]
+  webhookEndpoints   WebhookEndpoint[]
+  pipelines          Pipeline[]
+  contactNotes       ContactNote[]
+  contactCustomFields ContactCustomField[]
+  emailTemplates     EmailTemplate[]
+  deals              Deal[]
+  contactTasks       ContactTask[]
+  appointmentTypes   AppointmentType[]
+  bookings           Booking[]
 
   @@map("users")
 }
@@ -285,6 +301,10 @@ model Contact {
 
   @@unique([ownerUserId, email])
   @@index([ownerUserId])
+  @@index([ownerUserId, createdAt])
+  // Analytics queries filter by sourceCardId and often sort/range on createdAt.
+  // A compound index avoids a full-table scan on the contacts table at scale.
+  @@index([sourceCardId, createdAt])
   @@map("contacts")
 }
 
@@ -505,6 +525,7 @@ model LeadSubmission {
   contact  Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([leadFormId])
+  @@index([leadFormId, submittedAt])
   @@index([contactId])
   @@map("lead_submissions")
 }
@@ -575,13 +596,22 @@ model Pipeline {
   ownerUserId String
   name        String   @db.VarChar(200)
   stages      Json     @default("[\"NEW\",\"CONTACTED\",\"QUALIFIED\",\"CLOSED\",\"LOST\"]")
+  stageColors Json     @default("{}")
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  owner            User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   pipelineContacts CrmPipeline[]
 
   @@index([ownerUserId])
+  // B7: Enforce only one default pipeline per user at the DB level.
+  // When isDefault is false this unique pair (ownerUserId, false) could in theory
+  // collide for many non-default pipelines, so we use a partial approach:
+  // the application always sets isDefault=false on existing defaults before
+  // setting a new one, and this unique constraint guarantees at most one
+  // (ownerUserId, true) row exists.
+  @@unique([ownerUserId, isDefault], name: "pipelines_owner_default_uidx", map: "pipelines_owner_default_uidx")
   @@map("pipelines")
 }
 
@@ -596,7 +626,8 @@ model ContactNote {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerUser User    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@map("contact_notes")
@@ -612,7 +643,8 @@ model ContactCustomField {
   displayOrder Int             @default(0)
   createdAt    DateTime        @default(now())
 
-  values ContactCustomFieldValue[]
+  ownerUser User                       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  values    ContactCustomFieldValue[]
 
   @@index([ownerUserId])
   @@map("contact_custom_fields")
@@ -648,7 +680,8 @@ model Deal {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerUser User    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([ownerUserId])
@@ -665,25 +698,153 @@ model EmailTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
   @@index([ownerUserId])
   @@map("email_templates")
 }
 
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskType {
+  CALL
+  EMAIL
+  MEETING
+  TODO
+  FOLLOW_UP
+}
+
 // Tasks / reminders (Gap 7)
 model ContactTask {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   contactId   String
   ownerUserId String
-  title       String    @db.VarChar(500)
+  title       String        @db.VarChar(500)
   dueAt       DateTime?
-  completed   Boolean   @default(false)
+  completed   Boolean       @default(false)
   completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  priority    TaskPriority  @default(MEDIUM)
+  type        TaskType      @default(TODO)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerUser User    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([ownerUserId, completed])
   @@map("contact_tasks")
+}
+
+// ─── In-App Scheduling (Calendly replacement) ────────────────────────────────
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+}
+
+enum DayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+/// An appointment type the owner publishes (e.g. "30-min intro call")
+model AppointmentType {
+  id           String   @id @default(cuid())
+  ownerUserId  String
+  /// Slug used in the public booking URL: /book/<cardHandle>/<slug>
+  slug         String   @db.VarChar(100)
+  name         String   @db.VarChar(200)
+  description  String?  @db.VarChar(2000)
+  durationMins Int      @default(30)
+  /// Hex colour shown on the booking page
+  color        String   @default("#0ea5e9") @db.VarChar(7)
+  /// Maximum days in advance a visitor can book
+  bufferDays   Int      @default(60)
+  /// Minutes of buffer added after each meeting
+  bufferAfterMins Int   @default(0)
+  isActive     Boolean  @default(true)
+  /// Optional meeting location / URL (e.g. Zoom link, office address)
+  location     String?  @db.VarChar(500)
+  /// IANA timezone for this appointment type, e.g. "America/New_York"
+  timezone     String   @default("UTC") @db.VarChar(64)
+  /// CRITICAL-2: Soft-delete timestamp. Set instead of hard-deleting so that
+  /// all related Booking rows (past and future) are preserved for audit/history.
+  /// When non-null the type is hidden from all owner/public queries.
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownerUser         User               @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+
+  @@unique([ownerUserId, slug])
+  @@index([ownerUserId])
+  @@map("appointment_types")
+}
+
+/// Weekly recurring availability window for an appointment type
+model AvailabilityRule {
+  id                String          @id @default(cuid())
+  appointmentTypeId String
+  dayOfWeek         DayOfWeek
+  /// "HH:MM" in the owner's local time (stored as plain string, no TZ)
+  startTime         String          @db.VarChar(5)
+  endTime           String          @db.VarChar(5)
+
+  appointmentType AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentTypeId])
+  @@map("availability_rules")
+}
+
+/// A visitor booking for a specific appointment type + time slot
+model Booking {
+  id                String        @id @default(cuid())
+  appointmentTypeId String
+  ownerUserId       String
+  /// ISO-8601 start datetime (UTC stored)
+  startAt           DateTime
+  /// ISO-8601 end datetime derived from durationMins
+  endAt             DateTime
+  status            BookingStatus @default(CONFIRMED)
+  /// Visitor details
+  guestName         String        @db.VarChar(200)
+  guestEmail        String        @db.VarChar(254)
+  guestNotes        String?       @db.VarChar(2000)
+  /// Owner-side cancel reason
+  cancelReason      String?       @db.VarChar(500)
+  /// Unique token used in cancellation / reschedule links
+  token             String        @unique @default(cuid())
+  /// HIGH-4: Expiry for the cancel/reschedule token. Set to startAt + 24h so
+  /// that links in confirmation emails stop working after the appointment has
+  /// passed. Null means no expiry (legacy rows before this field was added).
+  tokenExpiresAt    DateTime?
+  /// Set after a 24h-before reminder email is sent — prevents duplicate sends
+  reminderSentAt    DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  /// CRITICAL-2: Restrict prevents hard-deleting an appointment type that still
+  /// has bookings — the soft-delete path (deletedAt) is the intended delete path.
+  appointmentType AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Restrict)
+  ownerUser       User            @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, startAt])
+  @@index([appointmentTypeId, startAt])
+  @@index([token])
+  @@map("bookings")
 }

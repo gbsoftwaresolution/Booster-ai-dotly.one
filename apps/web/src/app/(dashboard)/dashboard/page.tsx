@@ -7,14 +7,21 @@ import {
   Plus,
   Eye,
   MousePointerClick,
-  UserCheck,
   CreditCard,
   ChevronRight,
   Pencil,
+  Users,
+  Briefcase,
+  CheckSquare,
+  AlertCircle,
+  Calendar,
+  TrendingUp,
 } from 'lucide-react'
 import { getAccessToken, createClient } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CardSummary {
   id: string
@@ -30,7 +37,104 @@ interface AnalyticsSummary {
   totalLeads: number
 }
 
-// ─── Stat card ────────────────────────────────────────────────────────────────
+interface ContactRow {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  crmStage?: string
+  createdAt: string
+}
+
+interface LeadSubmission {
+  id: string
+  cardId: string
+  data: Record<string, string>
+  createdAt: string
+}
+
+interface Deal {
+  id: string
+  title: string
+  value: number
+  currency: string
+  stage: string
+  closeDate?: string
+  probability?: number
+  contact?: { firstName: string; lastName: string }
+}
+
+interface TaskItem {
+  id: string
+  title: string
+  dueAt?: string
+  completed: boolean
+  contact?: { firstName: string; lastName: string }
+}
+
+interface FunnelStage {
+  stage: string
+  count: number
+}
+
+interface CrmFunnel {
+  stages: FunnelStage[]
+  totalActive: number
+}
+
+interface AppointmentType {
+  id: string
+  title: string
+  durationMinutes: number
+  isActive: boolean
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const m = Math.floor(diff / 60_000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return `${d}d ago`
+}
+
+function formatCurrency(value: number, currency = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function dueDateLabel(dueAt?: string): { label: string; overdue: boolean } | null {
+  if (!dueAt) return null
+  const diff = new Date(dueAt).getTime() - Date.now()
+  const d = Math.ceil(diff / 86_400_000)
+  if (d < 0) return { label: `${Math.abs(d)}d overdue`, overdue: true }
+  if (d === 0) return { label: 'Due today', overdue: false }
+  if (d === 1) return { label: 'Due tomorrow', overdue: false }
+  return { label: `Due in ${d}d`, overdue: false }
+}
+
+const STAGE_COLORS: Record<string, string> = {
+  PROSPECT: 'bg-blue-100 text-blue-700',
+  PROPOSAL: 'bg-yellow-100 text-yellow-700',
+  NEGOTIATION: 'bg-orange-100 text-orange-700',
+  CLOSED_WON: 'bg-green-100 text-green-700',
+  CLOSED_LOST: 'bg-red-100 text-red-700',
+  NEW: 'bg-gray-100 text-gray-600',
+  CONTACTED: 'bg-blue-100 text-blue-700',
+  QUALIFIED: 'bg-purple-100 text-purple-700',
+  CLOSED: 'bg-green-100 text-green-700',
+  LOST: 'bg-red-100 text-red-700',
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({
   label,
@@ -38,15 +142,20 @@ function StatCard({
   icon: Icon,
   color,
   bg,
+  href,
 }: {
   label: string
   value: number | string
   icon: React.ElementType
   color: string
   bg: string
+  href: string
 }): JSX.Element {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+    <Link
+      href={href}
+      className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md active:shadow-none"
+    >
       <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', bg)}>
         <Icon className={cn('h-4 w-4', color)} aria-hidden="true" />
       </div>
@@ -54,11 +163,39 @@ function StatCard({
         <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{label}</p>
         <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', color)}>{value}</p>
       </div>
+    </Link>
+  )
+}
+
+function SectionHeader({
+  title,
+  href,
+  linkLabel = 'See all',
+}: {
+  title: string
+  href: string
+  linkLabel?: string
+}): JSX.Element {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+      <Link href={href} className="flex items-center gap-0.5 text-xs font-medium text-brand-500">
+        {linkLabel}
+        <ChevronRight className="h-3.5 w-3.5" />
+      </Link>
     </div>
   )
 }
 
-// ─── Per-card row ─────────────────────────────────────────────────────────────
+function SkeletonList({ rows = 3 }: { rows?: number }): JSX.Element {
+  return (
+    <div className="space-y-2.5">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-14 animate-pulse rounded-2xl bg-gray-100" />
+      ))}
+    </div>
+  )
+}
 
 function CardAnalyticsRow({
   card,
@@ -76,7 +213,7 @@ function CardAnalyticsRow({
       setSummary(data)
       onLoaded?.(card.id, data)
     } catch {
-      // silently ignore — no data yet
+      // silently ignore
     }
   }, [card.id, onLoaded])
 
@@ -98,21 +235,16 @@ function CardAnalyticsRow({
   return (
     <Link
       href={`/cards/${card.id}/edit`}
-      className="group flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow active:shadow-none"
+      className="group flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md active:shadow-none"
     >
-      {/* Avatar */}
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-bold text-white">
         {initials || '?'}
       </div>
-
-      {/* Name + url */}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-gray-900">{name}</p>
         {title && <p className="truncate text-xs text-gray-400">{title}</p>}
         <p className="truncate text-[11px] text-gray-300">dotly.one/{card.handle}</p>
       </div>
-
-      {/* Analytics mini pills */}
       {summary ? (
         <div className="flex shrink-0 flex-col items-end gap-1">
           <div className="flex items-center gap-1.5">
@@ -134,8 +266,6 @@ function CardAnalyticsRow({
           <div className="h-3 w-8 animate-pulse rounded bg-gray-100" />
         </div>
       )}
-
-      {/* Status + edit hint */}
       <div className="flex shrink-0 flex-col items-end gap-2">
         <span
           className={cn(
@@ -155,12 +285,15 @@ function CardAnalyticsRow({
 
 export default function DashboardPage(): JSX.Element {
   const [cards, setCards] = useState<CardSummary[]>([])
-  // C5: Use a Map<cardId, AnalyticsSummary> so each card's refresh *replaces*
-  // its previous entry rather than accumulating into a running sum. The old
-  // approach called setTotalStats(prev => prev + summary) on every 60s tick,
-  // doubling the totals each cycle.
   const [cardStats, setCardStats] = useState<Map<string, AnalyticsSummary>>(new Map())
+  const [contacts, setContacts] = useState<ContactRow[]>([])
+  const [leads, setLeads] = useState<LeadSubmission[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [tasks, setTasks] = useState<TaskItem[]>([])
+  const [funnel, setFunnel] = useState<CrmFunnel | null>(null)
+  const [appointmentTypes, setAppointmentTypes] = useState<AppointmentType[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [userName, setUserName] = useState<string>('there')
 
   const handleCardLoaded = useCallback((cardId: string, summary: AnalyticsSummary) => {
@@ -171,7 +304,6 @@ export default function DashboardPage(): JSX.Element {
     })
   }, [])
 
-  // Derive totals from the map on each render — no stale accumulation
   const totalStats = Array.from(cardStats.values()).reduce(
     (acc, s) => ({
       views: acc.views + s.totalViews,
@@ -192,15 +324,41 @@ export default function DashboardPage(): JSX.Element {
           user?.email?.split('@')[0] ??
           'there',
       )
+
+      let token = ''
       try {
-        const token = await getAccessToken()
-        const data = await apiGet<CardSummary[]>('/cards', token)
-        setCards(data)
+        token = (await getAccessToken()) ?? ''
       } catch {
-        // ignore
-      } finally {
+        setLoadError('Authentication error. Please refresh.')
         setLoading(false)
+        return
       }
+
+      const results = await Promise.allSettled([
+        apiGet<CardSummary[]>('/cards', token),
+        apiGet<{ contacts: ContactRow[]; total: number }>('/contacts?limit=5', token),
+        apiGet<{ submissions: LeadSubmission[]; total: number }>(
+          '/lead-submissions?limit=5',
+          token,
+        ),
+        apiGet<Deal[]>('/deals', token),
+        apiGet<TaskItem[]>('/tasks?completed=false', token),
+        apiGet<CrmFunnel>('/crm/analytics/funnel', token),
+        apiGet<AppointmentType[]>('/scheduling/appointment-types', token),
+      ])
+
+      if (results[0].status === 'fulfilled') setCards(results[0].value)
+      else setLoadError('Failed to load cards.')
+
+      if (results[1].status === 'fulfilled') setContacts(results[1].value.contacts ?? [])
+      if (results[2].status === 'fulfilled') setLeads(results[2].value.submissions ?? [])
+      if (results[3].status === 'fulfilled') setDeals(results[3].value ?? [])
+      if (results[4].status === 'fulfilled') setTasks(results[4].value ?? [])
+      if (results[5].status === 'fulfilled') setFunnel(results[5].value)
+      if (results[6].status === 'fulfilled')
+        setAppointmentTypes((results[6].value ?? []).filter((a) => a.isActive))
+
+      setLoading(false)
     }
     void load()
   }, [])
@@ -208,101 +366,456 @@ export default function DashboardPage(): JSX.Element {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
+  const openDeals = deals.filter((d) => d.stage !== 'CLOSED_WON' && d.stage !== 'CLOSED_LOST')
+  const pipelineValue = openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
+  const overdueTasks = tasks.filter((t) => t.dueAt && new Date(t.dueAt) < new Date())
+  const funnelMax = funnel ? Math.max(...funnel.stages.map((s) => s.count), 1) : 1
+
   return (
     <div className="space-y-5">
-      {/* ── Hero greeting ── */}
+      {/* Error banner */}
+      {loadError && (
+        <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => setLoadError(null)}
+            className="ml-4 font-bold text-red-400 hover:text-red-600"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ── Greeting ── */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">{greeting}</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">
+          {greeting}
+        </p>
         <h1 className="mt-0.5 text-2xl font-bold text-gray-900">{userName} 👋</h1>
-        <p className="mt-1 text-sm text-gray-400">Here&apos;s how your cards are performing.</p>
+        <p className="mt-1 text-sm text-gray-400">
+          Here&apos;s your business overview for today.
+        </p>
       </div>
 
-      {/* ── Stat grid — 2×2 on mobile, 4-col on desktop ── */}
+      {/* ── 4-tile stat grid ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="Views"
+          label="Card Views"
           value={loading ? '—' : totalStats.views}
           icon={Eye}
           color="text-blue-600"
           bg="bg-blue-50"
+          href="/analytics"
         />
         <StatCard
-          label="Clicks"
-          value={loading ? '—' : totalStats.clicks}
-          icon={MousePointerClick}
+          label="Contacts"
+          value={loading ? '—' : contacts.length}
+          icon={Users}
           color="text-purple-600"
           bg="bg-purple-50"
+          href="/contacts"
         />
         <StatCard
-          label="Leads"
-          value={loading ? '—' : totalStats.leads}
-          icon={UserCheck}
+          label="Open Deals"
+          value={loading ? '—' : openDeals.length}
+          icon={Briefcase}
           color="text-green-600"
           bg="bg-green-50"
+          href="/deals"
         />
         <StatCard
-          label="Cards"
-          value={loading ? '—' : cards.length}
-          icon={CreditCard}
-          color="text-orange-600"
-          bg="bg-orange-50"
+          label="Pending Tasks"
+          value={loading ? '—' : tasks.length}
+          icon={CheckSquare}
+          color={overdueTasks.length > 0 ? 'text-red-600' : 'text-orange-600'}
+          bg={overdueTasks.length > 0 ? 'bg-red-50' : 'bg-orange-50'}
+          href="/tasks"
         />
       </div>
 
-      {/* ── My Cards section ── */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">My Cards</h2>
-          <Link
-            href="/cards"
-            className="flex items-center gap-0.5 text-xs font-medium text-brand-500"
-          >
-            See all
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-[72px] animate-pulse rounded-2xl bg-gray-100" />
-            ))}
-          </div>
-        ) : cards.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-gray-200 bg-white py-10 text-center">
-            <CreditCard className="mb-3 h-10 w-10 text-gray-200" />
-            <p className="text-sm font-medium text-gray-500">No cards yet</p>
-            <p className="mt-1 text-xs text-gray-400">
-              Create your first digital card to start sharing.
-            </p>
-            <Link
-              href="/cards/create"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-            >
-              <Plus className="h-4 w-4" />
-              Create card
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {cards.slice(0, 5).map((card) => (
-              <CardAnalyticsRow key={card.id} card={card} onLoaded={handleCardLoaded} />
-            ))}
-
-            {cards.length > 5 && (
-              <Link
-                href="/cards"
-                className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
-              >
-                View all {cards.length} cards
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+      {/* ── Two-column layout ── */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* ── LEFT COLUMN ── */}
+        <div className="space-y-5">
+          {/* Recent Leads */}
+          <div>
+            <SectionHeader title="Recent Leads" href="/leads" />
+            {loading ? (
+              <SkeletonList rows={3} />
+            ) : leads.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+                No leads captured yet.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {leads.map((lead) => {
+                  const name =
+                    lead.data['name'] ??
+                    lead.data['fullName'] ??
+                    lead.data['firstName'] ??
+                    'Unknown'
+                  const email = lead.data['email'] ?? ''
+                  return (
+                    <Link
+                      key={lead.id}
+                      href="/leads"
+                      className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{name}</p>
+                        {email && (
+                          <p className="truncate text-xs text-gray-400">{email}</p>
+                        )}
+                      </div>
+                      <span className="ml-3 shrink-0 text-xs text-gray-400">
+                        {timeAgo(lead.createdAt)}
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
             )}
           </div>
-        )}
+
+          {/* Recent Contacts */}
+          <div>
+            <SectionHeader title="Recent Contacts" href="/contacts" />
+            {loading ? (
+              <SkeletonList rows={3} />
+            ) : contacts.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+                No contacts yet.{' '}
+                <Link href="/contacts" className="text-brand-500 underline">
+                  Add one
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {contacts.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/contacts/${c.id}`}
+                    className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {c.firstName} {c.lastName}
+                      </p>
+                      {c.email && (
+                        <p className="truncate text-xs text-gray-400">{c.email}</p>
+                      )}
+                    </div>
+                    {c.crmStage && (
+                      <span
+                        className={cn(
+                          'ml-3 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          STAGE_COLORS[c.crmStage] ?? 'bg-gray-100 text-gray-500',
+                        )}
+                      >
+                        {c.crmStage}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Pending Tasks */}
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-gray-900">Pending Tasks</h2>
+                {overdueTasks.length > 0 && (
+                  <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                    <AlertCircle className="h-3 w-3" />
+                    {overdueTasks.length} overdue
+                  </span>
+                )}
+              </div>
+              <Link
+                href="/tasks"
+                className="flex items-center gap-0.5 text-xs font-medium text-brand-500"
+              >
+                See all <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            {loading ? (
+              <SkeletonList rows={3} />
+            ) : tasks.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+                All caught up — no pending tasks.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tasks.slice(0, 5).map((task) => {
+                  const due = dueDateLabel(task.dueAt)
+                  return (
+                    <Link
+                      key={task.id}
+                      href="/tasks"
+                      className="flex items-start justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {task.title}
+                        </p>
+                        {task.contact && (
+                          <p className="text-xs text-gray-400">
+                            {task.contact.firstName} {task.contact.lastName}
+                          </p>
+                        )}
+                      </div>
+                      {due && (
+                        <span
+                          className={cn(
+                            'ml-3 mt-0.5 shrink-0 text-xs font-semibold',
+                            due.overdue ? 'text-red-500' : 'text-gray-400',
+                          )}
+                        >
+                          {due.label}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── RIGHT COLUMN ── */}
+        <div className="space-y-5">
+          {/* Active Deals */}
+          <div>
+            <SectionHeader title="Active Deals" href="/deals" />
+            {loading ? (
+              <SkeletonList rows={3} />
+            ) : openDeals.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+                No open deals.{' '}
+                <Link href="/deals" className="text-brand-500 underline">
+                  Add one
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl bg-green-50 px-4 py-2">
+                  <span className="text-xs font-medium text-green-700">Pipeline value</span>
+                  <span className="text-sm font-bold text-green-700">
+                    {formatCurrency(pipelineValue)}
+                  </span>
+                </div>
+                {openDeals.slice(0, 5).map((deal) => (
+                  <Link
+                    key={deal.id}
+                    href="/deals"
+                    className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">{deal.title}</p>
+                      {deal.contact && (
+                        <p className="text-xs text-gray-400">
+                          {deal.contact.firstName} {deal.contact.lastName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="ml-3 flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-sm font-bold text-gray-900">
+                        {formatCurrency(deal.value, deal.currency)}
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          STAGE_COLORS[deal.stage] ?? 'bg-gray-100 text-gray-500',
+                        )}
+                      >
+                        {deal.stage.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CRM Funnel */}
+          {(loading || funnel) && (
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-gray-900">CRM Funnel</h2>
+                <Link
+                  href="/crm"
+                  className="flex items-center gap-0.5 text-xs font-medium text-brand-500"
+                >
+                  View CRM <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+              {loading ? (
+                <SkeletonList rows={4} />
+              ) : funnel && funnel.stages.length > 0 ? (
+                <div className="space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                  {funnel.stages.map((s) => (
+                    <div key={s.stage}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="font-medium text-gray-600">{s.stage}</span>
+                        <span className="font-semibold tabular-nums text-gray-900">{s.count}</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-2 rounded-full bg-brand-500 transition-all"
+                          style={{ width: `${Math.round((s.count / funnelMax) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <p className="pt-1 text-xs text-gray-400">
+                    {funnel.totalActive} total active contacts
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* My Cards */}
+          <div>
+            <SectionHeader title="My Cards" href="/cards" />
+            {loading ? (
+              <SkeletonList rows={2} />
+            ) : cards.length === 0 ? (
+              <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-gray-200 bg-white py-10 text-center">
+                <CreditCard className="mb-3 h-10 w-10 text-gray-200" />
+                <p className="text-sm font-medium text-gray-500">No cards yet</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Create your first digital card to start sharing.
+                </p>
+                <Link
+                  href="/cards/create"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create card
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {cards.slice(0, 3).map((card) => (
+                  <CardAnalyticsRow key={card.id} card={card} onLoaded={handleCardLoaded} />
+                ))}
+                {cards.length > 3 && (
+                  <Link
+                    href="/cards"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
+                  >
+                    View all {cards.length} cards
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Scheduling — only shown if active appointment types exist */}
+          {!loading && appointmentTypes.length > 0 && (
+            <div>
+              <SectionHeader title="Scheduling" href="/scheduling" linkLabel="Manage" />
+              <div className="space-y-2">
+                {appointmentTypes.slice(0, 4).map((at) => (
+                  <Link
+                    key={at.id}
+                    href="/scheduling"
+                    className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 shrink-0 text-brand-400" />
+                      <span className="text-sm font-semibold text-gray-900">{at.title}</span>
+                    </div>
+                    <span className="text-xs text-gray-400">{at.durationMinutes} min</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Quick action FAB — mobile only ── */}
+      {/* ── Card performance summary bar ── */}
+      {!loading && cards.length > 0 && (
+        <div className="grid grid-cols-3 divide-x divide-gray-100 rounded-2xl border border-gray-100 bg-white shadow-sm">
+          {[
+            { label: 'Total Views', value: totalStats.views, icon: Eye, color: 'text-blue-600' },
+            {
+              label: 'Link Clicks',
+              value: totalStats.clicks,
+              icon: MousePointerClick,
+              color: 'text-purple-600',
+            },
+            {
+              label: 'Leads Captured',
+              value: totalStats.leads,
+              icon: TrendingUp,
+              color: 'text-green-600',
+            },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="flex flex-col items-center gap-1 py-4">
+              <Icon className={cn('h-4 w-4', color)} />
+              <p className={cn('text-xl font-bold tabular-nums', color)}>{value}</p>
+              <p className="text-[11px] text-gray-400">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Quick Actions ── */}
+      <div>
+        <h2 className="mb-3 text-base font-semibold text-gray-900">Quick Actions</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            {
+              label: 'New Card',
+              href: '/cards/create',
+              icon: CreditCard,
+              color: 'text-brand-500',
+              bg: 'bg-brand-50',
+            },
+            {
+              label: 'Add Contact',
+              href: '/contacts',
+              icon: Users,
+              color: 'text-purple-600',
+              bg: 'bg-purple-50',
+            },
+            {
+              label: 'New Deal',
+              href: '/deals',
+              icon: Briefcase,
+              color: 'text-green-600',
+              bg: 'bg-green-50',
+            },
+            {
+              label: 'Add Task',
+              href: '/tasks',
+              icon: CheckSquare,
+              color: 'text-orange-600',
+              bg: 'bg-orange-50',
+            },
+          ].map(({ label, href, icon: Icon, color, bg }) => (
+            <Link
+              key={label}
+              href={href}
+              className="flex flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md active:scale-95"
+            >
+              <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', bg)}>
+                <Icon className={cn('h-5 w-5', color)} />
+              </div>
+              <span className="text-xs font-semibold text-gray-700">{label}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Mobile FAB ── */}
       <Link
         href="/cards/create"
         className="fixed bottom-[calc(env(safe-area-inset-bottom)+68px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 shadow-lg shadow-brand-500/30 transition-transform active:scale-95 lg:hidden"

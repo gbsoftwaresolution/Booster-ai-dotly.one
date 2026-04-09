@@ -1,0 +1,15 @@
+                                                                                 Table "public.pipelines"
+   Column    |              Type              | Collation | Nullable |                           Default                            | Storage  | Compression | Stats target | Description 
+-------------+--------------------------------+-----------+----------+--------------------------------------------------------------+----------+-------------+--------------+-------------
+ id          | text                           |           | not null |                                                              | extended |             |              | 
+ ownerUserId | text                           |           | not null |                                                              | extended |             |              | 
+ name        | character varying(200)         |           | not null |                                                              | extended |             |              | 
+ stages      | jsonb                          |           | not null | '["NEW", "CONTACTED", "QUALIFIED", "CLOSED", "LOST"]'::jsonb | extended |             |              | 
+ isDefault   | boolean                        |           | not null | false                                                        | plain    |             |              | 
+ createdAt   | timestamp(3) without time zone |           | not null | CURRENT_TIMESTAMP                                            | plain    |             |              | 
+ updatedAt   | timestamp(3) without time zone |           | not null |                                                              | plain    |             |              | 
+Indexes:
+    "pipelines_pkey" PRIMARY KEY, btree (id)
+    "pipelines_ownerUserId_idx" btree ("ownerUserId")
+Access method: heap
+

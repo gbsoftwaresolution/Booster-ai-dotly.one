@@ -37,6 +37,15 @@ export default function RootLayout() {
     async function handleUrl(url: string) {
       // Parse fragment-style tokens (#access_token=...) as well as query params
       const parsed = Linking.parse(url)
+
+      // SECURITY: Only accept auth tokens from the exact expected callback path.
+      // Accepting tokens from arbitrary deep links enables session-fixation attacks
+      // where a malicious dotly:// link injects an attacker-controlled session.
+      // The normalised path from expo-linking omits the leading slash.
+      if (parsed.path !== 'auth/callback') {
+        return
+      }
+
       const params = parsed.queryParams ?? {}
       // Supabase sometimes encodes tokens in the fragment; expo-linking puts them in queryParams
       const accessToken = params['access_token'] as string | undefined

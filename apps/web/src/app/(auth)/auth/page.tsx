@@ -5,6 +5,8 @@ import type { JSX } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+const DOTLY_AUTH_CALLBACK_URL = 'https://dotly.one/auth/callback'
+
 export default function AuthPage(): JSX.Element {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin')
   const [email, setEmail] = useState('')
@@ -24,7 +26,7 @@ export default function AuthPage(): JSX.Element {
     try {
       if (mode === 'reset') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+          redirectTo: `${DOTLY_AUTH_CALLBACK_URL}?next=/settings`,
         })
         if (error) throw error
         setSuccessMessage('Password reset link sent — check your email.')
@@ -38,7 +40,7 @@ export default function AuthPage(): JSX.Element {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: DOTLY_AUTH_CALLBACK_URL,
           },
         })
         if (error) throw error
@@ -56,7 +58,7 @@ export default function AuthPage(): JSX.Element {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: DOTLY_AUTH_CALLBACK_URL,
       },
     })
     if (error) setError(error.message)

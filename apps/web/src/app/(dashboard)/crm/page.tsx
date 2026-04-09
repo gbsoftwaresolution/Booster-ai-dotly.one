@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -36,10 +36,17 @@ interface PipelineResponse {
   visibleCount: number
 }
 
-const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
-type Stage = (typeof STAGES)[number]
+interface NamedPipeline {
+  id: string
+  name: string
+  stages: string[]
+  isDefault: boolean
+}
 
-const STAGE_LABELS: Record<Stage, string> = {
+const DEFAULT_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
+type DefaultStage = (typeof DEFAULT_STAGES)[number]
+
+const DEFAULT_STAGE_LABELS: Record<DefaultStage, string> = {
   NEW: 'New',
   CONTACTED: 'Contacted',
   QUALIFIED: 'Qualified',
@@ -47,12 +54,29 @@ const STAGE_LABELS: Record<Stage, string> = {
   LOST: 'Lost',
 }
 
-const STAGE_HEADER_COLORS: Record<Stage, string> = {
+const DEFAULT_STAGE_COLORS: Record<string, string> = {
   NEW: 'bg-gray-100 border-gray-200',
   CONTACTED: 'bg-blue-50 border-blue-200',
   QUALIFIED: 'bg-yellow-50 border-yellow-200',
   CLOSED: 'bg-green-50 border-green-200',
   LOST: 'bg-red-50 border-red-200',
+}
+
+// Cycle through a palette for custom pipeline stages
+const PALETTE = [
+  'bg-blue-50 border-blue-200',
+  'bg-purple-50 border-purple-200',
+  'bg-yellow-50 border-yellow-200',
+  'bg-green-50 border-green-200',
+  'bg-red-50 border-red-200',
+  'bg-indigo-50 border-indigo-200',
+  'bg-orange-50 border-orange-200',
+]
+
+function stageHeaderColor(stage: string, index: number): string {
+  return (
+    DEFAULT_STAGE_COLORS[stage] ?? PALETTE[index % PALETTE.length] ?? 'bg-gray-50 border-gray-200'
+  )
 }
 
 async function getToken(): Promise<string | undefined> {
@@ -129,10 +153,14 @@ function KanbanCard({
 
 function DroppableColumn({
   stage,
+  stageLabel,
+  colorClass,
   contacts,
   onOpenContact,
 }: {
-  stage: Stage
+  stage: string
+  stageLabel: string
+  colorClass: string
   contacts: PipelineContact[]
   onOpenContact: (id: string) => void
 }): JSX.Element {
@@ -141,9 +169,9 @@ function DroppableColumn({
   return (
     <div className="flex w-64 shrink-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
       {/* Column header */}
-      <div className={`rounded-t-xl border-b px-4 py-3 ${STAGE_HEADER_COLORS[stage]}`}>
+      <div className={`rounded-t-xl border-b px-4 py-3 ${colorClass}`}>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">{STAGE_LABELS[stage]}</h3>
+          <h3 className="text-sm font-semibold text-gray-700">{stageLabel}</h3>
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-gray-600 shadow-sm">
             {contacts.length}
           </span>
@@ -159,7 +187,7 @@ function DroppableColumn({
         ].join(' ')}
       >
         {contacts.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Drop cards here</p>
+          <p className="py-4 text-center text-xs text-gray-400">No contacts in this stage</p>
         ) : (
           contacts.map((contact) => (
             <KanbanCard
@@ -183,22 +211,74 @@ export default function CrmPage(): JSX.Element {
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
+  // Named pipelines
+  const [namedPipelines, setNamedPipelines] = useState<NamedPipeline[]>([])
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>('') // '' = default
+
+  // Derive active stages list from selected pipeline or fall back to defaults.
+  // Wrapped in useMemo so the array reference is stable between renders and
+  // does not invalidate useCallback dependencies unnecessarily.
+  const activeStages: string[] = useMemo(
+    () =>
+      selectedPipelineId
+        ? (namedPipelines.find((p) => p.id === selectedPipelineId)?.stages ?? [...DEFAULT_STAGES])
+        : [...DEFAULT_STAGES],
+    [selectedPipelineId, namedPipelines],
+  )
+
+  const stageLabelFor = (stage: string): string =>
+    DEFAULT_STAGE_LABELS[stage as DefaultStage] ?? stage
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  // Load named pipelines once
+  useEffect(() => {
+    void (async () => {
+      try {
+        const token = await getToken()
+        const data = await apiGet<NamedPipeline[]>('/pipelines', token)
+        setNamedPipelines(data)
+        // Auto-select default pipeline if exists
+        const def = data.find((p) => p.isDefault)
+        if (def) setSelectedPipelineId(def.id)
+      } catch {
+        // silently ignore — named pipelines are optional
+      }
+    })()
+  }, [])
 
   const loadPipeline = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const token = await getToken()
-      const data = await apiGet<PipelineResponse>('/crm/pipeline', token)
-      setPipeline(data.pipeline)
-      setTruncated(data.truncated)
+      if (selectedPipelineId) {
+        // Load contacts assigned to this specific pipeline
+        const contacts = await apiGet<PipelineContact[]>(
+          `/pipelines/${selectedPipelineId}/contacts`,
+          token,
+        )
+        // Group by crmPipeline.stage
+        const grouped: PipelineData = {}
+        for (const stage of activeStages) grouped[stage] = []
+        for (const contact of contacts) {
+          const stage = contact.crmPipeline?.stage ?? activeStages[0] ?? 'NEW'
+          if (!grouped[stage]) grouped[stage] = []
+          grouped[stage].push(contact)
+        }
+        setPipeline(grouped)
+        setTruncated(contacts.length >= 200)
+      } else {
+        const data = await apiGet<PipelineResponse>('/crm/pipeline', token)
+        setPipeline(data.pipeline)
+        setTruncated(data.truncated)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load pipeline')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedPipelineId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void loadPipeline()
@@ -212,13 +292,13 @@ export default function CrmPage(): JSX.Element {
     : null
 
   const findContactStage = useCallback(
-    (contactId: string): Stage | null => {
-      for (const stage of STAGES) {
+    (contactId: string): string | null => {
+      for (const stage of activeStages) {
         if ((pipeline[stage] ?? []).some((c) => c.id === contactId)) return stage
       }
       return null
     },
-    [pipeline],
+    [pipeline, activeStages],
   )
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -236,7 +316,7 @@ export default function CrmPage(): JSX.Element {
       if (!over) return
 
       const contactId = String(active.id)
-      const targetStage = String(over.id) as Stage
+      const targetStage = String(over.id)
 
       const sourceStage = findContactStage(contactId)
       if (!sourceStage || sourceStage === targetStage) return
@@ -288,11 +368,33 @@ export default function CrmPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">CRM Pipeline</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Drag contacts between stages to update their pipeline status.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">CRM Pipeline</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Drag contacts between stages to update their pipeline status.
+          </p>
+        </div>
+
+        {/* Pipeline selector */}
+        {namedPipelines.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600 font-medium">Pipeline:</label>
+            <select
+              value={selectedPipelineId}
+              onChange={(e) => setSelectedPipelineId(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="">Default stages</option>
+              {namedPipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.isDefault ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Error */}
@@ -326,7 +428,7 @@ export default function CrmPage(): JSX.Element {
       {/* Loading skeleton */}
       {loading ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {STAGES.map((s) => (
+          {activeStages.map((s) => (
             <div key={s} className="h-64 w-64 shrink-0 animate-pulse rounded-xl bg-gray-100" />
           ))}
         </div>
@@ -338,10 +440,12 @@ export default function CrmPage(): JSX.Element {
           onDragEnd={(e) => void handleDragEnd(e)}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STAGES.map((stage) => (
+            {activeStages.map((stage, idx) => (
               <DroppableColumn
                 key={stage}
                 stage={stage}
+                stageLabel={stageLabelFor(stage)}
+                colorClass={stageHeaderColor(stage, idx)}
                 contacts={pipeline[stage] ?? []}
                 onOpenContact={setDrawerContactId}
               />

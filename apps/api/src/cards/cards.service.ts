@@ -26,10 +26,15 @@ import { randomBytes } from 'crypto'
 // because CardsService has no dependency on BillingService; if you add more
 // card-specific limits in the future, extend this map and remove them from
 // BillingService to keep a true single source.
+//
+// Keep in sync with BillingService.getPlanLimits() card counts:
+//   FREE/STARTER: 1  PRO: 3  BUSINESS: 10  AGENCY: 50  ENTERPRISE: unlimited
 const PLAN_CARD_LIMITS: Record<string, number> = {
   FREE: 1,
+  STARTER: 1,
   PRO: 3,
   BUSINESS: 10,
+  AGENCY: 50,
   ENTERPRISE: Infinity,
 }
 
@@ -98,7 +103,7 @@ export class CardsService {
     // L-07: Cap at 100 cards to prevent unbounded memory/query time.
     // ENTERPRISE plan allows "unlimited" cards but in practice no user has
     // 100+ cards. If this becomes a real limit, add cursor-based pagination.
-    return this.prisma.card.findMany({
+    const cards = await this.prisma.card.findMany({
       where: { userId: internalUserId },
       include: {
         theme: true,
@@ -109,6 +114,22 @@ export class CardsService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     })
+
+    const viewCounts = await this.prisma.analyticsEvent.groupBy({
+      by: ['cardId'],
+      where: {
+        cardId: { in: cards.map((card) => card.id) },
+        type: 'VIEW',
+      },
+      _count: { _all: true },
+    })
+
+    const viewsByCardId = new Map(viewCounts.map((row) => [row.cardId, row._count._all]))
+
+    return cards.map((card) => ({
+      ...card,
+      viewCount: viewsByCardId.get(card.id) ?? 0,
+    }))
   }
 
   async create(userId: string, dto: CreateCardDto) {
@@ -355,72 +376,95 @@ export class CardsService {
     const internalUserId = await this.resolveInternalUserId(userId)
     const source = await this.findById(id, userId)
 
-    // Check plan limit before creating duplicate
     const user = await this.prisma.user.findUnique({ where: { id: internalUserId } })
     const plan = user?.plan ?? 'FREE'
     const limit = PLAN_CARD_LIMITS[plan] ?? 1
-    const cardCount = await this.prisma.card.count({ where: { userId: internalUserId } })
-    if (cardCount >= limit) {
-      throw new ForbiddenException({
-        code: 'PLAN_LIMIT_REACHED',
-        limit,
-        current: cardCount,
-        message: `Plan ${plan} allows a maximum of ${limit} card(s)`,
-      })
-    }
 
-    // Generate a unique handle for the copy
-    const baseHandle = `${source.handle}-copy`
-    const newHandle = `${baseHandle}-${randomBytes(2).toString('hex')}`
+    // CRIT-02 (duplicate path): Wrap the plan-limit check AND the duplicate
+    // insert in a SERIALIZABLE transaction — mirrors the protection in create().
+    // Without this, two concurrent duplicate requests can both read cardCount < limit,
+    // both pass the check, and both succeed, bypassing the per-plan card cap.
+    let duplicate: Awaited<ReturnType<typeof this.prisma.card.create>>
+    try {
+      duplicate = await this.prisma.$transaction(
+        async (tx) => {
+          const cardCount = await tx.card.count({ where: { userId: internalUserId } })
+          if (cardCount >= limit) {
+            throw new ForbiddenException({
+              code: 'PLAN_LIMIT_REACHED',
+              limit,
+              current: cardCount,
+              message: `Plan ${plan} allows a maximum of ${limit} card(s)`,
+            })
+          }
 
-    const duplicate = await this.prisma.card.create({
-      data: {
-        userId: internalUserId,
-        handle: newHandle,
-        templateId: source.templateId,
-        fields: source.fields as Prisma.InputJsonValue,
-        isActive: false, // copies start as draft
-        theme: source.theme
-          ? {
-              create: {
-                primaryColor: source.theme.primaryColor,
-                secondaryColor: source.theme.secondaryColor,
-                fontFamily: source.theme.fontFamily,
-                backgroundUrl: source.theme.backgroundUrl,
-                logoUrl: source.theme.logoUrl,
+          // Generate a unique handle for the copy
+          const baseHandle = `${source.handle}-copy`
+          const newHandle = `${baseHandle}-${randomBytes(2).toString('hex')}`
+
+          return tx.card.create({
+            data: {
+              userId: internalUserId,
+              handle: newHandle,
+              templateId: source.templateId,
+              fields: source.fields as Prisma.InputJsonValue,
+              isActive: false, // copies start as draft
+              theme: source.theme
+                ? {
+                    create: {
+                      primaryColor: source.theme.primaryColor,
+                      secondaryColor: source.theme.secondaryColor,
+                      fontFamily: source.theme.fontFamily,
+                      backgroundUrl: source.theme.backgroundUrl,
+                      logoUrl: source.theme.logoUrl,
+                    },
+                  }
+                : {
+                    create: {
+                      primaryColor: '#000000',
+                      secondaryColor: '#ffffff',
+                      fontFamily: 'Inter',
+                    },
+                  },
+              socialLinks: {
+                create: source.socialLinks.map((sl) => ({
+                  platform: sl.platform,
+                  url: sl.url,
+                  displayOrder: sl.displayOrder,
+                })),
               },
-            }
-          : {
-              create: {
-                primaryColor: '#000000',
-                secondaryColor: '#ffffff',
-                fontFamily: 'Inter',
+              mediaBlocks: {
+                create: source.mediaBlocks.map((mb) => ({
+                  type: mb.type as unknown as PrismaMediaBlockType,
+                  url: mb.url,
+                  caption: mb.caption,
+                  altText: (mb as { altText?: string }).altText,
+                  linkUrl: (mb as { linkUrl?: string }).linkUrl,
+                  displayOrder: mb.displayOrder,
+                  mimeType: (mb as { mimeType?: string }).mimeType,
+                  fileSize: (mb as { fileSize?: number }).fileSize,
+                  groupId: (mb as { groupId?: string }).groupId,
+                  groupName: (mb as { groupName?: string }).groupName,
+                })),
               },
             },
-        socialLinks: {
-          create: source.socialLinks.map((sl) => ({
-            platform: sl.platform,
-            url: sl.url,
-            displayOrder: sl.displayOrder,
-          })),
+            include: { theme: true, socialLinks: true, mediaBlocks: true },
+          })
         },
-        mediaBlocks: {
-          create: source.mediaBlocks.map((mb) => ({
-            type: mb.type as unknown as PrismaMediaBlockType,
-            url: mb.url,
-            caption: mb.caption,
-            altText: mb.altText,
-            linkUrl: mb.linkUrl,
-            displayOrder: mb.displayOrder,
-            mimeType: (mb as { mimeType?: string }).mimeType,
-            fileSize: (mb as { fileSize?: number }).fileSize,
-            groupId: (mb as { groupId?: string }).groupId,
-            groupName: (mb as { groupName?: string }).groupName,
-          })),
-        },
-      },
-      include: { theme: true, socialLinks: true, mediaBlocks: true },
-    })
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+    } catch (err) {
+      if (err instanceof ForbiddenException || err instanceof ConflictException) throw err
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('Handle already taken — please try again')
+      }
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+        throw new ConflictException(
+          'Could not duplicate card due to a concurrent request — please try again',
+        )
+      }
+      throw err
+    }
 
     void this.audit
       .log({
@@ -556,7 +600,13 @@ export class CardsService {
     return { url: `${this.r2PublicUrl}/${key}` }
   }
 
-  async getUploadUrl(id: string, userId: string, filename: string, contentType: string) {
+  async getUploadUrl(
+    id: string,
+    userId: string,
+    filename: string,
+    contentType: string,
+    fileSizeBytes: number,
+  ) {
     await this.findById(id, userId)
 
     // Defense-in-depth: strip any directory components from the filename even
@@ -579,6 +629,10 @@ export class CardsService {
       Bucket: this.r2Bucket,
       Key: key,
       ContentType: contentType,
+      // Enforce the declared upload size: R2/S3 will reject PUT requests whose
+      // Content-Length header does not match this value, capping uploads at the
+      // DTO-validated 10 MB maximum without needing a presigned-POST policy.
+      ContentLength: fileSizeBytes,
     })
     const uploadUrl = await getSignedUrl(this.r2Client, command, { expiresIn: 60 })
     return {

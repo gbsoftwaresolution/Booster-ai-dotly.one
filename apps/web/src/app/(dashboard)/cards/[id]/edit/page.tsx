@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { CardRenderer } from '@dotly/ui'
 import { useCardBuilder } from '@/hooks/useCardBuilder'
@@ -44,7 +44,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ]
 
 interface EditPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 interface AnalyticsSummary {
@@ -54,7 +54,7 @@ interface AnalyticsSummary {
 }
 
 export default function CardEditPage({ params }: EditPageProps): JSX.Element {
-  const { id } = params
+  const { id } = use(params)
   const [activeTab, setActiveTab] = useState<Tab>('profile')
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
 

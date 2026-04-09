@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, type JSX } from 'react'
+import { formatDate as tzFormatDate } from '@/lib/tz'
+import { useUserTimezone } from '@/hooks/useUserLocale'
 import {
   X,
   Mail,
@@ -17,6 +19,8 @@ import {
   ChevronRight,
   Search,
   Loader2,
+  Pencil,
+  Check,
 } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut, apiPatch, apiPost, apiDelete } from '@/lib/api'
@@ -26,6 +30,14 @@ interface ContactNote {
   id: string
   content: string
   createdAt: string
+}
+
+interface ContactEmail {
+  id: string
+  subject: string
+  sentAt: string
+  openedAt: string | null
+  clickedAt: string | null
 }
 
 interface ContactDeal {
@@ -190,9 +202,9 @@ function getDealStageClasses(stage: string): string {
   return DEAL_STAGE_COLORS[stage as (typeof DEAL_STAGES)[number]] ?? 'bg-gray-100 text-gray-700'
 }
 
-function formatDate(dateStr: string | null | undefined): string {
+function formatDate(dateStr: string | null | undefined, tz?: string | null): string {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString()
+  return tzFormatDate(dateStr, tz ?? undefined)
 }
 
 function formatDateInputValue(dateStr: string | null | undefined): string {
@@ -268,6 +280,7 @@ export function ContactDetailDrawer({
   onUpdate,
 }: ContactDetailDrawerProps): JSX.Element | null {
   const [contact, setContact] = useState<ContactDetail | null>(null)
+  const userTz = useUserTimezone()
   const [loading, setLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [newTag, setNewTag] = useState('')
@@ -279,6 +292,10 @@ export function ContactDetailDrawer({
   const [newNote, setNewNote] = useState('')
   const [addingNote, setAddingNote] = useState(false)
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editNoteContent, setEditNoteContent] = useState('')
+  const [savingEditNoteId, setSavingEditNoteId] = useState<string | null>(null)
+  const [emails, setEmails] = useState<ContactEmail[]>([])
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDueAt, setTaskDueAt] = useState('')
   const [addingTask, setAddingTask] = useState(false)
@@ -305,17 +322,18 @@ export function ContactDetailDrawer({
     setDrawerError(null)
     try {
       const token = await getToken()
-      const [data, fullTimeline, threadedNotes, tasks, deals, fieldDefinitions] = await Promise.all(
-        [
+      const [data, fullTimeline, threadedNotes, tasks, deals, fieldDefinitions, emailHistory] =
+        await Promise.all([
           apiGet<ContactDetail>(`/contacts/${id}`, token),
           apiGet<TimelineEvent[]>(`/contacts/${id}/timeline`, token).catch(() => null),
           apiGet<ContactNote[]>(`/contacts/${id}/notes`, token).catch(() => null),
           apiGet<ContactTask[]>(`/contacts/${id}/tasks`, token).catch(() => null),
           apiGet<ContactDeal[]>(`/contacts/${id}/deals`, token).catch(() => null),
           apiGet<CustomFieldDefinition[]>(`/crm/custom-fields`, token).catch(() => []),
-        ],
-      )
+          apiGet<ContactEmail[]>(`/contacts/${id}/emails`, token).catch(() => []),
+        ])
 
+      setEmails(emailHistory)
       setContact({
         ...data,
         timeline: fullTimeline ?? data.timeline,
@@ -447,6 +465,47 @@ export function ContactDetailDrawer({
     [contact],
   )
 
+  const startEditNote = useCallback((note: ContactNote) => {
+    setEditingNoteId(note.id)
+    setEditNoteContent(note.content)
+  }, [])
+
+  const cancelEditNote = useCallback(() => {
+    setEditingNoteId(null)
+    setEditNoteContent('')
+  }, [])
+
+  const saveEditNote = useCallback(
+    async (noteId: string) => {
+      if (!contact || !editNoteContent.trim()) return
+      setSavingEditNoteId(noteId)
+      try {
+        const token = await getToken()
+        await apiPatch(
+          `/contacts/${contact.id}/notes/${noteId}`,
+          { content: editNoteContent.trim() },
+          token,
+        )
+        setContact((prev) =>
+          prev
+            ? {
+                ...prev,
+                contactNotes: (prev.contactNotes ?? []).map((n) =>
+                  n.id === noteId ? { ...n, content: editNoteContent.trim() } : n,
+                ),
+              }
+            : prev,
+        )
+        setEditingNoteId(null)
+        setEditNoteContent('')
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to update note')
+      } finally {
+        setSavingEditNoteId(null)
+      }
+    },
+    [contact, editNoteContent],
+  )
   const addTask = useCallback(async () => {
     if (!contact || !taskTitle.trim()) return
     setAddingTask(true)
@@ -969,7 +1028,7 @@ export function ContactDetailDrawer({
                                 <p
                                   className={`mt-0.5 text-xs ${overdue ? 'text-red-600' : 'text-gray-400'}`}
                                 >
-                                  Due {formatDate(task.dueAt)}
+                                  Due {formatDate(task.dueAt, userTz)}
                                 </p>
                               )}
                             </div>
@@ -1062,7 +1121,7 @@ export function ContactDetailDrawer({
                                 </span>
                                 {deal.closeDate && (
                                   <span className="text-xs text-gray-400">
-                                    Close {formatDate(deal.closeDate)}
+                                    Close {formatDate(deal.closeDate, userTz)}
                                   </span>
                                 )}
                               </div>
@@ -1185,8 +1244,11 @@ export function ContactDetailDrawer({
                 {customFields.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-sm text-gray-400">
                     No custom fields.{' '}
-                    <a href="/settings" className="font-medium text-indigo-600 hover:underline">
-                      Manage custom fields in settings
+                    <a
+                      href="/crm/custom-fields"
+                      className="font-medium text-indigo-600 hover:underline"
+                    >
+                      Manage custom fields
                     </a>
                   </div>
                 ) : (
@@ -1222,21 +1284,64 @@ export function ContactDetailDrawer({
                     <div className="space-y-2">
                       {notes.map((note) => (
                         <div key={note.id} className="rounded-lg border border-gray-100 px-3 py-2">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="whitespace-pre-wrap text-sm text-gray-700">
-                              {note.content}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => void deleteNote(note.id)}
-                              disabled={deletingNoteId === note.id}
-                              className="shrink-0 text-gray-400 hover:text-red-500 disabled:opacity-50"
-                              aria-label="Delete note"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <p className="mt-2 text-xs text-gray-400">{timeAgo(note.createdAt)}</p>
+                          {editingNoteId === note.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                rows={3}
+                                value={editNoteContent}
+                                onChange={(e) => setEditNoteContent(e.target.value)}
+                                className="w-full rounded-lg border border-indigo-300 p-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void saveEditNote(note.id)}
+                                  disabled={savingEditNoteId === note.id || !editNoteContent.trim()}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  <Check className="h-3 w-3" />
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEditNote}
+                                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between gap-3">
+                                <p className="whitespace-pre-wrap text-sm text-gray-700">
+                                  {note.content}
+                                </p>
+                                <div className="flex shrink-0 gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditNote(note)}
+                                    className="text-gray-400 hover:text-indigo-500"
+                                    aria-label="Edit note"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteNote(note.id)}
+                                    disabled={deletingNoteId === note.id}
+                                    className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                                    aria-label="Delete note"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="mt-2 text-xs text-gray-400">
+                                {timeAgo(note.createdAt)}
+                              </p>
+                            </>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1276,6 +1381,40 @@ export function ContactDetailDrawer({
                   <div className="divide-y divide-gray-100">
                     {contact.timeline.map((event) => (
                       <TimelineItem key={event.id} event={event} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {emails.length > 0 && (
+                <section>
+                  <h3 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    <Mail className="h-3.5 w-3.5" />
+                    Email History
+                    <span className="ml-auto font-normal normal-case text-gray-400">
+                      {emails.length}
+                    </span>
+                  </h3>
+                  <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                    {emails.map((email) => (
+                      <div key={email.id} className="rounded-lg border border-gray-100 px-3 py-2">
+                        <p className="truncate text-sm font-medium text-gray-800">
+                          {email.subject || '(no subject)'}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-gray-400">{timeAgo(email.sentAt)}</span>
+                          {email.openedAt && (
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                              Opened
+                            </span>
+                          )}
+                          {email.clickedAt && (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                              Clicked
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </section>

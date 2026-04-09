@@ -5,6 +5,8 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  # Allow deploy.yml to reuse this workflow as a CI gate
+  workflow_call:
 
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_test
@@ -76,8 +78,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo typecheck
 
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run API unit tests
+        run: pnpm --filter @dotly/api test
+
   build:
     name: Build
+    needs: [lint, typecheck, unit-test]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -122,17 +141,28 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           NEXT_PUBLIC_API_URL: http://localhost:3001
+          # Both names used by different parts of the app (middleware uses APP_URL, web .env uses WEB_URL)
           NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          WEB_URL: http://localhost:3000
+          CORS_ORIGINS: http://localhost:3000
           # R2 / storage — placeholder values so the build succeeds without real credentials
           R2_ACCOUNT_ID: placeholder
           R2_ACCESS_KEY_ID: placeholder
           R2_SECRET_ACCESS_KEY: placeholder
-          R2_BUCKET_NAME: placeholder
+          # R2_BUCKET is the canonical name used by the API (env.validation.ts)
+          R2_BUCKET: placeholder
           R2_PUBLIC_URL: https://placeholder.r2.dev
           # Email — placeholder values
           MAILGUN_API_KEY: placeholder
           MAILGUN_DOMAIN: placeholder.mailgun.org
-          MAILGUN_FROM: 'Dotly <no-reply@placeholder.mailgun.org>'
+          MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
+          # On-chain billing — placeholder values (canonical names from env.validation.ts)
+          POLYGON_RPC_URL: https://polygon-rpc.com
+          DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
+          # Supabase extras required by API
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
           # OpenAI — placeholder value
           OPENAI_API_KEY: placeholder
 
@@ -200,8 +230,8 @@ jobs:
         run: pnpm --filter @dotly/database exec prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
-      - name: Build Next.js app
-        run: pnpm turbo build --filter=@dotly/web
+      - name: Build API + web
+        run: pnpm turbo build --filter=@dotly/api --filter=@dotly/web
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
           SUPABASE_JWT_SECRET: test-jwt-secret
@@ -209,14 +239,43 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           NEXT_PUBLIC_API_URL: http://localhost:3001
           NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          WEB_URL: http://localhost:3000
+          CORS_ORIGINS: http://localhost:3000
           R2_ACCOUNT_ID: placeholder
           R2_ACCESS_KEY_ID: placeholder
           R2_SECRET_ACCESS_KEY: placeholder
-          R2_BUCKET_NAME: placeholder
+          R2_BUCKET: placeholder
           R2_PUBLIC_URL: https://placeholder.r2.dev
           MAILGUN_API_KEY: placeholder
           MAILGUN_DOMAIN: placeholder.mailgun.org
-          MAILGUN_FROM: 'Dotly <no-reply@placeholder.mailgun.org>'
+          MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
+          POLYGON_RPC_URL: https://polygon-rpc.com
+          DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
+          OPENAI_API_KEY: placeholder
+      - name: Start NestJS API
+        run: pnpm --filter @dotly/api start &
+        env:
+          PORT: 3001
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          REDIS_URL: redis://localhost:6379
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
+          SUPABASE_JWT_SECRET: test-jwt-secret
+          WEB_URL: http://localhost:3000
+          CORS_ORIGINS: http://localhost:3000
+          R2_ACCOUNT_ID: placeholder
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
+          MAILGUN_API_KEY: placeholder
+          MAILGUN_DOMAIN: placeholder.mailgun.org
+          MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
+          POLYGON_RPC_URL: https://polygon-rpc.com
+          DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
           OPENAI_API_KEY: placeholder
       - name: Start Next.js server
         run: pnpm --filter @dotly/web start &
@@ -227,17 +286,22 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           NEXT_PUBLIC_API_URL: http://localhost:3001
           NEXT_PUBLIC_APP_URL: http://localhost:3000
-      - name: Wait for Next.js to be ready
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+      - name: Wait for API and Next.js to be ready
         run: |
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
-              echo "Next.js is ready"
+            API_OK=0
+            WEB_OK=0
+            curl -sf http://localhost:3001/health > /dev/null 2>&1 && API_OK=1
+            curl -sf http://localhost:3000 > /dev/null 2>&1 && WEB_OK=1
+            if [[ "$API_OK" == "1" && "$WEB_OK" == "1" ]]; then
+              echo "API and Next.js are ready"
               exit 0
             fi
-            echo "Waiting... ($i/30)"
+            echo "Waiting... ($i/30) API=$API_OK WEB=$WEB_OK"
             sleep 2
           done
-          echo "Next.js did not start in time"
+          echo "Services did not start in time"
           exit 1
       - name: Install Playwright browsers
         run: pnpm --filter @dotly/web exec playwright install --with-deps chromium

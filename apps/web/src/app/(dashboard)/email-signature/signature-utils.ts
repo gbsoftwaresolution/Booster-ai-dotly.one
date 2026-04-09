@@ -10,6 +10,8 @@ export interface CardSummary {
   } | null
   socialLinks?: { platform: string; url: string }[]
   qrCode?: { shortUrl: string } | null
+  // Resolved QR image data URL (fetched separately from GET /cards/:id/qr)
+  qrImageUrl?: string | null
 }
 
 export type SignatureStyle = 'minimal' | 'professional' | 'branded'
@@ -49,7 +51,8 @@ export function generateSignatureHtml(
   const primaryColor = card.theme?.primaryColor ?? '#6366f1'
 
   const socialLinks = card.socialLinks ?? []
-  const qrUrl = card.qrCode?.shortUrl ?? ''
+  // Use the resolved QR image data URL; fall back to nothing if unavailable
+  const qrImageUrl = card.qrImageUrl ?? ''
 
   const socialRow =
     options.showSocials && socialLinks.length > 0
@@ -64,9 +67,9 @@ export function generateSignatureHtml(
       : ''
 
   const qrCell =
-    options.showQr && qrUrl
+    options.showQr && qrImageUrl
       ? `<tr><td colspan="2" style="padding-top:10px;">
-          <img src="${esc(qrUrl)}" alt="QR" width="72" height="72" style="display:block;border-radius:4px;" />
+          <img src="${esc(qrImageUrl)}" alt="QR" width="72" height="72" style="display:block;border-radius:4px;" />
         </td></tr>`
       : ''
 

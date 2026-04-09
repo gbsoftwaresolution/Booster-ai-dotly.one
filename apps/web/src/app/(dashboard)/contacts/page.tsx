@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { ContactDetailDrawer, type ContactDetail } from '@/components/crm/ContactDetailDrawer'
+import { useUserTimezone } from '@/hooks/useUserLocale'
+import { formatDate } from '@/lib/tz'
 import {
   Plus,
   Search,
@@ -76,6 +78,7 @@ function getInitials(name: string): string {
 }
 
 export default function ContactsPage(): JSX.Element {
+  const userTz = useUserTimezone()
   const [contacts, setContacts] = useState<ContactRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -102,36 +105,32 @@ export default function ContactsPage(): JSX.Element {
   } | null>(null)
 
   const [cards, setCards] = useState<CardSummary[]>([])
+  const [allTags, setAllTags] = useState<string[]>([])
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const LIMIT = 20
 
-  // Derive all unique tags from loaded contacts for the tag filter dropdown
-  const allTags = Array.from(new Set(contacts.flatMap((c) => c.tags ?? []))).sort()
-
-  // Client-side tag filter + sort applied on top of server-paginated results
-  const displayedContacts = contacts
-    .filter((c) => !tagFilter || (c.tags ?? []).includes(tagFilter))
-    .sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name)
-      if (sortBy === 'stage') {
-        const stageOrder = { NEW: 0, CONTACTED: 1, QUALIFIED: 2, CLOSED: 3, LOST: 4 }
-        const aStage = (a.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
-        const bStage = (b.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
-        return (stageOrder[aStage] ?? 0) - (stageOrder[bStage] ?? 0)
-      }
-      if (sortBy === 'score') {
-        if (a.enrichmentScore == null && b.enrichmentScore == null) return 0
-        if (a.enrichmentScore == null) return 1
-        if (b.enrichmentScore == null) return -1
-        return b.enrichmentScore - a.enrichmentScore
-      }
-      // default: date desc (server already sorts this way)
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    })
+  // Client-side sort applied on top of server-paginated (and server-filtered) results
+  const displayedContacts = contacts.sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name)
+    if (sortBy === 'stage') {
+      const stageOrder = { NEW: 0, CONTACTED: 1, QUALIFIED: 2, CLOSED: 3, LOST: 4 }
+      const aStage = (a.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
+      const bStage = (b.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
+      return (stageOrder[aStage] ?? 0) - (stageOrder[bStage] ?? 0)
+    }
+    if (sortBy === 'score') {
+      if (a.enrichmentScore == null && b.enrichmentScore == null) return 0
+      if (a.enrichmentScore == null) return 1
+      if (b.enrichmentScore == null) return -1
+      return b.enrichmentScore - a.enrichmentScore
+    }
+    // default: date desc (server already sorts this way)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
 
   const loadContacts = useCallback(
-    async (p = 1, s = search, stage = stageFilter) => {
+    async (p = 1, s = search, stage = stageFilter, tag = tagFilter) => {
       setLoading(true)
       setError(null)
       try {
@@ -139,6 +138,7 @@ export default function ContactsPage(): JSX.Element {
         const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) })
         if (s) params.set('search', s)
         if (stage !== 'ALL') params.set('stage', stage)
+        if (tag) params.set('tag', tag)
         const data = await apiGet<ContactsResponse>(`/contacts?${params.toString()}`, token)
         setContacts(data.contacts)
         setTotal(data.total)
@@ -149,39 +149,76 @@ export default function ContactsPage(): JSX.Element {
         setLoading(false)
       }
     },
-    [search, stageFilter],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stageFilter, tagFilter],
   )
 
+  // Initial load and stage/tag filter changes — search changes go through the debounce only
   useEffect(() => {
-    void loadContacts(1, search, stageFilter)
+    void loadContacts(1, search, stageFilter, tagFilter)
     void (async () => {
       try {
         const token = await getAccessToken()
-        const data = await apiGet<CardSummary[]>('/cards', token)
-        setCards(data)
+        const [cardsData, tagsData] = await Promise.all([
+          apiGet<CardSummary[]>('/cards', token),
+          apiGet<string[]>('/contacts/tags', token),
+        ])
+        setCards(cardsData)
+        setAllTags(tagsData)
       } catch {
         /* ignore */
       }
     })()
-  }, [loadContacts, search, stageFilter])
+    // loadContacts changes only when stageFilter or tagFilter changes
+  }, [loadContacts]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearchChange = useCallback(
     (value: string) => {
       setSearch(value)
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
       searchDebounceRef.current = setTimeout(() => {
-        void loadContacts(1, value, stageFilter)
+        void loadContacts(1, value, stageFilter, tagFilter)
       }, 300)
     },
-    [loadContacts, stageFilter],
+    [loadContacts, stageFilter, tagFilter],
   )
+
+  const handleExportCSV = useCallback(async () => {
+    try {
+      const token = await getAccessToken()
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export`, {
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+      })
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      const csv = await res.text()
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Export failed')
+    }
+  }, [])
 
   const handleStageFilter = useCallback(
     (stage: string) => {
       setStageFilter(stage)
-      void loadContacts(1, search, stage)
+      void loadContacts(1, search, stage, tagFilter)
     },
-    [loadContacts, search],
+    [loadContacts, search, tagFilter],
+  )
+
+  const handleTagFilter = useCallback(
+    (tag: string) => {
+      setTagFilter(tag)
+      void loadContacts(1, search, stageFilter, tag)
+    },
+    [loadContacts, search, stageFilter],
   )
 
   const toggleSelect = useCallback((id: string) => {
@@ -194,12 +231,12 @@ export default function ContactsPage(): JSX.Element {
   }, [])
 
   const selectAll = useCallback(() => {
-    if (selectedIds.size === contacts.length) {
+    if (selectedIds.size === displayedContacts.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(contacts.map((c) => c.id)))
+      setSelectedIds(new Set(displayedContacts.map((c) => c.id)))
     }
-  }, [contacts, selectedIds.size])
+  }, [displayedContacts, selectedIds.size])
 
   const handleBulkStageChange = useCallback(async () => {
     if (!bulkStage || selectedIds.size === 0) return
@@ -317,13 +354,14 @@ export default function ContactsPage(): JSX.Element {
           </div>
         </div>
         <div className="flex gap-2">
-          <a
-            href="/api/export/contacts"
+          <button
+            type="button"
+            onClick={() => void handleExportCSV()}
             className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
             <Download className="h-4 w-4" />
             Export CSV
-          </a>
+          </button>
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
@@ -363,7 +401,7 @@ export default function ContactsPage(): JSX.Element {
             <Tag className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <select
               value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
+              onChange={(e) => handleTagFilter(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
             >
               <option value="">All tags</option>
@@ -513,7 +551,9 @@ export default function ContactsPage(): JSX.Element {
                 <th className="px-4 py-3">
                   <input
                     type="checkbox"
-                    checked={selectedIds.size === contacts.length && contacts.length > 0}
+                    checked={
+                      selectedIds.size === displayedContacts.length && displayedContacts.length > 0
+                    }
                     onChange={selectAll}
                     className="rounded border-gray-300"
                   />
@@ -589,7 +629,7 @@ export default function ContactsPage(): JSX.Element {
                     className="px-4 py-3 text-gray-500 hidden lg:table-cell"
                     onClick={() => setDrawerContactId(contact.id)}
                   >
-                    {new Date(contact.createdAt).toLocaleDateString()}
+                    {formatDate(contact.createdAt, userTz)}
                   </td>
                   <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
                     <span
@@ -914,9 +954,25 @@ function ImportCsvModal({
   onImported: () => void
 }): JSX.Element {
   const [csv, setCsv] = useState('')
+  const [fileName, setFileName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportContactsResponse | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      setCsv((evt.target?.result as string) ?? '')
+      setResult(null)
+      setError(null)
+    }
+    reader.onerror = () => setError('Failed to read file')
+    reader.readAsText(file, 'utf-8')
+  }
 
   const handleImport = async () => {
     if (!csv.trim()) return
@@ -942,20 +998,59 @@ function ImportCsvModal({
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-lg -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
         <h2 className="text-lg font-semibold text-gray-900">Import CSV</h2>
-        <div className="mt-4 space-y-3">
-          <label className="block text-sm font-medium text-gray-700" htmlFor="contacts-import-csv">
-            Paste CSV content
-          </label>
-          <textarea
-            id="contacts-import-csv"
-            rows={10}
-            value={csv}
-            onChange={(e) => setCsv(e.target.value)}
-            placeholder={
-              'name,email,phone,company,title,website,address\nJane Doe,jane@example.com,+1-555-0100,Acme,Founder,https://acme.com,New York'
-            }
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
-          />
+        <div className="mt-4 space-y-4">
+          {/* File picker */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-700">Upload a CSV file</p>
+            <div
+              className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+            >
+              <Upload className="mb-2 h-7 w-7 text-gray-400" />
+              {fileName ? (
+                <p className="text-sm font-medium text-indigo-700">{fileName}</p>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600">Click to select a .csv file</p>
+                  <p className="mt-0.5 text-xs text-gray-400">or paste content below</p>
+                </>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
+          </div>
+
+          {/* Paste fallback */}
+          <div>
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1"
+              htmlFor="contacts-import-csv"
+            >
+              Or paste CSV content
+            </label>
+            <textarea
+              id="contacts-import-csv"
+              rows={6}
+              value={csv}
+              onChange={(e) => {
+                setCsv(e.target.value)
+                setFileName(null)
+              }}
+              placeholder={
+                'name,email,phone,company,title,website,address\nJane Doe,jane@example.com,+1-555-0100,Acme,Founder,https://acme.com,New York'
+              }
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
           {result && (
             <p className="text-sm text-green-700">

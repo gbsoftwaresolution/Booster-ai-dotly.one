@@ -23,7 +23,9 @@ async function bootstrap() {
   // Fail fast if critical env vars are missing
   const webUrl = process.env['WEB_URL']
   if (!webUrl) {
-    console.error('[Bootstrap] FATAL: WEB_URL environment variable is not set. CORS will be misconfigured. Aborting.')
+    console.error(
+      '[Bootstrap] FATAL: WEB_URL environment variable is not set. CORS will be misconfigured. Aborting.',
+    )
     process.exit(1)
   }
 
@@ -32,7 +34,7 @@ async function bootstrap() {
   // WEB_URL is always included as a baseline origin.
   const extraOrigins = (process.env['CORS_ORIGINS'] ?? '')
     .split(',')
-    .map(o => o.trim())
+    .map((o) => o.trim())
     .filter(Boolean)
   const allowedOrigins = Array.from(new Set([webUrl, ...extraOrigins]))
 
@@ -79,7 +81,8 @@ async function bootstrap() {
   const port = process.env.PORT || 3001
   await app.listen(port)
   const logger = app.get(WINSTON_MODULE_NEST_PROVIDER)
-  logger.log(`Dotly API running on http://localhost:${port}`, 'Bootstrap')
+  const url = await app.getUrl()
+  logger.log(`Dotly API running on ${url}`, 'Bootstrap')
 
   const config = new DocumentBuilder()
     .setTitle('Dotly.one API')
@@ -103,7 +106,7 @@ async function bootstrap() {
     process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true'
   if (swaggerEnabled) {
     SwaggerModule.setup('api/docs', app, document)
-    logger.log(`Swagger: http://localhost:${port}/api/docs`, 'Bootstrap')
+    logger.log(`Swagger: ${url}/api/docs`, 'Bootstrap')
   }
 }
 bootstrap().catch((err) => {

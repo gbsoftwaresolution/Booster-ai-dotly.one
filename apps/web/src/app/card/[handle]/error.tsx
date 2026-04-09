@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import * as Sentry from '@sentry/nextjs'
 
 export default function CardError({
   error,
@@ -12,7 +13,7 @@ export default function CardError({
   const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
-    console.error('[card/error]', error)
+    Sentry.captureException(error)
   }, [error])
 
   function handleReset() {

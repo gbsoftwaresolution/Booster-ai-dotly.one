@@ -17,7 +17,32 @@ on:
           - production
 
 jobs:
+  # Gate every EAS build (including tag-triggered production builds) on the
+  # full CI suite (lint, typecheck, unit tests) so that a broken commit can
+  # never produce a shippable binary.
+  ci:
+    name: CI Gate
+    uses: ./.github/workflows/ci.yml
+
+  # Resolve the effective build profile once so all downstream jobs are
+  # consistent. Tag pushes always build production; workflow_dispatch uses
+  # the chosen profile (default: preview).
+  resolve-profile:
+    name: Resolve Profile
+    runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.resolve.outputs.profile }}
+    steps:
+      - id: resolve
+        run: |
+          if [[ "${{ startsWith(github.ref, 'refs/tags/v') }}" == "true" ]]; then
+            echo "profile=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "profile=${{ github.event.inputs.profile || 'preview' }}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: [ci, resolve-profile]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,18 +60,17 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Build on EAS
-        run: eas build --platform all --profile ${{ github.event.inputs.profile || 'preview' }} --non-interactive
+        run: eas build --platform all --profile ${{ needs.resolve-profile.outputs.profile }} --non-interactive
         working-directory: apps/mobile
 
   # Submitting to app stores is a separate job that requires explicit approval
   # for production builds. This prevents an accidental tag push from shipping
   # an untested binary directly to production store users.
+  # Only runs when the resolved profile is production.
   submit:
-    needs: build
+    needs: [build, resolve-profile]
     runs-on: ubuntu-latest
-    # Only run for production builds and require manual approval via GitHub environment protection rules.
-    # Set up a "store-submit" environment in GitHub repo settings with required reviewers.
-    if: ${{ github.event.inputs.profile == 'production' || startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ needs.resolve-profile.outputs.profile == 'production' }}
     environment: store-submit
     steps:
       - uses: actions/checkout@v4

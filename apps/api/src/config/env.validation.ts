@@ -1,6 +1,16 @@
 import { plainToInstance } from 'class-transformer'
 import { Transform } from 'class-transformer'
-import { IsString, IsOptional, IsEmail, IsUrl, IsNotIn, Matches, IsBooleanString, ValidateIf, validateSync } from 'class-validator'
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  IsUrl,
+  IsNotIn,
+  Matches,
+  IsBooleanString,
+  ValidateIf,
+  validateSync,
+} from 'class-validator'
 
 class EnvironmentVariables {
   @IsOptional() @IsString() NODE_ENV?: string
@@ -9,7 +19,8 @@ class EnvironmentVariables {
   @IsString() SUPABASE_ANON_KEY!: string
   @IsString()
   @IsNotIn(['super-secret-jwt-key-placeholder', 'your-jwt-secret', 'changeme'], {
-    message: 'SUPABASE_JWT_SECRET must be set to the real value from your Supabase project — placeholder detected',
+    message:
+      'SUPABASE_JWT_SECRET must be set to the real value from your Supabase project — placeholder detected',
   })
   SUPABASE_JWT_SECRET!: string
 
@@ -17,10 +28,11 @@ class EnvironmentVariables {
   // Must be set in production via Railway secrets (never commit to source control).
   @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
-  @IsString() SUPABASE_SERVICE_ROLE_KEY?: string
+  @IsString()
+  SUPABASE_SERVICE_ROLE_KEY?: string
 
   @IsString() REDIS_URL!: string
-  @IsString() WEB_URL!: string
+  @IsUrl() WEB_URL!: string
 
   @IsOptional() @IsString() OPENAI_API_KEY?: string
 
@@ -28,16 +40,17 @@ class EnvironmentVariables {
   // Set via Railway secrets. Validated as a URL so typos are caught at startup.
   @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
-  @IsUrl() SENTRY_DSN?: string
+  @IsUrl()
+  SENTRY_DSN?: string
 
   // Email — at least one provider is expected in production
   @IsOptional() @IsString() MAILGUN_API_KEY?: string
   @IsOptional() @IsString() MAILGUN_DOMAIN?: string
-  @IsOptional() @IsEmail()  MAILGUN_FROM_EMAIL?: string
+  @IsOptional() @IsEmail() MAILGUN_FROM_EMAIL?: string
   @IsOptional() @IsString() AWS_SES_ACCESS_KEY?: string
   @IsOptional() @IsString() AWS_SES_SECRET_KEY?: string
   @IsOptional() @IsString() AWS_SES_REGION?: string
-  @IsOptional() @IsEmail()  AWS_SES_FROM_EMAIL?: string
+  @IsOptional() @IsEmail() AWS_SES_FROM_EMAIL?: string
 
   // Cloudflare R2 — required for media uploads
   @IsString() R2_ACCOUNT_ID!: string
@@ -48,7 +61,9 @@ class EnvironmentVariables {
 
   // On-chain billing — required for subscription verification
   @IsString()
-  @Matches(/^0x[0-9a-fA-F]{40}$/, { message: 'DOTLY_CONTRACT_ADDRESS must be a valid EVM address (0x + 40 hex chars)' })
+  @Matches(/^0x[0-9a-fA-F]{40}$/, {
+    message: 'DOTLY_CONTRACT_ADDRESS must be a valid EVM address (0x + 40 hex chars)',
+  })
   DOTLY_CONTRACT_ADDRESS!: string
 
   @IsUrl({}, { message: 'POLYGON_RPC_URL must be a valid HTTPS URL' })
@@ -79,8 +94,34 @@ class EnvironmentVariables {
   @IsOptional() @IsString() BOOSTERAI_COUNTRY_CODE?: string
 
   // Shared secret for BoosterAI → Dotly internal calls (x-boosterai-api-key header).
-  // Required in production. Without this, partner eligibility checks are denied.
-  @IsOptional() @IsString() BOOSTERAI_DOTLY_API_KEY?: string
+  // Required in production: without this the partner guard denies every BoosterAI
+  // request at runtime, breaking affiliate billing.  Validated here so the API
+  // refuses to boot in production if the secret is missing or left as a placeholder.
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o) => o.NODE_ENV === 'production')
+  @IsString()
+  BOOSTERAI_DOTLY_API_KEY?: string
+
+  // ── Apple Wallet pass generation ─────────────────────────────────────────────
+  // Optional: if unset, Apple Wallet endpoints return 400 rather than crashing.
+  // In production deployments that offer Apple Wallet, set all four.
+  @IsOptional() @IsString() APPLE_PASS_TYPE_ID?: string
+  @IsOptional() @IsString() APPLE_TEAM_ID?: string
+  // Base-64 encoded .p12 certificate bundle
+  @IsOptional() @IsString() APPLE_PASS_CERT_P12?: string
+  @IsOptional() @IsString() APPLE_PASS_CERT_PASS?: string
+
+  // ── Google Wallet pass generation ────────────────────────────────────────────
+  // Optional: if unset, Google Wallet endpoints return 400 rather than crashing.
+  @IsOptional() @IsString() GOOGLE_WALLET_ISSUER_ID?: string
+  @IsOptional() @IsString() GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL?: string
+  // Base-64 encoded service account JSON key
+  @IsOptional() @IsString() GOOGLE_WALLET_SERVICE_ACCOUNT_KEY?: string
+
+  // ── CORS ─────────────────────────────────────────────────────────────────────
+  // Optional comma-separated list of additional allowed origins beyond WEB_URL
+  // (e.g. staging URLs, mobile dev, preview deployments).
+  @IsOptional() @IsString() CORS_ORIGINS?: string
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -91,5 +132,48 @@ export function validate(config: Record<string, unknown>) {
   if (errors.length > 0) {
     throw new Error(errors.toString())
   }
+
+  if (validatedConfig.CORS_ORIGINS) {
+    const invalidOrigins = validatedConfig.CORS_ORIGINS.split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .filter((origin) => {
+        try {
+          new URL(origin)
+          return false
+        } catch {
+          return true
+        }
+      })
+
+    if (invalidOrigins.length > 0) {
+      throw new Error(
+        `Invalid CORS_ORIGINS entries: ${invalidOrigins.join(', ')}. ` +
+          'Each origin must be a full URL including protocol, e.g. https://dotly.one',
+      )
+    }
+  }
+
+  // In production, at least one complete email provider must be configured.
+  // Without this, booking confirmations, password resets, and invite emails
+  // are silently dropped — a critical user-facing failure.
+  if (validatedConfig.NODE_ENV === 'production') {
+    const mailgunOk =
+      validatedConfig.MAILGUN_API_KEY &&
+      validatedConfig.MAILGUN_DOMAIN &&
+      validatedConfig.MAILGUN_FROM_EMAIL
+    const sesOk =
+      validatedConfig.AWS_SES_ACCESS_KEY &&
+      validatedConfig.AWS_SES_SECRET_KEY &&
+      validatedConfig.AWS_SES_FROM_EMAIL
+    if (!mailgunOk && !sesOk) {
+      throw new Error(
+        'Production boot failed: no email provider configured. ' +
+          'Set either MAILGUN_API_KEY + MAILGUN_DOMAIN + MAILGUN_FROM_EMAIL ' +
+          'or AWS_SES_ACCESS_KEY + AWS_SES_SECRET_KEY + AWS_SES_FROM_EMAIL.',
+      )
+    }
+  }
+
   return validatedConfig
 }

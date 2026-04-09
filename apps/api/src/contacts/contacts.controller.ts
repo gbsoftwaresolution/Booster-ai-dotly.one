@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
   Res,
+  BadRequestException,
 } from '@nestjs/common'
 import type { Response } from 'express'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
@@ -34,7 +35,7 @@ import {
   IsNumber,
   IsDateString,
 } from 'class-validator'
-import { Type } from 'class-transformer'
+import { Type, Transform } from 'class-transformer'
 import { SendEmailDto } from './dto/send-email.dto'
 
 // Minimal RFC-4180 CSV parser — no external deps needed.
@@ -264,6 +265,11 @@ class PaginationQuery {
   @IsOptional()
   @IsString()
   search?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  tag?: string
 }
 
 class PipelineQuery {
@@ -303,6 +309,11 @@ class LeadSubmissionsQuery {
   @Min(1)
   @Max(100)
   limit?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string
 }
 
 // Gap 1: Threaded Notes
@@ -323,6 +334,30 @@ class CreateCustomFieldDto {
   @IsString()
   @MaxLength(100)
   label!: string
+
+  @IsOptional()
+  @IsIn(['TEXT', 'NUMBER', 'DATE', 'URL', 'SELECT'])
+  fieldType?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[]
+
+  @IsOptional()
+  @IsInt()
+  displayOrder?: number
+}
+
+// PATCH uses a fully-optional version of the create DTO so callers can update
+// just the label, just the options, or just the display order without having to
+// re-supply all fields.  Using CreateCustomFieldDto here would fail validation
+// because `label` is required (@IsString() with no @IsOptional()).
+class UpdateCustomFieldDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  label?: string
 
   @IsOptional()
   @IsIn(['TEXT', 'NUMBER', 'DATE', 'URL', 'SELECT'])
@@ -386,6 +421,11 @@ class UpdateDealDto {
   title?: string
 
   @IsOptional()
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false },
+    { message: 'value must be a non-negative number' },
+  )
+  @Min(0)
   value?: number | null
 
   @IsOptional()
@@ -398,9 +438,13 @@ class UpdateDealDto {
   stage?: string
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
   probability?: number | null
 
   @IsOptional()
+  @IsDateString({}, { message: 'closeDate must be an ISO 8601 date string' })
   closeDate?: string | null
 
   @IsOptional()
@@ -450,6 +494,16 @@ class CreateTaskDto {
   @IsOptional()
   @IsDateString()
   dueAt?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+  priority?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['CALL', 'EMAIL', 'MEETING', 'TODO', 'FOLLOW_UP'])
+  type?: string
 }
 
 class UpdateTaskDto {
@@ -459,18 +513,46 @@ class UpdateTaskDto {
   title?: string
 
   @IsOptional()
+  @IsDateString({}, { message: 'dueAt must be an ISO 8601 date string' })
   dueAt?: string | null
 
   @IsOptional()
   @IsBoolean()
   completed?: boolean
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+  priority?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['CALL', 'EMAIL', 'MEETING', 'TODO', 'FOLLOW_UP'])
+  type?: string
 }
 
 class TasksQuery {
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  // @Type(() => Boolean) would coerce the string "false" → true because any
+  // non-empty string is truthy.  Use @Transform to parse the raw string value.
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === 'true') return true
+    if (value === 'false') return false
+    return value
+  })
   completed?: boolean
+}
+
+// Gap 10: Funnel analytics query
+class FunnelAnalyticsQuery {
+  @IsOptional()
+  @IsDateString()
+  dateFrom?: string
+
+  @IsOptional()
+  @IsDateString()
+  dateTo?: string
 }
 
 // Gap 9: Merge
@@ -547,6 +629,10 @@ class UpdatePipelineDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean
+
+  @IsOptional()
+  @IsObject()
+  stageColors?: Record<string, string>
 }
 
 class AssignPipelineDto {
@@ -590,6 +676,7 @@ export class ContactsController {
       search: query.search,
       page: query.page,
       limit: query.limit,
+      tag: query.tag,
     })
   }
 
@@ -701,7 +788,15 @@ export class ContactsController {
     return this.contactsService.getLeadSubmissions(user.id, cardId, {
       page: query.page,
       limit: query.limit,
+      search: query.search,
     })
+  }
+
+  @ApiBearerAuth()
+  @Delete('lead-submissions/:id')
+  @ApiOperation({ summary: 'Delete a lead submission' })
+  deleteLeadSubmission(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.contactsService.deleteLeadSubmission(id, user.id)
   }
 
   // ─── Gap 1: Threaded Notes ─────────────────────────────────────────────────
@@ -764,7 +859,7 @@ export class ContactsController {
   updateCustomField(
     @Param('fieldId') fieldId: string,
     @CurrentUser() user: { id: string },
-    @Body() dto: CreateCustomFieldDto,
+    @Body() dto: UpdateCustomFieldDto,
   ) {
     return this.contactsService.updateCustomField(fieldId, user.id, dto)
   }
@@ -841,8 +936,52 @@ export class ContactsController {
     summary: 'Import contacts from CSV text (Content-Type: application/json, field: csv)',
   })
   importContacts(@CurrentUser() user: { id: string }, @Body('csv') csvText: string) {
-    const rows = parseCSV(csvText ?? '')
+    // Cap CSV payload at 1 MB (~10,000 contacts) to prevent memory exhaustion.
+    // NestJS's body-parser default limit is 100 KB; we explicitly enforce 1 MB
+    // here as a second line of defence so the check travels with the handler.
+    const MAX_CSV_BYTES = 1_048_576 // 1 MB
+    if (!csvText || typeof csvText !== 'string') {
+      throw new BadRequestException('csv field is required')
+    }
+    if (Buffer.byteLength(csvText, 'utf8') > MAX_CSV_BYTES) {
+      throw new BadRequestException('CSV payload exceeds 1 MB limit')
+    }
+    const rows = parseCSV(csvText)
     return this.contactsService.importContacts(user.id, rows)
+  }
+
+  // ─── Contact Tags ─────────────────────────────────────────────────────────
+
+  @ApiBearerAuth()
+  @Get('contacts/tags')
+  @ApiOperation({
+    summary: 'Get all distinct tags used across contacts for the authenticated user',
+  })
+  getContactTags(@CurrentUser() user: { id: string }) {
+    return this.contactsService.getAllTags(user.id)
+  }
+
+  // ─── Contact Export (CSV) ─────────────────────────────────────────────────
+
+  @ApiBearerAuth()
+  @Get('contacts/export')
+  @ApiOperation({ summary: 'Export all contacts as CSV file' })
+  async exportContacts(@CurrentUser() user: { id: string }, @Res() res: Response) {
+    const csv = await this.contactsService.exportContacts(user.id)
+    const filename = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.end('\uFEFF' + csv) // BOM for Excel compatibility
+  }
+
+  // ─── Contact Email History ────────────────────────────────────────────────
+
+  @ApiBearerAuth()
+  @Get('contacts/:id/emails')
+  @ApiOperation({ summary: 'Get sent email history for a contact' })
+  getContactEmails(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.contactsService.getContactEmails(id, user.id)
   }
 
   // ─── Gap 5: Email tracking public endpoints ───────────────────────────────
@@ -988,9 +1127,14 @@ export class ContactsController {
 
   @ApiBearerAuth()
   @Get('crm/analytics/funnel')
-  @ApiOperation({ summary: 'Get stage conversion funnel analytics' })
-  getFunnelAnalytics(@CurrentUser() user: { id: string }) {
-    return this.contactsService.getFunnelAnalytics(user.id)
+  @ApiOperation({
+    summary: 'Get stage conversion funnel analytics (supports dateFrom/dateTo query params)',
+  })
+  getFunnelAnalytics(@CurrentUser() user: { id: string }, @Query() query: FunnelAnalyticsQuery) {
+    return this.contactsService.getFunnelAnalytics(user.id, {
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })
   }
 
   // ─── Gap 12: Bulk Edit Fields ─────────────────────────────────────────────

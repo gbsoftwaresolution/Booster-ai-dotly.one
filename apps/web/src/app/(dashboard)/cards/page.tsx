@@ -16,6 +16,7 @@ interface CardSummary {
   templateId: string
   isActive: boolean
   fields: Record<string, string>
+  viewCount?: number
   _count?: { analytics: number }
 }
 
@@ -314,7 +315,7 @@ export default function CardsPage(): JSX.Element {
               .join('')
               .toUpperCase()
             const isDuplicating = duplicatingId === card.id
-            const analyticsCount = card._count?.analytics
+            const viewCount = card.viewCount ?? 0
 
             return (
               <div
@@ -377,9 +378,9 @@ export default function CardsPage(): JSX.Element {
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   {/* Live / Draft + analytics */}
                   <div className="flex items-center gap-1.5">
-                    {analyticsCount !== undefined && analyticsCount > 0 && (
+                    {viewCount > 0 && (
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-400">
-                        {analyticsCount} view{analyticsCount !== 1 ? 's' : ''}
+                        {viewCount} view{viewCount !== 1 ? 's' : ''}
                       </span>
                     )}
                     <span

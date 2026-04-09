@@ -14,6 +14,7 @@ import {
 import { useState, useEffect, useCallback } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { api } from '../../lib/api'
+import { formatDate, getUserTimezone } from '../../lib/tz'
 
 interface TimelineEvent {
   id: string
@@ -40,10 +41,10 @@ interface ContactTask {
 interface ContactDeal {
   id: string
   title: string
-  value: number
+  value: number | string
   currency: string
   stage: string
-  probability: number
+  probability: number | string
   closeDate: string | null
 }
 
@@ -415,10 +416,14 @@ export default function ContactDetailScreen() {
   const [notes, setNotes] = useState<ContactNote[]>([])
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editNoteContent, setEditNoteContent] = useState('')
+  const [editNoteSaving, setEditNoteSaving] = useState(false)
 
   // Tasks state (Gap 7)
   const [tasks, setTasks] = useState<ContactTask[]>([])
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDueAt, setNewTaskDueAt] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
 
   // Deals state
@@ -427,11 +432,26 @@ export default function ContactDetailScreen() {
   const [newDealValue, setNewDealValue] = useState('')
   const [dealSaving, setDealSaving] = useState(false)
 
+  // Custom fields state
+  const [customFields, setCustomFields] = useState<
+    { id: string; label: string; fieldType: string; options: string[] | null }[]
+  >([])
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({})
+  const [fieldSavingId, setFieldSavingId] = useState<string | null>(null)
+
+  // Pipeline assignment state
+  const [pipelines, setPipelines] = useState<{ id: string; name: string; isDefault: boolean }[]>([])
+  const [pipelineAssigning, setPipelineAssigning] = useState(false)
+
   // Email compose state
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [emailSubject, setEmailSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
   const [emailSending, setEmailSending] = useState(false)
+  const [emailTemplates, setEmailTemplates] = useState<
+    { id: string; name: string; subject: string; body: string }[]
+  >([])
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
 
   // Tags state
   const [newTag, setNewTag] = useState('')
@@ -442,21 +462,57 @@ export default function ContactDetailScreen() {
 
   // Delete state
   const [deleting, setDeleting] = useState(false)
+  const [userTz, setUserTz] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
     void (async () => {
       try {
-        const [data, notesData, tasksData, dealsData] = await Promise.all([
+        const [
+          data,
+          notesData,
+          tasksData,
+          dealsData,
+          fieldsData,
+          pipelinesData,
+          templatesData,
+          tz,
+        ] = await Promise.all([
           api.getContact(id),
           api.getContactNotes(id),
           api.getContactTasks(id),
           api.getDeals(id),
+          api.getCustomFields(),
+          api.getPipelines(),
+          api.getEmailTemplates(),
+          getUserTimezone(),
         ])
-        setContact(data as ContactDetail)
+        const contactData = data as ContactDetail
+        setContact(contactData)
         setNotes(notesData as ContactNote[])
         setTasks(tasksData as ContactTask[])
         setDeals(dealsData as ContactDeal[])
+        setUserTz(tz)
+        setCustomFields(
+          fieldsData as {
+            id: string
+            label: string
+            fieldType: string
+            options: string[] | null
+          }[],
+        )
+        setPipelines(pipelinesData as { id: string; name: string; isDefault: boolean }[])
+        setEmailTemplates(
+          templatesData as { id: string; name: string; subject: string; body: string }[],
+        )
+        // Build initial custom field values map from contact
+        const cfv: Record<string, string> = {}
+        for (const cfVal of (
+          contactData as unknown as { customFieldValues?: { fieldId: string; value: string }[] }
+        ).customFieldValues ?? []) {
+          cfv[cfVal.fieldId] = cfVal.value
+        }
+        setCustomFieldValues(cfv)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load contact')
       } finally {
@@ -532,12 +588,44 @@ export default function ContactDetailScreen() {
     [id],
   )
 
+  const handleStartEditNote = useCallback((note: ContactNote) => {
+    setEditingNoteId(note.id)
+    setEditNoteContent(note.content)
+  }, [])
+
+  const handleSaveEditNote = useCallback(
+    async (noteId: string) => {
+      if (!id || !editNoteContent.trim()) return
+      setEditNoteSaving(true)
+      try {
+        await api.updateNote(noteId, id, editNoteContent.trim())
+        setNotes((prev) =>
+          prev.map((n) => (n.id === noteId ? { ...n, content: editNoteContent.trim() } : n)),
+        )
+        setEditingNoteId(null)
+        setEditNoteContent('')
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update note')
+      } finally {
+        setEditNoteSaving(false)
+      }
+    },
+    [id, editNoteContent],
+  )
+
+  const handleCancelEditNote = useCallback(() => {
+    setEditingNoteId(null)
+    setEditNoteContent('')
+  }, [])
+
   const handleCreateTask = useCallback(async () => {
     if (!id || !newTaskTitle.trim()) return
     setTaskSaving(true)
     try {
-      await api.createTask(id, newTaskTitle.trim())
+      const dueAt = newTaskDueAt.trim() || undefined
+      await api.createTask(id, newTaskTitle.trim(), dueAt)
       setNewTaskTitle('')
+      setNewTaskDueAt('')
       const tasksData = await api.getContactTasks(id)
       setTasks(tasksData as ContactTask[])
     } catch (err: unknown) {
@@ -545,7 +633,7 @@ export default function ContactDetailScreen() {
     } finally {
       setTaskSaving(false)
     }
-  }, [id, newTaskTitle])
+  }, [id, newTaskTitle, newTaskDueAt])
 
   const handleToggleTask = useCallback(async (task: ContactTask) => {
     try {
@@ -610,6 +698,20 @@ export default function ContactDetailScreen() {
         },
       },
     ])
+  }, [])
+
+  const DEAL_STAGES = ['PROSPECT', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'] as const
+
+  const handleChangeDealStage = useCallback(async (deal: ContactDeal) => {
+    const stages = DEAL_STAGES as readonly string[]
+    const currentIdx = stages.indexOf(deal.stage)
+    const nextStage = stages[(currentIdx + 1) % stages.length] ?? stages[0]!
+    try {
+      await api.updateDealStage(deal.id, nextStage)
+      setDeals((prev) => prev.map((d) => (d.id === deal.id ? { ...d, stage: nextStage } : d)))
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update deal stage')
+    }
   }, [])
 
   const handleSendEmail = useCallback(async () => {
@@ -690,6 +792,38 @@ export default function ContactDetailScreen() {
       setEnriching(false)
     }
   }, [id, contact])
+
+  const handleSaveCustomField = useCallback(
+    async (fieldId: string, value: string) => {
+      if (!id) return
+      setFieldSavingId(fieldId)
+      try {
+        await api.setCustomFieldValue(id, fieldId, value)
+        setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }))
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save field')
+      } finally {
+        setFieldSavingId(null)
+      }
+    },
+    [id],
+  )
+
+  const handleAssignPipeline = useCallback(
+    async (pipelineId: string) => {
+      if (!id) return
+      setPipelineAssigning(true)
+      try {
+        await api.assignContactToPipeline(id, pipelineId)
+        Alert.alert('Pipeline', 'Contact assigned to pipeline.')
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to assign pipeline')
+      } finally {
+        setPipelineAssigning(false)
+      }
+    },
+    [id],
+  )
 
   // ─── Loading / error states ────────────────────────────────────────────────
 
@@ -948,26 +1082,95 @@ export default function ContactDetailScreen() {
                     borderColor: '#e2e8f0',
                   }}
                 >
-                  <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
-                    {note.content}
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginTop: 6,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: '#94a3b8' }}>
-                      {relativeTime(note.createdAt)}
-                    </Text>
-                    <TouchableOpacity onPress={() => void handleDeleteNote(note.id)}>
-                      <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
-                        Delete
+                  {editingNoteId === note.id ? (
+                    <>
+                      <TextInput
+                        value={editNoteContent}
+                        onChangeText={setEditNoteContent}
+                        multiline
+                        numberOfLines={3}
+                        maxLength={5000}
+                        autoFocus
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#0ea5e9',
+                          borderRadius: 8,
+                          padding: 8,
+                          fontSize: 13,
+                          color: '#0f172a',
+                          minHeight: 64,
+                          textAlignVertical: 'top',
+                          backgroundColor: '#ffffff',
+                        }}
+                      />
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                        <TouchableOpacity
+                          onPress={() => void handleSaveEditNote(note.id)}
+                          disabled={editNoteSaving || !editNoteContent.trim()}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 7,
+                            borderRadius: 8,
+                            backgroundColor: editNoteContent.trim() ? '#0ea5e9' : '#e2e8f0',
+                            alignItems: 'center',
+                          }}
+                        >
+                          {editNoteSaving ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                          ) : (
+                            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 12 }}>
+                              Save
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleCancelEditNote}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 7,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: '#e2e8f0',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ color: '#64748b', fontWeight: '600', fontSize: 12 }}>
+                            Cancel
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
+                        {note.content}
                       </Text>
-                    </TouchableOpacity>
-                  </View>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginTop: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#94a3b8' }}>
+                          {relativeTime(note.createdAt)}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                          <TouchableOpacity onPress={() => handleStartEditNote(note)}>
+                            <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
+                              Edit
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => void handleDeleteNote(note.id)}>
+                            <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                              Delete
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </View>
               ))}
             </View>
@@ -1078,7 +1281,7 @@ export default function ContactDetailScreen() {
                     </Text>
                     {task.dueAt && (
                       <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                        Due {new Date(task.dueAt).toLocaleDateString()}
+                        Due {formatDate(task.dueAt, userTz)}
                       </Text>
                     )}
                   </View>
@@ -1101,15 +1304,61 @@ export default function ContactDetailScreen() {
               No tasks yet.
             </Text>
           )}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                value={newTaskTitle}
+                onChangeText={setNewTaskTitle}
+                placeholder="Add a task..."
+                placeholderTextColor="#94a3b8"
+                maxLength={500}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  borderRadius: 10,
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  fontSize: 13,
+                  color: '#0f172a',
+                  backgroundColor: '#f8fafc',
+                }}
+                onSubmitEditing={() => void handleCreateTask()}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                onPress={() => void handleCreateTask()}
+                disabled={taskSaving || !newTaskTitle.trim()}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 10,
+                  backgroundColor: newTaskTitle.trim() ? '#0ea5e9' : '#e2e8f0',
+                  justifyContent: 'center',
+                }}
+              >
+                {taskSaving ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text
+                    style={{
+                      color: newTaskTitle.trim() ? '#ffffff' : '#94a3b8',
+                      fontWeight: '700',
+                      fontSize: 13,
+                    }}
+                  >
+                    Add
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
             <TextInput
-              value={newTaskTitle}
-              onChangeText={setNewTaskTitle}
-              placeholder="Add a task..."
+              value={newTaskDueAt}
+              onChangeText={setNewTaskDueAt}
+              placeholder="Due date (YYYY-MM-DD, optional)"
               placeholderTextColor="#94a3b8"
-              maxLength={500}
+              maxLength={10}
               style={{
-                flex: 1,
                 borderWidth: 1,
                 borderColor: '#e2e8f0',
                 borderRadius: 10,
@@ -1119,34 +1368,7 @@ export default function ContactDetailScreen() {
                 color: '#0f172a',
                 backgroundColor: '#f8fafc',
               }}
-              onSubmitEditing={() => void handleCreateTask()}
-              returnKeyType="done"
             />
-            <TouchableOpacity
-              onPress={() => void handleCreateTask()}
-              disabled={taskSaving || !newTaskTitle.trim()}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 7,
-                borderRadius: 10,
-                backgroundColor: newTaskTitle.trim() ? '#0ea5e9' : '#e2e8f0',
-                justifyContent: 'center',
-              }}
-            >
-              {taskSaving ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text
-                  style={{
-                    color: newTaskTitle.trim() ? '#ffffff' : '#94a3b8',
-                    fontWeight: '700',
-                    fontSize: 13,
-                  }}
-                >
-                  Add
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -1178,25 +1400,35 @@ export default function ContactDetailScreen() {
                     <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a', flex: 1 }}>
                       {deal.title}
                     </Text>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteDeal(deal.id)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
-                        Delete
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                      <TouchableOpacity
+                        onPress={() => void handleChangeDealStage(deal)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
+                          Stage ›
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteDeal(deal.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}
                   >
-                    {deal.value > 0 && (
+                    {Number(deal.value) > 0 && (
                       <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a' }}>
                         {new Intl.NumberFormat(undefined, {
                           style: 'currency',
                           currency: deal.currency || 'USD',
                           maximumFractionDigits: 0,
-                        }).format(deal.value)}
+                        }).format(Number(deal.value))}
                       </Text>
                     )}
                     <View
@@ -1381,6 +1613,159 @@ export default function ContactDetailScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Custom Fields */}
+        {customFields.length > 0 && (
+          <View style={cardStyle}>
+            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 10 }}>
+              Custom Fields
+            </Text>
+            {customFields.map((field) => {
+              const currentValue = customFieldValues[field.id] ?? ''
+              const isSaving = fieldSavingId === field.id
+              return (
+                <View key={field.id} style={{ marginBottom: 12 }}>
+                  <Text
+                    style={{ fontSize: 12, color: '#64748b', fontWeight: '600', marginBottom: 4 }}
+                  >
+                    {field.label}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {field.fieldType === 'SELECT' && field.options ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          borderWidth: 1,
+                          borderColor: '#e2e8f0',
+                          borderRadius: 10,
+                          overflow: 'hidden',
+                          backgroundColor: '#f8fafc',
+                        }}
+                      >
+                        {field.options.map((opt) => (
+                          <TouchableOpacity
+                            key={opt}
+                            onPress={() => void handleSaveCustomField(field.id, opt)}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              backgroundColor: currentValue === opt ? '#ede9fe' : 'transparent',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                color: currentValue === opt ? '#6d28d9' : '#0f172a',
+                                fontWeight: currentValue === opt ? '700' : '400',
+                              }}
+                            >
+                              {opt}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : (
+                      <>
+                        <TextInput
+                          value={customFieldValues[field.id] ?? ''}
+                          onChangeText={(v) =>
+                            setCustomFieldValues((prev) => ({ ...prev, [field.id]: v }))
+                          }
+                          placeholder={`Enter ${field.label.toLowerCase()}...`}
+                          placeholderTextColor="#94a3b8"
+                          keyboardType={
+                            field.fieldType === 'NUMBER'
+                              ? 'numeric'
+                              : field.fieldType === 'URL'
+                                ? 'url'
+                                : 'default'
+                          }
+                          style={{
+                            flex: 1,
+                            borderWidth: 1,
+                            borderColor: '#e2e8f0',
+                            borderRadius: 10,
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            fontSize: 13,
+                            color: '#0f172a',
+                            backgroundColor: '#f8fafc',
+                          }}
+                          onSubmitEditing={() =>
+                            void handleSaveCustomField(field.id, customFieldValues[field.id] ?? '')
+                          }
+                          returnKeyType="done"
+                        />
+                        <TouchableOpacity
+                          onPress={() =>
+                            void handleSaveCustomField(field.id, customFieldValues[field.id] ?? '')
+                          }
+                          disabled={isSaving}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 7,
+                            borderRadius: 10,
+                            backgroundColor: '#0ea5e9',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {isSaving ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                          ) : (
+                            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 12 }}>
+                              Save
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              )
+            })}
+          </View>
+        )}
+
+        {/* Pipeline assignment */}
+        {pipelines.length > 0 && (
+          <View style={cardStyle}>
+            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 10 }}>
+              Pipeline
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+              Assign this contact to a pipeline:
+            </Text>
+            {pipelines.map((pipeline) => (
+              <TouchableOpacity
+                key={pipeline.id}
+                onPress={() => void handleAssignPipeline(pipeline.id)}
+                disabled={pipelineAssigning}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  marginBottom: 6,
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <Text style={{ fontSize: 14, color: '#0f172a', fontWeight: '500' }}>
+                  {pipeline.name}
+                  {pipeline.isDefault ? ' (default)' : ''}
+                </Text>
+                {pipelineAssigning ? (
+                  <ActivityIndicator size="small" color="#0ea5e9" />
+                ) : (
+                  <Text style={{ fontSize: 12, color: '#0ea5e9', fontWeight: '600' }}>Assign</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* AI Enrichment */}
         <View style={cardStyle}>
@@ -1621,6 +2006,30 @@ export default function ContactDetailScreen() {
               {contact.email}
             </Text>
 
+            {emailTemplates.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setTemplatePickerOpen(true)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#c7d2fe',
+                    backgroundColor: '#eef2ff',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: '#4338ca', fontWeight: '600' }}>
+                    Use a template
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#4338ca' }}>›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Subject</Text>
             <TextInput
               value={emailSubject}
@@ -1662,6 +2071,61 @@ export default function ContactDetailScreen() {
             />
           </View>
         </KeyboardAvoidingView>
+
+        {/* Template picker modal (inside email modal stack) */}
+        <Modal
+          visible={templatePickerOpen}
+          animationType="slide"
+          presentationStyle="formSheet"
+          onRequestClose={() => setTemplatePickerOpen(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#ffffff', paddingTop: 32 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 20,
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ fontWeight: '800', fontSize: 16, color: '#0f172a' }}>
+                Choose Template
+              </Text>
+              <TouchableOpacity onPress={() => setTemplatePickerOpen(false)}>
+                <Text style={{ color: '#64748b', fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 10, paddingBottom: 40 }}
+            >
+              {emailTemplates.map((tpl) => (
+                <TouchableOpacity
+                  key={tpl.id}
+                  onPress={() => {
+                    setEmailSubject(tpl.subject)
+                    setEmailBody(tpl.body)
+                    setTemplatePickerOpen(false)
+                  }}
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                    backgroundColor: '#f8fafc',
+                  }}
+                >
+                  <Text style={{ fontWeight: '700', fontSize: 14, color: '#0f172a' }}>
+                    {tpl.name}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }} numberOfLines={1}>
+                    {tpl.subject}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </Modal>
       </Modal>
     </View>
   )

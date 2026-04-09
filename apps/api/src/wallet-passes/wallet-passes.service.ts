@@ -28,7 +28,7 @@ import { createSign, createHash } from 'crypto'
  *     GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL
  *     GOOGLE_WALLET_SERVICE_ACCOUNT_KEY  Base64-encoded JSON key file
  *
- * If any of these are absent the endpoint returns 501 Not Implemented.
+ * If any of these are absent the endpoint throws 400 Bad Request.
  */
 @Injectable()
 export class WalletPassesService {

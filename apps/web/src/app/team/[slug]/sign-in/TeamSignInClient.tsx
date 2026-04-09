@@ -6,6 +6,8 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+const DOTLY_AUTH_CALLBACK_URL = 'https://dotly.one/auth/callback'
+
 interface TeamBrandData {
   id: string
   name: string
@@ -50,7 +52,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: DOTLY_AUTH_CALLBACK_URL,
       },
     })
     if (authError) setError(authError.message)

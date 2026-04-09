@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
-import { IsString, IsIn, MaxLength, Matches } from 'class-validator'
+import { IsString, IsIn, IsInt, Min, Max, MaxLength, Matches } from 'class-validator'
 import type { Response } from 'express'
 import { CardsService } from './cards.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -68,6 +68,16 @@ class UploadUrlDto {
 
   @IsIn(ALLOWED_MIME_TYPES)
   contentType!: string
+
+  /**
+   * Exact byte length of the file the client intends to upload.
+   * Passed as ContentLength to PutObjectCommand so R2 rejects uploads that
+   * exceed the declared size.  Max 10 MB (10_485_760 bytes).
+   */
+  @IsInt()
+  @Min(1)
+  @Max(10_485_760)
+  fileSizeBytes!: number
 }
 
 class UploadAvatarDto {
@@ -222,7 +232,13 @@ export class CardsController {
     @CurrentUser() user: { id: string },
     @Body() dto: UploadUrlDto,
   ) {
-    return this.cardsService.getUploadUrl(id, user.id, dto.filename, dto.contentType)
+    return this.cardsService.getUploadUrl(
+      id,
+      user.id,
+      dto.filename,
+      dto.contentType,
+      dto.fileSizeBytes,
+    )
   }
 
   @ApiBearerAuth()

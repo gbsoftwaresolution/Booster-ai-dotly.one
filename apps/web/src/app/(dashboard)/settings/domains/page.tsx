@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { apiGet, apiPost, apiDelete } from '@/lib/api'
+import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 
 interface CustomDomain {
@@ -20,6 +20,12 @@ interface CustomDomain {
   } | null
 }
 
+interface CardOption {
+  id: string
+  handle: string
+  fields?: { name?: string } | null
+}
+
 const STATUS_STYLES: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
   ACTIVE: 'bg-green-100 text-green-800',
@@ -28,12 +34,14 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function DomainsPage(): JSX.Element {
   const [domains, setDomains] = useState<CustomDomain[]>([])
+  const [cards, setCards] = useState<CardOption[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [domainInput, setDomainInput] = useState('')
   const [error, setError] = useState('')
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [assigningId, setAssigningId] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
     domainId: string
     domain: string
@@ -53,6 +61,16 @@ export default function DomainsPage(): JSX.Element {
 
   useEffect(() => {
     void fetchDomains()
+    // Load user cards for the assign-to-card selector
+    void (async () => {
+      try {
+        const token = await getAccessToken()
+        const data = await apiGet<CardOption[]>('/cards', token ?? undefined)
+        setCards(data)
+      } catch {
+        // non-fatal — card selector will just be empty
+      }
+    })()
   }, [fetchDomains])
 
   async function handleAddDomain(e: React.FormEvent) {
@@ -84,6 +102,19 @@ export default function DomainsPage(): JSX.Element {
       setError(msg)
     } finally {
       setVerifyingId(null)
+    }
+  }
+
+  async function handleAssignCard(domainId: string, cardId: string | null) {
+    setAssigningId(domainId)
+    try {
+      const token = await getAccessToken()
+      await apiPatch(`/custom-domains/${domainId}`, { cardId }, token ?? undefined)
+      await fetchDomains()
+    } catch {
+      setError('Failed to assign card to domain.')
+    } finally {
+      setAssigningId(null)
     }
   }
 
@@ -175,6 +206,27 @@ export default function DomainsPage(): JSX.Element {
                       <span className="text-xs text-gray-400">
                         → /{domain.card.handle}
                       </span>
+                    )}
+                  </div>
+
+                  {/* Assign to card */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="text-xs font-medium text-gray-500 shrink-0">Assign to card:</label>
+                    <select
+                      value={domain.card?.id ?? ''}
+                      disabled={assigningId === domain.id}
+                      onChange={(e) => { void handleAssignCard(domain.id, e.target.value || null) }}
+                      className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                    >
+                      <option value="">— None —</option>
+                      {cards.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          /{c.handle}{c.fields?.name ? ` (${c.fields.name})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {assigningId === domain.id && (
+                      <span className="text-xs text-gray-400">Saving…</span>
                     )}
                   </div>
 

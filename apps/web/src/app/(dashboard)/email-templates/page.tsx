@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
+import { formatDate } from '@/lib/tz'
+import { useUserTimezone } from '@/hooks/useUserLocale'
 
 interface EmailTemplate {
   id: string
@@ -27,19 +29,12 @@ const EMPTY_FORM: TemplateFormValues = {
   body: '',
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
 function subjectPreview(subject: string): string {
   return subject.trim() || 'No subject'
 }
 
 export default function EmailTemplatesPage(): JSX.Element {
+  const userTz = useUserTimezone()
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -196,8 +191,8 @@ export default function EmailTemplatesPage(): JSX.Element {
               </div>
 
               <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
-                <span>Created {formatDate(template.createdAt)}</span>
-                <span>Updated {formatDate(template.updatedAt)}</span>
+                <span>Created {formatDate(template.createdAt, userTz)}</span>
+                <span>Updated {formatDate(template.updatedAt, userTz)}</span>
               </div>
             </div>
           ))}
@@ -305,6 +300,29 @@ function TemplateModal({
             placeholder="Write the email body..."
             className={inputClass}
           />
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
+            <p className="mb-1.5 text-xs font-semibold text-indigo-700">Available merge tags</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                '{{contact.name}}',
+                '{{contact.email}}',
+                '{{contact.company}}',
+                '{{contact.title}}',
+              ].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setValues((prev) => ({ ...prev, body: prev.body + tag }))}
+                  className="rounded bg-white px-2 py-0.5 font-mono text-xs text-indigo-600 shadow-sm ring-1 ring-indigo-200 hover:bg-indigo-100"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-indigo-500">
+              Click a tag to insert it, or type it directly into subject or body.
+            </p>
+          </div>
           <div className="flex gap-2 pt-2">
             <button
               type="button"

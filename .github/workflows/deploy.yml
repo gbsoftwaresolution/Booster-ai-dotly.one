@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: false  # Never cancel a deploy in progress
+  cancel-in-progress: false # Never cancel a deploy in progress
 
 jobs:
   # Gate: all CI checks must pass
@@ -24,8 +24,10 @@ jobs:
       - name: Run database migrations
         # Run migrations against the production DB before deploying new API code.
         # This ensures the schema is up to date before the new binary starts.
+        # Pin prisma CLI to the same version used in packages/database/package.json
+        # to prevent a breaking CLI update from silently changing migration behaviour.
         run: |
-          npm install -g prisma
+          npm install -g prisma@5.15.0
           prisma migrate deploy
         working-directory: packages/database
         env:
@@ -82,7 +84,7 @@ jobs:
 
   rollback-on-failure:
     needs: smoke-test
-    if: failure()
+    if: always() && failure()
     runs-on: ubuntu-latest
     environment: production
     steps:

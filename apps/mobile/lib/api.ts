@@ -98,6 +98,11 @@ export const api = {
     apiFetch(`/contacts/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
   deleteNote: (noteId: string, contactId: string) =>
     apiFetch(`/contacts/${contactId}/notes/${noteId}`, { method: 'DELETE' }),
+  updateNote: (noteId: string, contactId: string, content: string) =>
+    apiFetch(`/contacts/${contactId}/notes/${noteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    }),
   getContactTasks: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/tasks`),
   createTask: (id: string, title: string, dueAt?: string) =>
     apiFetch(`/contacts/${id}/tasks`, { method: 'POST', body: JSON.stringify({ title, dueAt }) }),
@@ -112,6 +117,8 @@ export const api = {
   deleteDeal: (dealId: string) => apiFetch(`/deals/${dealId}`, { method: 'DELETE' }),
   updateDealStage: (dealId: string, stage: string) =>
     apiFetch(`/deals/${dealId}`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
+  getAllDeals: () => apiFetch<unknown[]>('/deals'),
+  getAllTasks: () => apiFetch<unknown[]>('/tasks'),
   getEmailTemplates: () => apiFetch<unknown[]>('/email-templates'),
   getFunnel: () => apiFetch<unknown>('/crm/analytics/funnel'),
   importContacts: (csv: string) =>
@@ -153,6 +160,39 @@ export const api = {
     notes?: string
     tags?: string[]
   }) => apiFetch('/contacts', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Custom fields
+  getCustomFields: () => apiFetch<unknown[]>('/crm/custom-fields'),
+  setCustomFieldValue: (contactId: string, fieldId: string, value: string) =>
+    apiFetch(`/contacts/${contactId}/custom-fields/${fieldId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
+
+  // Pipelines
+  getPipelines: () => apiFetch<unknown[]>('/pipelines'),
+  assignContactToPipeline: (contactId: string, pipelineId: string) =>
+    apiFetch(`/contacts/${contactId}/pipeline`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pipelineId }),
+    }),
+
+  // Duplicate detection & merge
+  findDuplicates: () => apiFetch<unknown[]>('/crm/duplicates'),
+  mergeContacts: (primaryId: string, duplicateId: string) =>
+    apiFetch(`/contacts/${primaryId}/merge`, {
+      method: 'POST',
+      body: JSON.stringify({ duplicateId }),
+    }),
+
+  // Scheduling
+  getAppointmentTypes: () => apiFetch<unknown[]>('/scheduling/appointment-types'),
+  getUpcomingBookings: () => apiFetch<unknown[]>('/scheduling/bookings?upcoming=true'),
+  cancelBooking: (bookingId: string) =>
+    apiFetch(`/scheduling/bookings/${bookingId}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    }),
 }
 
 // Card creation / editing functions

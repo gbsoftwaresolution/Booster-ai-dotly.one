@@ -2,11 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Hostnames that belong to the platform itself — not custom domains
-const PLATFORM_HOSTNAMES = [
-  'localhost',
-  'dotly.one',
-  'www.dotly.one',
-]
+const PLATFORM_HOSTNAMES = ['localhost', 'dotly.one', 'www.dotly.one']
 
 function isPlatformHost(hostname: string): boolean {
   if (PLATFORM_HOSTNAMES.includes(hostname)) return true
@@ -49,27 +45,23 @@ export async function middleware(request: NextRequest) {
     })
   }
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value: '', ...options })
-        },
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        return request.cookies.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        request.cookies.set({ name, value, ...options })
+        response = NextResponse.next({ request: { headers: request.headers } })
+        response.cookies.set({ name, value, ...options })
+      },
+      remove(name: string, options: CookieOptions) {
+        request.cookies.set({ name, value: '', ...options })
+        response = NextResponse.next({ request: { headers: request.headers } })
+        response.cookies.set({ name, value: '', ...options })
       },
     },
-  )
+  })
 
   const {
     data: { user },
@@ -83,6 +75,11 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/cards') ||
     request.nextUrl.pathname.startsWith('/settings') ||
     request.nextUrl.pathname.startsWith('/email-signature') ||
+    request.nextUrl.pathname.startsWith('/scheduling') ||
+    request.nextUrl.pathname.startsWith('/leads') ||
+    request.nextUrl.pathname.startsWith('/pipelines') ||
+    request.nextUrl.pathname.startsWith('/deals') ||
+    request.nextUrl.pathname.startsWith('/tasks') ||
     // M-01: /team routes need auth EXCEPT the public invite-acceptance and
     // sign-in pages which must be reachable by unauthenticated users.
     (request.nextUrl.pathname.startsWith('/team') &&
@@ -112,14 +109,14 @@ export async function middleware(request: NextRequest) {
     //
     // We use NEXT_PUBLIC_APP_URL (a build-time constant) as the base — it is
     // never attacker-controlled.
-    const fqdnRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
+    const fqdnRegex =
+      /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
     if (!fqdnRegex.test(hostname)) {
       // Hostname contains unexpected characters — skip custom-domain routing
       return response
     }
 
-    const appBase =
-      (process.env.NEXT_PUBLIC_APP_URL ?? 'https://dotly.one').replace(/\/$/, '')
+    const appBase = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://dotly.one').replace(/\/$/, '')
     const resolveUrl = `${appBase}/api/resolve-domain?host=${encodeURIComponent(hostname)}`
 
     try {

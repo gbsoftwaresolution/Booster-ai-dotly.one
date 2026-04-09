@@ -19,7 +19,16 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { RefreshCw, Download, TrendingUp, Eye, MousePointerClick, Users, Percent, type LucideIcon } from 'lucide-react'
+import {
+  RefreshCw,
+  Download,
+  TrendingUp,
+  Eye,
+  MousePointerClick,
+  Users,
+  Percent,
+  type LucideIcon,
+} from 'lucide-react'
 
 interface CardSummary {
   id: string
@@ -132,16 +141,43 @@ export default function AnalyticsPage(): JSX.Element {
     void loadAnalytics()
   }, [loadAnalytics])
 
-  const exportLeadsCSV = useCallback(() => {
-    window.open('/api/export/contacts', '_blank')
-  }, [])
+  const exportLeadsCSV = useCallback(async () => {
+    try {
+      const token = await getAccessToken()
+      const params = new URLSearchParams()
+      if (selectedCardId) params.set('cardId', selectedCardId)
+      const to = new Date()
+      const from = new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000)
+      params.set('from', from.toISOString())
+      params.set('to', to.toISOString())
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
+      const res = await fetch(`${apiBase}/contacts/export?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+      })
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      const csv = await res.text()
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Export failed')
+    }
+  }, [selectedCardId, dateRangeDays])
 
   if (cardsLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 animate-pulse rounded bg-gray-100" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
         <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
       </div>
@@ -161,10 +197,10 @@ export default function AnalyticsPage(): JSX.Element {
           {cards.length > 0 && (
             <select
               value={selectedCardId ?? ''}
-              onChange={e => setSelectedCardId(e.target.value)}
+              onChange={(e) => setSelectedCardId(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
-              {cards.map(card => (
+              {cards.map((card) => (
                 <option key={card.id} value={card.id}>
                   /{card.handle} {card.fields['name'] ? `— ${card.fields['name']}` : ''}
                 </option>
@@ -174,7 +210,7 @@ export default function AnalyticsPage(): JSX.Element {
 
           {/* Date range picker */}
           <div className="flex rounded-lg border border-gray-300 bg-white shadow-sm">
-            {DATE_RANGE_OPTIONS.map(opt => (
+            {DATE_RANGE_OPTIONS.map((opt) => (
               <button
                 key={opt.days}
                 type="button"
@@ -227,9 +263,11 @@ export default function AnalyticsPage(): JSX.Element {
       )}
 
       {/* Stats summary */}
-      {(loading && !analyticsData) ? (
+      {loading && !analyticsData ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       ) : analyticsData ? (
         analyticsData.summary.totalViews === 0 &&
@@ -244,184 +282,240 @@ export default function AnalyticsPage(): JSX.Element {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-5">
-            <StatCard label="Total Views" value={analyticsData.summary.totalViews} icon={Eye} color="bg-indigo-500" />
-            <StatCard label="Unique Visitors" value={analyticsData.summary.uniqueVisitors} icon={Users} color="bg-cyan-500" />
-            <StatCard label="Total Clicks" value={analyticsData.summary.totalClicks} icon={MousePointerClick} color="bg-amber-500" />
-            <StatCard label="Total Leads" value={analyticsData.summary.totalLeads} icon={TrendingUp} color="bg-emerald-500" />
-            <StatCard label="Conversion Rate" value={`${analyticsData.summary.conversionRate}%`} icon={Percent} color="bg-violet-500" />
+            <StatCard
+              label="Total Views"
+              value={analyticsData.summary.totalViews}
+              icon={Eye}
+              color="bg-indigo-500"
+            />
+            <StatCard
+              label="Unique Visitors"
+              value={analyticsData.summary.uniqueVisitors}
+              icon={Users}
+              color="bg-cyan-500"
+            />
+            <StatCard
+              label="Total Clicks"
+              value={analyticsData.summary.totalClicks}
+              icon={MousePointerClick}
+              color="bg-amber-500"
+            />
+            <StatCard
+              label="Total Leads"
+              value={analyticsData.summary.totalLeads}
+              icon={TrendingUp}
+              color="bg-emerald-500"
+            />
+            <StatCard
+              label="Conversion Rate"
+              value={`${analyticsData.summary.conversionRate}%`}
+              icon={Percent}
+              color="bg-violet-500"
+            />
           </div>
         )
       ) : null}
 
-      {/* Views over time line chart */}
-      {analyticsData && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">Views over time</h2>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={analyticsData.charts.viewsByDay} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11 }}
-                tickFormatter={d => {
-                  const parts = (d as string).split('-')
-                  return `${parts[1]}/${parts[2]}`
-                }}
-              />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip labelFormatter={d => String(d)} />
-              <Legend />
-              <Line type="monotone" dataKey="count" name="Views" stroke="#6366f1" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Clicks by platform + Device donut */}
-      {analyticsData && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Clicks by platform */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks by platform</h2>
-            {analyticsData.charts.clicksByLink.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">No click data yet.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={analyticsData.charts.clicksByLink} layout={analyticsData.charts.clicksByLink.length > 6 ? 'vertical' : 'horizontal'}>
+      {/* Charts and detail sections — only shown when there is actual data */}
+      {analyticsData &&
+        (analyticsData.summary.totalViews > 0 ||
+          analyticsData.summary.totalClicks > 0 ||
+          analyticsData.summary.totalLeads > 0) && (
+          <>
+            {/* Views over time line chart */}
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold text-gray-900">Views over time</h2>
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart
+                  data={analyticsData.charts.viewsByDay}
+                  margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  {analyticsData.charts.clicksByLink.length > 6 ? (
-                    <>
-                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
-                    </>
-                  ) : (
-                    <>
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    </>
-                  )}
-                  <Tooltip />
-                  <Bar dataKey="value" name="Clicks" fill="#6366f1" radius={[4,4,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Device breakdown donut */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Device breakdown</h2>
-            {analyticsData.charts.deviceBreakdown.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">No device data yet.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={analyticsData.charts.deviceBreakdown}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    label={({ name, percent }) => `${String(name)} ${(Number(percent) * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {analyticsData.charts.deviceBreakdown.map((_, idx) => (
-                      <Cell key={idx} fill={DEVICE_COLORS[idx % DEVICE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(d) => {
+                      const parts = (d as string).split('-')
+                      return `${parts[1]}/${parts[2]}`
+                    }}
+                  />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip labelFormatter={(d) => String(d)} />
                   <Legend />
-                </PieChart>
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    name="Views"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
               </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Countries + Referrers */}
-      {analyticsData && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Top countries */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Top countries</h2>
-            {analyticsData.charts.countryBreakdown.length === 0 ? (
-              <p className="text-sm text-gray-400">No country data yet.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-gray-500">
-                    <th className="pb-2 font-medium">Country</th>
-                    <th className="pb-2 text-right font-medium">Views</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {analyticsData.charts.countryBreakdown.map(item => (
-                    <tr key={item.name}>
-                      <td className="py-2 text-gray-700">{item.name}</td>
-                      <td className="py-2 text-right font-medium text-gray-900">{item.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+            {/* Clicks by platform + Device donut */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Clicks by platform */}
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks by platform</h2>
+                {analyticsData.charts.clicksByLink.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-400">No click data yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={analyticsData.charts.clicksByLink}
+                      layout={
+                        analyticsData.charts.clicksByLink.length > 6 ? 'vertical' : 'horizontal'
+                      }
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      {analyticsData.charts.clicksByLink.length > 6 ? (
+                        <>
+                          <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            tick={{ fontSize: 11 }}
+                            width={80}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                        </>
+                      )}
+                      <Tooltip />
+                      <Bar dataKey="value" name="Clicks" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
 
-          {/* Top referrers */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Top referrers</h2>
-            {analyticsData.charts.referrers.length === 0 ? (
-              <p className="text-sm text-gray-400">No referrer data yet.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-gray-500">
-                    <th className="pb-2 font-medium">Referrer</th>
-                    <th className="pb-2 text-right font-medium">Count</th>
-                    <th className="pb-2 text-right font-medium">%</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {(() => {
-                    const total = analyticsData.charts.referrers.reduce((s, r) => s + r.value, 0)
-                    return analyticsData.charts.referrers.map(item => (
-                      <tr key={item.name}>
-                        <td className="py-2 text-gray-700 truncate max-w-[160px]">{item.name}</td>
-                        <td className="py-2 text-right font-medium text-gray-900">{item.value}</td>
-                        <td className="py-2 text-right text-gray-500">
-                          {total > 0 ? ((item.value / total) * 100).toFixed(1) : '0'}%
-                        </td>
+              {/* Device breakdown donut */}
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">Device breakdown</h2>
+                {analyticsData.charts.deviceBreakdown.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-400">No device data yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={analyticsData.charts.deviceBreakdown}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        label={({ name, percent }) =>
+                          `${String(name)} ${(Number(percent) * 100).toFixed(0)}%`
+                        }
+                        labelLine={false}
+                      >
+                        {analyticsData.charts.deviceBreakdown.map((_, idx) => (
+                          <Cell key={idx} fill={DEVICE_COLORS[idx % DEVICE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* Countries + Referrers */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Top countries */}
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">Top countries</h2>
+                {analyticsData.charts.countryBreakdown.length === 0 ? (
+                  <p className="text-sm text-gray-400">No country data yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-500">
+                        <th className="pb-2 font-medium">Country</th>
+                        <th className="pb-2 text-right font-medium">Views</th>
                       </tr>
-                    ))
-                  })()}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {analyticsData.charts.countryBreakdown.map((item) => (
+                        <tr key={item.name}>
+                          <td className="py-2 text-gray-700">{item.name}</td>
+                          <td className="py-2 text-right font-medium text-gray-900">
+                            {item.value}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
 
-      {/* Leads table */}
-      {analyticsData && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Leads</h2>
-            <button
-              type="button"
-              onClick={exportLeadsCSV}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </button>
-          </div>
-          <p className="text-sm text-gray-500">
-            {analyticsData.summary.totalLeads > 0
-              ? `${analyticsData.summary.totalLeads} leads captured in this period.`
-              : 'No leads yet — share your card to start capturing contacts.'}
-          </p>
-        </div>
-      )}
+              {/* Top referrers */}
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">Top referrers</h2>
+                {analyticsData.charts.referrers.length === 0 ? (
+                  <p className="text-sm text-gray-400">No referrer data yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-500">
+                        <th className="pb-2 font-medium">Referrer</th>
+                        <th className="pb-2 text-right font-medium">Count</th>
+                        <th className="pb-2 text-right font-medium">%</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(() => {
+                        const total = analyticsData.charts.referrers.reduce(
+                          (s, r) => s + r.value,
+                          0,
+                        )
+                        return analyticsData.charts.referrers.map((item) => (
+                          <tr key={item.name}>
+                            <td className="py-2 text-gray-700 truncate max-w-[160px]">
+                              {item.name}
+                            </td>
+                            <td className="py-2 text-right font-medium text-gray-900">
+                              {item.value}
+                            </td>
+                            <td className="py-2 text-right text-gray-500">
+                              {total > 0 ? ((item.value / total) * 100).toFixed(1) : '0'}%
+                            </td>
+                          </tr>
+                        ))
+                      })()}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Leads section */}
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-gray-900">Leads</h2>
+                <button
+                  type="button"
+                  onClick={() => void exportLeadsCSV()}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </button>
+              </div>
+              <p className="text-sm text-gray-500">
+                {analyticsData.summary.totalLeads > 0
+                  ? `${analyticsData.summary.totalLeads} leads captured in this period.`
+                  : 'No leads yet — share your card to start capturing contacts.'}
+              </p>
+            </div>
+          </>
+        )}
     </div>
   )
 }

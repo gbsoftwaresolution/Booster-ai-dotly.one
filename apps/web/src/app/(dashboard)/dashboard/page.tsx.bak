@@ -1,0 +1,323 @@
+'use client'
+
+import type { JSX } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import {
+  Plus,
+  Eye,
+  MousePointerClick,
+  UserCheck,
+  CreditCard,
+  ChevronRight,
+  Pencil,
+} from 'lucide-react'
+import { getAccessToken, createClient } from '@/lib/supabase/client'
+import { apiGet } from '@/lib/api'
+import { cn } from '@/lib/cn'
+
+interface CardSummary {
+  id: string
+  handle: string
+  templateId: string
+  isActive: boolean
+  fields: Record<string, string>
+}
+
+interface AnalyticsSummary {
+  totalViews: number
+  totalClicks: number
+  totalLeads: number
+}
+
+// ─── Stat card ────────────────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+  bg,
+}: {
+  label: string
+  value: number | string
+  icon: React.ElementType
+  color: string
+  bg: string
+}): JSX.Element {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', bg)}>
+        <Icon className={cn('h-4 w-4', color)} aria-hidden="true" />
+      </div>
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{label}</p>
+        <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', color)}>{value}</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Per-card row ─────────────────────────────────────────────────────────────
+
+function CardAnalyticsRow({
+  card,
+  onLoaded,
+}: {
+  card: CardSummary
+  onLoaded?: (cardId: string, summary: AnalyticsSummary) => void
+}): JSX.Element {
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const token = await getAccessToken()
+      const data = await apiGet<AnalyticsSummary>(`/cards/${card.id}/analytics/summary`, token)
+      setSummary(data)
+      onLoaded?.(card.id, data)
+    } catch {
+      // silently ignore — no data yet
+    }
+  }, [card.id, onLoaded])
+
+  useEffect(() => {
+    void load()
+    const interval = setInterval(() => void load(), 60_000)
+    return () => clearInterval(interval)
+  }, [load])
+
+  const name = (card.fields['name'] as string | undefined) ?? card.handle
+  const title = (card.fields['title'] as string | undefined) ?? ''
+  const initials = name
+    .split(' ')
+    .map((n) => n[0] ?? '')
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+
+  return (
+    <Link
+      href={`/cards/${card.id}/edit`}
+      className="group flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow active:shadow-none"
+    >
+      {/* Avatar */}
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-bold text-white">
+        {initials || '?'}
+      </div>
+
+      {/* Name + url */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-gray-900">{name}</p>
+        {title && <p className="truncate text-xs text-gray-400">{title}</p>}
+        <p className="truncate text-[11px] text-gray-300">dotly.one/{card.handle}</p>
+      </div>
+
+      {/* Analytics mini pills */}
+      {summary ? (
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold tabular-nums text-blue-600">
+              {summary.totalViews}
+            </span>
+            <Eye className="h-3 w-3 text-gray-300" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold tabular-nums text-purple-600">
+              {summary.totalClicks}
+            </span>
+            <MousePointerClick className="h-3 w-3 text-gray-300" />
+          </div>
+        </div>
+      ) : (
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <div className="h-3 w-10 animate-pulse rounded bg-gray-100" />
+          <div className="h-3 w-8 animate-pulse rounded bg-gray-100" />
+        </div>
+      )}
+
+      {/* Status + edit hint */}
+      <div className="flex shrink-0 flex-col items-end gap-2">
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+            card.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400',
+          )}
+        >
+          {card.isActive ? 'Live' : 'Draft'}
+        </span>
+        <Pencil className="h-3.5 w-3.5 text-gray-300 transition-colors group-hover:text-brand-400" />
+      </div>
+    </Link>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function DashboardPage(): JSX.Element {
+  const [cards, setCards] = useState<CardSummary[]>([])
+  // C5: Use a Map<cardId, AnalyticsSummary> so each card's refresh *replaces*
+  // its previous entry rather than accumulating into a running sum. The old
+  // approach called setTotalStats(prev => prev + summary) on every 60s tick,
+  // doubling the totals each cycle.
+  const [cardStats, setCardStats] = useState<Map<string, AnalyticsSummary>>(new Map())
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string>('there')
+
+  const handleCardLoaded = useCallback((cardId: string, summary: AnalyticsSummary) => {
+    setCardStats((prev) => {
+      const next = new Map(prev)
+      next.set(cardId, summary)
+      return next
+    })
+  }, [])
+
+  // Derive totals from the map on each render — no stale accumulation
+  const totalStats = Array.from(cardStats.values()).reduce(
+    (acc, s) => ({
+      views: acc.views + s.totalViews,
+      clicks: acc.clicks + s.totalClicks,
+      leads: acc.leads + s.totalLeads,
+    }),
+    { views: 0, clicks: 0, leads: 0 },
+  )
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUserName(
+        (user?.user_metadata?.full_name as string | undefined) ??
+          user?.email?.split('@')[0] ??
+          'there',
+      )
+      try {
+        const token = await getAccessToken()
+        const data = await apiGet<CardSummary[]>('/cards', token)
+        setCards(data)
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : 'Failed to load cards.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
+  }, [])
+
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+  return (
+    <div className="space-y-5">
+      {/* Error banner */}
+      {loadError && (
+        <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => setLoadError(null)} className="ml-4 font-bold text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+      {/* ── Hero greeting ── */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">{greeting}</p>
+        <h1 className="mt-0.5 text-2xl font-bold text-gray-900">{userName} 👋</h1>
+        <p className="mt-1 text-sm text-gray-400">Here&apos;s how your cards are performing.</p>
+      </div>
+
+      {/* ── Stat grid — 2×2 on mobile, 4-col on desktop ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Views"
+          value={loading ? '—' : totalStats.views}
+          icon={Eye}
+          color="text-blue-600"
+          bg="bg-blue-50"
+        />
+        <StatCard
+          label="Clicks"
+          value={loading ? '—' : totalStats.clicks}
+          icon={MousePointerClick}
+          color="text-purple-600"
+          bg="bg-purple-50"
+        />
+        <StatCard
+          label="Leads"
+          value={loading ? '—' : totalStats.leads}
+          icon={UserCheck}
+          color="text-green-600"
+          bg="bg-green-50"
+        />
+        <StatCard
+          label="Cards"
+          value={loading ? '—' : cards.length}
+          icon={CreditCard}
+          color="text-orange-600"
+          bg="bg-orange-50"
+        />
+      </div>
+
+      {/* ── My Cards section ── */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">My Cards</h2>
+          <Link
+            href="/cards"
+            className="flex items-center gap-0.5 text-xs font-medium text-brand-500"
+          >
+            See all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-[72px] animate-pulse rounded-2xl bg-gray-100" />
+            ))}
+          </div>
+        ) : cards.length === 0 ? (
+          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-gray-200 bg-white py-10 text-center">
+            <CreditCard className="mb-3 h-10 w-10 text-gray-200" />
+            <p className="text-sm font-medium text-gray-500">No cards yet</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Create your first digital card to start sharing.
+            </p>
+            <Link
+              href="/cards/create"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+            >
+              <Plus className="h-4 w-4" />
+              Create card
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {cards.slice(0, 5).map((card) => (
+              <CardAnalyticsRow key={card.id} card={card} onLoaded={handleCardLoaded} />
+            ))}
+
+            {cards.length > 5 && (
+              <Link
+                href="/cards"
+                className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
+              >
+                View all {cards.length} cards
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Quick action FAB — mobile only ── */}
+      <Link
+        href="/cards/create"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+68px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 shadow-lg shadow-brand-500/30 transition-transform active:scale-95 lg:hidden"
+        aria-label="Create new card"
+      >
+        <Plus className="h-6 w-6 text-white" aria-hidden="true" />
+      </Link>
+    </div>
+  )
+}
