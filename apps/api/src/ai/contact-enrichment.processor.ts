@@ -30,13 +30,32 @@ export class ContactEnrichmentProcessor {
       return
     }
 
-    const result = await this.aiService.enrichContact({
-      name: contact.name,
-      email: contact.email,
-      company: contact.company,
-      title: contact.title,
-      notes: contact.notes,
+    // H7: Record ENRICHMENT_QUEUED timeline event
+    await this.prisma.contactTimeline.create({
+      data: { contactId, event: 'ENRICHMENT_QUEUED', metadata: {} },
     })
+
+    let result: Awaited<ReturnType<typeof this.aiService.enrichContact>>
+    try {
+      result = await this.aiService.enrichContact({
+        name: contact.name,
+        email: contact.email,
+        company: contact.company,
+        title: contact.title,
+        notes: contact.notes,
+      })
+    } catch (err: unknown) {
+      // H6/H7: On failure, record timeline event with error message
+      await this.prisma.contactTimeline.create({
+        data: {
+          contactId,
+          event: 'ENRICHMENT_FAILED',
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        },
+      })
+      this.logger.error(`Enrichment failed for contact ${contactId}`, err)
+      throw err // re-throw so Bull marks the job as failed (triggers retries)
+    }
 
     await this.prisma.contact.update({
       where: { id: contactId },
@@ -53,6 +72,19 @@ export class ContactEnrichmentProcessor {
         enrichmentScore: result.enrichmentScore,
         enrichmentSummary: result.summary,
         enrichedAt: new Date(),
+      },
+    })
+
+    // H7: Record ENRICHMENT_COMPLETED timeline event
+    await this.prisma.contactTimeline.create({
+      data: {
+        contactId,
+        event: 'ENRICHMENT_COMPLETED',
+        metadata: {
+          enrichmentScore: result.enrichmentScore ?? null,
+          inferredIndustry: result.inferredIndustry ?? null,
+          inferredSeniority: result.inferredSeniority ?? null,
+        },
       },
     })
 

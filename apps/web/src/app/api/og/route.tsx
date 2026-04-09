@@ -2,20 +2,22 @@ import { ImageResponse } from 'next/og'
 import type { NextRequest } from 'next/server'
 import { getServerApiUrl } from '@/lib/server-api'
 
-export const runtime = 'edge'
+// Use Node.js runtime — Edge runtime has restrictions on fetch options and
+// module-scope env access that cause silent failures with ImageResponse.
+export const runtime = 'nodejs'
+
+// Cache the rendered image for 5 minutes at the CDN / reverse-proxy level.
+// WhatsApp and other crawlers respect Cache-Control and will re-fetch after
+// this window, picking up profile updates.
+export const revalidate = 300
 
 const API_URL = getServerApiUrl()
-
-// OG image dimensions — 1200×630 is the standard social card size
 const W = 1200
 const H = 630
 
 interface RawCard {
   fields: Record<string, string>
-  theme?: {
-    primaryColor?: string
-    secondaryColor?: string
-  }
+  theme?: { primaryColor?: string; secondaryColor?: string }
   teamBrand?: {
     brandName?: string | null
     brandLogoUrl?: string | null
@@ -28,7 +30,6 @@ function safeBrandColor(color: string | null | undefined): string {
   return /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : '#0ea5e9'
 }
 
-// Lighten a hex colour for use as a subtle background tint
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
   const full =
@@ -42,6 +43,21 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
 }
 
+/** Safely fetch an avatar URL and return it as a base64 data URI so
+ *  Satori never has to make a cross-origin request at render time. */
+async function fetchAvatarAsDataUri(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) })
+    if (!res.ok) return null
+    const ct = res.headers.get('content-type') ?? 'image/jpeg'
+    const buf = await res.arrayBuffer()
+    const b64 = Buffer.from(buf).toString('base64')
+    return `data:${ct};base64,${b64}`
+  } catch {
+    return null
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const handle = searchParams.get('handle')
@@ -50,31 +66,35 @@ export async function GET(req: NextRequest) {
     return new Response('Missing handle', { status: 400 })
   }
 
-  // Fetch card data
+  // Fetch card data server-side
   let card: RawCard | null = null
   try {
     const res = await fetch(`${API_URL}/public/cards/${handle}`, {
-      next: { revalidate: 300 }, // cache 5 min at edge
+      next: { revalidate: 300 },
     })
     if (res.ok) card = (await res.json()) as RawCard
   } catch {
-    // fall through to default
+    // fall through — render a generic card
   }
 
   const fields = card?.fields ?? {}
   const name: string = fields.name ?? handle
   const jobTitle: string = fields.title ?? ''
   const company: string = fields.company ?? ''
-  const avatarUrl: string | null = fields.avatarUrl ?? null
+  const rawAvatarUrl: string | null = fields.avatarUrl ?? null
+
   const accentRaw = card?.teamBrand?.brandColor ?? card?.theme?.primaryColor ?? '#0ea5e9'
   const accent = safeBrandColor(accentRaw)
   const [r, g, b] = hexToRgb(accent)
-  const bgTint = `rgba(${r},${g},${b},0.07)`
-  const accentLight = `rgba(${r},${g},${b},0.18)`
+  const bgTint = `rgba(${r},${g},${b},0.08)`
+  const accentLight = `rgba(${r},${g},${b},0.20)`
 
   const subtitle = [jobTitle, company].filter(Boolean).join(' · ')
 
-  return new ImageResponse(
+  // Pre-fetch avatar as data URI so Satori doesn't need to make a network call
+  const avatarDataUri = rawAvatarUrl ? await fetchAvatarAsDataUri(rawAvatarUrl) : null
+
+  const imageResponse = new ImageResponse(
     <div
       style={{
         width: W,
@@ -86,7 +106,7 @@ export async function GET(req: NextRequest) {
         overflow: 'hidden',
       }}
     >
-      {/* Subtle tinted background */}
+      {/* Tinted radial background */}
       <div
         style={{
           position: 'absolute',
@@ -102,36 +122,37 @@ export async function GET(req: NextRequest) {
           left: 0,
           top: 0,
           bottom: 0,
-          width: 8,
+          width: 10,
           background: accent,
         }}
       />
 
-      {/* Decorative circle top-right */}
+      {/* Decorative circle — top right */}
       <div
         style={{
           position: 'absolute',
-          right: -120,
-          top: -120,
-          width: 420,
-          height: 420,
+          right: -100,
+          top: -100,
+          width: 400,
+          height: 400,
           borderRadius: '50%',
           background: accentLight,
         }}
       />
+      {/* Decorative circle — bottom right */}
       <div
         style={{
           position: 'absolute',
-          right: 80,
-          bottom: -80,
-          width: 200,
-          height: 200,
+          right: 90,
+          bottom: -70,
+          width: 180,
+          height: 180,
           borderRadius: '50%',
           background: bgTint,
         }}
       />
 
-      {/* Main content — left-padded after the accent bar */}
+      {/* Main row */}
       <div
         style={{
           position: 'relative',
@@ -140,41 +161,41 @@ export async function GET(req: NextRequest) {
           flexDirection: 'row',
           alignItems: 'center',
           width: '100%',
-          padding: '64px 96px 64px 72px',
-          gap: 64,
+          padding: '64px 96px 64px 76px',
+          gap: 56,
         }}
       >
-        {/* Avatar */}
-        {avatarUrl && (
+        {/* Avatar circle */}
+        {avatarDataUri && (
           <div
             style={{
               flexShrink: 0,
-              width: 200,
-              height: 200,
+              width: 204,
+              height: 204,
               borderRadius: '50%',
               overflow: 'hidden',
               border: `6px solid ${accent}`,
-              boxShadow: `0 0 0 6px ${accentLight}`,
+              outline: `6px solid ${accentLight}`,
               display: 'flex',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={avatarUrl}
-              width={200}
-              height={200}
+              src={avatarDataUri}
+              width={204}
+              height={204}
               alt={name}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
         )}
 
-        {/* Text block */}
+        {/* Text */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 16,
+            gap: 14,
             flex: 1,
             minWidth: 0,
           }}
@@ -182,10 +203,10 @@ export async function GET(req: NextRequest) {
           {/* Name */}
           <div
             style={{
-              fontSize: avatarUrl ? 72 : 80,
+              fontSize: avatarDataUri ? 70 : 78,
               fontWeight: 800,
               color: '#0f172a',
-              lineHeight: 1.1,
+              lineHeight: 1.05,
               letterSpacing: '-2px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -195,14 +216,14 @@ export async function GET(req: NextRequest) {
             {name}
           </div>
 
-          {/* Job title · Company */}
-          {subtitle && (
+          {/* Subtitle */}
+          {subtitle ? (
             <div
               style={{
-                fontSize: 32,
+                fontSize: 30,
                 fontWeight: 500,
-                color: '#475569',
-                letterSpacing: '-0.5px',
+                color: '#64748b',
+                letterSpacing: '-0.4px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -210,24 +231,18 @@ export async function GET(req: NextRequest) {
             >
               {subtitle}
             </div>
-          )}
+          ) : null}
 
-          {/* Accent pill — handle */}
-          <div
-            style={{
-              display: 'flex',
-              marginTop: 8,
-            }}
-          >
+          {/* Handle pill */}
+          <div style={{ display: 'flex', marginTop: 10 }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
                 background: accent,
                 color: '#ffffff',
                 borderRadius: 100,
-                padding: '10px 28px',
+                padding: '10px 30px',
                 fontSize: 26,
                 fontWeight: 700,
                 letterSpacing: '-0.3px',
@@ -239,24 +254,32 @@ export async function GET(req: NextRequest) {
         </div>
       </div>
 
-      {/* Bottom-right Dotly wordmark */}
+      {/* Wordmark */}
       <div
         style={{
           position: 'absolute',
-          bottom: 28,
-          right: 48,
-          fontSize: 22,
+          bottom: 26,
+          right: 44,
+          fontSize: 20,
           fontWeight: 800,
           color: '#cbd5e1',
-          letterSpacing: '-0.5px',
+          letterSpacing: '-0.4px',
         }}
       >
         Dotly.one
       </div>
     </div>,
-    {
-      width: W,
-      height: H,
-    },
+    { width: W, height: H },
   )
+
+  // Explicitly set caching headers WhatsApp and other crawlers honour.
+  // s-maxage = CDN / proxy cache; max-age = browser cache.
+  imageResponse.headers.set(
+    'Cache-Control',
+    'public, s-maxage=300, max-age=300, stale-while-revalidate=600',
+  )
+  // Explicitly declare content type — some proxies strip it
+  imageResponse.headers.set('Content-Type', 'image/png')
+
+  return imageResponse
 }

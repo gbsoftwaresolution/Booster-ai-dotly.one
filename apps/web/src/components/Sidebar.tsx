@@ -15,6 +15,7 @@ import {
   FileSignature,
   LogOut,
   Webhook,
+  Inbox,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -23,6 +24,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/cards', label: 'My Cards', icon: CreditCard },
   { href: '/contacts', label: 'Contacts', icon: Users },
+  { href: '/leads', label: 'Lead Submissions', icon: Inbox },
   { href: '/crm', label: 'CRM', icon: Kanban },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/email-signature', label: 'Signature', icon: FileSignature },

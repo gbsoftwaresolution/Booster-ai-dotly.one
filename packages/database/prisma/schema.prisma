@@ -251,11 +251,12 @@ model Contact {
   enrichmentSummary   String?
   enrichedAt          DateTime?
 
-  ownerUser   User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  sourceCard  Card?             @relation("ContactSourceCard", fields: [sourceCardId], references: [id], onDelete: SetNull)
-  crmPipeline CrmPipeline?
-  emails      ContactEmail[]
-  timeline    ContactTimeline[]
+  ownerUser       User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sourceCard      Card?             @relation("ContactSourceCard", fields: [sourceCardId], references: [id], onDelete: SetNull)
+  crmPipeline     CrmPipeline?
+  emails          ContactEmail[]
+  timeline        ContactTimeline[]
+  leadSubmissions LeadSubmission[]
 
   @@unique([ownerUserId, email])
   @@index([ownerUserId])
@@ -266,8 +267,6 @@ model CrmPipeline {
   id          String       @id @default(cuid())
   contactId   String       @unique
   stage       ContactStage @default(NEW)
-  notes       String?
-  tags        String[]
   ownerUserId String
   updatedAt   DateTime     @updatedAt
 
@@ -472,6 +471,7 @@ model LeadSubmission {
   submittedAt DateTime @default(now())
 
   leadForm LeadForm @relation(fields: [leadFormId], references: [id], onDelete: Cascade)
+  contact  Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([leadFormId])
   @@index([contactId])

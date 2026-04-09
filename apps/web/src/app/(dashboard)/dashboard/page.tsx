@@ -65,7 +65,7 @@ function CardAnalyticsRow({
   onLoaded,
 }: {
   card: CardSummary
-  onLoaded?: (summary: AnalyticsSummary) => void
+  onLoaded?: (cardId: string, summary: AnalyticsSummary) => void
 }): JSX.Element {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null)
 
@@ -74,7 +74,7 @@ function CardAnalyticsRow({
       const token = await getAccessToken()
       const data = await apiGet<AnalyticsSummary>(`/cards/${card.id}/analytics/summary`, token)
       setSummary(data)
-      onLoaded?.(data)
+      onLoaded?.(card.id, data)
     } catch {
       // silently ignore — no data yet
     }
@@ -155,18 +155,31 @@ function CardAnalyticsRow({
 
 export default function DashboardPage(): JSX.Element {
   const [cards, setCards] = useState<CardSummary[]>([])
-  const [totalStats, setTotalStats] = useState({ views: 0, clicks: 0, leads: 0 })
+  // C5: Use a Map<cardId, AnalyticsSummary> so each card's refresh *replaces*
+  // its previous entry rather than accumulating into a running sum. The old
+  // approach called setTotalStats(prev => prev + summary) on every 60s tick,
+  // doubling the totals each cycle.
+  const [cardStats, setCardStats] = useState<Map<string, AnalyticsSummary>>(new Map())
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState<string>('there')
 
-  // Accumulate analytics from each card row without a duplicate N+1 fetch.
-  const handleCardLoaded = useCallback((summary: AnalyticsSummary) => {
-    setTotalStats((prev) => ({
-      views: prev.views + summary.totalViews,
-      clicks: prev.clicks + summary.totalClicks,
-      leads: prev.leads + summary.totalLeads,
-    }))
+  const handleCardLoaded = useCallback((cardId: string, summary: AnalyticsSummary) => {
+    setCardStats((prev) => {
+      const next = new Map(prev)
+      next.set(cardId, summary)
+      return next
+    })
   }, [])
+
+  // Derive totals from the map on each render — no stale accumulation
+  const totalStats = Array.from(cardStats.values()).reduce(
+    (acc, s) => ({
+      views: acc.views + s.totalViews,
+      clicks: acc.clicks + s.totalClicks,
+      leads: acc.leads + s.totalLeads,
+    }),
+    { views: 0, clicks: 0, leads: 0 },
+  )
 
   useEffect(() => {
     async function load() {

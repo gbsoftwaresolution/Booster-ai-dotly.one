@@ -7,8 +7,13 @@ import {
   RefreshControl,
   ActivityIndicator,
   Linking,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
 } from 'react-native'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 import { ScanCardButton } from '../../components/ScanCardButton'
@@ -35,6 +40,8 @@ const STAGE_COLORS: Record<string, { bg: string; text: string }> = {
   LOST: { bg: '#fee2e2', text: '#b91c1c' },
 }
 
+const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
+
 function Avatar({ name, id }: { name: string; id: string }) {
   const colors = ['#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
   const color = colors[id.charCodeAt(0) % colors.length]
@@ -59,6 +66,218 @@ function Avatar({ name, id }: { name: string; id: string }) {
   )
 }
 
+// M9: Create Contact Modal
+function CreateContactModal({
+  visible,
+  onClose,
+  onCreated,
+}: {
+  visible: boolean
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [company, setCompany] = useState('')
+  const [title, setTitle] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const reset = () => {
+    setName('')
+    setEmail('')
+    setPhone('')
+    setCompany('')
+    setTitle('')
+  }
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      Alert.alert('Name required', 'Please enter a contact name.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await api.createContact({
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        company: company.trim() || undefined,
+        title: title.trim() || undefined,
+      })
+      reset()
+      onCreated()
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create contact')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+    marginBottom: 10,
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: '#ffffff',
+            paddingTop: Platform.OS === 'ios' ? 56 : 32,
+            paddingHorizontal: 20,
+          }}
+        >
+          {/* Modal header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 24,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => {
+                reset()
+                onClose()
+              }}
+            >
+              <Text style={{ color: '#64748b', fontSize: 15 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ fontWeight: '800', fontSize: 16, color: '#0f172a' }}>Add Contact</Text>
+            <TouchableOpacity onPress={() => void handleCreate()} disabled={submitting}>
+              {submitting ? (
+                <ActivityIndicator size="small" color="#0ea5e9" />
+              ) : (
+                <Text style={{ color: '#0ea5e9', fontWeight: '700', fontSize: 15 }}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#94a3b8',
+                marginBottom: 4,
+                fontWeight: '600',
+                letterSpacing: 0.5,
+              }}
+            >
+              FULL NAME *
+            </Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Jane Smith"
+              placeholderTextColor="#94a3b8"
+              autoFocus
+              style={inputStyle}
+            />
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#94a3b8',
+                marginBottom: 4,
+                fontWeight: '600',
+                letterSpacing: 0.5,
+              }}
+            >
+              EMAIL
+            </Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="jane@example.com"
+              placeholderTextColor="#94a3b8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={inputStyle}
+            />
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#94a3b8',
+                marginBottom: 4,
+                fontWeight: '600',
+                letterSpacing: 0.5,
+              }}
+            >
+              PHONE
+            </Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+1 555 000 0000"
+              placeholderTextColor="#94a3b8"
+              keyboardType="phone-pad"
+              style={inputStyle}
+            />
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#94a3b8',
+                marginBottom: 4,
+                fontWeight: '600',
+                letterSpacing: 0.5,
+              }}
+            >
+              COMPANY
+            </Text>
+            <TextInput
+              value={company}
+              onChangeText={setCompany}
+              placeholder="Acme Corp"
+              placeholderTextColor="#94a3b8"
+              style={inputStyle}
+            />
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#94a3b8',
+                marginBottom: 4,
+                fontWeight: '600',
+                letterSpacing: 0.5,
+              }}
+            >
+              JOB TITLE
+            </Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="CEO"
+              placeholderTextColor="#94a3b8"
+              style={inputStyle}
+            />
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
 export default function ContactsTab() {
   const router = useRouter()
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -70,12 +289,18 @@ export default function ContactsTab() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // M6: Debounced server-side search — search is sent to the API,
+  // not filtered client-side, so it works across all pages.
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchContacts = useCallback(
-    async (reset = false, currentPage?: number) => {
+    async (reset = false, currentPage?: number, searchQuery?: string) => {
       try {
         const pageToFetch = reset ? 1 : (currentPage ?? 1)
-        const data = await api.getContacts(pageToFetch, 50)
+        const q = searchQuery !== undefined ? searchQuery : search
+        const data = await api.getContacts(pageToFetch, 50, q)
         const nextContacts = data.contacts as Contact[]
         if (reset) {
           setContacts(nextContacts)
@@ -99,7 +324,7 @@ export default function ContactsTab() {
         setLoadingMore(false)
       }
     },
-    [],
+    [search],
   )
 
   useEffect(() => {
@@ -109,7 +334,7 @@ export default function ContactsTab() {
   const handleRefresh = () => {
     setRefreshing(true)
     setPage(1)
-    void fetchContacts(true)
+    void fetchContacts(true, 1, search)
   }
 
   const handleLoadMore = () => {
@@ -122,17 +347,28 @@ export default function ContactsTab() {
     if (page > 1) void fetchContacts(false, page)
   }, [page, fetchContacts])
 
-  const filtered = contacts.filter(
-    (c) =>
-      !search ||
-      c.name?.toLowerCase().includes(search.toLowerCase()) ||
-      c.email?.toLowerCase().includes(search.toLowerCase()),
-  )
+  // M6: Server-side search with 350ms debounce
+  const handleSearchChange = (text: string) => {
+    setSearch(text)
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setLoading(true)
+      void fetchContacts(true, 1, text)
+    }, 350)
+  }
 
   // Plan upsell screen
   if (planError) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#f8fafc',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 32,
+        }}
+      >
         <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
           CRM is available on Pro and above
         </Text>
@@ -156,9 +392,16 @@ export default function ContactsTab() {
   }
 
   // Loading screen
-  if (loading) {
+  if (loading && contacts.length === 0) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#f8fafc',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <ActivityIndicator size="large" color="#0ea5e9" />
       </View>
     )
@@ -177,12 +420,32 @@ export default function ContactsTab() {
           borderBottomColor: '#e2e8f0',
         }}
       >
-        <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', marginBottom: 12 }}>
-          Contacts
-        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a' }}>Contacts</Text>
+          {/* M9: Add Contact button */}
+          <TouchableOpacity
+            onPress={() => setShowCreateModal(true)}
+            style={{
+              backgroundColor: '#0ea5e9',
+              borderRadius: 10,
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>+ Add</Text>
+          </TouchableOpacity>
+        </View>
+        {/* M6: Search input wired to server-side search */}
         <TextInput
           value={search}
-          onChangeText={setSearch}
+          onChangeText={handleSearchChange}
           placeholder="Search contacts..."
           placeholderTextColor="#94a3b8"
           style={{
@@ -220,7 +483,7 @@ export default function ContactsTab() {
       )}
 
       <FlatList
-        data={filtered}
+        data={contacts}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         onEndReached={handleLoadMore}
@@ -233,11 +496,19 @@ export default function ContactsTab() {
           ) : null
         }
         ListEmptyComponent={
-          <View style={{ paddingVertical: 80, paddingHorizontal: 32, alignItems: 'center' }}>
-            <Text style={{ color: '#94a3b8', textAlign: 'center', fontSize: 15, lineHeight: 24 }}>
-              Your leads will appear here{'\n'}after someone scans your card
-            </Text>
-          </View>
+          loading ? (
+            <View style={{ paddingVertical: 80, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#0ea5e9" />
+            </View>
+          ) : (
+            <View style={{ paddingVertical: 80, paddingHorizontal: 32, alignItems: 'center' }}>
+              <Text style={{ color: '#94a3b8', textAlign: 'center', fontSize: 15, lineHeight: 24 }}>
+                {search
+                  ? `No contacts match "${search}"`
+                  : 'Your leads will appear here\nafter someone scans your card'}
+              </Text>
+            </View>
+          )
         }
         contentContainerStyle={{ paddingVertical: 8 }}
         renderItem={({ item }) => {
@@ -272,18 +543,12 @@ export default function ContactsTab() {
                   {item.name}
                 </Text>
                 {item.email ? (
-                  <Text
-                    style={{ color: '#64748b', fontSize: 13, marginTop: 1 }}
-                    numberOfLines={1}
-                  >
+                  <Text style={{ color: '#64748b', fontSize: 13, marginTop: 1 }} numberOfLines={1}>
                     {item.email}
                   </Text>
                 ) : null}
                 {item.company ? (
-                  <Text
-                    style={{ color: '#94a3b8', fontSize: 12, marginTop: 1 }}
-                    numberOfLines={1}
-                  >
+                  <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 1 }} numberOfLines={1}>
                     {item.company}
                   </Text>
                 ) : null}
@@ -312,7 +577,13 @@ export default function ContactsTab() {
                   backgroundColor: STAGE_COLORS[stage]?.bg ?? '#f1f5f9',
                 }}
               >
-                <Text style={{ color: STAGE_COLORS[stage]?.text ?? '#475569', fontSize: 11, fontWeight: '700' }}>
+                <Text
+                  style={{
+                    color: STAGE_COLORS[stage]?.text ?? '#475569',
+                    fontSize: 11,
+                    fontWeight: '700',
+                  }}
+                >
                   {stage}
                 </Text>
               </View>
@@ -327,6 +598,16 @@ export default function ContactsTab() {
           position: 'absolute',
           bottom: 28,
           right: 20,
+        }}
+      />
+
+      {/* M9: Create Contact Modal */}
+      <CreateContactModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={() => {
+          setShowCreateModal(false)
+          void fetchContacts(true)
         }}
       />
     </View>

@@ -163,7 +163,7 @@ export class EmailService {
           <p><strong>${safeName}</strong> connected with your card <em>${safeCard}</em>.</p>
           ${safeEmail ? `<p>Email: <a href="mailto:${safeEmail}">${safeEmail}</a></p>` : ''}
           ${safePhone ? `<p>Phone: ${safePhone}</p>` : ''}
-          <a href="${this.webUrl}/dashboard/contacts" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">View in CRM</a>
+          <a href="${this.webUrl}/contacts" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">View in CRM</a>
           <p style="color:#9ca3af;font-size:12px;margin-top:32px">Dotly.one — Tap. Share. Convert.</p>
         </div>
       `,
@@ -282,7 +282,11 @@ export class EmailService {
     // H-04: strip CR/LF from caller-supplied subject to prevent header injection
     const sent = await this.send({ to, subject: this.stripCrLf(subject), html, from })
     if (!sent) {
-      this.logger.warn(`Direct CRM email to ${to} could not be delivered (no provider configured)`)
+      // C3: Throw so callers do NOT record timeline / ContactEmail as if the
+      // email was delivered. A warning log alone is a silent false-positive.
+      throw new Error(
+        'Email delivery failed: no provider configured or all providers rejected the message',
+      )
     }
   }
 }

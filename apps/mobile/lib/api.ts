@@ -84,8 +84,12 @@ export const api = {
   getCard: (id: string) => apiFetch<unknown>(`/cards/${id}`),
   getMe: () => apiFetch<unknown>('/users/me'),
   getAnalyticsSummary: (id: string) => apiFetch<AnalyticsSummary>(`/cards/${id}/analytics/summary`),
-  getContacts: (page = 1, limit = 50) =>
-    apiFetch<ContactsResponse>(`/contacts?page=${page}&limit=${limit}`),
+  // M6: Added optional search param for server-side search
+  getContacts: (page = 1, limit = 50, search?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search) params.set('search', search)
+    return apiFetch<ContactsResponse>(`/contacts?${params.toString()}`)
+  },
   getContact: (id: string) => apiFetch<unknown>(`/contacts/${id}`),
   updateContactStage: (id: string, stage: string) =>
     apiFetch(`/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
@@ -99,6 +103,32 @@ export const api = {
   updateTags: (id: string, tags: string[]) =>
     apiFetch(`/contacts/${id}`, { method: 'PUT', body: JSON.stringify({ tags }) }),
   triggerEnrich: (id: string) => apiFetch(`/contacts/${id}/enrich`, { method: 'POST' }),
+  // M7: Update contact fields
+  updateContact: (
+    id: string,
+    data: Partial<{
+      name: string
+      email: string
+      phone: string
+      company: string
+      title: string
+      website: string
+      address: string
+      notes: string
+    }>,
+  ) => apiFetch(`/contacts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  // M8: Delete contact
+  deleteContact: (id: string) => apiFetch(`/contacts/${id}`, { method: 'DELETE' }),
+  // M9: Create contact manually
+  createContact: (data: {
+    name: string
+    email?: string
+    phone?: string
+    company?: string
+    title?: string
+    website?: string
+    address?: string
+  }) => apiFetch('/contacts', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // Card creation / editing functions

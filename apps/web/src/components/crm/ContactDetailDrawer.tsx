@@ -2,7 +2,7 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Mail, Phone, Building2, Globe, Tag, Clock } from 'lucide-react'
+import { X, Mail, Phone, Building2, Globe, Tag, Clock, Briefcase, MapPin } from 'lucide-react'
 import { createClient, getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut, apiPatch, apiPost } from '@/lib/api'
 import { ComposeEmailModal } from './ComposeEmailModal'
@@ -15,6 +15,7 @@ export interface ContactDetail {
   company?: string | null
   title?: string | null
   website?: string | null
+  address?: string | null
   notes?: string | null
   tags: string[]
   createdAt: string
@@ -90,20 +91,38 @@ function getInitials(name: string): string {
 function TimelineItem({ event }: { event: TimelineEvent }): JSX.Element {
   const meta = event.metadata
 
-  let label = event.event
+  let label = event.event.replace(/_/g, ' ').toLowerCase()
+  label = label.charAt(0).toUpperCase() + label.slice(1)
+
   if (event.event === 'LEAD_CAPTURED') label = 'Lead captured'
   else if (event.event === 'STAGE_CHANGED')
     label = `Stage: ${String(meta.from ?? '')} → ${String(meta.to ?? '')}`
   else if (event.event === 'NOTE_ADDED') label = 'Note added'
-  else if (event.event === 'EMAIL_SENT') label = 'Email sent'
+  else if (event.event === 'EMAIL_SENT') label = `Email sent: ${String(meta.subject ?? '')}`
+  else if (event.event === 'CONTACT_UPDATED') label = 'Contact updated'
+  else if (event.event === 'ENRICHMENT_QUEUED') label = 'AI enrichment queued'
+  else if (event.event === 'ENRICHMENT_COMPLETED') label = 'AI enrichment completed'
+  else if (event.event === 'ENRICHMENT_FAILED') label = 'AI enrichment failed'
+
+  const dotColor =
+    event.event === 'ENRICHMENT_FAILED'
+      ? 'bg-red-400'
+      : event.event === 'ENRICHMENT_COMPLETED'
+        ? 'bg-green-400'
+        : event.event === 'EMAIL_SENT'
+          ? 'bg-blue-400'
+          : 'bg-indigo-400'
 
   return (
     <div className="flex gap-3 py-2">
-      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-indigo-400" />
+      <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
       <div>
         <p className="text-sm text-gray-700">{label}</p>
         {event.event === 'NOTE_ADDED' && Boolean(meta.content) && (
           <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{String(meta.content)}</p>
+        )}
+        {event.event === 'ENRICHMENT_FAILED' && Boolean(meta.error) && (
+          <p className="mt-0.5 text-xs text-red-500 line-clamp-2">{String(meta.error)}</p>
         )}
         <p className="mt-0.5 text-xs text-gray-400">{timeAgo(event.createdAt)}</p>
       </div>
@@ -134,8 +153,16 @@ export function ContactDetailDrawer({
     setDrawerError(null)
     try {
       const token = await getToken()
-      const data = await apiGet<ContactDetail>(`/contacts/${id}`, token)
-      setContact(data)
+      // H2: Fetch contact and full timeline in parallel.
+      // findOne only returns 20 timeline events; /timeline returns up to 100.
+      const [data, fullTimeline] = await Promise.all([
+        apiGet<ContactDetail>(`/contacts/${id}`, token),
+        apiGet<TimelineEvent[]>(`/contacts/${id}/timeline`, token).catch(() => null),
+      ])
+      setContact({
+        ...data,
+        timeline: fullTimeline ?? data.timeline,
+      })
       setNoteText(data.notes ?? '')
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Failed to load contact')
@@ -381,7 +408,9 @@ export function ContactDetailDrawer({
                     { field: 'email', label: 'Email', icon: Mail, value: contact.email },
                     { field: 'phone', label: 'Phone', icon: Phone, value: contact.phone },
                     { field: 'company', label: 'Company', icon: Building2, value: contact.company },
+                    { field: 'title', label: 'Title', icon: Briefcase, value: contact.title },
                     { field: 'website', label: 'Website', icon: Globe, value: contact.website },
+                    { field: 'address', label: 'Address', icon: MapPin, value: contact.address },
                   ].map(({ field, label, icon: Icon, value }) => (
                     <EditableField
                       key={field}
@@ -513,6 +542,21 @@ export function ContactDetailDrawer({
                         : 'Enrich with AI'}
                   </button>
                 </div>
+                {/* H6: Show failure state if last enrichment event is FAILED */}
+                {(() => {
+                  const lastEnrichEvent = contact.timeline
+                    ?.filter((e) => ['ENRICHMENT_COMPLETED', 'ENRICHMENT_FAILED'].includes(e.event))
+                    .at(0)
+                  if (lastEnrichEvent?.event === 'ENRICHMENT_FAILED') {
+                    return (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                        <strong>Enrichment failed:</strong>{' '}
+                        {String(lastEnrichEvent.metadata.error ?? 'Unknown error')}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
                 {contact.enrichedAt ? (
                   <div className="space-y-3">
                     {/* Score bar */}

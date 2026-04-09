@@ -29,6 +29,8 @@ interface ContactDetail {
   phone?: string
   company?: string
   title?: string
+  website?: string
+  address?: string
   notes?: string
   tags?: string[]
   enrichedAt?: string | null
@@ -98,6 +100,23 @@ function relativeTime(dateStr: string): string {
   return `${days}d ago`
 }
 
+function eventDotColor(event: TimelineEvent): string {
+  switch (event.event) {
+    case 'ENRICHMENT_FAILED':
+      return '#ef4444'
+    case 'ENRICHMENT_COMPLETED':
+      return '#22c55e'
+    case 'EMAIL_SENT':
+      return '#2563eb'
+    case 'STAGE_CHANGED':
+      return '#a855f7'
+    case 'NOTE_ADDED':
+      return '#f59e0b'
+    default:
+      return '#0ea5e9'
+  }
+}
+
 function eventLabel(event: TimelineEvent): string {
   switch (event.event) {
     case 'LEAD_CAPTURED':
@@ -107,7 +126,17 @@ function eventLabel(event: TimelineEvent): string {
     case 'NOTE_ADDED':
       return `Note: ${String(event.metadata?.content ?? '').slice(0, 60)}`
     case 'EMAIL_SENT':
-      return 'Email sent'
+      return event.metadata?.subject
+        ? `Email sent: ${String(event.metadata.subject).slice(0, 50)}`
+        : 'Email sent'
+    case 'CONTACT_UPDATED':
+      return 'Contact details updated'
+    case 'ENRICHMENT_QUEUED':
+      return 'AI enrichment queued'
+    case 'ENRICHMENT_COMPLETED':
+      return 'AI enrichment completed'
+    case 'ENRICHMENT_FAILED':
+      return `Enrichment failed${event.metadata?.reason ? `: ${String(event.metadata.reason)}` : ''}`
     default:
       return event.event
   }
@@ -127,6 +156,224 @@ const cardStyle = {
   borderColor: '#f1f5f9',
 } as const
 
+// ─── EditContactModal ─────────────────────────────────────────────────────────
+
+interface EditContactModalProps {
+  visible: boolean
+  contact: ContactDetail
+  onClose: () => void
+  onSaved: (updated: ContactDetail) => void
+}
+
+function EditContactModal({ visible, contact, onClose, onSaved }: EditContactModalProps) {
+  const [name, setName] = useState(contact.name)
+  const [email, setEmail] = useState(contact.email ?? '')
+  const [phone, setPhone] = useState(contact.phone ?? '')
+  const [company, setCompany] = useState(contact.company ?? '')
+  const [title, setTitle] = useState(contact.title ?? '')
+  const [website, setWebsite] = useState(contact.website ?? '')
+  const [address, setAddress] = useState(contact.address ?? '')
+  const [saving, setSaving] = useState(false)
+
+  // Reset fields when contact changes
+  useEffect(() => {
+    setName(contact.name)
+    setEmail(contact.email ?? '')
+    setPhone(contact.phone ?? '')
+    setCompany(contact.company ?? '')
+    setTitle(contact.title ?? '')
+    setWebsite(contact.website ?? '')
+    setAddress(contact.address ?? '')
+  }, [contact.id])
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert('Validation', 'Name is required.')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.updateContact(contact.id, {
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        company: company.trim() || undefined,
+        title: title.trim() || undefined,
+        website: website.trim() || undefined,
+        address: address.trim() || undefined,
+      })
+      onSaved({
+        ...contact,
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        company: company.trim() || undefined,
+        title: title.trim() || undefined,
+        website: website.trim() || undefined,
+        address: address.trim() || undefined,
+      })
+      onClose()
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save changes')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const fieldStyle = {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14 as const,
+    color: '#0f172a' as const,
+    backgroundColor: '#f8fafc' as const,
+    marginBottom: 12,
+  }
+
+  const labelStyle = {
+    fontSize: 12 as const,
+    color: '#64748b' as const,
+    fontWeight: '600' as const,
+    marginBottom: 4,
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: '#ffffff',
+            paddingTop: Platform.OS === 'ios' ? 56 : 32,
+            paddingHorizontal: 20,
+          }}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 24,
+            }}
+          >
+            <TouchableOpacity onPress={onClose} disabled={saving}>
+              <Text style={{ color: '#64748b', fontSize: 15 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ fontWeight: '800', fontSize: 16, color: '#0f172a' }}>Edit Contact</Text>
+            <TouchableOpacity onPress={() => void handleSave()} disabled={saving || !name.trim()}>
+              {saving ? (
+                <ActivityIndicator size="small" color="#0ea5e9" />
+              ) : (
+                <Text
+                  style={{
+                    color: name.trim() ? '#0ea5e9' : '#94a3b8',
+                    fontWeight: '700',
+                    fontSize: 15,
+                  }}
+                >
+                  Save
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={labelStyle}>Name *</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Full name"
+              placeholderTextColor="#94a3b8"
+              maxLength={200}
+              style={fieldStyle}
+            />
+
+            <Text style={labelStyle}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="email@example.com"
+              placeholderTextColor="#94a3b8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              maxLength={254}
+              style={fieldStyle}
+            />
+
+            <Text style={labelStyle}>Phone</Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+1 555 000 0000"
+              placeholderTextColor="#94a3b8"
+              keyboardType="phone-pad"
+              maxLength={30}
+              style={fieldStyle}
+            />
+
+            <Text style={labelStyle}>Company</Text>
+            <TextInput
+              value={company}
+              onChangeText={setCompany}
+              placeholder="Company name"
+              placeholderTextColor="#94a3b8"
+              maxLength={200}
+              style={fieldStyle}
+            />
+
+            <Text style={labelStyle}>Title</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Job title"
+              placeholderTextColor="#94a3b8"
+              maxLength={200}
+              style={fieldStyle}
+            />
+
+            <Text style={labelStyle}>Website</Text>
+            <TextInput
+              value={website}
+              onChangeText={setWebsite}
+              placeholder="https://example.com"
+              placeholderTextColor="#94a3b8"
+              keyboardType="url"
+              autoCapitalize="none"
+              maxLength={500}
+              style={fieldStyle}
+            />
+
+            <Text style={labelStyle}>Address</Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Street, City, Country"
+              placeholderTextColor="#94a3b8"
+              maxLength={500}
+              style={fieldStyle}
+            />
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export default function ContactDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
@@ -135,6 +382,9 @@ export default function ContactDetailScreen() {
   const [loading, setLoading] = useState(true)
   const [stageLoading, setStageLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   // Notes state
   const [noteText, setNoteText] = useState('')
@@ -152,6 +402,9 @@ export default function ContactDetailScreen() {
 
   // Enrichment state
   const [enriching, setEnriching] = useState(false)
+
+  // Delete state
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -179,6 +432,31 @@ export default function ContactDetailScreen() {
       setStageLoading(false)
     }
   }
+
+  const handleDelete = useCallback(() => {
+    if (!id) return
+    Alert.alert(
+      'Delete Contact',
+      'Are you sure you want to permanently delete this contact? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true)
+            try {
+              await api.deleteContact(id)
+              router.back()
+            } catch (err: unknown) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete contact')
+              setDeleting(false)
+            }
+          },
+        },
+      ],
+    )
+  }, [id, router])
 
   const handleAddNote = useCallback(async () => {
     if (!id || !noteText.trim()) return
@@ -333,13 +611,41 @@ export default function ContactDetailScreen() {
           borderBottomColor: '#e2e8f0',
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 12,
+          justifyContent: 'space-between',
         }}
       >
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={{ color: '#0ea5e9', fontSize: 16, fontWeight: '600' }}>← Back</Text>
         </TouchableOpacity>
-        {stageLoading && <ActivityIndicator size="small" color="#0ea5e9" />}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          {(stageLoading || deleting) && <ActivityIndicator size="small" color="#0ea5e9" />}
+          {/* Edit button */}
+          <TouchableOpacity
+            onPress={() => setEditModalOpen(true)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 8,
+              backgroundColor: '#f1f5f9',
+            }}
+          >
+            <Text style={{ color: '#475569', fontWeight: '600', fontSize: 13 }}>Edit</Text>
+          </TouchableOpacity>
+          {/* Delete button */}
+          <TouchableOpacity
+            onPress={handleDelete}
+            disabled={deleting}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 8,
+              backgroundColor: '#fee2e2',
+            }}
+          >
+            <Text style={{ color: '#b91c1c', fontWeight: '600', fontSize: 13 }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -398,8 +704,8 @@ export default function ContactDetailScreen() {
               onPress={() => openEmail(contact.email!)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
             >
-              <Text style={{ color: '#94a3b8', fontSize: 13, width: 48 }}>Email</Text>
-              <Text style={{ color: '#0ea5e9', fontSize: 14 }}>{contact.email}</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Email</Text>
+              <Text style={{ color: '#0ea5e9', fontSize: 14, flex: 1 }}>{contact.email}</Text>
             </TouchableOpacity>
           )}
           {contact.phone && (
@@ -407,13 +713,27 @@ export default function ContactDetailScreen() {
               onPress={() => openPhone(contact.phone!)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
             >
-              <Text style={{ color: '#94a3b8', fontSize: 13, width: 48 }}>Phone</Text>
-              <Text style={{ color: '#0ea5e9', fontSize: 14 }}>{contact.phone}</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Phone</Text>
+              <Text style={{ color: '#0ea5e9', fontSize: 14, flex: 1 }}>{contact.phone}</Text>
             </TouchableOpacity>
+          )}
+          {contact.website && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Web</Text>
+              <Text style={{ color: '#475569', fontSize: 14, flex: 1 }}>{contact.website}</Text>
+            </View>
+          )}
+          {contact.address && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 13, width: 56, marginTop: 1 }}>Addr</Text>
+              <Text style={{ color: '#475569', fontSize: 14, flex: 1, lineHeight: 20 }}>
+                {contact.address}
+              </Text>
+            </View>
           )}
           {contact.sourceCard && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ color: '#94a3b8', fontSize: 13, width: 48 }}>Card</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Card</Text>
               <Text style={{ color: '#475569', fontSize: 14 }}>@{contact.sourceCard.handle}</Text>
             </View>
           )}
@@ -759,7 +1079,7 @@ export default function ContactDetailScreen() {
                       width: 8,
                       height: 8,
                       borderRadius: 4,
-                      backgroundColor: '#0ea5e9',
+                      backgroundColor: eventDotColor(event),
                       marginTop: 5,
                       flexShrink: 0,
                     }}
@@ -781,6 +1101,16 @@ export default function ContactDetailScreen() {
         {/* Bottom padding */}
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {/* Edit Contact Modal */}
+      {editModalOpen && (
+        <EditContactModal
+          visible={editModalOpen}
+          contact={contact}
+          onClose={() => setEditModalOpen(false)}
+          onSaved={(updated) => setContact(updated)}
+        />
+      )}
 
       {/* Send Email Modal */}
       <Modal

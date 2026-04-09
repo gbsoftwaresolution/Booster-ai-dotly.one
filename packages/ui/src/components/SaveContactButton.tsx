@@ -19,13 +19,13 @@ function SaveIcon({ size = 16 }: { size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.2"
+      strokeWidth="2.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <path d="M8 21h8M12 17v4" />
-      <path d="M12 7v6M9 10l3 3 3-3" />
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <polyline points="17 21 17 13 7 13 7 21" />
+      <polyline points="7 3 7 8 15 8" />
     </svg>
   )
 }
@@ -34,8 +34,8 @@ export function SaveContactButton({
   card,
   handle,
   onSaveContact,
-  primaryColor = '#0ea5e9',
-  secondaryColor = '#dbeafe',
+  primaryColor = '#007AFF',
+  secondaryColor = '#007AFF',
   buttonStyle = 'filled-icon-text',
 }: SaveContactButtonProps) {
   const handleDownload = () => {
@@ -46,185 +46,136 @@ export function SaveContactButton({
   }
 
   const onClick = onSaveContact ?? handleDownload
+  const baseLabel = 'Save Contact'
 
-  // ── icon only ────────────────────────────────────────────────────────────────
-  if (buttonStyle === 'icon') {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
+  return (
+    <>
+      <style>
+        {`
+          .apple-save-btn {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            cursor: pointer;
+            letter-spacing: -0.02em;
+            -webkit-font-smoothing: antialiased;
+          }
+          .apple-save-btn:active {
+            transform: scale(0.96);
+            opacity: 0.85;
+          }
+          .apple-save-icon-btn {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            cursor: pointer;
+          }
+          .apple-save-icon-btn:active {
+            transform: scale(0.92);
+            opacity: 0.85;
+          }
+        `}
+      </style>
+      
+      {buttonStyle === 'icon' && (
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={onClick}
+            title={baseLabel}
+            aria-label={baseLabel}
+            className="apple-save-icon-btn"
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: '#FFFFFF',
+              color: primaryColor,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1), 0 0 0 1px rgba(0,0,0,0.03)',
+            }}
+          >
+            <SaveIcon size={22} />
+          </button>
+        </div>
+      )}
+
+      {buttonStyle === 'filled-icon' && (
         <button
           onClick={onClick}
-          title="Save to Contacts"
-          aria-label="Save to Contacts"
+          title={baseLabel}
+          aria-label={baseLabel}
+          className="apple-save-btn"
           style={{
-            width: 52,
+            width: '100%',
             height: 52,
-            borderRadius: 999,
-            border: `1px solid color-mix(in srgb, ${secondaryColor} 58%, white)`,
-            background: `linear-gradient(180deg, rgba(255,255,255,0.98) 0%, color-mix(in srgb, ${secondaryColor} 18%, white) 100%)`,
-            color: primaryColor,
-            cursor: 'pointer',
+            borderRadius: 18,
+            border: 'none',
+            background: primaryColor,
+            color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 6px 16px rgba(60,64,67,0.10)',
-            transition: 'transform 0.12s, box-shadow 0.12s',
-            flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
-            ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-              '0 10px 22px rgba(60,64,67,0.14)'
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
-            ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-              '0 6px 16px rgba(60,64,67,0.10)'
+            boxShadow: `0 8px 16px color-mix(in srgb, ${primaryColor} 20%, transparent)`,
           }}
         >
-          <SaveIcon size={20} />
+          <SaveIcon size={24} />
         </button>
-      </div>
-    )
-  }
+      )}
 
-  // ── filled icon (wide, no label) ─────────────────────────────────────────────
-  if (buttonStyle === 'filled-icon') {
-    return (
-      <button
-        onClick={onClick}
-        title="Save to Contacts"
-        aria-label="Save to Contacts"
-        style={{
-          width: '100%',
-          minHeight: 54,
-          padding: '14px 20px',
-          borderRadius: 18,
-          border: `1px solid color-mix(in srgb, ${secondaryColor} 56%, white)`,
-          background: `linear-gradient(180deg, color-mix(in srgb, ${secondaryColor} 22%, ${primaryColor}) 0%, ${primaryColor} 100%)`,
-          color: '#ffffff',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 12px 24px rgba(60,64,67,0.12)',
-          transition: 'transform 0.12s, box-shadow 0.12s',
-        }}
-        onMouseEnter={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
-          ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-            '0 16px 28px rgba(60,64,67,0.16)'
-        }}
-        onMouseLeave={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
-          ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-            '0 12px 24px rgba(60,64,67,0.12)'
-        }}
-      >
-        <SaveIcon size={20} />
-      </button>
-    )
-  }
+      {buttonStyle === 'filled-icon-text' && (
+        <button
+          onClick={onClick}
+          className="apple-save-btn"
+          style={{
+            width: '100%',
+            height: 50,
+            borderRadius: 16,
+            border: 'none',
+            background: primaryColor,
+            color: '#FFFFFF',
+            fontSize: 15,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            boxShadow: `0 6px 14px color-mix(in srgb, ${primaryColor} 25%, transparent)`,
+          }}
+        >
+          <SaveIcon size={18} />
+          {baseLabel}
+        </button>
+      )}
 
-  // ── icon + text (outlined ghost) ─────────────────────────────────────────────
-  if (buttonStyle === 'icon-text') {
-    return (
-      <button
-        onClick={onClick}
-        style={{
-          width: '100%',
-          minHeight: 54,
-          padding: '14px 20px',
-          borderRadius: 18,
-          border: `2px solid color-mix(in srgb, ${primaryColor} 40%, white)`,
-          background: 'rgba(255,255,255,0.82)',
-          color: primaryColor,
-          fontFamily: 'inherit',
-          fontSize: 15,
-          fontWeight: 700,
-          cursor: 'pointer',
-          letterSpacing: '-0.01em',
-          transition: 'background 0.12s, transform 0.12s, box-shadow 0.12s',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-          boxShadow: '0 6px 18px rgba(60,64,67,0.06)',
-        }}
-        onMouseEnter={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.background =
-            `color-mix(in srgb, ${primaryColor} 6%, white)`
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
-          ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-            '0 10px 24px rgba(60,64,67,0.10)'
-        }}
-        onMouseLeave={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.82)'
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
-          ;(e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 18px rgba(60,64,67,0.06)'
-        }}
-      >
-        <SaveIcon size={18} />
-        <span>Save to Contacts</span>
-      </button>
-    )
-  }
-
-  // ── filled + icon + text (default) ───────────────────────────────────────────
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        width: '100%',
-        minHeight: 54,
-        padding: '14px 20px',
-        borderRadius: 18,
-        border: `1px solid color-mix(in srgb, ${secondaryColor} 58%, white)`,
-        background: `linear-gradient(180deg, rgba(255,255,255,0.98) 0%, color-mix(in srgb, ${secondaryColor} 18%, white) 100%)`,
-        color: '#202124',
-        fontFamily: 'inherit',
-        fontSize: 15,
-        fontWeight: 700,
-        cursor: 'pointer',
-        letterSpacing: '-0.01em',
-        transition: 'background 0.12s, transform 0.12s, box-shadow 0.12s',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        boxShadow: '0 12px 24px rgba(60,64,67,0.08), inset 0 1px 0 rgba(255,255,255,0.72)',
-      }}
-      onMouseEnter={(e) => {
-        ;(e.currentTarget as HTMLButtonElement).style.background =
-          `linear-gradient(180deg, rgba(255,255,255,0.98) 0%, color-mix(in srgb, ${secondaryColor} 24%, white) 100%)`
-        ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
-        ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-          '0 16px 28px rgba(60,64,67,0.10), inset 0 1px 0 rgba(255,255,255,0.72)'
-      }}
-      onMouseLeave={(e) => {
-        ;(e.currentTarget as HTMLButtonElement).style.background =
-          'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,250,252,0.98) 100%)'
-        ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
-        ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-          '0 12px 24px rgba(60,64,67,0.08), inset 0 1px 0 rgba(255,255,255,0.72)'
-      }}
-    >
-      <span
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 999,
-          background: `color-mix(in srgb, ${primaryColor} 10%, white)`,
-          color: primaryColor,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          border: `1px solid color-mix(in srgb, ${secondaryColor} 50%, white)`,
-        }}
-      >
-        <SaveIcon size={16} />
-      </span>
-      <span>Save to Contacts</span>
-    </button>
+      {buttonStyle === 'icon-text' && (
+        <button
+          onClick={onClick}
+          className="apple-save-btn"
+          style={{
+            width: '100%',
+            height: 50,
+            borderRadius: 16,
+            border: 'none',
+            background: '#FFFFFF',
+            color: primaryColor,
+            fontSize: 15,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1), 0 0 0 1px rgba(0,0,0,0.03)',
+          }}
+        >
+          <SaveIcon size={18} />
+          {baseLabel}
+        </button>
+      )}
+    </>
   )
 }

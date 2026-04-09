@@ -34,9 +34,12 @@ import { SendEmailDto } from './dto/send-email.dto'
 
 class CreateLeadDto {
   // MED-03: Cap all string fields to prevent large string DoS on the public endpoint.
+  // C1: Make name optional — custom forms may not use a "Name" field label;
+  // the service will extract the name from the `fields` mapping if absent.
+  @IsOptional()
   @IsString()
   @MaxLength(200)
-  name!: string
+  name?: string
 
   @IsOptional()
   @IsEmail()
@@ -202,6 +205,45 @@ class PaginationQuery {
   search?: string
 }
 
+class PipelineQuery {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string
+}
+
+class BulkStageDto {
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(500)
+  ids!: string[]
+
+  @IsIn(['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'])
+  stage!: string
+}
+
+class BulkDeleteDto {
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(500)
+  ids!: string[]
+}
+
+class LeadSubmissionsQuery {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number
+}
+
 @ApiTags('contacts')
 @Controller()
 export class ContactsController {
@@ -317,7 +359,39 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('crm/pipeline')
   @ApiOperation({ summary: 'Get CRM pipeline grouped by stage' })
-  getPipeline(@CurrentUser() user: { id: string }) {
-    return this.contactsService.getPipeline(user.id)
+  getPipeline(@CurrentUser() user: { id: string }, @Query() query: PipelineQuery) {
+    return this.contactsService.getPipeline(user.id, { search: query.search })
+  }
+
+  // M1: Real bulk stage update — single DB transaction instead of N individual requests.
+  @ApiBearerAuth()
+  @Patch('contacts/bulk-stage')
+  @ApiOperation({ summary: 'Update CRM stage for multiple contacts at once' })
+  bulkUpdateStage(@CurrentUser() user: { id: string }, @Body() dto: BulkStageDto) {
+    return this.contactsService.bulkUpdateStage(user.id, dto.ids, dto.stage)
+  }
+
+  // M1: Real bulk delete — single DB transaction instead of N individual requests.
+  @ApiBearerAuth()
+  @Delete('contacts/bulk')
+  @ApiOperation({ summary: 'Delete multiple contacts at once' })
+  bulkDelete(@CurrentUser() user: { id: string }, @Body() dto: BulkDeleteDto) {
+    return this.contactsService.bulkDelete(user.id, dto.ids)
+  }
+
+  // H1: Lead submissions list for a card — shows all LeadSubmission records
+  // with associated answers, contact info, and submission timestamp.
+  @ApiBearerAuth()
+  @Get('lead-submissions')
+  @ApiOperation({ summary: 'List lead form submissions for a card' })
+  getLeadSubmissions(
+    @CurrentUser() user: { id: string },
+    @Query('cardId') cardId: string,
+    @Query() query: LeadSubmissionsQuery,
+  ) {
+    return this.contactsService.getLeadSubmissions(user.id, cardId, {
+      page: query.page,
+      limit: query.limit,
+    })
   }
 }

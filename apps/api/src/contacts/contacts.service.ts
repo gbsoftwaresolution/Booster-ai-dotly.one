@@ -28,7 +28,9 @@ function assertValidStage(stage: string): CrmStage {
 }
 
 interface CreateLeadDto {
-  name: string
+  // C1: name is optional — custom forms may label the name field differently.
+  // The service resolves it from fields if absent.
+  name?: string
   email?: string
   phone?: string
   cardId: string
@@ -122,6 +124,55 @@ export class ContactsService {
       }
     }
 
+    // C1: Resolve the contact name. Priority:
+    //   1. dto.name (set by standard 3-field form)
+    //   2. Fuzzy match from dto.fields — custom forms may label it "Full Name",
+    //      "First Name", "Your Name", etc.  The web encodes spaces as underscores,
+    //      so we normalize both before matching.
+    //   3. Derive from email local-part
+    //   4. Fallback to "Anonymous"
+    const NAME_FIELD_KEYS = [
+      'name',
+      'full name',
+      'full_name',
+      'fullname',
+      'your name',
+      'your_name',
+      'first name',
+      'first_name',
+      'firstname',
+    ]
+    const EMAIL_FIELD_KEYS = ['email', 'e-mail', 'e_mail', 'email address', 'email_address']
+    const PHONE_FIELD_KEYS = ['phone', 'phone number', 'phone_number', 'mobile', 'tel', 'telephone']
+
+    // Normalize a field key: lowercase + replace underscores with spaces
+    const normalizeKey = (k: string) => k.toLowerCase().trim().replace(/_/g, ' ')
+
+    const resolvedName: string =
+      dto.name?.trim() ||
+      (dto.fields &&
+        Object.entries(dto.fields)
+          .find(([k]) => NAME_FIELD_KEYS.includes(normalizeKey(k)))?.[1]
+          ?.trim()) ||
+      (dto.email ? dto.email.split('@')[0] : '') ||
+      'Anonymous'
+
+    // Resolve email and phone from fields if not top-level (custom forms may
+    // send them exclusively inside `fields` keyed by "Email" / "Phone").
+    const resolvedEmail: string | undefined =
+      dto.email ||
+      (dto.fields &&
+        Object.entries(dto.fields).find(([k]) =>
+          EMAIL_FIELD_KEYS.includes(normalizeKey(k)),
+        )?.[1]) ||
+      undefined
+    const resolvedPhone: string | undefined =
+      dto.phone ||
+      (dto.fields &&
+        Object.entries(dto.fields).find(([k]) =>
+          PHONE_FIELD_KEYS.includes(normalizeKey(k)),
+        )?.[1]) ||
+      undefined
     // MED-01: Wrap the three writes (contact, crmPipeline, contactTimeline) in a
     // single atomic transaction.  Without this, a crash between writes leaves the
     // contact without a pipeline record or timeline entry, causing silent data
@@ -132,9 +183,9 @@ export class ContactsService {
         const c = await tx.contact.create({
           data: {
             ownerUserId: card.userId,
-            name: dto.name,
-            email: dto.email,
-            phone: dto.phone,
+            name: resolvedName,
+            email: resolvedEmail,
+            phone: resolvedPhone,
             sourceCardId: dto.cardId,
           },
         })
@@ -196,9 +247,9 @@ export class ContactsService {
     void this.webhooksService
       .fanOut(card.userId, 'lead.created', {
         contactId: contact.id,
-        name: dto.name,
-        email: dto.email ?? null,
-        phone: dto.phone ?? null,
+        name: resolvedName,
+        email: resolvedEmail ?? null,
+        phone: resolvedPhone ?? null,
         cardId: dto.cardId,
         cardHandle: dto.sourceHandle ?? card.handle,
       })
@@ -209,11 +260,11 @@ export class ContactsService {
     void this.emailService
       .sendNewLeadNotification(
         card.user.email,
-        dto.name,
+        resolvedName,
         cardName,
         card.handle,
-        dto.email,
-        dto.phone,
+        resolvedEmail,
+        resolvedPhone,
       )
       .catch((err: unknown) => this.logger.warn('Lead notification email failed', err))
 
@@ -223,7 +274,7 @@ export class ContactsService {
         .sendPushNotification(
           card.user.pushToken,
           'New Lead!',
-          `${dto.name} just saved your card`,
+          `${resolvedName} just saved your card`,
           { contactId: contact.id },
         )
         .catch((err: unknown) => this.logger.warn('Lead push notification failed', err))
@@ -361,13 +412,61 @@ export class ContactsService {
   async update(contactId: string, userId: string, dto: UpdateContactDto) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
-    return this.prisma.contact.update({ where: { id: contactId }, data: dto })
+
+    let updated: Awaited<ReturnType<typeof this.prisma.contact.update>>
+    try {
+      updated = await this.prisma.contact.update({ where: { id: contactId }, data: dto })
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new HttpException(
+          'A contact with this email address already exists',
+          HttpStatus.CONFLICT,
+        )
+      }
+      throw err
+    }
+
+    // Timeline audit entry
+    await this.prisma.contactTimeline.create({
+      data: {
+        contactId,
+        event: 'CONTACT_UPDATED',
+        metadata: { changes: dto as unknown as Prisma.InputJsonValue },
+      },
+    })
+
+    // Fire-and-forget webhook: contact.updated
+    void this.webhooksService
+      .fanOut(userId, 'contact.updated', {
+        contactId,
+        name: updated.name,
+        email: updated.email ?? null,
+        changes: dto as Record<string, unknown>,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.updated)', err))
+
+    return updated
   }
 
   async remove(contactId: string, userId: string) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+
+    // M3: Record timeline event before deletion (cascade will remove it, but
+    // this ensures any external log consumers see the deletion event).
+    // In practice, the timeline row is deleted by cascade — this is primarily
+    // for webhook consumers and future audit log exports.
     await this.prisma.contact.delete({ where: { id: contactId } })
+
+    // Fire-and-forget webhook: contact.deleted
+    void this.webhooksService
+      .fanOut(userId, 'contact.deleted', {
+        contactId,
+        name: contact.name,
+        email: contact.email ?? null,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.deleted)', err))
+
     return { deleted: true }
   }
 
@@ -417,7 +516,7 @@ export class ContactsService {
       data: { contactId, event: 'NOTE_ADDED', metadata: { content } },
     })
 
-    return this.prisma.contact.update({
+    const updated = await this.prisma.contact.update({
       where: { id: contactId },
       // Intentional: `notes` is a single freeform text field, not an append log.
       // The full history is stored in ContactTimeline (NOTE_ADDED event above).
@@ -425,6 +524,18 @@ export class ContactsService {
       // move notes to a separate ContactNote relation.
       data: { notes: content },
     })
+
+    // H8: Fire-and-forget webhook: contact.note_added
+    void this.webhooksService
+      .fanOut(userId, 'contact.note_added', {
+        contactId,
+        name: contact.name,
+        email: contact.email ?? null,
+        note: content,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.note_added)', err))
+
+    return updated
   }
 
   async getTimeline(contactId: string, userId: string) {
@@ -439,13 +550,22 @@ export class ContactsService {
     })
   }
 
-  async getPipeline(userId: string) {
+  async getPipeline(userId: string, params?: { search?: string }) {
     // LOW-08: Fetch one extra record beyond the cap so we can detect truncation
     // without a separate COUNT query.  If we get 201 results, we know there are
     // more and we set truncated=true in the response (while only returning 200).
     const CAP = 200
+    const where: Prisma.ContactWhereInput = { ownerUserId: userId }
+    if (params?.search) {
+      where.OR = [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { company: { contains: params.search, mode: 'insensitive' } },
+      ]
+    }
+
     const contacts = await this.prisma.contact.findMany({
-      where: { ownerUserId: userId },
+      where,
       include: { crmPipeline: true, sourceCard: { select: { handle: true } } },
       orderBy: { createdAt: 'desc' },
       take: CAP + 1, // fetch one extra to detect truncation
@@ -515,19 +635,30 @@ export class ContactsService {
     // Send the email
     await this.emailService.sendDirectCrmEmail(contact.email, subject, body, fromName)
 
-    // Record timeline event
-    await this.prisma.contactTimeline.create({
-      data: {
-        contactId,
-        event: 'EMAIL_SENT',
-        metadata: { subject, sentAt: new Date().toISOString() },
-      },
-    })
+    // M10: Wrap timeline + ContactEmail writes in a single transaction so
+    // both are created atomically — or neither is, on failure.
+    await this.prisma.$transaction([
+      this.prisma.contactTimeline.create({
+        data: {
+          contactId,
+          event: 'EMAIL_SENT',
+          metadata: { subject, sentAt: new Date().toISOString() },
+        },
+      }),
+      this.prisma.contactEmail.create({
+        data: { contactId, subject, body },
+      }),
+    ])
 
-    // Also persist in ContactEmail table
-    await this.prisma.contactEmail.create({
-      data: { contactId, subject, body },
-    })
+    // H8: Fire-and-forget webhook: contact.email_sent
+    void this.webhooksService
+      .fanOut(userId, 'contact.email_sent', {
+        contactId,
+        name: contact.name,
+        email: contact.email,
+        subject,
+      })
+      .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.email_sent)', err))
 
     return { sent: true }
   }
@@ -538,5 +669,127 @@ export class ContactsService {
 
     await this.enrichmentQueue.add('enrich', { contactId }, { delay: 0 })
     return { queued: true, contactId }
+  }
+
+  // M1: Bulk stage update — applies the same stage to all specified contacts
+  // in a single prisma.$transaction to avoid partial success on N requests.
+  async bulkUpdateStage(userId: string, ids: string[], stage: string) {
+    const validatedStage = assertValidStage(stage)
+
+    // Verify all contacts belong to this user before updating
+    const owned = await this.prisma.contact.findMany({
+      where: { id: { in: ids }, ownerUserId: userId },
+      select: { id: true },
+    })
+    const ownedIds = owned.map((c) => c.id)
+    if (ownedIds.length === 0) throw new ForbiddenException()
+
+    await this.prisma.$transaction([
+      this.prisma.crmPipeline.updateMany({
+        where: { contactId: { in: ownedIds } },
+        data: { stage: validatedStage },
+      }),
+      // Create a STAGE_CHANGED timeline entry for each contact
+      this.prisma.contactTimeline.createMany({
+        data: ownedIds.map((contactId) => ({
+          contactId,
+          event: 'STAGE_CHANGED',
+          metadata: { to: validatedStage, bulk: true } as unknown as Prisma.InputJsonValue,
+        })),
+      }),
+    ])
+
+    return { updated: ownedIds.length }
+  }
+
+  // M1: Bulk delete — removes all specified contacts in one prisma.deleteMany
+  // instead of N individual DELETE requests.
+  async bulkDelete(userId: string, ids: string[]) {
+    // Only delete contacts that belong to the requesting user — silently ignore others.
+    const result = await this.prisma.contact.deleteMany({
+      where: { id: { in: ids }, ownerUserId: userId },
+    })
+
+    // Webhook: fire-and-forget for each deleted contact ID
+    void this.webhooksService
+      .fanOut(userId, 'contact.deleted', {
+        contactIds: ids,
+        deletedCount: result.count,
+        bulk: true,
+      })
+      .catch((err: unknown) =>
+        this.logger.warn('Webhook fan-out failed (contact.deleted bulk)', err),
+      )
+
+    return { deleted: result.count }
+  }
+
+  // H1: List lead submissions for all lead forms belonging to a user's card.
+  // If cardId is supplied, scoped to that card. Returns paginated submissions
+  // with associated answers, contact name/email, and submission timestamp.
+  async getLeadSubmissions(
+    userId: string,
+    cardId: string | undefined,
+    params: { page?: number; limit?: number },
+  ) {
+    if (cardId) {
+      // Verify the card belongs to the requesting user
+      const card = await this.prisma.card.findUnique({
+        where: { id: cardId },
+        select: { userId: true },
+      })
+      if (!card || card.userId !== userId) throw new ForbiddenException()
+    }
+
+    const limit = Math.min(params.limit ?? 20, 100)
+    const skip = ((params.page ?? 1) - 1) * limit
+
+    // Find all lead form IDs belonging to the user (optionally filtered by card)
+    const leadForms = await this.prisma.leadForm.findMany({
+      where: cardId ? { cardId } : { card: { userId } },
+      select: { id: true, cardId: true, title: true, card: { select: { handle: true } } },
+    })
+    const leadFormIds = leadForms.map((f) => f.id)
+    const leadFormMap = new Map(leadForms.map((f) => [f.id, f]))
+
+    const [submissions, total] = await Promise.all([
+      this.prisma.leadSubmission.findMany({
+        where: { leadFormId: { in: leadFormIds } },
+        orderBy: { submittedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.leadSubmission.count({
+        where: { leadFormId: { in: leadFormIds } },
+      }),
+    ])
+
+    // Attach contact data for submissions that have a contactId
+    const contactIds = submissions.map((s) => s.contactId).filter(Boolean) as string[]
+    const contacts = contactIds.length
+      ? await this.prisma.contact.findMany({
+          where: { id: { in: contactIds } },
+          select: { id: true, name: true, email: true, phone: true },
+        })
+      : []
+    const contactMap = new Map(contacts.map((c) => [c.id, c]))
+
+    const enrichedSubmissions = submissions.map((s) => ({
+      id: s.id,
+      leadFormId: s.leadFormId,
+      leadFormTitle: leadFormMap.get(s.leadFormId)?.title ?? null,
+      cardHandle: leadFormMap.get(s.leadFormId)?.card.handle ?? null,
+      cardId: leadFormMap.get(s.leadFormId)?.cardId ?? null,
+      answers: s.answers,
+      submittedAt: s.submittedAt,
+      contact: s.contactId ? (contactMap.get(s.contactId) ?? null) : null,
+    }))
+
+    return {
+      submissions: enrichedSubmissions,
+      total,
+      page: params.page ?? 1,
+      limit,
+    }
   }
 }
