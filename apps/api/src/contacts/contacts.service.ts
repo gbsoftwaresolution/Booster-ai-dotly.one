@@ -21,6 +21,23 @@ import { Prisma } from '@dotly/database'
 const VALID_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 type CrmStage = (typeof VALID_STAGES)[number]
 
+const CONTACT_LIST_SELECT = Prisma.validator<Prisma.ContactSelect>()({
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  company: true,
+  title: true,
+  website: true,
+  address: true,
+  notes: true,
+  tags: true,
+  createdAt: true,
+  updatedAt: true,
+  sourceCard: { select: { handle: true } },
+  crmPipeline: { select: { stage: true, updatedAt: true } },
+})
+
 function assertValidStage(stage: string): CrmStage {
   if (!(VALID_STAGES as readonly string[]).includes(stage)) {
     throw new BadRequestException(`Invalid stage: must be one of ${VALID_STAGES.join(', ')}`)
@@ -396,7 +413,7 @@ export class ContactsService {
     const [contacts, total] = await Promise.all([
       this.prisma.contact.findMany({
         where,
-        include: { crmPipeline: true, sourceCard: { select: { handle: true } } },
+        select: CONTACT_LIST_SELECT,
         orderBy: { createdAt: 'desc' },
         skip: ((params.page || 1) - 1) * (params.limit || 20),
         take: params.limit || 20,
@@ -604,7 +621,7 @@ export class ContactsService {
 
     const contacts = await this.prisma.contact.findMany({
       where,
-      include: { crmPipeline: true, sourceCard: { select: { handle: true } } },
+      select: CONTACT_LIST_SELECT,
       orderBy: { createdAt: 'desc' },
       take: CAP + 1, // fetch one extra to detect truncation
     })
@@ -1768,7 +1785,7 @@ export class ContactsService {
         ownerUserId: userId,
         crmPipeline: { pipelineId },
       },
-      include: { crmPipeline: true },
+      select: CONTACT_LIST_SELECT,
       orderBy: { createdAt: 'desc' },
     })
   }

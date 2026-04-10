@@ -402,19 +402,19 @@ export default function ContactsPage(): JSX.Element {
   )
   const focusMessage =
     selectedIds.size > 0
-      ? `${selectedIds.size} contact${selectedIds.size === 1 ? '' : 's'} selected for bulk actions.`
+      ? `${selectedIds.size} contact${selectedIds.size === 1 ? '' : 's'} selected.`
       : search.trim()
-        ? `Search is narrowing your CRM to ${total} matching contact${total === 1 ? '' : 's'}.`
+        ? `${total} matching contact${total === 1 ? '' : 's'} in search.`
         : stageFilter !== 'ALL'
-          ? `${total} contact${total === 1 ? '' : 's'} currently sit in the ${stageFilter.toLowerCase()} stage.`
+          ? `${total} contact${total === 1 ? '' : 's'} in ${stageFilter.toLowerCase()}.`
           : total > 0
-            ? `${total} contact${total === 1 ? '' : 's'} in your CRM and ${visibleWithEmail} on this page are ready for outreach.`
-            : 'Add your first contact to start building your pipeline.'
+            ? `${visibleWithEmail} ready for outreach on this page.`
+            : 'Add your first contact to start your pipeline.'
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-5 py-6 sm:px-8 sm:py-7">
         <div
           className="absolute inset-0 opacity-90"
           aria-hidden="true"
@@ -430,23 +430,23 @@ export default function ContactsPage(): JSX.Element {
               Contacts
             </div>
             <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
-              Grow and manage your relationship pipeline
+              Manage contacts and pipeline
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
-              Keep your contact database clean, spot qualification momentum, and move quickly
-              between import, follow-up, and pipeline work.
+              Keep contacts clean, spot qualified leads, and move faster between import, follow-up,
+              and pipeline work.
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
               {[
-                { label: 'Total Contacts', value: loading ? '—' : total },
-                { label: 'Visible Qualified', value: loading ? '—' : visibleQualified },
-                { label: 'Tagged On Page', value: loading ? '—' : visibleTagged },
-                { label: 'Source Cards', value: loading ? '—' : visibleFromCards },
+                { label: 'Total', value: loading ? '—' : total },
+                { label: 'Qualified', value: loading ? '—' : visibleQualified },
+                { label: 'Tagged', value: loading ? '—' : visibleTagged },
+                { label: 'Card Leads', value: loading ? '—' : visibleFromCards },
               ].map(({ label, value }) => (
                 <div
                   key={label}
-                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                  className="rounded-[18px] bg-white/70 px-3 py-3 sm:rounded-[22px] sm:border sm:border-white/80 sm:bg-white/85 sm:shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
                     {label}
@@ -491,13 +491,13 @@ export default function ContactsPage(): JSX.Element {
             </div>
           </div>
 
-          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+          <div className="rounded-[24px] border border-white/70 bg-white/72 p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] sm:app-panel-subtle sm:rounded-[30px] sm:border-0 sm:bg-transparent sm:p-5 sm:shadow-none">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                  Current Snapshot
+                  CRM Snapshot
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">CRM health on this page</p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">This page at a glance</p>
               </div>
               <Link
                 href="/crm/analytics"
@@ -510,32 +510,32 @@ export default function ContactsPage(): JSX.Element {
             <div className="mt-4 space-y-3">
               {[
                 {
-                  label: 'Qualified momentum',
+                  label: 'Qualified',
                   value: loading
                     ? '—'
                     : `${visibleStageCounts.QUALIFIED + visibleStageCounts.CLOSED}`,
-                  detail: 'Qualified and closed contacts in current results',
+                  detail: 'Qualified and closed in these results',
                   icon: CheckCircle2,
                   tone: 'bg-green-50 text-green-600',
                 },
                 {
-                  label: 'Reachable contacts',
+                  label: 'Reachable',
                   value: loading ? '—' : `${visibleWithEmail}`,
-                  detail: 'Visible contacts with an email address ready to use',
+                  detail: 'Visible contacts with email',
                   icon: FileText,
                   tone: 'bg-violet-50 text-violet-600',
                 },
                 {
-                  label: 'New intake',
+                  label: 'New',
                   value: loading ? '—' : `${visibleStageCounts.NEW}`,
-                  detail: 'Fresh contacts still waiting for first-touch action',
+                  detail: 'Fresh contacts waiting for first touch',
                   icon: AlertTriangle,
                   tone: 'bg-amber-50 text-amber-600',
                 },
               ].map(({ label, value, detail, icon: Icon, tone }) => (
                 <div
                   key={label}
-                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                  className="flex items-center gap-3 rounded-[18px] bg-white/88 px-4 py-3 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.2)] sm:rounded-[24px] sm:border sm:border-white/80 sm:bg-white/80 sm:px-4 sm:shadow-none"
                 >
                   <span
                     className={`${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}
@@ -569,9 +569,9 @@ export default function ContactsPage(): JSX.Element {
       )}
 
       {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         {/* Search */}
-        <div className="relative min-w-[200px] flex-1 max-w-sm">
+        <div className="relative w-full min-w-0 flex-1 sm:min-w-[200px] sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
@@ -585,13 +585,13 @@ export default function ContactsPage(): JSX.Element {
 
         {/* Tag filter */}
         {allTags.length > 0 && (
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Tag className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <select
               aria-label="Filter by tag"
               value={tagFilter}
               onChange={(e) => handleTagFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
             >
               <option value="">All tags</option>
               {allTags.map((tag) => (
@@ -604,13 +604,13 @@ export default function ContactsPage(): JSX.Element {
         )}
 
         {/* Sort — client-side on current page */}
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <select
             aria-label="Sort contacts"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'stage' | 'score')}
-            className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
           >
             <option value="date">Newest first</option>
             <option value="name">Name A–Z</option>
@@ -646,14 +646,14 @@ export default function ContactsPage(): JSX.Element {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+        <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
           <span className="text-sm font-semibold text-blue-700">{selectedIds.size} selected</span>
 
           {/* Stage change */}
           <select
             value={bulkStage}
             onChange={(e) => setBulkStage(e.target.value)}
-            className="rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
           >
             <option value="">Change stage…</option>
             {STAGES.map((s) => (
@@ -679,7 +679,7 @@ export default function ContactsPage(): JSX.Element {
               setBulkEditMode(e.target.value as 'company' | 'tagsAdd' | 'tagsRemove' | '')
               setBulkEditValue('')
             }}
-            className="rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
           >
             <option value="">Bulk edit…</option>
             <option value="company">Set company</option>
@@ -696,7 +696,7 @@ export default function ContactsPage(): JSX.Element {
                   if (e.key === 'Enter') void handleBulkEdit()
                 }}
                 placeholder={bulkEditMode === 'company' ? 'Company name' : 'Tags (comma-separated)'}
-                className="rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
               />
               <button
                 type="button"
@@ -720,7 +720,7 @@ export default function ContactsPage(): JSX.Element {
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
-            className="ml-auto rounded-md p-1.5 text-blue-500 hover:bg-blue-100"
+            className="self-end rounded-md p-1.5 text-blue-500 hover:bg-blue-100 sm:ml-auto"
             aria-label="Clear selection"
           >
             <X className="h-4 w-4" />
@@ -739,7 +739,7 @@ export default function ContactsPage(): JSX.Element {
       )}
 
       {/* Table */}
-      <div className="app-table-shell overflow-x-auto">
+      <div>
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -752,10 +752,11 @@ export default function ContactsPage(): JSX.Element {
             onAdd={() => setShowAddModal(true)}
           />
         ) : (
-          <table className="app-table">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                <th className="px-4 py-3">
+          <>
+            <div className="space-y-3 md:hidden">
+              <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <span className="text-sm font-medium text-gray-700">Visible contacts</span>
+                <label className="flex items-center gap-2 text-sm text-gray-500">
                   <input
                     type="checkbox"
                     aria-label="Select all"
@@ -765,141 +766,237 @@ export default function ContactsPage(): JSX.Element {
                     onChange={selectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Email
-                </th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 md:table-cell">
-                  Company
-                </th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">
-                  Source Card
-                </th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">
-                  Added
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Stage
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Score
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+                  Select all
+                </label>
+              </div>
+
               {displayedContacts.map((contact) => {
                 const stage = (contact.crmPipeline?.stage ?? 'NEW') as Stage
                 return (
-                  <tr
-                    key={contact.id}
-                    className="cursor-pointer transition-colors hover:bg-blue-50/40"
-                  >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <div key={contact.id} className="app-panel rounded-[24px] p-4">
+                    <div className="flex items-start gap-3">
                       <input
                         type="checkbox"
                         aria-label={`Select ${contact.name}`}
                         checked={selectedIds.has(contact.id)}
                         onChange={() => toggleSelect(contact.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                    </td>
-                    <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColour(contact.name)}`}
-                        >
-                          {getInitials(contact.name)}
+                      <button
+                        type="button"
+                        onClick={() => setDrawerContactId(contact.id)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColour(contact.name)}`}
+                          >
+                            {getInitials(contact.name)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-semibold text-gray-900">{contact.name}</p>
+                            <p className="truncate text-sm text-gray-500">
+                              {contact.email ?? contact.phone ?? 'No email or phone'}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-gray-900">{contact.name}</p>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${STAGE_BADGE[stage]}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${STAGE_DOT[stage]}`} />
+                            {stage.charAt(0) + stage.slice(1).toLowerCase()}
+                          </span>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}
+                          >
+                            Score {contact.enrichmentScore ?? '—'}
+                          </span>
+                          {contact.sourceCard && (
+                            <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                              /{contact.sourceCard.handle}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-3 space-y-1 text-sm text-gray-500">
+                          <p>{contact.company ?? 'No company added'}</p>
+                          <p>Added {formatDate(contact.createdAt, userTz)}</p>
                           {contact.tags && contact.tags.length > 0 && (
-                            <p className="truncate text-xs text-gray-400">
+                            <p className="truncate">
                               {contact.tags.slice(0, 2).join(', ')}
                               {contact.tags.length > 2 && ` +${contact.tags.length - 2}`}
                             </p>
                           )}
                         </div>
-                      </div>
-                    </td>
-                    <td
-                      className="px-4 py-3 text-gray-500"
-                      onClick={() => setDrawerContactId(contact.id)}
-                    >
-                      {contact.email ?? '—'}
-                    </td>
-                    <td
-                      className="hidden px-4 py-3 text-gray-500 md:table-cell"
-                      onClick={() => setDrawerContactId(contact.id)}
-                    >
-                      {contact.company ?? '—'}
-                    </td>
-                    <td
-                      className="hidden px-4 py-3 lg:table-cell"
-                      onClick={() => setDrawerContactId(contact.id)}
-                    >
-                      {contact.sourceCard ? (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          /{contact.sourceCard.handle}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td
-                      className="hidden px-4 py-3 text-gray-500 lg:table-cell"
-                      onClick={() => setDrawerContactId(contact.id)}
-                    >
-                      {formatDate(contact.createdAt, userTz)}
-                    </td>
-                    <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_BADGE[stage]}`}
-                      >
-                        <span className={`h-1.5 w-1.5 rounded-full ${STAGE_DOT[stage]}`} />
-                        {stage.charAt(0) + stage.slice(1).toLowerCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}
-                      >
-                        {contact.enrichmentScore ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      </button>
                       <button
                         type="button"
                         aria-label={`Delete ${contact.name}`}
                         onClick={() => void handleDelete(contact.id)}
-                        className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+
+            <div className="hidden md:block app-table-shell overflow-x-auto">
+              <table className="app-table">
+                <thead className="border-b border-gray-100 bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all"
+                        checked={
+                          selectedIds.size === displayedContacts.length &&
+                          displayedContacts.length > 0
+                        }
+                        onChange={selectAll}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Name
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Email
+                    </th>
+                    <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 md:table-cell">
+                      Company
+                    </th>
+                    <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">
+                      Source Card
+                    </th>
+                    <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">
+                      Added
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Stage
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Score
+                    </th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {displayedContacts.map((contact) => {
+                    const stage = (contact.crmPipeline?.stage ?? 'NEW') as Stage
+                    return (
+                      <tr
+                        key={contact.id}
+                        className="cursor-pointer transition-colors hover:bg-blue-50/40"
+                      >
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${contact.name}`}
+                            checked={selectedIds.has(contact.id)}
+                            onChange={() => toggleSelect(contact.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColour(contact.name)}`}
+                            >
+                              {getInitials(contact.name)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-gray-900">{contact.name}</p>
+                              {contact.tags && contact.tags.length > 0 && (
+                                <p className="truncate text-xs text-gray-400">
+                                  {contact.tags.slice(0, 2).join(', ')}
+                                  {contact.tags.length > 2 && ` +${contact.tags.length - 2}`}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-3 text-gray-500"
+                          onClick={() => setDrawerContactId(contact.id)}
+                        >
+                          {contact.email ?? '—'}
+                        </td>
+                        <td
+                          className="hidden px-4 py-3 text-gray-500 md:table-cell"
+                          onClick={() => setDrawerContactId(contact.id)}
+                        >
+                          {contact.company ?? '—'}
+                        </td>
+                        <td
+                          className="hidden px-4 py-3 lg:table-cell"
+                          onClick={() => setDrawerContactId(contact.id)}
+                        >
+                          {contact.sourceCard ? (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                              /{contact.sourceCard.handle}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td
+                          className="hidden px-4 py-3 text-gray-500 lg:table-cell"
+                          onClick={() => setDrawerContactId(contact.id)}
+                        >
+                          {formatDate(contact.createdAt, userTz)}
+                        </td>
+                        <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_BADGE[stage]}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${STAGE_DOT[stage]}`} />
+                            {stage.charAt(0) + stage.slice(1).toLowerCase()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}
+                          >
+                            {contact.enrichmentScore ?? '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            aria-label={`Delete ${contact.name}`}
+                            onClick={() => void handleDelete(contact.id)}
+                            className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
             Showing {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, total)} of {total}
           </p>
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               type="button"
               disabled={page === 1}
               onClick={() => void loadContacts(page - 1)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors sm:flex-none"
             >
               Previous
             </button>
@@ -907,7 +1004,7 @@ export default function ContactsPage(): JSX.Element {
               type="button"
               disabled={page === totalPages}
               onClick={() => void loadContacts(page + 1)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors sm:flex-none"
             >
               Next
             </button>
