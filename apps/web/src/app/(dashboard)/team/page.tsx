@@ -574,17 +574,27 @@ export default function TeamPage(): JSX.Element {
 
       {/* Create team modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="app-panel w-full max-w-md rounded-[28px] p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-900">Create Team</h2>
-            <input
-              type="text"
-              value={newTeamName}
-              onChange={(e) => setNewTeamName(e.target.value)}
-              placeholder="Team name"
-              className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            <div className="mt-4 flex justify-end gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="app-panel w-full max-w-md rounded-[28px] shadow-xl">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500/80">
+                Collaboration
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-gray-900">Create Team</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Start a shared workspace for members, roles, and invitations.
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <input
+                type="text"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                placeholder="Team name"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
@@ -606,25 +616,35 @@ export default function TeamPage(): JSX.Element {
 
       {/* Invite modal */}
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="app-panel w-full max-w-md rounded-[28px] p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-900">Invite Member</h2>
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="Email address"
-              className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'ADMIN' | 'MEMBER')}
-              className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            <div className="mt-4 flex justify-end gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="app-panel w-full max-w-md rounded-[28px] shadow-xl">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500/80">
+                Collaboration
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-gray-900">Invite Member</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Add a teammate and choose the right level of access for your workspace.
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Email address"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as 'ADMIN' | 'MEMBER')}
+                className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="MEMBER">Member</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
               <button
                 type="button"
                 onClick={() => setShowInviteModal(false)}

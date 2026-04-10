@@ -428,13 +428,25 @@ export default function PipelinesPage(): JSX.Element {
 
       {/* Create / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="app-panel mx-4 w-full max-w-lg rounded-[28px] shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                {editingPipeline ? 'Edit Pipeline' : 'New Pipeline'}
-              </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-500/80">
+                  CRM Setup
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-gray-900">
+                  {editingPipeline ? 'Edit Pipeline' : 'New Pipeline'}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Define the stage order and default flow for how contacts move through your CRM.
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <span className="sr-only">Close</span>
                 <X className="h-5 w-5" />
               </button>
             </div>
