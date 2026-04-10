@@ -750,6 +750,28 @@ export class ContactsController {
   }
 
   @ApiBearerAuth()
+  @Get('lead-submissions/export')
+  @ApiOperation({ summary: 'Export lead submissions as CSV' })
+  async exportLeadSubmissions(
+    @CurrentUser() user: { id: string },
+    @Res() res: Response,
+    @Query('cardId') cardId?: string,
+    @Query('search') search?: string,
+  ) {
+    await this.assertCsvExportAccess(user.id)
+    const result = await this.contactsService.exportLeadSubmissions(user.id, { cardId, search })
+    const filename = `lead-submissions-${new Date().toISOString().slice(0, 10)}.csv`
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Cache-Control', 'no-store')
+    if (result.truncated) {
+      res.setHeader('X-Export-Truncated', 'true')
+      res.setHeader('X-Export-Row-Count', String(result.total))
+    }
+    res.end('\uFEFF' + result.csv)
+  }
+
+  @ApiBearerAuth()
   @Get('contacts/:id')
   @ApiOperation({ summary: 'Get a single contact' })
   findOne(@Param('id') id: string, @CurrentUser() user: { id: string }) {

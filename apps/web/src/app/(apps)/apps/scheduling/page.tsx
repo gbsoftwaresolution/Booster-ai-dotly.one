@@ -142,7 +142,7 @@ export default function SchedulingDashboard(): JSX.Element {
 
             <div className="mt-4 flex flex-wrap gap-3">
               <Link
-                href="/scheduling"
+                href="/apps/scheduling?tab=types"
                 className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(5,150,105,0.45)] transition-transform hover:-translate-y-0.5"
                 style={{ background: 'linear-gradient(135deg,#34d399,#059669)' }}
               >
@@ -150,7 +150,7 @@ export default function SchedulingDashboard(): JSX.Element {
                 New Appointment Type
               </Link>
               <Link
-                href="/apps/scheduling/bookings"
+                href="/apps/scheduling?tab=bookings"
                 className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
                 <CalendarClock className="h-4 w-4 text-sky-500" />
@@ -296,7 +296,10 @@ export default function SchedulingDashboard(): JSX.Element {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Appointment Types</h2>
-          <Link href="/scheduling" className="text-xs font-medium text-emerald-600 hover:underline">
+          <Link
+            href="/apps/scheduling?tab=types"
+            className="text-xs font-medium text-emerald-600 hover:underline"
+          >
             Manage all
           </Link>
         </div>
@@ -315,7 +318,7 @@ export default function SchedulingDashboard(): JSX.Element {
               Create your first bookable appointment type
             </p>
             <Link
-              href="/scheduling"
+              href="/apps/scheduling?tab=types"
               className="mt-4 flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white"
               style={{ background: 'linear-gradient(135deg,#34d399,#059669)' }}
             >
@@ -361,7 +364,7 @@ export default function SchedulingDashboard(): JSX.Element {
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Upcoming Bookings</h2>
           <Link
-            href="/apps/scheduling/bookings"
+            href="/apps/scheduling?tab=bookings"
             className="text-xs font-medium text-emerald-600 hover:underline"
           >
             View all

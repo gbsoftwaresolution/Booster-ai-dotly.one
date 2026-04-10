@@ -1602,6 +1602,69 @@ export class ContactsService {
     return { csv, truncated, total: page.length }
   }
 
+  async exportLeadSubmissions(
+    userId: string,
+    opts?: { cardId?: string; search?: string },
+  ): Promise<{ csv: string; truncated: boolean; total: number }> {
+    const EXPORT_CAP = 10_000
+    const submissionsResult = await this.getLeadSubmissions(userId, opts?.cardId, {
+      page: 1,
+      limit: EXPORT_CAP + 1,
+      search: opts?.search,
+    })
+
+    const truncated = submissionsResult.submissions.length > EXPORT_CAP
+    const page = truncated
+      ? submissionsResult.submissions.slice(0, EXPORT_CAP)
+      : submissionsResult.submissions
+
+    const answerKeys = Array.from(
+      new Set(
+        page.flatMap((submission) =>
+          Object.keys((submission.answers ?? {}) as Record<string, unknown>).sort((a, b) =>
+            a.localeCompare(b),
+          ),
+        ),
+      ),
+    )
+
+    const escapeField = (value: string | null | undefined): string => {
+      if (!value) return ''
+      if (/[,"\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+      return value
+    }
+
+    const csvHeader = [
+      'submittedAt',
+      'cardHandle',
+      'leadFormTitle',
+      'contactName',
+      'contactEmail',
+      'contactPhone',
+      ...answerKeys,
+    ].join(',')
+
+    const rows = page.map((submission) => {
+      const answers = (submission.answers ?? {}) as Record<string, unknown>
+      const fields = [
+        escapeField(new Date(submission.submittedAt).toISOString()),
+        escapeField(submission.cardHandle),
+        escapeField(submission.leadFormTitle),
+        escapeField(submission.contact?.name ?? ''),
+        escapeField(submission.contact?.email ?? ''),
+        escapeField(submission.contact?.phone ?? ''),
+        ...answerKeys.map((key) => escapeField(String(answers[key] ?? ''))),
+      ]
+      return fields.join(',')
+    })
+
+    return {
+      csv: [csvHeader, ...rows].join('\n'),
+      truncated,
+      total: page.length,
+    }
+  }
+
   async getContactEmails(contactId: string, userId: string) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()

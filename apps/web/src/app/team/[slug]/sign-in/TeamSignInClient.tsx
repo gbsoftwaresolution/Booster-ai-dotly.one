@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import Image from 'next/image'
+import { getAuthCallbackUrl } from '@/lib/app-url'
+import { apiGet } from '@/lib/api'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
-const DOTLY_AUTH_CALLBACK_URL = 'https://dotly.one/auth/callback'
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 interface TeamBrandData {
@@ -32,6 +33,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
   const supabase = createClient()
   const brandColor = team.brandColor ?? '#0ea5e9'
   const displayName = team.brandName ?? team.name
+  const teamNext = `/team/${team.slug}/sign-in`
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
@@ -65,7 +67,10 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
         password,
       })
       if (authError) throw authError
-      router.push('/dashboard')
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      await apiGet(`/teams/${team.id}`, token)
+      router.push(teamNext)
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
@@ -79,7 +84,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: DOTLY_AUTH_CALLBACK_URL,
+        redirectTo: `${getAuthCallbackUrl()}?next=${encodeURIComponent(teamNext)}`,
       },
     })
     if (authError) setError(authError.message)
@@ -225,7 +230,10 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Not a member of {displayName}?{' '}
-            <a href="/auth" className="font-medium text-sky-500 hover:text-sky-600">
+            <a
+              href={`/auth?next=${encodeURIComponent(teamNext)}`}
+              className="font-medium text-sky-500 hover:text-sky-600"
+            >
               Sign in with your account
             </a>
           </p>

@@ -668,7 +668,7 @@ export default function DashboardPage(): JSX.Element {
                 {contacts.map((c) => (
                   <Link
                     key={c.id}
-                    href={`/contacts/${c.id}`}
+                    href="/contacts"
                     className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="min-w-0">
@@ -860,7 +860,7 @@ export default function DashboardPage(): JSX.Element {
                   Create your first digital card to start sharing.
                 </p>
                 <Link
-                  href="/qr"
+                  href="/apps/cards/create"
                   className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
                 >
                   <Plus className="h-4 w-4" />
@@ -888,12 +888,16 @@ export default function DashboardPage(): JSX.Element {
           {/* Scheduling — only shown if active appointment types exist */}
           {!loading && appointmentTypes.length > 0 && (
             <div>
-              <SectionHeader title="Scheduling" href="/scheduling" linkLabel="Manage" />
+              <SectionHeader
+                title="Scheduling"
+                href="/apps/scheduling?tab=types"
+                linkLabel="Manage"
+              />
               <div className="space-y-2">
                 {appointmentTypes.slice(0, 4).map((at) => (
                   <Link
                     key={at.id}
-                    href="/scheduling"
+                    href="/apps/scheduling?tab=types"
                     className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="flex items-center gap-3">
@@ -986,9 +990,9 @@ export default function DashboardPage(): JSX.Element {
 
       {/* ── Mobile QR FAB ── */}
       <Link
-        href="/qr"
+        href="/apps/cards/create"
         className="fixed bottom-[calc(env(safe-area-inset-bottom)+68px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 shadow-lg shadow-brand-500/30 transition-transform active:scale-95 lg:hidden"
-        aria-label="Show QR code"
+        aria-label="Create card"
       >
         <QrCode className="h-6 w-6 text-white" aria-hidden="true" />
       </Link>

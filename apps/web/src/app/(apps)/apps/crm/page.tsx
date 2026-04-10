@@ -19,6 +19,7 @@ import {
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 
 interface ContactRow {
   id: string
@@ -32,6 +33,16 @@ interface ContactRow {
 interface CRMOverview {
   contacts: ContactRow[]
   recentCount: number
+  dealCount: number
+  leadCount: number
+}
+
+interface DealRow {
+  id: string
+}
+
+interface LeadSubmissionRow {
+  id: string
 }
 
 function StatPill({
@@ -65,22 +76,36 @@ function StatPill({
 }
 
 export default function CRMDashboard(): JSX.Element {
-  const [data, setData] = useState<CRMOverview>({ contacts: [], recentCount: 0 })
+  const [data, setData] = useState<CRMOverview>({
+    contacts: [],
+    recentCount: 0,
+    dealCount: 0,
+    leadCount: 0,
+  })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
       const token = await getAccessToken()
-      const contactsRes = await apiGet<{ contacts: ContactRow[]; total?: number }>(
-        '/contacts?limit=5',
-        token,
-      ).catch(() => ({ contacts: [], total: 0 }))
+      const [contactsRes, dealsRes, leadsRes] = await Promise.all([
+        apiGet<{ contacts: ContactRow[]; total?: number }>('/contacts?limit=5', token),
+        apiGet<DealRow[]>('/deals', token),
+        apiGet<{ submissions: LeadSubmissionRow[]; total: number }>(
+          '/lead-submissions?limit=1',
+          token,
+        ),
+      ])
       setData({
         contacts: contactsRes.contacts ?? [],
         recentCount: contactsRes.total ?? (contactsRes.contacts ?? []).length,
+        dealCount: dealsRes.length,
+        leadCount: leadsRes.total ?? leadsRes.submissions.length,
       })
-    } catch {
-      // silently handled
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load CRM overview.')
     } finally {
       setLoading(false)
     }
@@ -92,6 +117,8 @@ export default function CRMDashboard(): JSX.Element {
 
   return (
     <div className="space-y-8">
+      {error && <StatusNotice message={error} />}
+
       {/* Header */}
       <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
         <div>
@@ -121,21 +148,21 @@ export default function CRMDashboard(): JSX.Element {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           <StatPill
             label="Contacts"
-            value={data.contacts.length}
+            value={data.recentCount}
             icon={Users}
             color="bg-violet-500"
             href="/apps/crm/contacts"
           />
           <StatPill
             label="Deals"
-            value={0}
+            value={data.dealCount}
             icon={DollarSign}
             color="bg-emerald-500"
             href="/apps/crm/deals"
           />
           <StatPill
             label="Lead Submissions"
-            value={0}
+            value={data.leadCount}
             icon={Inbox}
             color="bg-sky-500"
             href="/apps/crm/leads"

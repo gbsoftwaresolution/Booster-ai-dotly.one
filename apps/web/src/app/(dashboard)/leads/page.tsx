@@ -142,14 +142,17 @@ export default function LeadsPage(): JSX.Element {
       const token = await getAccessToken()
       const params = new URLSearchParams()
       if (cardFilter) params.set('cardId', cardFilter)
+      if (search.trim()) params.set('search', search.trim())
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export?${params.toString()}`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? ''}/lead-submissions/export?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token ?? ''}` } },
       )
       if (!res.ok) {
         const message = await res.text().catch(() => '')
         if (message.includes('CSV export is available on Pro.')) {
-          throw new Error('CSV export is available on Pro. Upgrade in billing to export leads.')
+          throw new Error(
+            'CSV export is available on Pro. Upgrade in billing to export lead submissions.',
+          )
         }
         throw new Error(`Export failed: ${res.status}`)
       }
@@ -158,7 +161,7 @@ export default function LeadsPage(): JSX.Element {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `lead-submissions-${new Date().toISOString().slice(0, 10)}.csv`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -166,7 +169,7 @@ export default function LeadsPage(): JSX.Element {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed')
     }
-  }, [cardFilter])
+  }, [cardFilter, search])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -231,7 +234,7 @@ export default function LeadsPage(): JSX.Element {
             className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            Export lead submissions CSV
           </button>
         </div>
       </div>

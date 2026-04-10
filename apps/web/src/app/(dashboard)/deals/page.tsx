@@ -728,11 +728,14 @@ export default function DealsPage(): JSX.Element {
               </button>
               <button
                 type="button"
-                onClick={() => setStageFilter('ALL')}
+                onClick={() => {
+                  setStageFilter('ALL')
+                  setSearch('')
+                }}
                 className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
                 <Target className="h-4 w-4 text-indigo-500" />
-                View Full Pipeline
+                Clear filters
               </button>
             </div>
 
