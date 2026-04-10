@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import {
-  IsString,
   IsOptional,
   IsBoolean,
   IsArray,

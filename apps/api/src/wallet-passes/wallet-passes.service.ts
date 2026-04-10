@@ -7,8 +7,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { createSign, createHash } from 'crypto'
-import { Prisma } from '@dotly/database'
+import { createSign } from 'crypto'
 
 /**
  * WalletPassesService
@@ -105,6 +104,23 @@ export class WalletPassesService {
     }
 
     const card = await this.assertCardOwnerAndFetch(cardId, userId)
+    return this.generateApplePassBuffer(card)
+  }
+
+  private async generateApplePassBuffer(
+    card: Awaited<ReturnType<typeof this.assertCardOwnerAndFetch>>,
+  ): Promise<Buffer> {
+    const passTypeId = this.config.get<string>('APPLE_PASS_TYPE_ID')
+    const teamId = this.config.get<string>('APPLE_TEAM_ID')
+    const certB64 = this.config.get<string>('APPLE_PASS_CERT_P12')
+
+    if (!passTypeId || !teamId || !certB64) {
+      throw new BadRequestException(
+        'Apple Wallet passes are not configured on this server. ' +
+          'Set APPLE_PASS_TYPE_ID, APPLE_TEAM_ID, APPLE_PASS_CERT_P12, and APPLE_PASS_CERT_PASS.',
+      )
+    }
+
     const fields = card.fields as Record<string, string>
     const theme = card.theme
 
@@ -302,7 +318,7 @@ export class WalletPassesService {
     if (!passTypeId || !teamId || !certB64) {
       throw new BadRequestException('Apple Wallet passes are not configured on this server.')
     }
-    return this.generateApplePass(card.id, card.userId)
+    return this.generateApplePassBuffer(card)
   }
 
   /** Sign the manifest buffer using the Apple-provided certificate. */

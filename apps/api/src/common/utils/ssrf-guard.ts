@@ -9,31 +9,31 @@ const BLOCKED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '169.254.169.
 
 // IPv4 private/link-local/loopback/unspecified ranges
 const BLOCKED_IPV4_RANGES = [
-  /^0\./,                 // 0.0.0.0/8 — "this network" (routes to loopback on some kernels)
-  /^127\./,               // loopback
-  /^10\./,               // RFC 1918 class A
+  /^0\./, // 0.0.0.0/8 — "this network" (routes to loopback on some kernels)
+  /^127\./, // loopback
+  /^10\./, // RFC 1918 class A
   /^172\.(1[6-9]|2\d|3[01])\./, // RFC 1918 class B
-  /^192\.168\./,          // RFC 1918 class C
-  /^169\.254\./,          // link-local (APIPA / metadata)
+  /^192\.168\./, // RFC 1918 class C
+  /^169\.254\./, // link-local (APIPA / metadata)
   /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // RFC 6598 CGNAT
-  /^192\.0\.2\./,         // TEST-NET-1 (RFC 5737)
-  /^198\.51\.100\./,      // TEST-NET-2 (RFC 5737)
-  /^203\.0\.113\./,       // TEST-NET-3 (RFC 5737)
-  /^240\./,               // reserved (RFC 1112)
+  /^192\.0\.2\./, // TEST-NET-1 (RFC 5737)
+  /^198\.51\.100\./, // TEST-NET-2 (RFC 5737)
+  /^203\.0\.113\./, // TEST-NET-3 (RFC 5737)
+  /^240\./, // reserved (RFC 1112)
 ]
 
 // IPv6 private/link-local/loopback prefixes (lower-cased)
 const BLOCKED_IPV6_PREFIXES = [
-  '::1',           // loopback
-  'fc',            // unique-local fc00::/7 (fc00:: – fdff::)
-  'fd',            // unique-local fc00::/7
-  'fe80',          // link-local fe80::/10
-  'fe90',          // link-local
-  'fea0',          // link-local
-  'feb0',          // link-local
-  '::ffff:',       // IPv4-mapped IPv6 — validated separately via IPv4 range checks
-  '64:ff9b:',      // IPv4/IPv6 translation (RFC 6052)
-  '::',            // unspecified / all-zeros
+  '::1', // loopback
+  'fc', // unique-local fc00::/7 (fc00:: – fdff::)
+  'fd', // unique-local fc00::/7
+  'fe80', // link-local fe80::/10
+  'fe90', // link-local
+  'fea0', // link-local
+  'feb0', // link-local
+  '::ffff:', // IPv4-mapped IPv6 — validated separately via IPv4 range checks
+  '64:ff9b:', // IPv4/IPv6 translation (RFC 6052)
+  '::', // unspecified / all-zeros
 ]
 
 /**
@@ -68,7 +68,7 @@ function isBlockedIp(ip: string): boolean {
   if (mapped !== null) {
     // The mapped address itself might be safe-looking but embedded in ::ffff: space
     // Any IPv4-mapped address is blocked — force resolution instead.
-    return isBlockedIPv4(mapped) || true  // always block ::ffff:* without known-safe list
+    return isBlockedIPv4(mapped) || true // always block ::ffff:* without known-safe list
   }
 
   // IPv6 prefix checks

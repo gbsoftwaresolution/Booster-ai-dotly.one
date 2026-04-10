@@ -11,9 +11,9 @@ import { UserIdThrottlerGuard } from '../common/guards/user-id-throttler.guard'
 // cards service — it receives raw base64 directly.
 const SCAN_CARD_MAGIC: Record<string, { offset: number; bytes: number[] }[]> = {
   'image/jpeg': [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
-  'image/png':  [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }],
+  'image/png': [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }],
   'image/webp': [{ offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] }],
-  'image/gif':  [
+  'image/gif': [
     { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] }, // GIF87a
     { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] }, // GIF89a
   ],

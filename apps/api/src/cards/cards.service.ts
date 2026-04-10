@@ -656,7 +656,9 @@ export class CardsService {
     }
 
     // Strip owner-only identifiers from the public response.
-    const { user: _user, userId: _userId, ...publicCard } = card
+    const { user, userId, ...publicCard } = card
+    void user
+    void userId
     return {
       ...publicCard,
       fields: this.sanitizeCardFields(publicCard.fields),

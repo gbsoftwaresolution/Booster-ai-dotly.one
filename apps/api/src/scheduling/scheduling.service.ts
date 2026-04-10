@@ -14,7 +14,7 @@ import { UpdateAppointmentTypeDto } from './dto/update-appointment-type.dto'
 import { SetAvailabilityDto } from './dto/set-availability.dto'
 import { CreateBookingDto } from './dto/create-booking.dto'
 import { SetBookingQuestionsDto } from './dto/manage-booking-questions.dto'
-import { BookingStatus, Prisma } from '@dotly/database'
+import { BookingStatus } from '@dotly/database'
 import { ConfigService } from '@nestjs/config'
 
 // Day-of-week index: 0=Sunday, 1=Monday, ... 6=Saturday (JS Date.getDay())
@@ -339,16 +339,15 @@ export class SchedulingService {
     // Replace all questions atomically
     await this.prisma.$transaction([
       this.prisma.bookingQuestion.deleteMany({ where: { appointmentTypeId } }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.prisma.bookingQuestion.createMany({
         data: dto.questions.map((q, idx) => ({
           appointmentTypeId,
           label: q.label,
           type: q.type,
-          options: q.options ?? [],
+          options: JSON.stringify(q.options ?? []),
           required: q.required ?? false,
           position: q.position ?? idx,
-        })) as any,
+        })),
       }),
     ])
 
@@ -995,7 +994,8 @@ export class SchedulingService {
     if (booking.tokenExpiresAt && booking.tokenExpiresAt < new Date())
       throw new NotFoundException('This link has expired')
     // Omit tokenExpiresAt from the public response — internal field
-    const { tokenExpiresAt: _exp, ...publicBooking } = booking
+    const { tokenExpiresAt, ...publicBooking } = booking
+    void tokenExpiresAt
     return publicBooking
   }
 

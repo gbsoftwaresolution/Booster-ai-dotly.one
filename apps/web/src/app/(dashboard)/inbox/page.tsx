@@ -6,9 +6,20 @@ import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch, apiDelete } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import {
-  MessageSquare, Mic, FolderOpen, Inbox,
-  Mail, MailOpen, Trash2, Download, Play, Pause,
-  RefreshCw, ChevronDown, Search, X,
+  MessageSquare,
+  Mic,
+  FolderOpen,
+  Inbox,
+  Mail,
+  MailOpen,
+  Trash2,
+  Download,
+  Play,
+  Pause,
+  RefreshCw,
+  ChevronDown,
+  Search,
+  X,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,6 +65,9 @@ interface InboxData {
   unreadCount: { messages: number; voiceNotes: number; dropboxFiles: number }
 }
 
+type InboxListKey = 'messages' | 'voiceNotes' | 'dropboxFiles'
+type InboxListItem = Message | VoiceNote | DropboxFile
+
 type Tab = 'all' | 'messages' | 'voice' | 'files'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -94,6 +108,10 @@ function mimeIcon(mime: string): string {
   return '📎'
 }
 
+function getInboxListKey(type: 'messages' | 'voice-notes' | 'dropbox'): InboxListKey {
+  return type === 'messages' ? 'messages' : type === 'voice-notes' ? 'voiceNotes' : 'dropboxFiles'
+}
+
 // ─── Audio player ─────────────────────────────────────────────────────────────
 
 function AudioPlayer({ src, duration }: { src: string; duration?: number | null }) {
@@ -105,21 +123,33 @@ function AudioPlayer({ src, duration }: { src: string; duration?: number | null 
   useEffect(() => {
     const audio = new Audio(src)
     audioRef.current = audio
-    audio.onended = () => { setPlaying(false); setProgress(0); setElapsed(0) }
+    audio.onended = () => {
+      setPlaying(false)
+      setProgress(0)
+      setElapsed(0)
+    }
     audio.ontimeupdate = () => {
       if (audio.duration) {
         setProgress((audio.currentTime / audio.duration) * 100)
         setElapsed(Math.floor(audio.currentTime))
       }
     }
-    return () => { audio.pause(); audio.src = '' }
+    return () => {
+      audio.pause()
+      audio.src = ''
+    }
   }, [src])
 
   function toggle() {
     const audio = audioRef.current
     if (!audio) return
-    if (playing) { audio.pause(); setPlaying(false) }
-    else { void audio.play(); setPlaying(true) }
+    if (playing) {
+      audio.pause()
+      setPlaying(false)
+    } else {
+      void audio.play()
+      setPlaying(true)
+    }
   }
 
   return (
@@ -151,7 +181,9 @@ function AudioPlayer({ src, duration }: { src: string; duration?: number | null 
 // ─── Item cards ───────────────────────────────────────────────────────────────
 
 function MessageCard({
-  item, onMarkRead, onDelete,
+  item,
+  onMarkRead,
+  onDelete,
 }: {
   item: Message
   onMarkRead: (id: string) => void
@@ -160,10 +192,12 @@ function MessageCard({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className={cn(
-      'group rounded-2xl border bg-white p-4 transition-all',
-      item.read ? 'border-gray-100' : 'border-sky-200 bg-sky-50/40',
-    )}>
+    <div
+      className={cn(
+        'group rounded-2xl border bg-white p-4 transition-all',
+        item.read ? 'border-gray-100' : 'border-sky-200 bg-sky-50/40',
+      )}
+    >
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600 font-bold text-sm">
@@ -172,24 +206,26 @@ function MessageCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-semibold text-gray-900 truncate">{item.senderName}</span>
+              <span className="text-sm font-semibold text-gray-900 truncate">
+                {item.senderName}
+              </span>
               {!item.read && <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />}
             </div>
             <span className="text-[11px] text-gray-400 shrink-0">{timeAgo(item.createdAt)}</span>
           </div>
-          {item.senderEmail && (
-            <p className="text-xs text-gray-400 truncate">{item.senderEmail}</p>
-          )}
+          {item.senderEmail && <p className="text-xs text-gray-400 truncate">{item.senderEmail}</p>}
           {item.card && (
             <p className="text-[11px] text-gray-400">
               via <span className="font-medium">dotly.one/{item.card.handle}</span>
             </p>
           )}
           {/* Message body */}
-          <p className={cn(
-            'mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap',
-            !expanded && item.message.length > 200 && 'line-clamp-3',
-          )}>
+          <p
+            className={cn(
+              'mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap',
+              !expanded && item.message.length > 200 && 'line-clamp-3',
+            )}
+          >
             {item.message}
           </p>
           {item.message.length > 200 && (
@@ -227,17 +263,21 @@ function MessageCard({
 }
 
 function VoiceNoteCard({
-  item, onMarkRead, onDelete,
+  item,
+  onMarkRead,
+  onDelete,
 }: {
   item: VoiceNote
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
 }) {
   return (
-    <div className={cn(
-      'group rounded-2xl border bg-white p-4 transition-all',
-      item.read ? 'border-gray-100' : 'border-violet-200 bg-violet-50/40',
-    )}>
+    <div
+      className={cn(
+        'group rounded-2xl border bg-white p-4 transition-all',
+        item.read ? 'border-gray-100' : 'border-violet-200 bg-violet-50/40',
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 font-bold text-sm">
           {item.senderName.charAt(0).toUpperCase()}
@@ -245,14 +285,14 @@ function VoiceNoteCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-semibold text-gray-900 truncate">{item.senderName}</span>
+              <span className="text-sm font-semibold text-gray-900 truncate">
+                {item.senderName}
+              </span>
               {!item.read && <span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />}
             </div>
             <span className="text-[11px] text-gray-400 shrink-0">{timeAgo(item.createdAt)}</span>
           </div>
-          {item.senderEmail && (
-            <p className="text-xs text-gray-400 truncate">{item.senderEmail}</p>
-          )}
+          {item.senderEmail && <p className="text-xs text-gray-400 truncate">{item.senderEmail}</p>}
           {item.card && (
             <p className="text-[11px] text-gray-400">
               via <span className="font-medium">dotly.one/{item.card.handle}</span>
@@ -296,17 +336,21 @@ function VoiceNoteCard({
 }
 
 function DropboxFileCard({
-  item, onMarkRead, onDelete,
+  item,
+  onMarkRead,
+  onDelete,
 }: {
   item: DropboxFile
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
 }) {
   return (
-    <div className={cn(
-      'group rounded-2xl border bg-white p-4 transition-all',
-      item.read ? 'border-gray-100' : 'border-emerald-200 bg-emerald-50/40',
-    )}>
+    <div
+      className={cn(
+        'group rounded-2xl border bg-white p-4 transition-all',
+        item.read ? 'border-gray-100' : 'border-emerald-200 bg-emerald-50/40',
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 font-bold text-sm">
           {item.senderName.charAt(0).toUpperCase()}
@@ -314,14 +358,14 @@ function DropboxFileCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-semibold text-gray-900 truncate">{item.senderName}</span>
+              <span className="text-sm font-semibold text-gray-900 truncate">
+                {item.senderName}
+              </span>
               {!item.read && <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
             </div>
             <span className="text-[11px] text-gray-400 shrink-0">{timeAgo(item.createdAt)}</span>
           </div>
-          {item.senderEmail && (
-            <p className="text-xs text-gray-400 truncate">{item.senderEmail}</p>
-          )}
+          {item.senderEmail && <p className="text-xs text-gray-400 truncate">{item.senderEmail}</p>}
           {item.card && (
             <p className="text-[11px] text-gray-400">
               via <span className="font-medium">dotly.one/{item.card.handle}</span>
@@ -378,7 +422,7 @@ function EmptyState({ tab }: { tab: Tab }) {
     messages: {
       icon: <MessageSquare className="h-10 w-10 text-gray-300" />,
       title: 'No messages yet',
-      sub: 'When visitors send you messages via your card, they\'ll show up here.',
+      sub: "When visitors send you messages via your card, they'll show up here.",
     },
     voice: {
       icon: <Mic className="h-10 w-10 text-gray-300" />,
@@ -413,7 +457,8 @@ export default function InboxPage(): JSX.Element {
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     try {
       const token = await getAccessToken()
       const result = await apiGet<InboxData>('/inbox', token)
@@ -425,7 +470,9 @@ export default function InboxPage(): JSX.Element {
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   async function markRead(type: 'messages' | 'voice-notes' | 'dropbox', id: string) {
     try {
@@ -433,19 +480,19 @@ export default function InboxPage(): JSX.Element {
       await apiPatch(`/inbox/${type}/${id}/read`, {}, token)
       setData((prev) => {
         if (!prev) return prev
-        const key = type === 'messages' ? 'messages' : type === 'voice-notes' ? 'voiceNotes' : 'dropboxFiles'
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updated = (prev[key] as any[]).map((item: BaseItem) =>
+        const key = getInboxListKey(type)
+        const updated = prev[key].map((item: InboxListItem) =>
           item.id === id ? { ...item, read: true } : item,
         )
-        const unreadKey = type === 'messages' ? 'messages' : type === 'voice-notes' ? 'voiceNotes' : 'dropboxFiles'
         return {
           ...prev,
           [key]: updated,
-          unreadCount: { ...prev.unreadCount, [unreadKey]: Math.max(0, prev.unreadCount[unreadKey] - 1) },
+          unreadCount: { ...prev.unreadCount, [key]: Math.max(0, prev.unreadCount[key] - 1) },
         }
       })
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   async function del(type: 'messages' | 'voice-notes' | 'dropbox', id: string) {
@@ -454,60 +501,105 @@ export default function InboxPage(): JSX.Element {
       await apiDelete(`/inbox/${type}/${id}`, token)
       setData((prev) => {
         if (!prev) return prev
-        const key = type === 'messages' ? 'messages' : type === 'voice-notes' ? 'voiceNotes' : 'dropboxFiles'
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const list = prev[key] as any[]
-        const item = list.find((i: BaseItem) => i.id === id) as BaseItem | undefined
+        const key = getInboxListKey(type)
+        const list = prev[key]
+        const item = list.find((i: InboxListItem) => i.id === id)
         const wasUnread = item && !item.read
-        const updated = list.filter((i: BaseItem) => i.id !== id)
-        const unreadKey = type === 'messages' ? 'messages' : type === 'voice-notes' ? 'voiceNotes' : 'dropboxFiles'
+        const updated = list.filter((i: InboxListItem) => i.id !== id)
         return {
           ...prev,
           [key]: updated,
           unreadCount: {
             ...prev.unreadCount,
-            [unreadKey]: wasUnread ? Math.max(0, prev.unreadCount[unreadKey] - 1) : prev.unreadCount[unreadKey],
+            [key]: wasUnread ? Math.max(0, prev.unreadCount[key] - 1) : prev.unreadCount[key],
           },
         }
       })
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   // Filtered + searched items
   const q = search.toLowerCase()
-  const messages = data?.messages.filter((m) =>
-    !q || m.senderName.toLowerCase().includes(q) || m.message.toLowerCase().includes(q) || (m.senderEmail ?? '').toLowerCase().includes(q)
-  ) ?? []
-  const voiceNotes = data?.voiceNotes.filter((v) =>
-    !q || v.senderName.toLowerCase().includes(q) || (v.senderEmail ?? '').toLowerCase().includes(q)
-  ) ?? []
-  const dropboxFiles = data?.dropboxFiles.filter((f) =>
-    !q || f.senderName.toLowerCase().includes(q) || f.fileName.toLowerCase().includes(q) || (f.senderEmail ?? '').toLowerCase().includes(q)
-  ) ?? []
+  const messages =
+    data?.messages.filter(
+      (m) =>
+        !q ||
+        m.senderName.toLowerCase().includes(q) ||
+        m.message.toLowerCase().includes(q) ||
+        (m.senderEmail ?? '').toLowerCase().includes(q),
+    ) ?? []
+  const voiceNotes =
+    data?.voiceNotes.filter(
+      (v) =>
+        !q ||
+        v.senderName.toLowerCase().includes(q) ||
+        (v.senderEmail ?? '').toLowerCase().includes(q),
+    ) ?? []
+  const dropboxFiles =
+    data?.dropboxFiles.filter(
+      (f) =>
+        !q ||
+        f.senderName.toLowerCase().includes(q) ||
+        f.fileName.toLowerCase().includes(q) ||
+        (f.senderEmail ?? '').toLowerCase().includes(q),
+    ) ?? []
 
-  const totalUnread = (data?.unreadCount.messages ?? 0) + (data?.unreadCount.voiceNotes ?? 0) + (data?.unreadCount.dropboxFiles ?? 0)
+  const totalUnread =
+    (data?.unreadCount.messages ?? 0) +
+    (data?.unreadCount.voiceNotes ?? 0) +
+    (data?.unreadCount.dropboxFiles ?? 0)
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode; count: number; color: string }[] = [
-    { id: 'all', label: 'All', icon: <Inbox className="h-4 w-4" />, count: totalUnread, color: 'sky' },
-    { id: 'messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" />, count: data?.unreadCount.messages ?? 0, color: 'sky' },
-    { id: 'voice', label: 'Voice', icon: <Mic className="h-4 w-4" />, count: data?.unreadCount.voiceNotes ?? 0, color: 'violet' },
-    { id: 'files', label: 'Files', icon: <FolderOpen className="h-4 w-4" />, count: data?.unreadCount.dropboxFiles ?? 0, color: 'emerald' },
+    {
+      id: 'all',
+      label: 'All',
+      icon: <Inbox className="h-4 w-4" />,
+      count: totalUnread,
+      color: 'sky',
+    },
+    {
+      id: 'messages',
+      label: 'Messages',
+      icon: <MessageSquare className="h-4 w-4" />,
+      count: data?.unreadCount.messages ?? 0,
+      color: 'sky',
+    },
+    {
+      id: 'voice',
+      label: 'Voice',
+      icon: <Mic className="h-4 w-4" />,
+      count: data?.unreadCount.voiceNotes ?? 0,
+      color: 'violet',
+    },
+    {
+      id: 'files',
+      label: 'Files',
+      icon: <FolderOpen className="h-4 w-4" />,
+      count: data?.unreadCount.dropboxFiles ?? 0,
+      color: 'emerald',
+    },
   ]
 
   // Combined feed for "all" tab sorted by date
-  const allItems: Array<{ type: 'message' | 'voice' | 'file'; item: Message | VoiceNote | DropboxFile }> = [
+  const allItems: Array<{
+    type: 'message' | 'voice' | 'file'
+    item: Message | VoiceNote | DropboxFile
+  }> = [
     ...messages.map((m) => ({ type: 'message' as const, item: m })),
     ...voiceNotes.map((v) => ({ type: 'voice' as const, item: v })),
     ...dropboxFiles.map((f) => ({ type: 'file' as const, item: f })),
   ].sort((a, b) => new Date(b.item.createdAt).getTime() - new Date(a.item.createdAt).getTime())
 
-  const isEmpty = activeTab === 'all'
-    ? allItems.length === 0
-    : activeTab === 'messages'
-    ? messages.length === 0
-    : activeTab === 'voice'
-    ? voiceNotes.length === 0
-    : dropboxFiles.length === 0
+  const isEmpty =
+    activeTab === 'all'
+      ? allItems.length === 0
+      : activeTab === 'messages'
+        ? messages.length === 0
+        : activeTab === 'voice'
+          ? voiceNotes.length === 0
+          : dropboxFiles.length === 0
 
   return (
     <div className="flex h-full flex-col bg-gray-50">
@@ -610,62 +702,68 @@ export default function InboxPage(): JSX.Element {
         ) : (
           <div className="space-y-3 pb-24 lg:pb-6">
             {/* All tab — chronological mix */}
-            {activeTab === 'all' && allItems.map(({ type, item }) => {
-              if (type === 'message') return (
+            {activeTab === 'all' &&
+              allItems.map(({ type, item }) => {
+                if (type === 'message')
+                  return (
+                    <MessageCard
+                      key={item.id}
+                      item={item as Message}
+                      onMarkRead={(id) => void markRead('messages', id)}
+                      onDelete={(id) => void del('messages', id)}
+                    />
+                  )
+                if (type === 'voice')
+                  return (
+                    <VoiceNoteCard
+                      key={item.id}
+                      item={item as VoiceNote}
+                      onMarkRead={(id) => void markRead('voice-notes', id)}
+                      onDelete={(id) => void del('voice-notes', id)}
+                    />
+                  )
+                return (
+                  <DropboxFileCard
+                    key={item.id}
+                    item={item as DropboxFile}
+                    onMarkRead={(id) => void markRead('dropbox', id)}
+                    onDelete={(id) => void del('dropbox', id)}
+                  />
+                )
+              })}
+
+            {/* Messages tab */}
+            {activeTab === 'messages' &&
+              messages.map((m) => (
                 <MessageCard
-                  key={item.id}
-                  item={item as Message}
+                  key={m.id}
+                  item={m}
                   onMarkRead={(id) => void markRead('messages', id)}
                   onDelete={(id) => void del('messages', id)}
                 />
-              )
-              if (type === 'voice') return (
+              ))}
+
+            {/* Voice tab */}
+            {activeTab === 'voice' &&
+              voiceNotes.map((v) => (
                 <VoiceNoteCard
-                  key={item.id}
-                  item={item as VoiceNote}
+                  key={v.id}
+                  item={v}
                   onMarkRead={(id) => void markRead('voice-notes', id)}
                   onDelete={(id) => void del('voice-notes', id)}
                 />
-              )
-              return (
+              ))}
+
+            {/* Files tab */}
+            {activeTab === 'files' &&
+              dropboxFiles.map((f) => (
                 <DropboxFileCard
-                  key={item.id}
-                  item={item as DropboxFile}
+                  key={f.id}
+                  item={f}
                   onMarkRead={(id) => void markRead('dropbox', id)}
                   onDelete={(id) => void del('dropbox', id)}
                 />
-              )
-            })}
-
-            {/* Messages tab */}
-            {activeTab === 'messages' && messages.map((m) => (
-              <MessageCard
-                key={m.id}
-                item={m}
-                onMarkRead={(id) => void markRead('messages', id)}
-                onDelete={(id) => void del('messages', id)}
-              />
-            ))}
-
-            {/* Voice tab */}
-            {activeTab === 'voice' && voiceNotes.map((v) => (
-              <VoiceNoteCard
-                key={v.id}
-                item={v}
-                onMarkRead={(id) => void markRead('voice-notes', id)}
-                onDelete={(id) => void del('voice-notes', id)}
-              />
-            ))}
-
-            {/* Files tab */}
-            {activeTab === 'files' && dropboxFiles.map((f) => (
-              <DropboxFileCard
-                key={f.id}
-                item={f}
-                onMarkRead={(id) => void markRead('dropbox', id)}
-                onDelete={(id) => void del('dropbox', id)}
-              />
-            ))}
+              ))}
           </div>
         )}
       </div>

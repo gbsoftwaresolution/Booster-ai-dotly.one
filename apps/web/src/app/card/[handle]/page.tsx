@@ -8,7 +8,6 @@ import type { CardTemplate, SocialPlatform, MediaBlockType } from '@dotly/types'
 
 export const revalidate = 0
 
-const API_URL = getServerApiUrl()
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
 
 interface TeamBrand {
@@ -69,8 +68,9 @@ function safeBrandColor(color: string | null | undefined): string | null {
  * share one network request transparently.
  */
 async function getCard(handle: string): Promise<RawCard | null> {
+  const apiUrl = getServerApiUrl()
   try {
-    const res = await fetch(`${API_URL}/public/cards/${handle}`)
+    const res = await fetch(`${apiUrl}/public/cards/${handle}`)
     if (!res.ok) return null
     return (await res.json()) as RawCard
   } catch {

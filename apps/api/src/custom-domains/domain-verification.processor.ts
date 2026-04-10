@@ -1,4 +1,4 @@
-import { Processor, Process, InjectQueue } from '@nestjs/bull'
+import { Processor, Process } from '@nestjs/bull'
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { InjectQueue as InjectBullQueue } from '@nestjs/bull'
 import type { Queue, Job } from 'bull'

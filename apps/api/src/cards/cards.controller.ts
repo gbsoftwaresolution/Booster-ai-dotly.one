@@ -267,10 +267,16 @@ export class CardsController {
   }
 
   @Public()
-  @ApiOperation({ summary: 'Download vCard for a published card (no auth required for public cards)' })
+  @ApiOperation({
+    summary: 'Download vCard for a published card (no auth required for public cards)',
+  })
   @ApiResponse({ status: 200, description: 'vCard 3.0 file attachment' })
   @Get('public/cards/:handle/vcard')
-  async getVcard(@Param('handle') handle: string, @Res() res: Response, @Req() req: { headers: Record<string, string | undefined> }) {
+  async getVcard(
+    @Param('handle') handle: string,
+    @Res() res: Response,
+    @Req() req: { headers: Record<string, string | undefined> },
+  ) {
     // SEC-01: Extract Bearer token from the Authorization header only.
     // Previously the endpoint also accepted a ?token= query parameter so
     // <a download> links could authenticate without setting headers. This is

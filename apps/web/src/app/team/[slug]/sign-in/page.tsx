@@ -2,8 +2,6 @@ import { redirect } from 'next/navigation'
 import { getServerApiUrl } from '@/lib/server-api'
 import { TeamSignInClient } from './TeamSignInClient'
 
-const API_URL = getServerApiUrl()
-
 interface TeamBrandData {
   id: string
   name: string
@@ -14,8 +12,9 @@ interface TeamBrandData {
 }
 
 async function getTeamBySlug(slug: string): Promise<TeamBrandData | null> {
+  const apiUrl = getServerApiUrl()
   try {
-    const res = await fetch(`${API_URL}/teams/by-slug/${slug}`, { cache: 'no-store' })
+    const res = await fetch(`${apiUrl}/teams/by-slug/${slug}`, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as TeamBrandData
   } catch {
@@ -23,11 +22,7 @@ async function getTeamBySlug(slug: string): Promise<TeamBrandData | null> {
   }
 }
 
-export default async function TeamSignInPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}) {
+export default async function TeamSignInPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const team = await getTeamBySlug(slug)
 

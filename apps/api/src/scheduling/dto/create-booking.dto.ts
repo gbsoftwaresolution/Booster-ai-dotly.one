@@ -1,4 +1,14 @@
-import { IsString, IsEmail, IsOptional, IsDateString, MaxLength, MinLength, IsArray, ValidateNested, ArrayMaxSize } from 'class-validator'
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsDateString,
+  MaxLength,
+  MinLength,
+  IsArray,
+  ValidateNested,
+  ArrayMaxSize,
+} from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 
 export class BookingAnswerDto {

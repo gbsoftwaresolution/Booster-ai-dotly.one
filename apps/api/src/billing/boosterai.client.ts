@@ -12,37 +12,37 @@ import { Plan, BillingDuration } from '@dotly/types'
 
 export const PLAN_PRICING: Record<string, Record<BillingDuration, string>> = {
   [Plan.STARTER]: {
-    [BillingDuration.MONTHLY]:    '10.00',
+    [BillingDuration.MONTHLY]: '10.00',
     [BillingDuration.SIX_MONTHS]: '55.00',
-    [BillingDuration.ANNUAL]:     '100.00',
+    [BillingDuration.ANNUAL]: '100.00',
   },
   [Plan.PRO]: {
-    [BillingDuration.MONTHLY]:    '20.00',
+    [BillingDuration.MONTHLY]: '20.00',
     [BillingDuration.SIX_MONTHS]: '110.00',
-    [BillingDuration.ANNUAL]:     '200.00',
+    [BillingDuration.ANNUAL]: '200.00',
   },
   [Plan.BUSINESS]: {
-    [BillingDuration.MONTHLY]:    '50.00',
+    [BillingDuration.MONTHLY]: '50.00',
     [BillingDuration.SIX_MONTHS]: '275.00',
-    [BillingDuration.ANNUAL]:     '500.00',
+    [BillingDuration.ANNUAL]: '500.00',
   },
   [Plan.AGENCY]: {
-    [BillingDuration.MONTHLY]:    '100.00',
+    [BillingDuration.MONTHLY]: '100.00',
     [BillingDuration.SIX_MONTHS]: '550.00',
-    [BillingDuration.ANNUAL]:     '1000.00',
+    [BillingDuration.ANNUAL]: '1000.00',
   },
   [Plan.ENTERPRISE]: {
-    [BillingDuration.MONTHLY]:    '199.00',
+    [BillingDuration.MONTHLY]: '199.00',
     [BillingDuration.SIX_MONTHS]: '1095.00',
-    [BillingDuration.ANNUAL]:     '1990.00',
+    [BillingDuration.ANNUAL]: '1990.00',
   },
 }
 
 // Duration → number of days (used to compute currentPeriodEnd)
 export const DURATION_DAYS: Record<BillingDuration, number> = {
-  [BillingDuration.MONTHLY]:    30,
+  [BillingDuration.MONTHLY]: 30,
   [BillingDuration.SIX_MONTHS]: 183,
-  [BillingDuration.ANNUAL]:     365,
+  [BillingDuration.ANNUAL]: 365,
 }
 
 // ─── BoosterAI response shapes ────────────────────────────────────────────────
@@ -58,7 +58,7 @@ export interface BoosterAiCreateOrderResponse {
 
 export interface BoosterAiOrderStatusResponse {
   orderId: string
-  orderStatus: string   // e.g. 'PENDING' | 'FINALIZED_ONCHAIN' | 'REFUNDED_ONCHAIN'
+  orderStatus: string // e.g. 'PENDING' | 'FINALIZED_ONCHAIN' | 'REFUNDED_ONCHAIN'
   entitlementStatus: string
   partnerId: string | null
   planId: number
@@ -82,13 +82,13 @@ export class BoosterAiClient {
 
   constructor(private config: ConfigService) {
     this.baseUrl = config.get<string>('BOOSTERAI_API_URL') ?? 'https://api.boosterai.space'
-    this.apiKey  = config.get<string>('BOOSTERAI_INTERNAL_API_KEY') ?? ''
+    this.apiKey = config.get<string>('BOOSTERAI_INTERNAL_API_KEY') ?? ''
 
     this.planIds = {
-      [Plan.STARTER]:    parseInt(config.get<string>('BOOSTERAI_PLAN_ID_STARTER')    ?? '1', 10),
-      [Plan.PRO]:        parseInt(config.get<string>('BOOSTERAI_PLAN_ID_PRO')        ?? '2', 10),
-      [Plan.BUSINESS]:   parseInt(config.get<string>('BOOSTERAI_PLAN_ID_BUSINESS')   ?? '3', 10),
-      [Plan.AGENCY]:     parseInt(config.get<string>('BOOSTERAI_PLAN_ID_AGENCY')     ?? '4', 10),
+      [Plan.STARTER]: parseInt(config.get<string>('BOOSTERAI_PLAN_ID_STARTER') ?? '1', 10),
+      [Plan.PRO]: parseInt(config.get<string>('BOOSTERAI_PLAN_ID_PRO') ?? '2', 10),
+      [Plan.BUSINESS]: parseInt(config.get<string>('BOOSTERAI_PLAN_ID_BUSINESS') ?? '3', 10),
+      [Plan.AGENCY]: parseInt(config.get<string>('BOOSTERAI_PLAN_ID_AGENCY') ?? '4', 10),
       [Plan.ENTERPRISE]: parseInt(config.get<string>('BOOSTERAI_PLAN_ID_ENTERPRISE') ?? '5', 10),
     }
   }
@@ -116,13 +116,14 @@ export class BoosterAiClient {
     partnerCode?: string
     countryCode?: string
   }): Promise<BoosterAiCreateOrderResponse> {
-    const planId      = this.getPlanId(params.plan)
-    const amountUsdt  = this.getAmountUsdt(params.plan, params.duration)
-    const countryCode = params.countryCode ?? this.config.get<string>('BOOSTERAI_COUNTRY_CODE') ?? 'US'
+    const planId = this.getPlanId(params.plan)
+    const amountUsdt = this.getAmountUsdt(params.plan, params.duration)
+    const countryCode =
+      params.countryCode ?? this.config.get<string>('BOOSTERAI_COUNTRY_CODE') ?? 'US'
 
     const body: Record<string, unknown> = {
       planId,
-      payerWallet:  params.walletAddress,
+      payerWallet: params.walletAddress,
       amountUsdt,
       rail: 'CRYPTO',
       countryCode,
@@ -174,17 +175,18 @@ export class BoosterAiClient {
         signal: controller.signal,
       })
 
-      const json = await res.json() as unknown
+      const json = (await res.json()) as unknown
 
       if (!res.ok) {
-        const msg = (json as any)?.error?.message ?? `BoosterAI responded with ${res.status}`
+        const errorBody = json as { error?: { message?: string } }
+        const msg = errorBody.error?.message ?? `BoosterAI responded with ${res.status}`
         this.logger.error(`BoosterAI ${method} ${path} failed: ${msg}`)
         throw new Error(msg)
       }
 
       return json as T
     } catch (err) {
-      if ((err as any)?.name === 'AbortError') {
+      if (err instanceof Error && err.name === 'AbortError') {
         throw new Error(`BoosterAI request timed out: ${method} ${path}`)
       }
       throw err

@@ -61,7 +61,8 @@ export default function SchedulingDashboard(): JSX.Element {
   }, [fetchData])
 
   const upcomingBookings = bookings.filter(
-    (b) => (b.status === 'CONFIRMED' || b.status === 'confirmed') && new Date(b.startAt) > new Date(),
+    (b) =>
+      (b.status === 'CONFIRMED' || b.status === 'confirmed') && new Date(b.startAt) > new Date(),
   )
 
   return (
@@ -174,7 +175,7 @@ export default function SchedulingDashboard(): JSX.Element {
                   <p className="font-semibold text-gray-900 truncate">{apt.name}</p>
                   <p className="text-xs text-gray-400">
                     {apt.durationMins} min
-                    ' · Free'
+                    {' · Free'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -186,7 +187,6 @@ export default function SchedulingDashboard(): JSX.Element {
                   >
                     {apt.isActive ? 'Active' : 'Inactive'}
                   </span>
-
                 </div>
               </div>
             ))}

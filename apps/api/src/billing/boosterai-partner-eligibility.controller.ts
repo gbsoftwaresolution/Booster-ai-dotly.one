@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
-import { IsEmail, IsEthereumAddress, IsOptional, ValidateIf } from 'class-validator'
+import { IsEmail, IsEthereumAddress, IsOptional } from 'class-validator'
 import { PrismaService } from '../prisma/prisma.service'
 import { BoosterAiPartnerGuard } from './boosterai-partner.guard'
 import { Public } from '../auth/decorators/public.decorator'

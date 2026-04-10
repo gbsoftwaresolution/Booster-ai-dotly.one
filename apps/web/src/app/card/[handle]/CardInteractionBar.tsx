@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost } from '@/lib/api'
+import { getPublicApiUrl } from '@/lib/public-env'
 import {
   MessageSquare,
   Mic,
@@ -42,7 +43,7 @@ const GLOBAL_STYLES = `
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
 
 /** Download a vCard using fetch() + createObjectURL() so that the
@@ -338,16 +339,19 @@ function VoiceTab({
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const blobUrlRef = useRef<string | null>(null)
   const MAX_SECONDS = 120
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    blobUrlRef.current = blobUrl
+  }, [blobUrl])
+
+  useEffect(() => {
+    return () => {
       if (timerRef.current) clearInterval(timerRef.current)
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    },
-    [],
-  )
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+    }
+  }, [])
 
   async function startRecording() {
     setError('')

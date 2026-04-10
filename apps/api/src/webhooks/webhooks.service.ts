@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, ForbiddenException, BadRequestException, Logger } from '@nestjs/common'
 import { Prisma } from '@dotly/database'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
@@ -175,7 +169,8 @@ export class WebhooksService {
   }
 
   private sanitizeEndpoint<T extends { secret?: string | null }>(endpoint: T): Omit<T, 'secret'> {
-    const { secret: _secret, ...rest } = endpoint
+    const { secret, ...rest } = endpoint
+    void secret
     return rest
   }
 

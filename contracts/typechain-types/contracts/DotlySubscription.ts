@@ -31,21 +31,27 @@ export interface DotlySubscriptionInterface extends Interface {
       | "isActive"
       | "monthlyPrice"
       | "owner"
+      | "pause"
+      | "paused"
       | "renounceOwnership"
       | "setMonthlyPrice"
       | "subscribe"
       | "subscriptions"
       | "transferOwnership"
+      | "unpause"
       | "usdc"
       | "withdrawUSDC"
   ): FunctionFragment;
 
   getEvent(
     nameOrSignatureOrTopic:
+      | "FundsWithdrawn"
       | "OwnershipTransferred"
+      | "Paused"
       | "PlanPriceUpdated"
       | "SubscriptionActivated"
       | "SubscriptionCancelled"
+      | "Unpaused"
   ): EventFragment;
 
   encodeFunctionData(
@@ -65,6 +71,8 @@ export interface DotlySubscriptionInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
+  encodeFunctionData(functionFragment: "pause", values?: undefined): string;
+  encodeFunctionData(functionFragment: "paused", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "renounceOwnership",
     values?: undefined
@@ -75,7 +83,7 @@ export interface DotlySubscriptionInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "subscribe",
-    values: [BigNumberish, BigNumberish]
+    values: [BigNumberish, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "subscriptions",
@@ -85,6 +93,7 @@ export interface DotlySubscriptionInterface extends Interface {
     functionFragment: "transferOwnership",
     values: [AddressLike]
   ): string;
+  encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
   encodeFunctionData(functionFragment: "usdc", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "withdrawUSDC",
@@ -105,6 +114,8 @@ export interface DotlySubscriptionInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "paused", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "renounceOwnership",
     data: BytesLike
@@ -122,11 +133,25 @@ export interface DotlySubscriptionInterface extends Interface {
     functionFragment: "transferOwnership",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "unpause", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "usdc", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawUSDC",
     data: BytesLike
   ): Result;
+}
+
+export namespace FundsWithdrawnEvent {
+  export type InputTuple = [to: AddressLike, amount: BigNumberish];
+  export type OutputTuple = [to: string, amount: bigint];
+  export interface OutputObject {
+    to: string;
+    amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace OwnershipTransferredEvent {
@@ -135,6 +160,18 @@ export namespace OwnershipTransferredEvent {
   export interface OutputObject {
     previousOwner: string;
     newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace PausedEvent {
+  export type InputTuple = [account: AddressLike];
+  export type OutputTuple = [account: string];
+  export interface OutputObject {
+    account: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -174,10 +211,28 @@ export namespace SubscriptionActivatedEvent {
 }
 
 export namespace SubscriptionCancelledEvent {
-  export type InputTuple = [user: AddressLike];
-  export type OutputTuple = [user: string];
+  export type InputTuple = [
+    user: AddressLike,
+    plan: BigNumberish,
+    cancelledAt: BigNumberish
+  ];
+  export type OutputTuple = [user: string, plan: bigint, cancelledAt: bigint];
   export interface OutputObject {
     user: string;
+    plan: bigint;
+    cancelledAt: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace UnpausedEvent {
+  export type InputTuple = [account: AddressLike];
+  export type OutputTuple = [account: string];
+  export interface OutputObject {
+    account: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -248,6 +303,10 @@ export interface DotlySubscription extends BaseContract {
 
   owner: TypedContractMethod<[], [string], "view">;
 
+  pause: TypedContractMethod<[], [void], "nonpayable">;
+
+  paused: TypedContractMethod<[], [boolean], "view">;
+
   renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
   setMonthlyPrice: TypedContractMethod<
@@ -257,7 +316,7 @@ export interface DotlySubscription extends BaseContract {
   >;
 
   subscribe: TypedContractMethod<
-    [plan: BigNumberish, months: BigNumberish],
+    [plan: BigNumberish, months: BigNumberish, maxPricePerMonth: BigNumberish],
     [void],
     "nonpayable"
   >;
@@ -279,6 +338,8 @@ export interface DotlySubscription extends BaseContract {
     [void],
     "nonpayable"
   >;
+
+  unpause: TypedContractMethod<[], [void], "nonpayable">;
 
   usdc: TypedContractMethod<[], [string], "view">;
 
@@ -318,6 +379,12 @@ export interface DotlySubscription extends BaseContract {
     nameOrSignature: "owner"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
+    nameOrSignature: "pause"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "paused"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
     nameOrSignature: "renounceOwnership"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
@@ -330,7 +397,7 @@ export interface DotlySubscription extends BaseContract {
   getFunction(
     nameOrSignature: "subscribe"
   ): TypedContractMethod<
-    [plan: BigNumberish, months: BigNumberish],
+    [plan: BigNumberish, months: BigNumberish, maxPricePerMonth: BigNumberish],
     [void],
     "nonpayable"
   >;
@@ -351,6 +418,9 @@ export interface DotlySubscription extends BaseContract {
     nameOrSignature: "transferOwnership"
   ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "unpause"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
     nameOrSignature: "usdc"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
@@ -362,11 +432,25 @@ export interface DotlySubscription extends BaseContract {
   >;
 
   getEvent(
+    key: "FundsWithdrawn"
+  ): TypedContractEvent<
+    FundsWithdrawnEvent.InputTuple,
+    FundsWithdrawnEvent.OutputTuple,
+    FundsWithdrawnEvent.OutputObject
+  >;
+  getEvent(
     key: "OwnershipTransferred"
   ): TypedContractEvent<
     OwnershipTransferredEvent.InputTuple,
     OwnershipTransferredEvent.OutputTuple,
     OwnershipTransferredEvent.OutputObject
+  >;
+  getEvent(
+    key: "Paused"
+  ): TypedContractEvent<
+    PausedEvent.InputTuple,
+    PausedEvent.OutputTuple,
+    PausedEvent.OutputObject
   >;
   getEvent(
     key: "PlanPriceUpdated"
@@ -389,8 +473,26 @@ export interface DotlySubscription extends BaseContract {
     SubscriptionCancelledEvent.OutputTuple,
     SubscriptionCancelledEvent.OutputObject
   >;
+  getEvent(
+    key: "Unpaused"
+  ): TypedContractEvent<
+    UnpausedEvent.InputTuple,
+    UnpausedEvent.OutputTuple,
+    UnpausedEvent.OutputObject
+  >;
 
   filters: {
+    "FundsWithdrawn(address,uint256)": TypedContractEvent<
+      FundsWithdrawnEvent.InputTuple,
+      FundsWithdrawnEvent.OutputTuple,
+      FundsWithdrawnEvent.OutputObject
+    >;
+    FundsWithdrawn: TypedContractEvent<
+      FundsWithdrawnEvent.InputTuple,
+      FundsWithdrawnEvent.OutputTuple,
+      FundsWithdrawnEvent.OutputObject
+    >;
+
     "OwnershipTransferred(address,address)": TypedContractEvent<
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,
@@ -400,6 +502,17 @@ export interface DotlySubscription extends BaseContract {
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,
       OwnershipTransferredEvent.OutputObject
+    >;
+
+    "Paused(address)": TypedContractEvent<
+      PausedEvent.InputTuple,
+      PausedEvent.OutputTuple,
+      PausedEvent.OutputObject
+    >;
+    Paused: TypedContractEvent<
+      PausedEvent.InputTuple,
+      PausedEvent.OutputTuple,
+      PausedEvent.OutputObject
     >;
 
     "PlanPriceUpdated(uint8,uint256)": TypedContractEvent<
@@ -424,7 +537,7 @@ export interface DotlySubscription extends BaseContract {
       SubscriptionActivatedEvent.OutputObject
     >;
 
-    "SubscriptionCancelled(address)": TypedContractEvent<
+    "SubscriptionCancelled(address,uint8,uint256)": TypedContractEvent<
       SubscriptionCancelledEvent.InputTuple,
       SubscriptionCancelledEvent.OutputTuple,
       SubscriptionCancelledEvent.OutputObject
@@ -433,6 +546,17 @@ export interface DotlySubscription extends BaseContract {
       SubscriptionCancelledEvent.InputTuple,
       SubscriptionCancelledEvent.OutputTuple,
       SubscriptionCancelledEvent.OutputObject
+    >;
+
+    "Unpaused(address)": TypedContractEvent<
+      UnpausedEvent.InputTuple,
+      UnpausedEvent.OutputTuple,
+      UnpausedEvent.OutputObject
+    >;
+    Unpaused: TypedContractEvent<
+      UnpausedEvent.InputTuple,
+      UnpausedEvent.OutputTuple,
+      UnpausedEvent.OutputObject
     >;
   };
 }

@@ -24,10 +24,7 @@ export class HealthController {
     status: string
     services: { database: string; redis: string }
   }> {
-    const [dbStatus, redisStatus] = await Promise.all([
-      this.checkDatabase(),
-      this.checkRedis(),
-    ])
+    const [dbStatus, redisStatus] = await Promise.all([this.checkDatabase(), this.checkRedis()])
 
     // F-21: Remove `uptime` and `timestamp` from the public health response.
     // uptime is a useful fingerprinting signal (reveals last restart time and

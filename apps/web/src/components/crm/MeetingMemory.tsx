@@ -7,13 +7,22 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { getAccessToken } from '@/lib/supabase/client'
 import {
-  Plus, MapPin, Calendar, Tag, Trash2, ChevronDown, ChevronUp,
-  Loader2, Save, AlertTriangle,
+  Plus,
+  MapPin,
+  Calendar,
+  Tag,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Save,
+  AlertTriangle,
 } from 'lucide-react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,15 +37,21 @@ type ContextTag =
   | 'Other'
 
 const CONTEXT_TAGS: ContextTag[] = [
-  'Event', 'Conference', 'Online', 'Referral',
-  'Cold outreach', 'Networking', 'Client meeting', 'Other',
+  'Event',
+  'Conference',
+  'Online',
+  'Referral',
+  'Cold outreach',
+  'Networking',
+  'Client meeting',
+  'Other',
 ]
 
 export interface Memory {
   id: string
   contactId: string
   metAt: string
-  date: string       // YYYY-MM-DD
+  date: string // YYYY-MM-DD
   tags: ContextTag[]
   notes: string
   createdAt: string
@@ -44,18 +59,26 @@ export interface Memory {
 
 // ─── Local persistence ────────────────────────────────────────────────────────
 
-function storageKey(contactId: string) { return `dotly_memories_${contactId}` }
+function storageKey(contactId: string) {
+  return `dotly_memories_${contactId}`
+}
 
 function loadLocal(contactId: string): Memory[] {
   if (typeof window === 'undefined') return []
-  try { return JSON.parse(localStorage.getItem(storageKey(contactId)) ?? '[]') as Memory[] }
-  catch { return [] }
+  try {
+    return JSON.parse(localStorage.getItem(storageKey(contactId)) ?? '[]') as Memory[]
+  } catch {
+    return []
+  }
 }
 
 function saveLocal(contactId: string, memories: Memory[]) {
   if (typeof window === 'undefined') return
-  try { localStorage.setItem(storageKey(contactId), JSON.stringify(memories)) }
-  catch { /* QuotaExceededError — silent */ }
+  try {
+    localStorage.setItem(storageKey(contactId), JSON.stringify(memories))
+  } catch {
+    /* QuotaExceededError — silent */
+  }
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -64,7 +87,9 @@ async function apiWithToken(fn: (token: string) => Promise<void>) {
   try {
     const token = await getAccessToken()
     if (token) await fn(token)
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 }
 
 // ─── Confirm delete hook ──────────────────────────────────────────────────────
@@ -87,12 +112,16 @@ function MemoryCard({
 }) {
   const date = memory.date
     ? new Date(memory.date + 'T12:00:00').toLocaleDateString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
       })
     : null
 
   const addedDate = new Date(memory.createdAt).toLocaleDateString(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
   })
 
   return (
@@ -155,9 +184,7 @@ function DeleteConfirmBanner({
   onCancel: () => void
 }) {
   return (
-    <div
-      className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3"
-    >
+    <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
       <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
       <p className="flex-1 text-xs font-semibold text-red-700">Delete this memory?</p>
       <div className="flex gap-2">
@@ -201,9 +228,7 @@ function AddMemoryForm({
   const todayStr = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-${String(todayLocal.getDate()).padStart(2, '0')}`
 
   function toggleTag(tag: ContextTag) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    )
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -212,7 +237,8 @@ function AddMemoryForm({
       setError('Please enter at least a location or a note.')
       return
     }
-    setSaving(true); setError('')
+    setSaving(true)
+    setError('')
 
     const newMemory: Memory = {
       id: crypto.randomUUID(),
@@ -378,8 +404,11 @@ export function MeetingMemory({
         )
         setMemories(sorted)
         saveLocal(contactId, sorted)
-      } catch { /* silent */ }
-      finally { setSyncing(false) }
+      } catch {
+        /* silent */
+      } finally {
+        setSyncing(false)
+      }
     })()
   }, [contactId])
 
@@ -421,10 +450,11 @@ export function MeetingMemory({
             </span>
           )}
           {syncing && <Loader2 className="h-3 w-3 shrink-0 animate-spin text-slate-400" />}
-          {collapsed
-            ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
-            : <ChevronUp   className="h-4 w-4 shrink-0 text-slate-400" />
-          }
+          {collapsed ? (
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+          ) : (
+            <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" />
+          )}
         </button>
 
         {!collapsed && !adding && (

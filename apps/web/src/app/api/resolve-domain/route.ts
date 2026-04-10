@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerApiUrl } from '@/lib/server-api'
 
-const API_URL = getServerApiUrl()
-
 // HIGH-03: Validate the host param at the Next.js layer before forwarding to the
 // API.  The NestJS side also validates (FQDN_REGEX on the route param) but
 // defence-in-depth catches malformed input before any network hop.
@@ -14,6 +12,7 @@ const API_URL = getServerApiUrl()
 const FQDN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i
 
 export async function GET(request: NextRequest) {
+  const apiUrl = getServerApiUrl()
   const host = request.nextUrl.searchParams.get('host')
 
   if (!host) {
@@ -25,10 +24,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `${API_URL}/custom-domains/resolve/${encodeURIComponent(host)}`,
-      { cache: 'no-store' },
-    )
+    const res = await fetch(`${apiUrl}/custom-domains/resolve/${encodeURIComponent(host)}`, {
+      cache: 'no-store',
+    })
 
     if (!res.ok) {
       return NextResponse.json({ error: 'Domain not found' }, { status: 404 })

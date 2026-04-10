@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import { getPublicApiUrl } from '@/lib/public-env'
 import {
   Calendar,
   Clock,
@@ -45,7 +46,7 @@ interface AptType {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 
 function postAnalytics(body: Record<string, unknown>) {
   fetch(`${API_URL}/public/analytics`, {

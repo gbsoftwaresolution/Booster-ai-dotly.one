@@ -499,8 +499,6 @@ export class AnalyticsService {
       }),
     ])
 
-    const truncated = false // No longer truncating — all cards are aggregated
-
     const countByType = new Map(eventCounts.map((r) => [r.type, r._count._all]))
 
     const result = {

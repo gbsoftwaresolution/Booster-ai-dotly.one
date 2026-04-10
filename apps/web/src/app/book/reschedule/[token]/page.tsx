@@ -3,9 +3,10 @@
 import type { JSX } from 'react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { Calendar, Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

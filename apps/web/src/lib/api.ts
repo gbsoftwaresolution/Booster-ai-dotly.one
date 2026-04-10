@@ -1,9 +1,11 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+import { getPublicApiUrl } from './public-env'
+
+const API_URL = getPublicApiUrl()
 
 async function throwApiError(res: Response): Promise<never> {
   let message = `API ${res.status}`
   try {
-    const body = await res.json() as Record<string, unknown>
+    const body = (await res.json()) as Record<string, unknown>
     const msg = body['message']
     if (typeof msg === 'string') {
       message = msg
@@ -29,7 +31,12 @@ export async function apiGet<T>(path: string, token?: string, signal?: AbortSign
   return res.json() as Promise<T>
 }
 
-export async function apiPost<T>(path: string, body: unknown, token?: string, signal?: AbortSignal): Promise<T> {
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: {
@@ -69,7 +76,11 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
   return res.json() as Promise<T>
 }
 
-export async function apiDelete<T = void>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
+export async function apiDelete<T = void>(
+  path: string,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'DELETE',
     headers: token ? { Authorization: `Bearer ${token}` } : {},

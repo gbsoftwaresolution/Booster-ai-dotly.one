@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiPost } from '@/lib/api'
+import { getPublicApiUrl } from '@/lib/public-env'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 
 // ─── Global styles (all keyframes in one place) ───────────────────────────────
 

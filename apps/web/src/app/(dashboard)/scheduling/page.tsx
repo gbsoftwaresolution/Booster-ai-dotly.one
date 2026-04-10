@@ -2,6 +2,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import { getPublicApiUrl } from '@/lib/public-env'
 import {
   Calendar,
   Clock,
@@ -82,7 +83,7 @@ const DAY_LABEL: Record<DayOfWeek, string> = {
   SUN: 'Sunday',
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -551,7 +552,6 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
   )
 }
 
-
 // ── Questions Builder Modal ───────────────────────────────────────────────────
 
 const QUESTION_TYPE_LABELS: Record<BookingQuestionType, string> = {
@@ -570,9 +570,20 @@ interface QuestionsBuilderProps {
   onClose: () => void
 }
 
-function QuestionsBuilder({ appointmentTypeId, initial, onSave, onClose }: QuestionsBuilderProps): JSX.Element {
+function QuestionsBuilder({
+  appointmentTypeId,
+  initial,
+  onSave,
+  onClose,
+}: QuestionsBuilderProps): JSX.Element {
   const [questions, setQuestions] = useState<Omit<BookingQuestion, 'id'>[]>(() =>
-    initial.map((q) => ({ label: q.label, type: q.type, options: q.options, required: q.required, position: q.position })),
+    initial.map((q) => ({
+      label: q.label,
+      type: q.type,
+      options: q.options,
+      required: q.required,
+      position: q.position,
+    })),
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -682,11 +693,18 @@ function QuestionsBuilder({ appointmentTypeId, initial, onSave, onClose }: Quest
               <div className="flex items-center gap-3 pl-7">
                 <select
                   value={q.type}
-                  onChange={(e) => updateQuestion(idx, { type: e.target.value as BookingQuestionType, options: [] })}
+                  onChange={(e) =>
+                    updateQuestion(idx, {
+                      type: e.target.value as BookingQuestionType,
+                      options: [],
+                    })
+                  }
                   className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none"
                 >
                   {(Object.keys(QUESTION_TYPE_LABELS) as BookingQuestionType[]).map((t) => (
-                    <option key={t} value={t}>{QUESTION_TYPE_LABELS[t]}</option>
+                    <option key={t} value={t}>
+                      {QUESTION_TYPE_LABELS[t]}
+                    </option>
                   ))}
                 </select>
                 <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
@@ -734,9 +752,7 @@ function QuestionsBuilder({ appointmentTypeId, initial, onSave, onClose }: Quest
           >
             <Plus className="h-4 w-4" /> Add question
           </button>
-          {error && (
-            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
-          )}
+          {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-100 p-5 flex-shrink-0">
           <button
@@ -775,7 +791,10 @@ export default function SchedulingPage(): JSX.Element {
   const [questionsEditorFor, setQuestionsEditorFor] = useState<AppointmentType | null>(null)
 
   // Google Calendar
-  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; googleEmail?: string } | null>(null)
+  const [googleStatus, setGoogleStatus] = useState<{
+    connected: boolean
+    googleEmail?: string
+  } | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
 
   // Tab: 'types' | 'bookings'
@@ -803,13 +822,17 @@ export default function SchedulingPage(): JSX.Element {
           token ?? undefined,
         ),
         apiGet<{ id: string; handle: string }[]>('/cards', token ?? undefined),
-        apiGet<{ connected: boolean; googleEmail?: string }>('/scheduling/google/status', token ?? undefined).catch(() => ({ connected: false })),
+        apiGet<{ connected: boolean; googleEmail?: string }>(
+          '/scheduling/google/status',
+          token ?? undefined,
+        ).catch(() => ({ connected: false })),
       ])
       setAptTypes(types)
       setBookings(bkgs)
       setAllCards(cardsResp)
       setGoogleStatus(gStatus)
-      if (cardsResp.length > 0 && cardsResp[0]) setCardHandle((prev) => prev ?? (cardsResp[0]?.handle ?? null))
+      if (cardsResp.length > 0 && cardsResp[0])
+        setCardHandle((prev) => prev ?? cardsResp[0]?.handle ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -834,7 +857,7 @@ export default function SchedulingPage(): JSX.Element {
       showToast('Failed to connect Google Calendar', false)
       window.history.replaceState({}, '', window.location.pathname)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleCreateOrUpdate(data: {
@@ -1019,7 +1042,7 @@ export default function SchedulingPage(): JSX.Element {
               </button>
             ) : (
               <a
-                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/scheduling/google/connect`}
+                href={`${API_URL}/scheduling/google/connect`}
                 className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
               >
                 <Settings2 className="inline h-3.5 w-3.5 mr-1" />

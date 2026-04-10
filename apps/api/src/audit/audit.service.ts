@@ -28,8 +28,8 @@ export interface AuditLogParams {
 function sanitizeLogField(value: string | undefined, maxLen = 512): string | undefined {
   if (value === undefined) return undefined
   return value
-    .replace(/[\r\n\x1b]/g, '')   // strip CR, LF, ESC
-    .slice(0, maxLen)              // truncate to safe length
+    .replace(/[\r\n\x1b]/g, '') // strip CR, LF, ESC
+    .slice(0, maxLen) // truncate to safe length
 }
 
 @Injectable()
@@ -45,7 +45,7 @@ export class AuditService {
         resourceId: params.resourceId,
         metadata: (params.metadata ?? {}) as Prisma.InputJsonValue,
         // LOW-02: sanitize before writing to DB / log forwarder
-        ipAddress: sanitizeLogField(params.ipAddress, 45),   // max IPv6 length = 45 chars
+        ipAddress: sanitizeLogField(params.ipAddress, 45), // max IPv6 length = 45 chars
         userAgent: sanitizeLogField(params.userAgent, 512),
       },
     })

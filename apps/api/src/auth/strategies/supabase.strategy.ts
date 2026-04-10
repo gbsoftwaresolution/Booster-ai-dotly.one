@@ -28,7 +28,10 @@ export interface SupabaseJwtPayload {
  * an attacker who knows the EC public key can treat it as an HS256 secret and
  * forge a signature that the library will accept under the second algorithm.
  */
-function resolveJwtKey(raw: string): { secretOrKey: string | Buffer; algorithm: 'ES256' | 'HS256' } {
+function resolveJwtKey(raw: string): {
+  secretOrKey: string | Buffer
+  algorithm: 'ES256' | 'HS256'
+} {
   try {
     const jwk = JSON.parse(raw) as Record<string, unknown>
     if (jwk['kty'] === 'EC') {

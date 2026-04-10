@@ -41,10 +41,7 @@ export class BoosterAiPartnerGuard implements CanActivate {
     const expectedBuf = Buffer.from(this.expectedKey, 'utf8')
     const providedBuf = Buffer.from(provided, 'utf8')
 
-    if (
-      expectedBuf.length !== providedBuf.length ||
-      !timingSafeEqual(expectedBuf, providedBuf)
-    ) {
+    if (expectedBuf.length !== providedBuf.length || !timingSafeEqual(expectedBuf, providedBuf)) {
       throw new UnauthorizedException('Invalid or missing x-boosterai-api-key')
     }
 

@@ -1897,7 +1897,7 @@ export default function ContactDetailScreen() {
             </View>
           ) : (
             <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
-              No enrichment data yet. Tap "Enrich with AI" to analyse this contact.
+              No enrichment data yet. Tap &quot;Enrich with AI&quot; to analyse this contact.
             </Text>
           )}
         </View>

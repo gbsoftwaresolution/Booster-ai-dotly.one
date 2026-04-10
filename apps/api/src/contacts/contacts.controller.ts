@@ -236,14 +236,6 @@ class UpdateStageDto {
   stage!: string
 }
 
-class AddNoteDto {
-  // MED-04: Cap note content to prevent multi-megabyte notes stored via the
-  // timeline endpoint.
-  @IsString()
-  @MaxLength(5000)
-  content!: string
-}
-
 class PaginationQuery {
   @IsOptional()
   @Type(() => Number)

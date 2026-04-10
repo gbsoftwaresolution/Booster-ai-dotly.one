@@ -26,9 +26,13 @@ interface Card {
 //   form with an arbitrarily long string.
 function sanitizeParam(value: string | undefined, maxLength: number): string {
   if (!value) return ''
-  return value
-    .replace(/[\x00-\x1F\x7F]/g, '') // strip control characters
-    .slice(0, maxLength)
+  const withoutControls = Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0)
+      return (code >= 0x20 && code !== 0x7f) || code > 0x7f
+    })
+    .join('')
+  return withoutControls.slice(0, maxLength)
 }
 
 export default function ScanResultScreen() {
@@ -156,9 +160,7 @@ export default function ScanResultScreen() {
           {saving ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
-              Save Contact
-            </Text>
+            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>Save Contact</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

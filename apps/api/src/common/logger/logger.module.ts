@@ -26,9 +26,19 @@ import * as winston from 'winston'
  * retains full log output for debugging.
  */
 const PII_FIELDS = new Set([
-  'email', 'name', 'supabaseId', 'pushToken', 'walletAddress',
-  'password', 'token', 'accessToken', 'refreshToken', 'apiKey',
-  'authorization', 'cookie', 'set-cookie',
+  'email',
+  'name',
+  'supabaseId',
+  'pushToken',
+  'walletAddress',
+  'password',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'apiKey',
+  'authorization',
+  'cookie',
+  'set-cookie',
 ])
 
 function redactPii(obj: unknown, depth = 0): unknown {
@@ -57,10 +67,7 @@ const piiRedactFormat = winston.format((info) => {
         new winston.transports.Console({
           format:
             process.env.NODE_ENV === 'production'
-              ? winston.format.combine(
-                  piiRedactFormat(),
-                  winston.format.json(),
-                )
+              ? winston.format.combine(piiRedactFormat(), winston.format.json())
               : winston.format.combine(
                   winston.format.colorize(),
                   winston.format.timestamp(),

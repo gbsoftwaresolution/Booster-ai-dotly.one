@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { getAccessToken } from '@/lib/supabase/client'
 
 interface QrSectionProps {
@@ -126,7 +127,7 @@ function ColorPicker({
 }
 
 export function QrSection({ cardId, apiUrl = '' }: QrSectionProps) {
-  const baseUrl = apiUrl || (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001')
+  const baseUrl = apiUrl || getPublicApiUrl()
   const [fgColor, setFgColor] = useState('#000000')
   const [bgColor, setBgColor] = useState('#ffffff')
   const [size, setSize] = useState(400)

@@ -5,13 +5,13 @@ import { getServerApiUrl } from '@/lib/server-api'
 // Use Node.js runtime — Edge runtime has restrictions on fetch options and
 // module-scope env access that cause silent failures with ImageResponse.
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 // Cache the rendered image for 5 minutes at the CDN / reverse-proxy level.
 // WhatsApp and other crawlers respect Cache-Control and will re-fetch after
 // this window, picking up profile updates.
 export const revalidate = 300
 
-const API_URL = getServerApiUrl()
 const W = 1200
 const H = 630
 
@@ -59,6 +59,7 @@ async function fetchAvatarAsDataUri(url: string): Promise<string | null> {
 }
 
 export async function GET(req: NextRequest) {
+  const apiUrl = getServerApiUrl()
   const { searchParams } = req.nextUrl
   const handle = searchParams.get('handle')
 
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
   // Fetch card data server-side
   let card: RawCard | null = null
   try {
-    const res = await fetch(`${API_URL}/public/cards/${handle}`, {
+    const res = await fetch(`${apiUrl}/public/cards/${handle}`, {
       next: { revalidate: 300 },
     })
     if (res.ok) card = (await res.json()) as RawCard

@@ -3,19 +3,39 @@
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost } from '@/lib/api'
 import jsQR from 'jsqr'
 import {
-  Pencil, ExternalLink, ChevronRight, Wifi, WifiOff, Loader2, Home, Camera, X,
-  UserPlus, Check, ArrowLeft, Building2, Phone, Mail, Globe, MessageSquare,
-  Copy, Share2, Zap, ZapOff, RotateCcw,
+  Pencil,
+  ExternalLink,
+  ChevronRight,
+  Wifi,
+  WifiOff,
+  Loader2,
+  Home,
+  Camera,
+  X,
+  UserPlus,
+  Check,
+  ArrowLeft,
+  Building2,
+  Phone,
+  Mail,
+  Globe,
+  MessageSquare,
+  Copy,
+  Share2,
+  Zap,
+  ZapOff,
+  RotateCcw,
 } from 'lucide-react'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
-const API_URL  = process.env.NEXT_PUBLIC_API_URL  ?? 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,43 +78,58 @@ interface PublicCardData {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function initials(name: string): string {
-  return name.split(' ').map((p) => p[0] ?? '').join('').toUpperCase().slice(0, 2)
+  return name
+    .split(' ')
+    .map((p) => p[0] ?? '')
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 }
 
 function parseDotlyHandle(url: string): string | null {
   try {
-    const parsed  = new URL(url)
-    const host     = parsed.hostname.replace(/^www\./, '')
+    const parsed = new URL(url)
+    const host = parsed.hostname.replace(/^www\./, '')
     const siteHost = new URL(SITE_URL).hostname.replace(/^www\./, '')
     if (host !== siteHost) return null
     const parts = parsed.pathname.split('/').filter(Boolean)
     if (parts.length === 1 && parts[0]) return parts[0]
     return null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 function vibrate(pattern: number | number[]) {
-  try { navigator.vibrate?.(pattern) } catch { /* ignore */ }
+  try {
+    navigator.vibrate?.(pattern)
+  } catch {
+    /* ignore */
+  }
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
-  try { await navigator.clipboard.writeText(text); return true }
-  catch { return false }
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // Social platform → brand colour
 const SOCIAL_COLORS: Record<string, string> = {
-  linkedin:  '#0077b5',
-  twitter:   '#1da1f2',
-  x:         '#000000',
+  linkedin: '#0077b5',
+  twitter: '#1da1f2',
+  x: '#000000',
   instagram: '#e1306c',
-  github:    '#333333',
-  youtube:   '#ff0000',
-  facebook:  '#1877f2',
-  tiktok:    '#010101',
-  discord:   '#5865f2',
-  telegram:  '#26a5e4',
-  whatsapp:  '#25d366',
+  github: '#333333',
+  youtube: '#ff0000',
+  facebook: '#1877f2',
+  tiktok: '#010101',
+  discord: '#5865f2',
+  telegram: '#26a5e4',
+  whatsapp: '#25d366',
 }
 function socialColor(platform: string): string {
   return SOCIAL_COLORS[platform.toLowerCase()] ?? '#55a7ff'
@@ -157,14 +192,14 @@ function ScannedCardSheet({
   onClose: () => void
   onDashboard: () => void
 }): JSX.Element {
-  const [card, setCard]           = useState<PublicCardData | null>(null)
-  const [loading, setLoading]     = useState(true)
+  const [card, setCard] = useState<PublicCardData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState('')
-  const [saving, setSaving]       = useState(false)
-  const [saved, setSaved]         = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [copied, setCopied]       = useState(false)
-  const [msgOpen, setMsgOpen]     = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [msgOpen, setMsgOpen] = useState(false)
 
   useEffect(() => {
     apiGet<PublicCardData>(`/public/cards/${handle}`)
@@ -175,23 +210,33 @@ function ScannedCardSheet({
 
   async function handleSave() {
     if (!card) return
-    setSaving(true); setSaveError('')
+    setSaving(true)
+    setSaveError('')
     try {
       const token = await getAccessToken()
-      if (!token) { setSaveError('Sign in to save contacts.'); return }
-      await apiPost('/contacts', {
-        name:         card.fields.name    ?? handle,
-        email:        card.fields.email   ?? '',
-        phone:        card.fields.phone   ?? '',
-        company:      card.fields.company ?? '',
-        title:        card.fields.title   ?? '',
-        sourceHandle: handle,
-      }, token)
+      if (!token) {
+        setSaveError('Sign in to save contacts.')
+        return
+      }
+      await apiPost(
+        '/contacts',
+        {
+          name: card.fields.name ?? handle,
+          email: card.fields.email ?? '',
+          phone: card.fields.phone ?? '',
+          company: card.fields.company ?? '',
+          title: card.fields.title ?? '',
+          sourceHandle: handle,
+        },
+        token,
+      )
       vibrate([30, 40, 80])
       setSaved(true)
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Failed to save.')
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleShare() {
@@ -201,14 +246,19 @@ function ScannedCardSheet({
       try {
         await navigator.share({ title: `${name}'s card`, url })
         return
-      } catch { /* user cancelled or not supported */ }
+      } catch {
+        /* user cancelled or not supported */
+      }
     }
     const ok = await copyToClipboard(url)
-    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000) }
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   const name = card?.fields.name ?? handle
-  const ini  = initials(name)
+  const ini = initials(name)
   const cardUrl = `${SITE_URL}/${handle}`
 
   return (
@@ -244,7 +294,6 @@ function ScannedCardSheet({
         className="flex-1 overflow-y-auto px-5 pb-10"
         style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}
       >
-
         {/* ── Loading skeleton ── */}
         {loading && (
           <div className="flex flex-col gap-4 pt-2 slide-up">
@@ -269,19 +318,29 @@ function ScannedCardSheet({
 
         {/* ── Error ── */}
         {fetchError && !loading && (
-          <div className="mt-10 flex flex-col items-center gap-4 rounded-3xl p-8 text-center slide-up"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <div className="flex h-14 w-14 items-center justify-center rounded-full"
-              style={{ background: 'rgba(239,68,68,0.12)' }}>
+          <div
+            className="mt-10 flex flex-col items-center gap-4 rounded-3xl p-8 text-center slide-up"
+            style={{ background: 'rgba(255,255,255,0.06)' }}
+          >
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-full"
+              style={{ background: 'rgba(239,68,68,0.12)' }}
+            >
               <X className="h-7 w-7 text-red-400" />
             </div>
             <div>
               <p className="font-semibold text-white">Card not found</p>
-              <p className="mt-1 text-sm" style={{ color: '#a5afc3' }}>{fetchError}</p>
+              <p className="mt-1 text-sm" style={{ color: '#a5afc3' }}>
+                {fetchError}
+              </p>
             </div>
-            <a href={cardUrl} target="_blank" rel="noopener noreferrer"
+            <a
+              href={cardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-2xl px-5 py-3 text-sm font-semibold text-white"
-              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              style={{ background: 'rgba(255,255,255,0.1)' }}
+            >
               Open in browser <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -290,27 +349,39 @@ function ScannedCardSheet({
         {/* ── Card loaded ── */}
         {card && !loading && (
           <div className="flex flex-col gap-4 slide-up">
-
             {/* ── Profile hero ── */}
-            <div className="rounded-3xl p-5" style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}>
-
+            <div
+              className="rounded-3xl p-5"
+              style={{
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
               {/* Avatar + name row */}
               <div className="flex items-start gap-4">
                 {card.fields.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={card.fields.avatarUrl} alt={name}
+                  <img
+                    src={card.fields.avatarUrl}
+                    alt={name}
                     className="h-[68px] w-[68px] shrink-0 rounded-[18px] object-cover"
-                    style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }} />
+                    style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
+                  />
                 ) : (
                   <div
                     className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-[18px] text-xl font-black text-white"
-                    style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)', boxShadow: '0 4px 16px rgba(85,167,255,0.25)' }}
+                    style={{
+                      background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
+                      boxShadow: '0 4px 16px rgba(85,167,255,0.25)',
+                    }}
                   >
                     {ini}
                   </div>
                 )}
                 <div className="min-w-0 flex-1 pt-1">
-                  <h2 className="text-[22px] font-black leading-tight tracking-tight text-white">{name}</h2>
+                  <h2 className="text-[22px] font-black leading-tight tracking-tight text-white">
+                    {name}
+                  </h2>
                   {card.fields.title && (
                     <p className="mt-0.5 text-sm font-medium" style={{ color: '#a5b0c8' }}>
                       {card.fields.title}
@@ -340,25 +411,42 @@ function ScannedCardSheet({
               {/* Contact action pills */}
               <div className="flex flex-wrap gap-2">
                 {card.fields.email && (
-                  <a href={`mailto:${card.fields.email}`}
+                  <a
+                    href={`mailto:${card.fields.email}`}
                     className="flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold text-white"
-                    style={{ background: 'rgba(85,167,255,0.12)', border: '1px solid rgba(85,167,255,0.2)' }}>
+                    style={{
+                      background: 'rgba(85,167,255,0.12)',
+                      border: '1px solid rgba(85,167,255,0.2)',
+                    }}
+                  >
                     <Mail className="h-3.5 w-3.5" style={{ color: '#55a7ff' }} />
                     Email
                   </a>
                 )}
                 {card.fields.phone && (
-                  <a href={`tel:${card.fields.phone}`}
+                  <a
+                    href={`tel:${card.fields.phone}`}
                     className="flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold text-white"
-                    style={{ background: 'rgba(85,167,255,0.12)', border: '1px solid rgba(85,167,255,0.2)' }}>
+                    style={{
+                      background: 'rgba(85,167,255,0.12)',
+                      border: '1px solid rgba(85,167,255,0.2)',
+                    }}
+                  >
                     <Phone className="h-3.5 w-3.5" style={{ color: '#55a7ff' }} />
                     Call
                   </a>
                 )}
                 {card.fields.website && (
-                  <a href={card.fields.website} target="_blank" rel="noopener noreferrer"
+                  <a
+                    href={card.fields.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold text-white"
-                    style={{ background: 'rgba(85,167,255,0.12)', border: '1px solid rgba(85,167,255,0.2)' }}>
+                    style={{
+                      background: 'rgba(85,167,255,0.12)',
+                      border: '1px solid rgba(85,167,255,0.2)',
+                    }}
+                  >
                     <Globe className="h-3.5 w-3.5" style={{ color: '#55a7ff' }} />
                     Website
                   </a>
@@ -369,9 +457,18 @@ function ScannedCardSheet({
               {card.socialLinks && card.socialLinks.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {card.socialLinks.map((s, i) => (
-                    <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
+                    <a
+                      key={i}
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold text-white capitalize"
-                      style={{ background: `${socialColor(s.platform)}1a`, border: `1px solid ${socialColor(s.platform)}33`, color: socialColor(s.platform) }}>
+                      style={{
+                        background: `${socialColor(s.platform)}1a`,
+                        border: `1px solid ${socialColor(s.platform)}33`,
+                        color: socialColor(s.platform),
+                      }}
+                    >
                       {s.label ?? s.platform}
                     </a>
                   ))}
@@ -380,12 +477,22 @@ function ScannedCardSheet({
             </div>
 
             {/* ── Primary CTA: Save contact ── */}
-            <div className="rounded-3xl p-5"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div
+              className="rounded-3xl p-5"
+              style={{
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
               {saved ? (
                 <div className="flex flex-col items-center gap-3 py-2">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full"
-                    style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                  <div
+                    className="flex h-14 w-14 items-center justify-center rounded-full"
+                    style={{
+                      background: 'rgba(34,197,94,0.12)',
+                      border: '1px solid rgba(34,197,94,0.2)',
+                    }}
+                  >
                     <Check className="h-7 w-7 text-green-400" />
                   </div>
                   <p className="text-base font-bold text-white">Contact saved!</p>
@@ -398,7 +505,11 @@ function ScannedCardSheet({
                     className="mt-1 flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold text-white"
                     style={{ background: 'rgba(255,255,255,0.08)' }}
                   >
-                    {copied ? <Check className="h-4 w-4 text-green-400" /> : <Share2 className="h-4 w-4" />}
+                    {copied ? (
+                      <Check className="h-4 w-4 text-green-400" />
+                    ) : (
+                      <Share2 className="h-4 w-4" />
+                    )}
                     {copied ? 'Link copied!' : `Share ${name}'s card`}
                   </button>
                 </div>
@@ -414,15 +525,20 @@ function ScannedCardSheet({
                       letterSpacing: '-0.2px',
                     }}
                   >
-                    {saving
-                      ? <Loader2 className="h-5 w-5 animate-spin" />
-                      : <UserPlus className="h-5 w-5" />}
+                    {saving ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <UserPlus className="h-5 w-5" />
+                    )}
                     {saving ? 'Saving…' : `Save ${name}`}
                   </button>
                   {saveError && (
                     <p className="mt-2 text-center text-xs text-red-400">{saveError}</p>
                   )}
-                  <p className="mt-2.5 text-center text-[11px] font-medium" style={{ color: '#6b7a96' }}>
+                  <p
+                    className="mt-2.5 text-center text-[11px] font-medium"
+                    style={{ color: '#6b7a96' }}
+                  >
                     They&apos;ll be notified and can add you back
                   </p>
                 </>
@@ -434,15 +550,22 @@ function ScannedCardSheet({
               <button
                 onClick={() => setMsgOpen(true)}
                 className="flex w-full items-center gap-3.5 rounded-3xl px-5 py-4 text-left"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                }}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                  style={{ background: 'rgba(85,167,255,0.12)' }}>
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  style={{ background: 'rgba(85,167,255,0.12)' }}
+                >
                   <MessageSquare className="h-5 w-5" style={{ color: '#55a7ff' }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white">Leave a message</p>
-                  <p className="text-xs" style={{ color: '#6b7a96' }}>Send {name} a private note</p>
+                  <p className="text-xs" style={{ color: '#6b7a96' }}>
+                    Send {name} a private note
+                  </p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0" style={{ color: '#6b7a96' }} />
               </button>
@@ -452,14 +575,18 @@ function ScannedCardSheet({
 
             {/* ── View full card ── */}
             <a
-              href={cardUrl} target="_blank" rel="noopener noreferrer"
+              href={cardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex w-full items-center justify-center gap-2 rounded-3xl py-3.5 text-sm font-semibold text-white"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
             >
               <ExternalLink className="h-4 w-4" style={{ color: '#6b7a96' }} />
               <span style={{ color: '#a5b0c8' }}>View full card</span>
             </a>
-
           </div>
         )}
       </div>
@@ -470,83 +597,143 @@ function ScannedCardSheet({
 // ─── LeaveMessage ─────────────────────────────────────────────────────────────
 
 function LeaveMessage({
-  handle, name, onDismiss,
-}: { handle: string; name: string; onDismiss: () => void }): JSX.Element {
-  const [senderName, setSenderName]   = useState('')
+  handle,
+  name,
+  onDismiss,
+}: {
+  handle: string
+  name: string
+  onDismiss: () => void
+}): JSX.Element {
+  const [senderName, setSenderName] = useState('')
   const [senderEmail, setSenderEmail] = useState('')
-  const [message, setMessage]         = useState('')
-  const [sending, setSending]         = useState(false)
-  const [sent, setSent]               = useState(false)
-  const [error, setError]             = useState('')
-  const [honeypot, setHoneypot]       = useState('')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+  const [honeypot, setHoneypot] = useState('')
   const openedAt = useRef(Date.now())
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
     if (honeypot) return
     if (Date.now() - openedAt.current < 1500) return
-    if (!senderName.trim() || !message.trim()) { setError('Name and message are required.'); return }
-    setSending(true); setError('')
+    if (!senderName.trim() || !message.trim()) {
+      setError('Name and message are required.')
+      return
+    }
+    setSending(true)
+    setError('')
     try {
       const res = await fetch(`${API_URL}/public/cards/${handle}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderName: senderName.trim(), senderEmail: senderEmail.trim(), message: message.trim() }),
+        body: JSON.stringify({
+          senderName: senderName.trim(),
+          senderEmail: senderEmail.trim(),
+          message: message.trim(),
+        }),
       })
       if (!res.ok) {
         const b = (await res.json().catch(() => ({}))) as { message?: string }
-        setError(res.status === 429 ? 'Too many messages. Try again later.' : (b.message ?? 'Something went wrong.'))
+        setError(
+          res.status === 429
+            ? 'Too many messages. Try again later.'
+            : (b.message ?? 'Something went wrong.'),
+        )
         return
       }
       setSent(true)
-    } catch { setError('Network error. Try again.') }
-    finally { setSending(false) }
+    } catch {
+      setError('Network error. Try again.')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
-    <div className="rounded-3xl p-5 slide-up"
-      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div
+      className="rounded-3xl p-5 slide-up"
+      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-bold text-white">Leave a message</h3>
-        <button onClick={onDismiss}
+        <button
+          onClick={onDismiss}
           className="flex h-8 w-8 items-center justify-center rounded-full"
-          style={{ background: 'rgba(255,255,255,0.08)' }}>
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+        >
           <X className="h-4 w-4 text-white" />
         </button>
       </div>
 
       {sent ? (
         <div className="flex flex-col items-center gap-3 py-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full"
-            style={{ background: 'rgba(34,197,94,0.12)' }}>
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-full"
+            style={{ background: 'rgba(34,197,94,0.12)' }}
+          >
             <Check className="h-6 w-6 text-green-400" />
           </div>
           <p className="text-sm font-bold text-white">Message sent!</p>
-          <p className="text-center text-xs" style={{ color: '#a5b0c8' }}>{name} will receive your message.</p>
+          <p className="text-center text-xs" style={{ color: '#a5b0c8' }}>
+            {name} will receive your message.
+          </p>
         </div>
       ) : (
         <form onSubmit={(e) => void handleSend(e)} className="flex flex-col gap-3">
           {/* Honeypot */}
-          <input type="text" value={honeypot} onChange={(e) => setHoneypot(e.target.value)}
-            tabIndex={-1} aria-hidden="true"
-            style={{ position: 'absolute', left: -9999, width: 1, height: 1 }} />
+          <input
+            type="text"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            tabIndex={-1}
+            aria-hidden="true"
+            style={{ position: 'absolute', left: -9999, width: 1, height: 1 }}
+          />
 
-          <input type="text" placeholder="Your name" value={senderName}
-            onChange={(e) => setSenderName(e.target.value)} required
+          <input
+            type="text"
+            placeholder="Your name"
+            value={senderName}
+            onChange={(e) => setSenderName(e.target.value)}
+            required
             className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }} />
-          <input type="email" placeholder="Your email (optional)" value={senderEmail}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }}
+          />
+          <input
+            type="email"
+            placeholder="Your email (optional)"
+            value={senderEmail}
             onChange={(e) => setSenderEmail(e.target.value)}
             className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }} />
-          <textarea placeholder={`Your message to ${name}…`} value={message}
-            onChange={(e) => setMessage(e.target.value)} required rows={3}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }}
+          />
+          <textarea
+            placeholder={`Your message to ${name}…`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            required
+            rows={3}
             className="w-full resize-none rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }} />
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }}
+          />
           {error && <p className="text-xs text-red-400">{error}</p>}
-          <button type="submit" disabled={sending}
+          <button
+            type="submit"
+            disabled={sending}
             className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}>
+            style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+          >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Message'}
           </button>
         </form>
@@ -558,17 +745,17 @@ function LeaveMessage({
 // ─── QR Scanner ───────────────────────────────────────────────────────────────
 
 function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
-  const videoRef    = useRef<HTMLVideoElement>(null)
-  const canvasRef   = useRef<HTMLCanvasElement>(null)
-  const streamRef   = useRef<MediaStream | null>(null)
-  const rafRef      = useRef<number | null>(null)
-  const torchTrack  = useRef<MediaStreamTrack | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const torchTrack = useRef<MediaStreamTrack | null>(null)
 
-  const [error, setError]               = useState('')
-  const [detected, setDetected]         = useState('')
+  const [error, setError] = useState('')
+  const [detected, setDetected] = useState('')
   const [scannedHandle, setScannedHandle] = useState<string | null>(null)
   const [flashVisible, setFlashVisible] = useState(false)
-  const [torchOn, setTorchOn]           = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
   const [torchSupported, setTorchSupported] = useState(false)
 
   useEffect(() => {
@@ -577,9 +764,16 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
     async function start() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         })
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
         streamRef.current = stream
 
         // Check torch capability
@@ -595,7 +789,9 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
         video.srcObject = stream
         video.setAttribute('playsinline', 'true')
         video.muted = true
-        await new Promise<void>((resolve) => { video.onloadedmetadata = () => resolve() })
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = () => resolve()
+        })
         await video.play()
         if (!cancelled) rafRef.current = requestAnimationFrame(tick)
       } catch (e) {
@@ -612,18 +808,31 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
 
     function tick() {
       if (cancelled) return
-      const video  = videoRef.current
+      const video = videoRef.current
       const canvas = canvasRef.current
-      if (!video || !canvas) { rafRef.current = requestAnimationFrame(tick); return }
-      const w = video.videoWidth; const h = video.videoHeight
-      if (w === 0 || h === 0) { rafRef.current = requestAnimationFrame(tick); return }
+      if (!video || !canvas) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+      const w = video.videoWidth
+      const h = video.videoHeight
+      if (w === 0 || h === 0) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
 
-      canvas.width = w; canvas.height = h
+      canvas.width = w
+      canvas.height = h
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      if (!ctx) { rafRef.current = requestAnimationFrame(tick); return }
+      if (!ctx) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
       ctx.drawImage(video, 0, 0, w, h)
 
-      const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'attemptBoth' })
+      const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, {
+        inversionAttempts: 'attemptBoth',
+      })
       if (code?.data && !cancelled) {
         setDetected(code.data)
         stopStream()
@@ -633,8 +842,11 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
     }
 
     void start()
-    return () => { cancelled = true; stopStream() }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true
+      stopStream()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function stopStream() {
@@ -651,11 +863,14 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
     try {
       await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })
       setTorchOn(next)
-    } catch { /* device doesn't support it */ }
+    } catch {
+      /* device doesn't support it */
+    }
   }
 
   function scanAgain() {
-    setDetected(''); setScannedHandle(null)
+    setDetected('')
+    setScannedHandle(null)
     // Re-mount scanner (remount by closing + reopening handled by parent)
     onClose()
   }
@@ -674,7 +889,11 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
     return (
       <ScannedCardSheet
         handle={scannedHandle}
-        onClose={() => { setScannedHandle(null); setDetected(''); onClose() }}
+        onClose={() => {
+          setScannedHandle(null)
+          setDetected('')
+          onClose()
+        }}
         onDashboard={() => onClose()}
       />
     )
@@ -686,8 +905,13 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
 
       {/* Detect flash overlay */}
       {flashVisible && (
-        <div className="pointer-events-none fixed inset-0 z-[110]"
-          style={{ background: 'rgba(85,167,255,0.25)', animation: 'detect-flash 0.4s ease forwards' }} />
+        <div
+          className="pointer-events-none fixed inset-0 z-[110]"
+          style={{
+            background: 'rgba(85,167,255,0.25)',
+            animation: 'detect-flash 0.4s ease forwards',
+          }}
+        />
       )}
 
       {/* Header */}
@@ -707,13 +931,18 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
               style={{ background: torchOn ? 'rgba(255,220,50,0.2)' : 'rgba(255,255,255,0.1)' }}
               aria-label={torchOn ? 'Turn off torch' : 'Turn on torch'}
             >
-              {torchOn
-                ? <Zap className="h-5 w-5" style={{ color: '#ffd632' }} />
-                : <ZapOff className="h-5 w-5 text-white" />}
+              {torchOn ? (
+                <Zap className="h-5 w-5" style={{ color: '#ffd632' }} />
+              ) : (
+                <ZapOff className="h-5 w-5 text-white" />
+              )}
             </button>
           )}
           <button
-            onClick={() => { stopStream(); onClose() }}
+            onClick={() => {
+              stopStream()
+              onClose()
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-full"
             style={{ background: 'rgba(255,255,255,0.1)' }}
             aria-label="Close scanner"
@@ -729,7 +958,8 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
 
         {/* Dimming vignette */}
         {!detected && !error && (
-          <div className="pointer-events-none absolute inset-0"
+          <div
+            className="pointer-events-none absolute inset-0"
             style={{
               background: `
                 radial-gradient(ellipse 70% 70% at 50% 50%,
@@ -751,7 +981,8 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
                 'bottom-0 right-0 rotate-180',
                 'bottom-0 left-0 -rotate-90',
               ].map((pos, i) => (
-                <span key={i}
+                <span
+                  key={i}
                   className={`absolute h-9 w-9 ${pos}`}
                   style={{
                     borderTop: '3px solid #55a7ff',
@@ -772,8 +1003,10 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
               />
             </div>
 
-            <p className="absolute text-xs font-medium"
-              style={{ color: 'rgba(255,255,255,0.5)', bottom: 'calc(50% - 160px)' }}>
+            <p
+              className="absolute text-xs font-medium"
+              style={{ color: 'rgba(255,255,255,0.5)', bottom: 'calc(50% - 160px)' }}
+            >
               Point at a Dotly QR code
             </p>
           </div>
@@ -782,14 +1015,21 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
         {/* Error state */}
         {error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full"
-              style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ background: 'rgba(255,255,255,0.08)' }}
+            >
               <Camera className="h-7 w-7 text-white/60" />
             </div>
             <p className="text-sm font-semibold text-white">{error}</p>
-            <button onClick={() => { stopStream(); onClose() }}
+            <button
+              onClick={() => {
+                stopStream()
+                onClose()
+              }}
               className="rounded-2xl px-6 py-3 text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}>
+              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+            >
               Go Back
             </button>
           </div>
@@ -806,7 +1046,10 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
             paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
           }}
         >
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#55a7ff' }}>
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.12em]"
+            style={{ color: '#55a7ff' }}
+          >
             QR Code Detected
           </p>
           <p className="truncate text-sm font-medium text-white">{detected}</p>
@@ -814,14 +1057,17 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
             <button
               onClick={scanAgain}
               className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white"
-              style={{ background: 'rgba(255,255,255,0.08)' }}>
+              style={{ background: 'rgba(255,255,255,0.08)' }}
+            >
               <RotateCcw className="h-4 w-4" /> Scan Again
             </button>
             <a
               href={detected.startsWith('http') ? detected : `https://${detected}`}
-              target="_blank" rel="noopener noreferrer"
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}>
+              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+            >
               Open <ExternalLink className="h-4 w-4" />
             </a>
           </div>
@@ -834,39 +1080,51 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
 // ─── QR Panel ────────────────────────────────────────────────────────────────
 
 function QrPanel({ card }: { card: CardSummary }): JSX.Element {
-  const name      = (card.fields['name']  as string | undefined) ?? card.handle
-  const jobTitle  = (card.fields['title'] as string | undefined) ?? ''
+  const name = (card.fields['name'] as string | undefined) ?? card.handle
+  const jobTitle = (card.fields['title'] as string | undefined) ?? ''
   const publicUrl = `${SITE_URL}/${card.handle}`
 
-  const [qr, setQr]               = useState<QrResult | null>(null)
+  const [qr, setQr] = useState<QrResult | null>(null)
   const [loadingQr, setLoadingQr] = useState(false)
-  const [qrError, setQrError]     = useState('')
+  const [qrError, setQrError] = useState('')
   const [imgLoaded, setImgLoaded] = useState(false)
-  const [copied, setCopied]       = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const [nfcSupported, setNfcSupported] = useState(false)
-  const [nfcEnabled, setNfcEnabled]     = useState(false)
-  const [nfcBusy, setNfcBusy]           = useState(false)
-  const [nfcStatus, setNfcStatus]       = useState<'off' | 'on' | 'error'>('off')
+  const [nfcEnabled, setNfcEnabled] = useState(false)
+  const [nfcBusy, setNfcBusy] = useState(false)
+  const [nfcStatus, setNfcStatus] = useState<'off' | 'on' | 'error'>('off')
 
-  useEffect(() => { setNfcSupported('NDEFReader' in window) }, [])
+  useEffect(() => {
+    setNfcSupported('NDEFReader' in window)
+  }, [])
 
   const fetchQr = useCallback(async () => {
-    setLoadingQr(true); setQrError(''); setImgLoaded(false)
+    setLoadingQr(true)
+    setQrError('')
+    setImgLoaded(false)
     try {
       const token = await getAccessToken()
       const res = await fetch(`${API_URL}/cards/${card.id}/qr`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ fgColor: '#0f172a', bgColor: '#ffffff', size: 480 }),
       })
       if (!res.ok) throw new Error('Failed')
       setQr((await res.json()) as QrResult)
-    } catch { setQrError('Could not generate QR code.') }
-    finally { setLoadingQr(false) }
+    } catch {
+      setQrError('Could not generate QR code.')
+    } finally {
+      setLoadingQr(false)
+    }
   }, [card.id])
 
-  useEffect(() => { void fetchQr() }, [fetchQr])
+  useEffect(() => {
+    void fetchQr()
+  }, [fetchQr])
 
   async function toggleNfc() {
     if (!nfcSupported) return
@@ -876,29 +1134,43 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
         // @ts-expect-error NDEFReader not in TS lib
         const ndef = new NDEFReader()
         await ndef.write({ records: [{ recordType: 'url', data: publicUrl }] })
-        setNfcEnabled(true); setNfcStatus('on')
+        setNfcEnabled(true)
+        setNfcStatus('on')
       } else {
-        setNfcEnabled(false); setNfcStatus('off')
+        setNfcEnabled(false)
+        setNfcStatus('off')
       }
-    } catch { setNfcStatus('error') }
-    finally { setNfcBusy(false) }
+    } catch {
+      setNfcStatus('error')
+    } finally {
+      setNfcBusy(false)
+    }
   }
 
   function downloadPng() {
     if (!qr) return
     const a = document.createElement('a')
-    a.href = qr.pngDataUrl; a.download = `dotly-${card.handle}.png`; a.click()
+    a.href = qr.pngDataUrl
+    a.download = `dotly-${card.handle}.png`
+    a.click()
   }
 
   async function handleCopy() {
     const ok = await copyToClipboard(publicUrl)
-    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000) }
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   async function handleShare() {
     if (typeof navigator.share === 'function') {
-      try { await navigator.share({ title: `${name}'s card`, url: publicUrl }); return }
-      catch { /* cancelled */ }
+      try {
+        await navigator.share({ title: `${name}'s card`, url: publicUrl })
+        return
+      } catch {
+        /* cancelled */
+      }
     }
     void handleCopy()
   }
@@ -907,7 +1179,6 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
 
   return (
     <div className="flex flex-col items-center w-full gap-4">
-
       {/* Identity + QR card */}
       <div
         className="w-full rounded-3xl overflow-hidden"
@@ -917,15 +1188,26 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
         <div className="px-6 pt-6 pb-4 text-center">
           <div
             className="mx-auto mb-3 flex h-[72px] w-[72px] items-center justify-center rounded-[20px] text-2xl font-black text-white"
-            style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)', boxShadow: '0 6px 20px rgba(85,167,255,0.3)' }}
+            style={{
+              background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
+              boxShadow: '0 6px 20px rgba(85,167,255,0.3)',
+            }}
           >
             {ini}
           </div>
           <h2 className="text-xl font-black tracking-tight text-white">{name}</h2>
-          {jobTitle && <p className="mt-0.5 text-sm font-medium" style={{ color: '#a5b0c8' }}>{jobTitle}</p>}
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer"
+          {jobTitle && (
+            <p className="mt-0.5 text-sm font-medium" style={{ color: '#a5b0c8' }}>
+              {jobTitle}
+            </p>
+          )}
+          <a
+            href={publicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold"
-            style={{ color: '#55a7ff' }}>
+            style={{ color: '#55a7ff' }}
+          >
             dotly.one/{card.handle}
             <ExternalLink className="h-3 w-3" />
           </a>
@@ -937,7 +1219,10 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
           {(loadingQr || (!imgLoaded && qr)) && (
             <div
               className="flex h-[240px] items-center justify-center qr-shimmer"
-              style={{ background: 'linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)', backgroundSize: '400px 100%' }}
+              style={{
+                background: 'linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)',
+                backgroundSize: '400px 100%',
+              }}
             >
               {loadingQr && <Loader2 className="h-7 w-7 animate-spin text-slate-300" />}
             </div>
@@ -945,8 +1230,10 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
           {qrError && !loadingQr && (
             <div className="flex h-[200px] flex-col items-center justify-center gap-3 p-6 text-center">
               <p className="text-sm text-slate-500">{qrError}</p>
-              <button onClick={() => void fetchQr()}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200">
+              <button
+                onClick={() => void fetchQr()}
+                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+              >
                 Retry
               </button>
             </div>
@@ -972,16 +1259,28 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
         <button
           onClick={() => void handleCopy()}
           className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white transition-opacity active:opacity-80"
-          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+          style={{
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}
         >
-          {copied
-            ? <><Check className="h-4 w-4 text-green-400" /> Copied!</>
-            : <><Copy className="h-4 w-4" /> Copy Link</>}
+          {copied ? (
+            <>
+              <Check className="h-4 w-4 text-green-400" /> Copied!
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4" /> Copy Link
+            </>
+          )}
         </button>
         <button
           onClick={() => void handleShare()}
           className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white"
-          style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)', boxShadow: '0 4px 18px rgba(85,167,255,0.25)' }}
+          style={{
+            background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
+            boxShadow: '0 4px 18px rgba(85,167,255,0.25)',
+          }}
         >
           <Share2 className="h-4 w-4" /> Share Card
         </button>
@@ -989,29 +1288,42 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
 
       {/* NFC — only shown when supported */}
       {nfcSupported && (
-        <div className="w-full rounded-2xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div
+          className="w-full rounded-2xl overflow-hidden"
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
           <button
             onClick={() => void toggleNfc()}
             disabled={nfcBusy}
             className="flex w-full items-center gap-4 px-5 py-4 text-left disabled:opacity-60"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: nfcEnabled ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.08)' }}>
-              {nfcBusy
-                ? <Loader2 className="h-4.5 w-4.5 animate-spin text-white" />
-                : nfcEnabled
-                  ? <Wifi className="h-4.5 w-4.5" style={{ color: '#2dd4bf' }} />
-                  : <WifiOff className="h-4.5 w-4.5 text-white/50" />}
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{
+                background: nfcEnabled ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.08)',
+              }}
+            >
+              {nfcBusy ? (
+                <Loader2 className="h-4.5 w-4.5 animate-spin text-white" />
+              ) : nfcEnabled ? (
+                <Wifi className="h-4.5 w-4.5" style={{ color: '#2dd4bf' }} />
+              ) : (
+                <WifiOff className="h-4.5 w-4.5 text-white/50" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">
                 {nfcEnabled ? 'NFC Sharing On' : 'Enable NFC Sharing'}
               </p>
               <p className="text-xs" style={{ color: '#6b7a96' }}>
-                {nfcStatus === 'on'    ? 'Hold phone near another device to share'
-                : nfcStatus === 'error' ? 'Could not enable NFC — try again'
-                :                        'Tap to share card via NFC'}
+                {nfcStatus === 'on'
+                  ? 'Hold phone near another device to share'
+                  : nfcStatus === 'error'
+                    ? 'Could not enable NFC — try again'
+                    : 'Tap to share card via NFC'}
               </p>
             </div>
             <span
@@ -1031,13 +1343,21 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
           onClick={downloadPng}
           disabled={!qr || !imgLoaded}
           className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-xs font-semibold text-white disabled:opacity-40"
-          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
         >
           Download QR
         </button>
-        <Link href={`/apps/cards/${card.id}/edit`}
+        <Link
+          href={`/apps/cards/${card.id}/edit`}
           className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-xs font-semibold text-white"
-          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
           <Pencil className="h-3.5 w-3.5" /> Edit Card
         </Link>
       </div>
@@ -1048,27 +1368,44 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
 // ─── Card Picker ──────────────────────────────────────────────────────────────
 
 function CardPicker({
-  cards, selected, onSelect,
-}: { cards: CardSummary[]; selected: CardSummary; onSelect: (c: CardSummary) => void }): JSX.Element {
+  cards,
+  selected,
+  onSelect,
+}: {
+  cards: CardSummary[]
+  selected: CardSummary
+  onSelect: (c: CardSummary) => void
+}): JSX.Element {
   return (
     <div className="flex flex-col gap-2 w-full">
-      <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#6b7a96' }}>
+      <p
+        className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em]"
+        style={{ color: '#6b7a96' }}
+      >
         Your Cards
       </p>
       {cards.map((card) => {
-        const cname    = (card.fields['name']  as string | undefined) ?? card.handle
-        const ctitle   = (card.fields['title'] as string | undefined) ?? ''
-        const isSel    = card.id === selected.id
+        const cname = (card.fields['name'] as string | undefined) ?? card.handle
+        const ctitle = (card.fields['title'] as string | undefined) ?? ''
+        const isSel = card.id === selected.id
         return (
-          <button key={card.id} onClick={() => onSelect(card)}
+          <button
+            key={card.id}
+            onClick={() => onSelect(card)}
             className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-all active:scale-[0.99]"
             style={{
-              background: isSel ? 'linear-gradient(135deg,rgba(85,167,255,0.15),rgba(125,107,255,0.15))' : 'rgba(255,255,255,0.05)',
-              border: isSel ? '1.5px solid rgba(85,167,255,0.35)' : '1.5px solid rgba(255,255,255,0.06)',
-            }}>
+              background: isSel
+                ? 'linear-gradient(135deg,rgba(85,167,255,0.15),rgba(125,107,255,0.15))'
+                : 'rgba(255,255,255,0.05)',
+              border: isSel
+                ? '1.5px solid rgba(85,167,255,0.35)'
+                : '1.5px solid rgba(255,255,255,0.06)',
+            }}
+          >
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] text-sm font-black text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}>
+              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+            >
               {initials(cname)}
             </div>
             <div className="flex-1 min-w-0">
@@ -1078,11 +1415,13 @@ function CardPicker({
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                 style={{
                   background: card.isActive ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.06)',
                   color: card.isActive ? '#2dd4bf' : '#6b7a96',
-                }}>
+                }}
+              >
                 {card.isActive ? 'Live' : 'Draft'}
               </span>
               <ChevronRight className="h-4 w-4" style={{ color: '#6b7a96' }} />
@@ -1097,23 +1436,31 @@ function CardPicker({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function QrPage(): JSX.Element {
-  const [cards, setCards]       = useState<CardSummary[]>([])
+  const [cards, setCards] = useState<CardSummary[]>([])
   const [selected, setSelected] = useState<CardSummary | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
 
   useEffect(() => {
     async function load() {
       try {
         const token = (await getAccessToken()) ?? ''
-        const data  = await apiGet<CardSummary[]>('/cards', token)
-        if (!data?.length) { setCards([]); return }
-        const sorted = [...data].sort((a, b) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1))
+        const data = await apiGet<CardSummary[]>('/cards', token)
+        if (!data?.length) {
+          setCards([])
+          return
+        }
+        const sorted = [...data].sort((a, b) =>
+          a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1,
+        )
         setCards(sorted)
         setSelected(sorted[0] ?? null)
-      } catch { setError('Failed to load your cards.') }
-      finally { setLoading(false) }
+      } catch {
+        setError('Failed to load your cards.')
+      } finally {
+        setLoading(false)
+      }
     }
     void load()
   }, [])
@@ -1138,13 +1485,22 @@ export default function QrPage(): JSX.Element {
         {/* Top bar */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#6b7a96' }}>Dotly</p>
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.12em]"
+              style={{ color: '#6b7a96' }}
+            >
+              Dotly
+            </p>
             <h1 className="text-xl font-black tracking-tight text-white">My QR Card</h1>
           </div>
           <button
             onClick={() => setScannerOpen(true)}
             className="flex h-12 w-12 items-center justify-center rounded-2xl text-white active:scale-95"
-            style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)', boxShadow: '0 4px 18px rgba(85,167,255,0.35)', animation: 'qrpulse 2.5s ease-in-out infinite' }}
+            style={{
+              background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
+              boxShadow: '0 4px 18px rgba(85,167,255,0.35)',
+              animation: 'qrpulse 2.5s ease-in-out infinite',
+            }}
             aria-label="Scan a QR code"
           >
             <Camera className="h-5 w-5" />
@@ -1155,14 +1511,21 @@ export default function QrPage(): JSX.Element {
         {loading && (
           <div className="flex flex-col items-center gap-4 pt-20">
             <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
-            <p className="text-sm" style={{ color: '#6b7a96' }}>Loading your cards…</p>
+            <p className="text-sm" style={{ color: '#6b7a96' }}>
+              Loading your cards…
+            </p>
           </div>
         )}
 
         {/* Error */}
         {error && !loading && (
-          <div className="mt-16 rounded-3xl p-6 text-center"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div
+            className="mt-16 rounded-3xl p-6 text-center"
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.07)',
+            }}
+          >
             <p className="text-sm text-red-400">{error}</p>
           </div>
         )}
@@ -1170,11 +1533,24 @@ export default function QrPage(): JSX.Element {
         {/* No cards */}
         {!loading && !error && cards.length === 0 && (
           <div className="mt-16 flex flex-col items-center gap-5 text-center fade-in">
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl"
-              style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b7a96" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/><path d="m14 14 3 3 4-4"/>
+            <div
+              className="flex h-20 w-20 items-center justify-center rounded-3xl"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6b7a96"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <path d="m14 14 3 3 4-4" />
               </svg>
             </div>
             <div>
@@ -1183,9 +1559,14 @@ export default function QrPage(): JSX.Element {
                 Create your first digital business card to get your QR code.
               </p>
             </div>
-            <Link href="/apps/cards/create"
+            <Link
+              href="/apps/cards/create"
               className="rounded-2xl px-7 py-3.5 text-sm font-black text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)', boxShadow: '0 4px 18px rgba(85,167,255,0.3)' }}>
+              style={{
+                background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
+                boxShadow: '0 4px 18px rgba(85,167,255,0.3)',
+              }}
+            >
               Create a Card
             </Link>
           </div>

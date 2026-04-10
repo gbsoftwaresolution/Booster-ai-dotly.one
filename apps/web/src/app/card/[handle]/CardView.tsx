@@ -5,6 +5,7 @@ import { CardRenderer } from '@dotly/ui'
 import type { CardRendererProps } from '@dotly/types'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost } from '@/lib/api'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { AnalyticsBeacon } from './AnalyticsBeacon'
 import { LeadCaptureModal } from './LeadCaptureModal'
 import { ShareBar } from './ShareBar'
@@ -21,7 +22,7 @@ interface CardViewProps extends CardRendererProps {
   } | null
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const API_URL = getPublicApiUrl()
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
 
 function postAnalytics(body: Record<string, unknown>) {

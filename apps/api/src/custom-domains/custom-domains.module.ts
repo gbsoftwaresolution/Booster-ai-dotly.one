@@ -15,11 +15,7 @@ import {
     }),
   ],
   controllers: [CustomDomainsController],
-  providers: [
-    CustomDomainsService,
-    DomainVerificationProcessor,
-    DomainVerificationScheduler,
-  ],
+  providers: [CustomDomainsService, DomainVerificationProcessor, DomainVerificationScheduler],
   exports: [CustomDomainsService],
 })
 export class CustomDomainsModule {}

@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "analyze": "ANALYZE=true next build"
+    "typecheck": "next typegen && tsc --noEmit",
+    "analyze": "ANALYZE=true next build",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

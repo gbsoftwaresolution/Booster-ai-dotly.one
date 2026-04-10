@@ -1,14 +1,5 @@
 import { Type } from 'class-transformer'
-import {
-  IsArray,
-  IsEnum,
-  IsInt,
-  IsString,
-  IsUrl,
-  Min,
-  ValidateNested,
-  ArrayMaxSize,
-} from 'class-validator'
+import { IsArray, IsEnum, IsInt, IsUrl, Min, ValidateNested, ArrayMaxSize } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 import { SocialPlatform } from '@dotly/types'
 

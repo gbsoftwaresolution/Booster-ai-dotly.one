@@ -26,8 +26,14 @@ const TEMPLATES: { id: Template; label: string; color: string }[] = [
 ]
 
 const PRESET_COLORS = [
-  '#0ea5e9', '#0f172a', '#dc2626', '#7c3aed',
-  '#16a34a', '#d97706', '#db2777', '#0284c7',
+  '#0ea5e9',
+  '#0f172a',
+  '#dc2626',
+  '#7c3aed',
+  '#16a34a',
+  '#d97706',
+  '#db2777',
+  '#0284c7',
 ]
 
 interface SocialLink {
@@ -76,7 +82,6 @@ export default function EditCardScreen() {
   const [email, setEmail] = useState('')
   const [website, setWebsite] = useState('')
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null)
-  const [avatarMime, setAvatarMime] = useState('image/jpeg')
 
   // Links tab
   const [socialLinks, setSocialLinks] = useState<Array<{ platform: string; url: string }>>([])
@@ -91,23 +96,26 @@ export default function EditCardScreen() {
   // Load card data
   useEffect(() => {
     if (!id) return
-    void api.getCard(id).then((data) => {
-      const card = data as CardDetail
-      setName(card.fields?.name ?? '')
-      setTagline(card.fields?.title ?? '')
-      setBio(card.fields?.bio ?? '')
-      setPhone(card.fields?.phone ?? '')
-      setEmail(card.fields?.email ?? '')
-      setWebsite(card.fields?.website ?? '')
-      setTemplate(card.templateId ?? 'MINIMAL')
-      setPrimaryColor(card.theme?.primaryColor ?? '#0ea5e9')
-      setSocialLinks(
-        (card.socialLinks ?? []).map((l) => ({ platform: l.platform, url: l.url })),
-      )
-      setLoading(false)
-      // Mark initial load done after state settles
-      setTimeout(() => { isInitialLoad.current = false }, 100)
-    }).catch(() => setLoading(false))
+    void api
+      .getCard(id)
+      .then((data) => {
+        const card = data as CardDetail
+        setName(card.fields?.name ?? '')
+        setTagline(card.fields?.title ?? '')
+        setBio(card.fields?.bio ?? '')
+        setPhone(card.fields?.phone ?? '')
+        setEmail(card.fields?.email ?? '')
+        setWebsite(card.fields?.website ?? '')
+        setTemplate(card.templateId ?? 'MINIMAL')
+        setPrimaryColor(card.theme?.primaryColor ?? '#0ea5e9')
+        setSocialLinks((card.socialLinks ?? []).map((l) => ({ platform: l.platform, url: l.url })))
+        setLoading(false)
+        // Mark initial load done after state settles
+        setTimeout(() => {
+          isInitialLoad.current = false
+        }, 100)
+      })
+      .catch(() => setLoading(false))
   }, [id])
 
   // Auto-save debounced
@@ -131,7 +139,9 @@ export default function EditCardScreen() {
 
   useEffect(() => {
     triggerAutoSave()
-    return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current) }
+    return () => {
+      if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
+    }
   }, [triggerAutoSave])
 
   // Header "Done" button
@@ -163,7 +173,6 @@ export default function EditCardScreen() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0]
       setAvatarBase64(asset.base64 ?? null)
-      setAvatarMime(asset.mimeType ?? 'image/jpeg')
       if (id && asset.base64) {
         try {
           await uploadAvatar(id, asset.base64, asset.mimeType ?? 'image/jpeg')
@@ -220,7 +229,10 @@ export default function EditCardScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {/* Auto-save indicator */}
         {saving && (
           <View style={{ backgroundColor: '#f0fdf4', paddingVertical: 4, alignItems: 'center' }}>
@@ -291,11 +303,23 @@ export default function EditCardScreen() {
 
               <View>
                 <Text style={labelStyle}>Name</Text>
-                <TextInput value={name} onChangeText={setName} placeholder="Jane Doe" placeholderTextColor="#9ca3af" style={inputStyle} />
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Jane Doe"
+                  placeholderTextColor="#9ca3af"
+                  style={inputStyle}
+                />
               </View>
               <View>
                 <Text style={labelStyle}>Tagline / Title</Text>
-                <TextInput value={tagline} onChangeText={setTagline} placeholder="Software Engineer" placeholderTextColor="#9ca3af" style={inputStyle} />
+                <TextInput
+                  value={tagline}
+                  onChangeText={setTagline}
+                  placeholder="Software Engineer"
+                  placeholderTextColor="#9ca3af"
+                  style={inputStyle}
+                />
               </View>
               <View>
                 <Text style={labelStyle}>Bio</Text>
@@ -311,15 +335,38 @@ export default function EditCardScreen() {
               </View>
               <View>
                 <Text style={labelStyle}>Phone</Text>
-                <TextInput value={phone} onChangeText={setPhone} placeholder="+1 (555) 000-0000" placeholderTextColor="#9ca3af" keyboardType="phone-pad" style={inputStyle} />
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="+1 (555) 000-0000"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad"
+                  style={inputStyle}
+                />
               </View>
               <View>
                 <Text style={labelStyle}>Email</Text>
-                <TextInput value={email} onChangeText={setEmail} placeholder="jane@example.com" placeholderTextColor="#9ca3af" keyboardType="email-address" autoCapitalize="none" style={inputStyle} />
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="jane@example.com"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={inputStyle}
+                />
               </View>
               <View>
                 <Text style={labelStyle}>Website</Text>
-                <TextInput value={website} onChangeText={setWebsite} placeholder="https://janedoe.com" placeholderTextColor="#9ca3af" keyboardType="url" autoCapitalize="none" style={inputStyle} />
+                <TextInput
+                  value={website}
+                  onChangeText={setWebsite}
+                  placeholder="https://janedoe.com"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  style={inputStyle}
+                />
               </View>
             </View>
           )}
@@ -432,9 +479,7 @@ export default function EditCardScreen() {
                       <Text style={{ fontWeight: '600', color: '#0f172a', fontSize: 14, flex: 1 }}>
                         {t.label}
                       </Text>
-                      {template === t.id && (
-                        <Text style={{ color: t.color, fontSize: 16 }}>✓</Text>
-                      )}
+                      {template === t.id && <Text style={{ color: t.color, fontSize: 16 }}>✓</Text>}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -464,7 +509,9 @@ export default function EditCardScreen() {
                     />
                   ))}
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}
+                >
                   <View
                     style={{
                       width: 32,
@@ -477,12 +524,18 @@ export default function EditCardScreen() {
                   />
                   <TextInput
                     value={primaryColor}
-                    onChangeText={(v) => { if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setPrimaryColor(v) }}
+                    onChangeText={(v) => {
+                      if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setPrimaryColor(v)
+                    }}
                     placeholder="#0ea5e9"
                     placeholderTextColor="#9ca3af"
                     autoCapitalize="none"
                     autoCorrect={false}
-                    style={{ ...inputStyle, flex: 1, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}
+                    style={{
+                      ...inputStyle,
+                      flex: 1,
+                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                    }}
                   />
                 </View>
               </View>

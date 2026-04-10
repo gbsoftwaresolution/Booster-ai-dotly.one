@@ -1,18 +1,17 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Put,
-  Delete,
-  Patch,
-  Param,
-  Body,
-} from '@nestjs/common'
+import { Controller, Post, Get, Put, Delete, Patch, Param, Body } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Public } from '../auth/decorators/public.decorator'
 import { TeamsService } from './teams.service'
-import { IsString, IsOptional, IsEmail, IsIn, MaxLength, IsBoolean, IsObject } from 'class-validator'
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  IsIn,
+  MaxLength,
+  IsBoolean,
+  IsObject,
+} from 'class-validator'
 
 class CreateTeamDto {
   // MED-05: Cap team name length to prevent unbounded DB storage and UI overflow.
@@ -90,7 +89,7 @@ export class TeamsController {
   }
 
   @Get('mine')
-  @ApiOperation({ summary: 'Get the current user\'s team (first membership)' })
+  @ApiOperation({ summary: "Get the current user's team (first membership)" })
   getMyTeam(@CurrentUser() user: { id: string }) {
     return this.teamsService.getMyTeam(user.id)
   }

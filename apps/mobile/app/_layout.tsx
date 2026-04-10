@@ -70,8 +70,6 @@ export default function RootLayout() {
 
   // Register push notifications and set up listeners
   useEffect(() => {
-    let cleanup: (() => void) | undefined
-
     registerForPushNotifications()
       .then((token) => {
         if (token) {
@@ -80,8 +78,8 @@ export default function RootLayout() {
       })
       .catch(() => void 0)
 
-    cleanup = setupNotificationListeners(
-      (_notification: Notifications.Notification) => {
+    const cleanup = setupNotificationListeners(
+      () => {
         // Notification received while app is foregrounded — no action needed
       },
       (response: Notifications.NotificationResponse) => {
