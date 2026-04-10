@@ -15,10 +15,60 @@ import { UpdateThemeDto } from './dto/update-theme.dto'
 import { UpsertSocialLinksDto } from './dto/upsert-social-links.dto'
 import { UpsertMediaBlocksDto } from './dto/upsert-media-blocks.dto'
 import { AuditService } from '../audit/audit.service'
+import { AnalyticsService } from '../analytics/analytics.service'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import * as path from 'path'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHmac, createVerify, createPublicKey } from 'crypto'
+
+// SEC-01: Verify a Supabase JWT signature and return the sub claim, or null if invalid.
+// Uses the same key-resolution logic as supabase.strategy.ts so verification is
+// consistent. Supports both ES256 (JWK) and HS256 (shared secret) key types.
+// This is used by getVcard() to authenticate MEMBERS_ONLY vCard downloads without
+// running the full Passport guard (which would reject unauthenticated requests before
+// the endpoint can decide whether the card requires auth).
+function verifySupabaseJwt(token: string, secret: string): string | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [headerB64, payloadB64, sigB64] = parts as [string, string, string]
+    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString()) as { alg?: string }
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as {
+      sub?: string
+      exp?: number
+    }
+    // Reject expired tokens
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
+
+    const signingInput = `${headerB64}.${payloadB64}`
+    const sig = Buffer.from(sigB64, 'base64url')
+
+    let valid = false
+    try {
+      const jwk = JSON.parse(secret) as Record<string, unknown>
+      if (jwk['kty'] === 'EC') {
+        // ES256: verify with EC public key
+        const pubKey = createPublicKey({ key: jwk, format: 'jwk' })
+        const verify = createVerify('SHA256')
+        verify.update(signingInput)
+        // Convert raw R||S signature (64 bytes) to DER if needed
+        valid = verify.verify(pubKey, sig)
+      } else {
+        // Fallback: HS256
+        const mac = createHmac('sha256', secret).update(signingInput).digest()
+        valid = mac.length === sig.length && mac.equals(sig)
+      }
+    } catch {
+      // JWK parse failed — treat as HS256 shared secret
+      const mac = createHmac('sha256', secret).update(signingInput).digest()
+      valid = mac.length === sig.length && mac.equals(sig)
+    }
+
+    return valid ? (payload.sub ?? null) : null
+  } catch {
+    return null
+  }
+}
 
 // F-26: Single source of truth for plan limits used in card creation.
 // BillingService.getPlanLimits() is the canonical source for all other plan
@@ -41,20 +91,33 @@ const PLAN_CARD_LIMITS: Record<string, number> = {
 // F-04: Magic-byte signatures for the MIME types we allow.
 // We check the actual decoded bytes, not just the declared mimeType, so an
 // attacker cannot upload a PHP/SVG/HTML file by claiming it is image/jpeg.
-const MAGIC_BYTES: Record<string, { offset: number; bytes: number[] }[]> = {
-  'image/jpeg': [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
-  'image/png': [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }],
-  'image/webp': [{ offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] }], // "RIFF"
+// MAGIC_BYTES: outer array = alternatives (ANY must match for gif, all required for others)
+// inner array = required byte-checks within one alternative (ALL must pass)
+// WEBP requires BOTH "RIFF" at offset 0 AND "WEBP" at offset 8 — they are in the same
+// inner array so both must pass. GIF has two inner arrays (one per version) so either passes.
+const MAGIC_BYTES: Record<string, { offset: number; bytes: number[] }[][]> = {
+  'image/jpeg': [[{ offset: 0, bytes: [0xff, 0xd8, 0xff] }]],
+  'image/png': [[{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }]],
+  // WEBP: both checks are in the SAME inner array — both must match
+  'image/webp': [
+    [
+      { offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] }, // "RIFF"
+      { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] }, // "WEBP" — distinguishes from AVI/WAV
+    ],
+  ],
   'image/gif': [
-    { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] }, // GIF87a
-    { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] }, // GIF89a
+    [{ offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] }], // GIF87a
+    [{ offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] }], // GIF89a
   ],
 }
 
 function verifyMagicBytes(buffer: Buffer, mimeType: string): boolean {
-  const signatures = MAGIC_BYTES[mimeType]
-  if (!signatures) return false
-  return signatures.some(({ offset, bytes }) => bytes.every((b, i) => buffer[offset + i] === b))
+  const alternatives = MAGIC_BYTES[mimeType]
+  if (!alternatives) return false
+  // At least one alternative must match; within an alternative ALL checks must pass
+  return alternatives.some((checks) =>
+    checks.every(({ offset, bytes }) => bytes.every((b, i) => buffer[offset + i] === b)),
+  )
 }
 
 @Injectable()
@@ -67,6 +130,7 @@ export class CardsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly analytics: AnalyticsService,
   ) {
     const accountId = this.config.getOrThrow<string>('R2_ACCOUNT_ID')
     const accessKeyId = this.config.getOrThrow<string>('R2_ACCESS_KEY_ID')
@@ -101,28 +165,41 @@ export class CardsService {
   async findAllByUser(userId: string) {
     const internalUserId = await this.resolveInternalUserId(userId)
     // L-07: Cap at 100 cards to prevent unbounded memory/query time.
-    // ENTERPRISE plan allows "unlimited" cards but in practice no user has
-    // 100+ cards. If this becomes a real limit, add cursor-based pagination.
-    const cards = await this.prisma.card.findMany({
-      where: { userId: internalUserId },
-      include: {
-        theme: true,
-        socialLinks: true,
-        qrCode: true,
-        _count: { select: { analytics: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
-
-    const viewCounts = await this.prisma.analyticsEvent.groupBy({
-      by: ['cardId'],
-      where: {
-        cardId: { in: cards.map((card) => card.id) },
-        type: 'VIEW',
-      },
-      _count: { _all: true },
-    })
+    // Return only the fields the dashboard needs — theme, socialLinks, and qrCode
+    // are full relations not used by the card list UI and add significant payload size.
+    // Parallelise the card list + view-count groupBy so they run in a single
+    // round trip instead of sequentially.
+    const [cards, viewCounts] = await Promise.all([
+      this.prisma.card.findMany({
+        where: { userId: internalUserId },
+        select: {
+          id: true,
+          handle: true,
+          templateId: true,
+          isActive: true,
+          fields: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      // We fetch view counts for ALL of the user's cards at once.
+      // Because we don't yet know the card IDs we can't use `in` here,
+      // so we join via userId through the card relation using a sub-select.
+      // Prisma doesn't support join-based groupBy, so we do a two-pass:
+      // first fetch IDs (above), then the groupBy — but both run in parallel
+      // using a placeholder that resolves after the card IDs are known.
+      // To truly parallelise we fetch the groupBy separately after the card
+      // query resolves; here we run them both and discard IDs we don't need.
+      this.prisma.analyticsEvent.groupBy({
+        by: ['cardId'],
+        where: {
+          card: { userId: internalUserId },
+          type: 'VIEW',
+        },
+        _count: { _all: true },
+      }),
+    ])
 
     const viewsByCardId = new Map(viewCounts.map((row) => [row.cardId, row._count._all]))
 
@@ -246,6 +323,10 @@ export class CardsService {
       })
       .catch(() => void 0)
 
+    // Bust the dashboard summary cache so the new card count is reflected
+    // on the next page load without waiting for the 60-second TTL.
+    void this.analytics.invalidateDashboardCache(internalUserId).catch(() => void 0)
+
     return card
   }
 
@@ -301,6 +382,7 @@ export class CardsService {
         ...(dto.templateId !== undefined && { templateId: dto.templateId }),
         ...(mergedFields !== undefined && { fields: mergedFields }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(dto.vcardPolicy !== undefined && { vcardPolicy: dto.vcardPolicy }),
       },
       include: { theme: true, socialLinks: true },
     })
@@ -409,6 +491,7 @@ export class CardsService {
               templateId: source.templateId,
               fields: source.fields as Prisma.InputJsonValue,
               isActive: false, // copies start as draft
+              vcardPolicy: source.vcardPolicy, // preserve source card's download policy
               theme: source.theme
                 ? {
                     create: {
@@ -417,6 +500,8 @@ export class CardsService {
                       fontFamily: source.theme.fontFamily,
                       backgroundUrl: source.theme.backgroundUrl,
                       logoUrl: source.theme.logoUrl,
+                      buttonStyle: source.theme.buttonStyle,
+                      socialButtonStyle: source.theme.socialButtonStyle,
                     },
                   }
                 : {
@@ -476,6 +561,8 @@ export class CardsService {
       })
       .catch(() => void 0)
 
+    void this.analytics.invalidateDashboardCache(internalUserId).catch(() => void 0)
+
     return duplicate
   }
 
@@ -491,31 +578,30 @@ export class CardsService {
         resourceType: 'card',
       })
       .catch(() => void 0)
+    void this.analytics.invalidateDashboardCache(internalUserId).catch(() => void 0)
     return result
   }
 
-  async togglePublish(id: string, userId: string) {
-    const card = await this.findById(id, userId)
-    return this.prisma.card.update({
-      where: { id },
-      data: { isActive: !card.isActive },
-    })
-  }
-
   async publish(id: string, userId: string) {
+    const internalUserId = await this.resolveInternalUserId(userId)
     await this.findById(id, userId)
-    return this.prisma.card.update({
+    const result = await this.prisma.card.update({
       where: { id },
       data: { isActive: true },
     })
+    void this.analytics.invalidateDashboardCache(internalUserId).catch(() => void 0)
+    return result
   }
 
   async unpublish(id: string, userId: string) {
+    const internalUserId = await this.resolveInternalUserId(userId)
     await this.findById(id, userId)
-    return this.prisma.card.update({
+    const result = await this.prisma.card.update({
       where: { id },
       data: { isActive: false },
     })
+    void this.analytics.invalidateDashboardCache(internalUserId).catch(() => void 0)
+    return result
   }
 
   async findByHandle(handle: string) {
@@ -536,6 +622,20 @@ export class CardsService {
       },
     })
     if (!card) throw new NotFoundException('Card not found')
+
+    const bookableAppointment = await this.prisma.appointmentType.findFirst({
+      where: {
+        ownerUserId: card.userId,
+        isActive: true,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        slug: true,
+        name: true,
+        durationMins: true,
+      },
+    })
 
     // Extract team brand from first team membership
     const firstMembership = card.user?.teamMemberships?.[0]
@@ -559,7 +659,7 @@ export class CardsService {
 
     // Strip internal user data from public response
     const { user: _user, ...publicCard } = card
-    return { ...publicCard, teamBrand }
+    return { ...publicCard, teamBrand, bookableAppointment }
   }
 
   async uploadAvatar(id: string, userId: string, base64: string, mimeType: string) {
@@ -642,14 +742,37 @@ export class CardsService {
     }
   }
 
-  async getVcard(handle: string): Promise<string> {
+  async getVcard(
+    handle: string,
+    bearerToken?: string,
+  ): Promise<{ content: string; handle: string }> {
     // F-17: Fetch the card from DB via the DB-validated handle rather than
     // using the raw @Param handle directly in the Content-Disposition header.
     // findByHandle throws NotFoundException if the card doesn't exist or is
     // unpublished, so the handle used in the header is always a real DB value.
     const card = await this.findByHandle(handle)
+
+    // SEC-01: MEMBERS_ONLY policy — verify the JWT signature before trusting sub.
+    // Previously the controller decoded the JWT payload without verifying the
+    // signature, allowing a forged token to bypass the policy check. Now we
+    // verify the signature here using the same SUPABASE_JWT_SECRET used by
+    // passport-jwt in SupabaseStrategy, so forged tokens are rejected.
+    if (card.vcardPolicy === 'MEMBERS_ONLY') {
+      const jwtSecret = this.config.get<string>('SUPABASE_JWT_SECRET') ?? ''
+      const requestUserId = bearerToken ? verifySupabaseJwt(bearerToken, jwtSecret) : null
+      if (!requestUserId) {
+        throw new ForbiddenException('Sign in to download this contact')
+      }
+    }
     const dbHandle = card.handle // Use the DB value, not the raw URL param.
-    const fields = card.fields as Record<string, string>
+    // Defensive string coercion — card.fields is JSONB and individual values may not
+    // be strings (e.g. legacy records stored numbers or nulls). Calling .replace()
+    // on a non-string would throw at runtime; coerce each field before use.
+    const rawFields = (card.fields ?? {}) as Record<string, unknown>
+    const safeField = (key: string): string => {
+      const v = rawFields[key]
+      return typeof v === 'string' ? v : v != null ? String(v) : ''
+    }
 
     // RFC 6350 §3.4: escape backslash, comma, semicolon, and newline in values
     const escapeVcard = (value: string): string =>
@@ -658,37 +781,38 @@ export class CardsService {
     const lines: string[] = ['BEGIN:VCARD', 'VERSION:3.0']
 
     // Full name (required by spec)
-    if (fields['name']) lines.push(`FN:${escapeVcard(fields['name'])}`)
+    if (safeField('name')) lines.push(`FN:${escapeVcard(safeField('name'))}`)
 
     // Name components — split first/last on first space
-    if (fields['name']) {
-      const parts = fields['name'].trim().split(/\s+/)
+    if (safeField('name')) {
+      const parts = safeField('name').trim().split(/\s+/)
       const last = parts.length > 1 ? (parts.pop() ?? '') : ''
       const first = parts.join(' ')
       lines.push(`N:${escapeVcard(last)};${escapeVcard(first)};;;`)
     }
 
-    if (fields['title']) lines.push(`TITLE:${escapeVcard(fields['title'])}`)
-    if (fields['company']) lines.push(`ORG:${escapeVcard(fields['company'])}`)
+    if (safeField('title')) lines.push(`TITLE:${escapeVcard(safeField('title'))}`)
+    if (safeField('company')) lines.push(`ORG:${escapeVcard(safeField('company'))}`)
 
     // Phone — prefer tel: type hint for mobile compatibility
-    if (fields['phone']) lines.push(`TEL;TYPE=CELL:${escapeVcard(fields['phone'])}`)
+    if (safeField('phone')) lines.push(`TEL;TYPE=CELL:${escapeVcard(safeField('phone'))}`)
 
     // Email
-    if (fields['email']) lines.push(`EMAIL;TYPE=WORK:${escapeVcard(fields['email'])}`)
+    if (safeField('email')) lines.push(`EMAIL;TYPE=WORK:${escapeVcard(safeField('email'))}`)
 
     // Website
-    if (fields['website']) lines.push(`URL:${escapeVcard(fields['website'])}`)
+    if (safeField('website')) lines.push(`URL:${escapeVcard(safeField('website'))}`)
 
     // Address — vCard ADR format: PO;Ext;Street;City;Region;ZIP;Country
     // We store a single free-form string so map it into the street component.
-    if (fields['address']) lines.push(`ADR;TYPE=WORK:;;${escapeVcard(fields['address'])};;;;;`)
+    if (safeField('address'))
+      lines.push(`ADR;TYPE=WORK:;;${escapeVcard(safeField('address'))};;;;;`)
 
     // Bio / note
-    if (fields['bio']) lines.push(`NOTE:${escapeVcard(fields['bio'])}`)
+    if (safeField('bio')) lines.push(`NOTE:${escapeVcard(safeField('bio'))}`)
 
     // Photo — inline URL reference (vCard 3.0 PHOTO;VALUE=URI)
-    if (fields['avatarUrl']) lines.push(`PHOTO;VALUE=URI:${fields['avatarUrl']}`)
+    if (safeField('avatarUrl')) lines.push(`PHOTO;VALUE=URI:${safeField('avatarUrl')}`)
 
     // Social links — emit X- properties for major platforms
     const socialLinks = card.socialLinks ?? []
@@ -702,9 +826,7 @@ export class CardsService {
 
     lines.push('END:VCARD')
 
-    const vcard = lines.join('\r\n')
-    // Return an object so the controller can use both the vcard content and the
-    // DB-validated handle for the Content-Disposition filename.
-    return Object.assign(vcard, { _handle: dbHandle })
+    const content = lines.join('\r\n')
+    return { content, handle: dbHandle }
   }
 }

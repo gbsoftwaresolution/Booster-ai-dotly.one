@@ -13,12 +13,36 @@ function isPlatformHost(hostname: string): boolean {
   return false
 }
 
+// ─── Legacy flat-URL → new /apps/* redirect map ───────────────────────────
+// Checked in order; first match wins.
+// String entries: exact match OR prefix (<pattern>/).
+// RegExp entries: matched against full pathname; replacer receives match array.
+type StringRedirect = [string, string]
+type RegExpRedirect = [RegExp, (m: RegExpMatchArray) => string]
+type RedirectEntry = StringRedirect | RegExpRedirect
+
+const LEGACY_REDIRECTS: RedirectEntry[] = [
+  // Cards — /cards/new redirects to /apps/cards/create; the bare /cards catch-all
+  // also matches all sub-paths (/cards/create, /cards/:id/edit, /cards/:id/analytics)
+  // because of the prefix-match logic below. All those sub-paths are now implemented
+  // under /apps/cards/* so the redirect is safe — no loops.
+  ['/cards/new',                            '/apps/cards/create'],
+  ['/cards',                                '/apps/cards'],
+  // CRM — specific sub-paths before the bare /crm catch-all
+  ['/crm/custom-fields',                    '/apps/crm/custom-fields'],
+  ['/crm/analytics',                        '/apps/crm/analytics'],
+  ['/crm',                                  '/apps/crm/pipeline'],
+  ['/contacts',                             '/apps/crm/contacts'],
+  ['/leads',                                '/apps/crm/leads'],
+  ['/deals',                                '/apps/crm/deals'],
+  ['/tasks',                                '/apps/crm/tasks'],
+  ['/pipelines',                            '/apps/crm/pipelines'],
+  // Scheduling
+  ['/scheduling',                           '/apps/scheduling'],
+]
+
 export async function middleware(request: NextRequest) {
   // H-2: Fail visibly if critical Supabase env vars are absent.
-  // Using non-null assertions (!) silently passes undefined to the Supabase
-  // client, which then fails to verify JWTs and lets every request through as
-  // unauthenticated.  Instead, return a 500 with a clear message so operators
-  // notice the misconfiguration immediately on first request.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -31,17 +55,13 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } })
 
   // ─── Referral cookie: ?ref=p_XXXXX ──────────────────────────────────────
-  // Capture the BoosterAI partner referral code from the URL and persist it in
-  // a 30-day cookie so it survives navigation to /auth and back to /pricing.
-  // We only set it if it looks like a valid partner code (alphanumeric + _ -)
-  // and only if no cookie is already set (first-touch attribution).
   const refParam = request.nextUrl.searchParams.get('ref')
   if (refParam && /^[a-zA-Z0-9_-]{1,64}$/.test(refParam) && !request.cookies.get('dotly_ref')) {
     response.cookies.set('dotly_ref', refParam, {
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
       sameSite: 'lax',
-      httpOnly: false, // must be readable by client-side JS at checkout
+      httpOnly: false,
     })
   }
 
@@ -69,12 +89,15 @@ export async function middleware(request: NextRequest) {
 
   const isDashboardRoute =
     request.nextUrl.pathname.startsWith('/dashboard') ||
+    request.nextUrl.pathname.startsWith('/qr') ||
+    request.nextUrl.pathname.startsWith('/apps') ||
     request.nextUrl.pathname.startsWith('/contacts') ||
     request.nextUrl.pathname.startsWith('/crm') ||
     request.nextUrl.pathname.startsWith('/analytics') ||
     request.nextUrl.pathname.startsWith('/cards') ||
     request.nextUrl.pathname.startsWith('/settings') ||
     request.nextUrl.pathname.startsWith('/email-signature') ||
+    request.nextUrl.pathname.startsWith('/email-templates') ||
     request.nextUrl.pathname.startsWith('/scheduling') ||
     request.nextUrl.pathname.startsWith('/leads') ||
     request.nextUrl.pathname.startsWith('/pipelines') ||
@@ -92,27 +115,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // ─── Legacy flat-URL → /apps/* permanent redirects (308) ─────────────────
+  // Only runs for authenticated users (unauthenticated were handled above).
+  const { pathname } = request.nextUrl
+  for (const entry of LEGACY_REDIRECTS) {
+    const [pattern, target] = entry
+    if (typeof pattern === 'string') {
+      if (pathname === pattern || pathname.startsWith(pattern + '/')) {
+        const url = request.nextUrl.clone()
+        url.pathname = target as string
+        return NextResponse.redirect(url, 308)
+      }
+    } else {
+      const m = pathname.match(pattern as RegExp)
+      if (m) {
+        const url = request.nextUrl.clone()
+        url.pathname = (target as (m: RegExpMatchArray) => string)(m)
+        return NextResponse.redirect(url, 308)
+      }
+    }
+  }
+
   // --- Custom domain routing ---
   const hostname = request.headers.get('host') ?? request.nextUrl.hostname
 
   if (!isPlatformHost(hostname)) {
-    // This is a custom domain — resolve it via the internal API route.
-    //
-    // CRIT-03: Do NOT use `request.url` as the base for the resolve URL.
-    // `request.url` includes the attacker-supplied Host header, so a crafted
-    // request with Host: 169.254.169.254 would construct a URL that hits the
-    // AWS metadata endpoint (SSRF).
-    //
-    // LOW-06: Validate the hostname looks like an FQDN before building the URL
-    // so path traversal characters (/, ?, #, ..) in the Host header cannot
-    // escape the intended query param.
-    //
-    // We use NEXT_PUBLIC_APP_URL (a build-time constant) as the base — it is
-    // never attacker-controlled.
+    // CRIT-03: Use NEXT_PUBLIC_APP_URL as base — never attacker-controlled.
+    // LOW-06: Validate hostname as FQDN before use.
     const fqdnRegex =
       /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
     if (!fqdnRegex.test(hostname)) {
-      // Hostname contains unexpected characters — skip custom-domain routing
       return response
     }
 
@@ -124,15 +156,9 @@ export async function middleware(request: NextRequest) {
       if (resolveRes.ok) {
         const data = (await resolveRes.json()) as { handle?: string }
         if (data.handle) {
-          // LOW-06: Validate the returned handle before using it in a rewrite.
-          // An API returning a handle with path traversal chars (../../..) or
-          // query strings could escape /card/[handle] and rewrite to arbitrary
-          // internal paths.  Allow only lowercase alphanumeric + hyphen.
           if (!/^[a-z0-9-]+$/.test(data.handle)) {
-            // Invalid handle — fall through to normal routing (returns 404)
             return response
           }
-          // Rewrite transparently to the card page
           const rewriteUrl = request.nextUrl.clone()
           rewriteUrl.pathname = `/card/${data.handle}`
           return NextResponse.rewrite(rewriteUrl)
@@ -147,11 +173,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Exclude Next.js internals and the public card viewer (/card/[handle]).
-  // Card pages are intentionally public — they have no auth gate and are
-  // served to anyone who visits a shared link or a custom domain rewrite.
-  // The custom-domain rewrite logic in this middleware rewrites requests
-  // from custom domains to /card/[handle] BEFORE the matcher runs, so
-  // keeping /card/* out of the matcher also prevents an infinite fetch loop.
   matcher: ['/((?!_next/static|_next/image|favicon.ico|card/).*)'],
 }

@@ -4,24 +4,32 @@ async function throwApiError(res: Response): Promise<never> {
   let message = `API ${res.status}`
   try {
     const body = await res.json() as Record<string, unknown>
-    if (typeof body['message'] === 'string') message = body['message']
-    else if (typeof body['error'] === 'string') message = body['error']
+    const msg = body['message']
+    if (typeof msg === 'string') {
+      message = msg
+    } else if (Array.isArray(msg) && msg.length > 0) {
+      // NestJS validation errors return message as string[]
+      message = (msg as string[]).join('; ')
+    } else if (typeof body['error'] === 'string') {
+      message = body['error']
+    }
   } catch {
     // ignore JSON parse failure — keep default message
   }
   throw new Error(message)
 }
 
-export async function apiGet<T>(path: string, token?: string): Promise<T> {
+export async function apiGet<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: 'no-store',
+    signal,
   })
   if (!res.ok) return throwApiError(res)
   return res.json() as Promise<T>
 }
 
-export async function apiPost<T>(path: string, body: unknown, token?: string): Promise<T> {
+export async function apiPost<T>(path: string, body: unknown, token?: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: {
@@ -29,6 +37,7 @@ export async function apiPost<T>(path: string, body: unknown, token?: string): P
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
+    signal,
   })
   if (!res.ok) return throwApiError(res)
   return res.json() as Promise<T>
@@ -60,10 +69,11 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
   return res.json() as Promise<T>
 }
 
-export async function apiDelete<T = void>(path: string, token?: string): Promise<T> {
+export async function apiDelete<T = void>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'DELETE',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal,
   })
   if (!res.ok) return throwApiError(res)
   // 204 No Content — no body to parse

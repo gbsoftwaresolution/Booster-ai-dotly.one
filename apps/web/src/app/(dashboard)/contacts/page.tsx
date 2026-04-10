@@ -18,7 +18,14 @@ import {
   Tag,
   ArrowUpDown,
   Upload,
+  X,
+  CheckCircle2,
+  FileText,
 } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface ContactRow {
   id: string
@@ -50,22 +57,47 @@ interface ImportContactsResponse {
   skipped: number
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 type Stage = (typeof STAGES)[number]
 
 const STAGE_BADGE: Record<Stage, string> = {
-  NEW: 'bg-gray-100 text-gray-700',
+  NEW: 'bg-gray-100 text-gray-600',
   CONTACTED: 'bg-blue-100 text-blue-700',
   QUALIFIED: 'bg-yellow-100 text-yellow-700',
   CLOSED: 'bg-green-100 text-green-700',
-  LOST: 'bg-red-100 text-red-700',
+  LOST: 'bg-red-100 text-red-600',
 }
+
+const STAGE_DOT: Record<Stage, string> = {
+  NEW: 'bg-gray-400',
+  CONTACTED: 'bg-blue-500',
+  QUALIFIED: 'bg-yellow-500',
+  CLOSED: 'bg-green-500',
+  LOST: 'bg-red-500',
+}
+
+const STAGE_FILTER_ACTIVE: Record<string, string> = {
+  ALL: 'bg-blue-600 text-white',
+  NEW: 'bg-gray-700 text-white',
+  CONTACTED: 'bg-blue-600 text-white',
+  QUALIFIED: 'bg-yellow-500 text-white',
+  CLOSED: 'bg-green-600 text-white',
+  LOST: 'bg-red-600 text-white',
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function getScoreBadgeClass(score?: number | null): string {
   if (score == null) return 'bg-gray-50 text-gray-400'
   if (score >= 75) return 'bg-green-100 text-green-700'
   if (score >= 50) return 'bg-yellow-100 text-yellow-700'
-  return 'bg-gray-100 text-gray-700'
+  return 'bg-gray-100 text-gray-600'
 }
 
 function getInitials(name: string): string {
@@ -77,6 +109,27 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
+// Deterministic avatar colour from name
+const AVATAR_COLOURS = [
+  'bg-blue-500',
+  'bg-violet-500',
+  'bg-emerald-500',
+  'bg-rose-500',
+  'bg-amber-500',
+  'bg-cyan-500',
+  'bg-pink-500',
+  'bg-indigo-500',
+]
+function avatarColour(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
+  return AVATAR_COLOURS[h % AVATAR_COLOURS.length]!
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function ContactsPage(): JSX.Element {
   const userTz = useUserTimezone()
   const [contacts, setContacts] = useState<ContactRow[]>([])
@@ -84,6 +137,7 @@ export default function ContactsPage(): JSX.Element {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('ALL')
@@ -98,7 +152,6 @@ export default function ContactsPage(): JSX.Element {
   const [showImportModal, setShowImportModal] = useState(false)
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
 
-  // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string
     onConfirm: () => void
@@ -110,14 +163,14 @@ export default function ContactsPage(): JSX.Element {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const LIMIT = 20
 
-  // Client-side sort applied on top of server-paginated (and server-filtered) results
-  const displayedContacts = contacts.sort((a, b) => {
+  // Fix: use spread to avoid mutating state array
+  const displayedContacts = [...contacts].sort((a, b) => {
     if (sortBy === 'name') return a.name.localeCompare(b.name)
     if (sortBy === 'stage') {
-      const stageOrder = { NEW: 0, CONTACTED: 1, QUALIFIED: 2, CLOSED: 3, LOST: 4 }
-      const aStage = (a.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
-      const bStage = (b.crmPipeline?.stage ?? 'NEW') as keyof typeof stageOrder
-      return (stageOrder[aStage] ?? 0) - (stageOrder[bStage] ?? 0)
+      const ORDER = { NEW: 0, CONTACTED: 1, QUALIFIED: 2, CLOSED: 3, LOST: 4 } as const
+      const aS = (a.crmPipeline?.stage ?? 'NEW') as Stage
+      const bS = (b.crmPipeline?.stage ?? 'NEW') as Stage
+      return (ORDER[aS] ?? 0) - (ORDER[bS] ?? 0)
     }
     if (sortBy === 'score') {
       if (a.enrichmentScore == null && b.enrichmentScore == null) return 0
@@ -125,7 +178,6 @@ export default function ContactsPage(): JSX.Element {
       if (b.enrichmentScore == null) return -1
       return b.enrichmentScore - a.enrichmentScore
     }
-    // default: date desc (server already sorts this way)
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 
@@ -153,7 +205,6 @@ export default function ContactsPage(): JSX.Element {
     [stageFilter, tagFilter],
   )
 
-  // Initial load and stage/tag filter changes — search changes go through the debounce only
   useEffect(() => {
     void loadContacts(1, search, stageFilter, tagFilter)
     void (async () => {
@@ -184,6 +235,7 @@ export default function ContactsPage(): JSX.Element {
   )
 
   const handleExportCSV = useCallback(async () => {
+    setExportError(null)
     try {
       const token = await getAccessToken()
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export`, {
@@ -201,7 +253,7 @@ export default function ContactsPage(): JSX.Element {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Export failed')
+      setExportError(err instanceof Error ? err.message : 'Export failed')
     }
   }, [])
 
@@ -242,26 +294,23 @@ export default function ContactsPage(): JSX.Element {
     if (!bulkStage || selectedIds.size === 0) return
     try {
       const token = await getAccessToken()
-      // M1: Use the real bulk API endpoint — single request instead of N individual PATCHes.
       await apiPatch('/contacts/bulk-stage', { ids: [...selectedIds], stage: bulkStage }, token)
       setSelectedIds(new Set())
       setBulkStage('')
       void loadContacts(page)
     } catch {
-      setError('Failed to update stage for one or more contacts. Please try again.')
+      setError('Failed to update stage for selected contacts. Please try again.')
     }
   }, [bulkStage, selectedIds, loadContacts, page])
 
   const handleBulkDelete = useCallback(async () => {
     setConfirmDialog({
-      message: `Delete ${selectedIds.size} contact(s)? This cannot be undone.`,
+      message: `Delete ${selectedIds.size} contact${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`,
       onConfirm: async () => {
         try {
           const token = await getAccessToken()
-          // M1: Use the real bulk delete API endpoint — single request instead of N DELETEs.
-          // The bulk endpoint uses DELETE with a body containing the IDs.
           const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/contacts/bulk`,
+            `${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/bulk`,
             {
               method: 'DELETE',
               headers: {
@@ -275,7 +324,7 @@ export default function ContactsPage(): JSX.Element {
           setSelectedIds(new Set())
           void loadContacts(page)
         } catch {
-          setError('Failed to delete one or more contacts. Please try again.')
+          setError('Failed to delete selected contacts. Please try again.')
         }
       },
     })
@@ -283,10 +332,8 @@ export default function ContactsPage(): JSX.Element {
 
   const handleBulkEdit = useCallback(async () => {
     if (!bulkEditMode || selectedIds.size === 0) return
-
     const trimmedValue = bulkEditValue.trim()
     if (!trimmedValue) return
-
     try {
       const token = await getAccessToken()
       const payload: {
@@ -299,13 +346,8 @@ export default function ContactsPage(): JSX.Element {
       if (bulkEditMode === 'company') {
         payload.company = trimmedValue
       } else {
-        const parsedTags = trimmedValue
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean)
-
+        const parsedTags = trimmedValue.split(',').map((t) => t.trim()).filter(Boolean)
         if (parsedTags.length === 0) return
-
         if (bulkEditMode === 'tagsAdd') payload.tagsAdd = parsedTags
         if (bulkEditMode === 'tagsRemove') payload.tagsRemove = parsedTags
       }
@@ -339,25 +381,24 @@ export default function ContactsPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your leads and connections.</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
-            <span>{total} total contacts</span>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <p className="text-sm text-gray-500">{total} total</p>
             <Link
               href="/crm/analytics"
-              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
             >
               View Funnel Analytics
             </Link>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void handleExportCSV()}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Download className="h-4 w-4" />
             Export CSV
@@ -365,7 +406,7 @@ export default function ContactsPage(): JSX.Element {
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Upload className="h-4 w-4" />
             Import CSV
@@ -373,7 +414,7 @@ export default function ContactsPage(): JSX.Element {
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Contact
@@ -381,111 +422,131 @@ export default function ContactsPage(): JSX.Element {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Export error */}
+      {exportError && (
+        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{exportError}</span>
+          <button type="button" onClick={() => setExportError(null)}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Filters row */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
-            type="text"
-            placeholder="Search contacts..."
+            type="search"
+            aria-label="Search contacts"
+            placeholder="Search contacts…"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
         {/* Tag filter */}
         {allTags.length > 0 && (
           <div className="relative">
-            <Tag className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+            <Tag className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <select
+              aria-label="Filter by tag"
               value={tagFilter}
               onChange={(e) => handleTagFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
+              className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
             >
               <option value="">All tags</option>
               {allTags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
+                <option key={tag} value={tag}>{tag}</option>
               ))}
             </select>
           </div>
         )}
 
-        {/* Sort */}
+        {/* Sort — client-side on current page */}
         <div className="relative">
-          <ArrowUpDown className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+          <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <select
+            aria-label="Sort contacts"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'stage' | 'score')}
-            className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
+            className="rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
           >
             <option value="date">Newest first</option>
             <option value="name">Name A–Z</option>
             <option value="stage">By stage</option>
-            <option value="score">Sort by Score</option>
+            <option value="score">By score</option>
           </select>
-        </div>
-
-        {/* Stage filters */}
-        <div className="flex flex-wrap gap-1.5">
-          {['ALL', ...STAGES].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => handleStageFilter(s)}
-              className={[
-                'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                stageFilter === s
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-              ].join(' ')}
-            >
-              {s}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* Bulk actions */}
+      {/* Stage filter pills */}
+      <div className="flex flex-wrap gap-1.5">
+        {(['ALL', ...STAGES] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => handleStageFilter(s)}
+            className={[
+              'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              stageFilter === s
+                ? (STAGE_FILTER_ACTIVE[s] ?? 'bg-blue-600 text-white')
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+            ].join(' ')}
+          >
+            {s !== 'ALL' && (
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${stageFilter === s ? 'bg-white/70' : (STAGE_DOT[s as Stage] ?? 'bg-gray-400')}`}
+              />
+            )}
+            {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
-          <span className="text-sm font-medium text-indigo-700">{selectedIds.size} selected</span>
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <span className="text-sm font-semibold text-blue-700">
+            {selectedIds.size} selected
+          </span>
+
+          {/* Stage change */}
           <select
             value={bulkStage}
             onChange={(e) => setBulkStage(e.target.value)}
-            className="rounded-md border border-indigo-300 bg-white px-2 py-1.5 text-sm text-gray-700"
+            className="rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
           >
-            <option value="">Change stage...</option>
+            <option value="">Change stage…</option>
             {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
+              <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
             ))}
           </select>
           {bulkStage && (
             <button
               type="button"
               onClick={() => void handleBulkStageChange()}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             >
               Apply
             </button>
           )}
+
+          {/* Bulk edit */}
           <select
             value={bulkEditMode}
             onChange={(e) => {
               setBulkEditMode(e.target.value as 'company' | 'tagsAdd' | 'tagsRemove' | '')
               setBulkEditValue('')
             }}
-            className="rounded-md border border-indigo-300 bg-white px-2 py-1.5 text-sm text-gray-700"
+            className="rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
           >
-            <option value="">Bulk Edit...</option>
-            <option value="company">Set Company</option>
-            <option value="tagsAdd">Add Tags</option>
-            <option value="tagsRemove">Remove Tags</option>
+            <option value="">Bulk edit…</option>
+            <option value="company">Set company</option>
+            <option value="tagsAdd">Add tags</option>
+            <option value="tagsRemove">Remove tags</option>
           </select>
           {bulkEditMode && (
             <>
@@ -493,169 +554,163 @@ export default function ContactsPage(): JSX.Element {
                 type="text"
                 value={bulkEditValue}
                 onChange={(e) => setBulkEditValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleBulkEdit() }}
                 placeholder={bulkEditMode === 'company' ? 'Company name' : 'Tags (comma-separated)'}
-                className="rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+                className="rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => void handleBulkEdit()}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
               >
                 Confirm
               </button>
             </>
           )}
+
           <button
             type="button"
             onClick={() => void handleBulkDelete()}
-            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto rounded-md p-1.5 text-blue-500 hover:bg-blue-100"
+            aria-label="Clear selection"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {/* Error */}
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} aria-label="Dismiss error">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100" />
             ))}
           </div>
         ) : displayedContacts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Users className="mb-4 h-12 w-12 text-gray-300" />
-            {total === 0 && !search && stageFilter === 'ALL' && !tagFilter ? (
-              <>
-                <p className="text-sm font-medium text-gray-700">No contacts yet</p>
-                <p className="mt-1 text-sm text-gray-400">
-                  Add your first contact or share your card to start capturing leads.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-medium text-gray-700">No results found</p>
-                <p className="mt-1 text-sm text-gray-400">Try adjusting your search or filter.</p>
-              </>
-            )}
-          </div>
+          <EmptyState
+            hasFilters={!!search || stageFilter !== 'ALL' || !!tagFilter}
+            onAdd={() => setShowAddModal(true)}
+          />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
                 <th className="px-4 py-3">
                   <input
                     type="checkbox"
-                    checked={
-                      selectedIds.size === displayedContacts.length && displayedContacts.length > 0
-                    }
+                    aria-label="Select all"
+                    checked={selectedIds.size === displayedContacts.length && displayedContacts.length > 0}
                     onChange={selectAll}
-                    className="rounded border-gray-300"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">
-                  Company
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">
-                  Source Card
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">
-                  Date Added
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Stage
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Score
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Email</th>
+                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 md:table-cell">Company</th>
+                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">Source Card</th>
+                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">Added</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Stage</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Score</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {displayedContacts.map((contact) => (
-                <tr key={contact.id} className="hover:bg-gray-50 cursor-pointer">
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(contact.id)}
-                      onChange={() => toggleSelect(contact.id)}
-                      className="rounded border-gray-300"
-                    />
-                  </td>
-                  <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
-                        {getInitials(contact.name)}
+              {displayedContacts.map((contact) => {
+                const stage = (contact.crmPipeline?.stage ?? 'NEW') as Stage
+                return (
+                  <tr
+                    key={contact.id}
+                    className="cursor-pointer hover:bg-blue-50/40 transition-colors"
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${contact.name}`}
+                        checked={selectedIds.has(contact.id)}
+                        onChange={() => toggleSelect(contact.id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColour(contact.name)}`}
+                        >
+                          {getInitials(contact.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-900">{contact.name}</p>
+                          {contact.tags && contact.tags.length > 0 && (
+                            <p className="truncate text-xs text-gray-400">
+                              {contact.tags.slice(0, 2).join(', ')}
+                              {contact.tags.length > 2 && ` +${contact.tags.length - 2}`}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <span className="font-medium text-gray-900">{contact.name}</span>
-                    </div>
-                  </td>
-                  <td
-                    className="px-4 py-3 text-gray-500"
-                    onClick={() => setDrawerContactId(contact.id)}
-                  >
-                    {contact.email ?? '—'}
-                  </td>
-                  <td
-                    className="px-4 py-3 text-gray-500 hidden md:table-cell"
-                    onClick={() => setDrawerContactId(contact.id)}
-                  >
-                    {contact.company ?? '—'}
-                  </td>
-                  <td
-                    className="px-4 py-3 hidden lg:table-cell"
-                    onClick={() => setDrawerContactId(contact.id)}
-                  >
-                    {contact.sourceCard ? (
-                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                        /{contact.sourceCard.handle}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500" onClick={() => setDrawerContactId(contact.id)}>
+                      {contact.email ?? '—'}
+                    </td>
+                    <td className="hidden px-4 py-3 text-gray-500 md:table-cell" onClick={() => setDrawerContactId(contact.id)}>
+                      {contact.company ?? '—'}
+                    </td>
+                    <td className="hidden px-4 py-3 lg:table-cell" onClick={() => setDrawerContactId(contact.id)}>
+                      {contact.sourceCard ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          /{contact.sourceCard.handle}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="hidden px-4 py-3 text-gray-500 lg:table-cell" onClick={() => setDrawerContactId(contact.id)}>
+                      {formatDate(contact.createdAt, userTz)}
+                    </td>
+                    <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_BADGE[stage]}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${STAGE_DOT[stage]}`} />
+                        {stage.charAt(0) + stage.slice(1).toLowerCase()}
                       </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td
-                    className="px-4 py-3 text-gray-500 hidden lg:table-cell"
-                    onClick={() => setDrawerContactId(contact.id)}
-                  >
-                    {formatDate(contact.createdAt, userTz)}
-                  </td>
-                  <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_BADGE[(contact.crmPipeline?.stage as Stage) ?? 'NEW'] ?? ''}`}
-                    >
-                      {contact.crmPipeline?.stage ?? 'NEW'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}
-                    >
-                      {contact.enrichmentScore ?? '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(contact.id)}
-                      className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}>
+                        {contact.enrichmentScore ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${contact.name}`}
+                        onClick={() => void handleDelete(contact.id)}
+                        className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
@@ -672,7 +727,7 @@ export default function ContactsPage(): JSX.Element {
               type="button"
               disabled={page === 1}
               onClick={() => void loadContacts(page - 1)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               Previous
             </button>
@@ -680,7 +735,7 @@ export default function ContactsPage(): JSX.Element {
               type="button"
               disabled={page === totalPages}
               onClick={() => void loadContacts(page + 1)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               Next
             </button>
@@ -688,7 +743,7 @@ export default function ContactsPage(): JSX.Element {
         </div>
       )}
 
-      {/* Add Contact Modal */}
+      {/* Modals */}
       {showAddModal && (
         <AddContactModal
           cards={cards}
@@ -703,13 +758,10 @@ export default function ContactsPage(): JSX.Element {
       {showImportModal && (
         <ImportCsvModal
           onClose={() => setShowImportModal(false)}
-          onImported={() => {
-            void loadContacts(1)
-          }}
+          onImported={() => void loadContacts(1)}
         />
       )}
 
-      {/* Contact Detail Drawer */}
       <ContactDetailDrawer
         contactId={drawerContactId}
         onClose={() => setDrawerContactId(null)}
@@ -718,7 +770,6 @@ export default function ContactsPage(): JSX.Element {
         }}
       />
 
-      {/* Confirm Delete Dialog */}
       {confirmDialog && (
         <ConfirmDialog
           message={confirmDialog.message}
@@ -733,6 +784,51 @@ export default function ContactsPage(): JSX.Element {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+
+function EmptyState({
+  hasFilters,
+  onAdd,
+}: {
+  hasFilters: boolean
+  onAdd: () => void
+}): JSX.Element {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
+        <Users className="h-8 w-8 text-gray-400" />
+      </div>
+      {hasFilters ? (
+        <>
+          <p className="text-sm font-semibold text-gray-700">No results found</p>
+          <p className="mt-1 text-sm text-gray-400">Try adjusting your search or filter.</p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold text-gray-800">No contacts yet</p>
+          <p className="mt-1 max-w-xs text-sm text-gray-400">
+            Add your first contact manually, import a CSV, or share your card to start capturing leads.
+          </p>
+          <button
+            type="button"
+            onClick={onAdd}
+            className="mt-5 flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add your first contact
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Confirm dialog — bottom sheet on mobile, centered modal on desktop
+// ---------------------------------------------------------------------------
+
 function ConfirmDialog({
   message,
   onConfirm,
@@ -742,10 +838,51 @@ function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }): JSX.Element {
+  // Close on Escape
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', handle)
+    return () => document.removeEventListener('keydown', handle)
+  }, [onCancel])
+
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+      <div
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+      {/* Mobile: bottom sheet */}
+      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5 shadow-2xl sm:hidden">
+        <div className="mb-4 h-1 w-10 rounded-full bg-gray-300 mx-auto" />
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">Confirm deletion</p>
+            <p className="mt-1 text-sm text-gray-500">{message}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="w-full rounded-xl bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+      {/* Desktop: centered modal */}
+      <div className="fixed inset-x-4 top-1/2 z-50 hidden w-full max-w-sm -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl sm:block sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
             <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -776,6 +913,10 @@ function ConfirmDialog({
   )
 }
 
+// ---------------------------------------------------------------------------
+// Add Contact Modal — bottom sheet on mobile, centered modal on desktop
+// ---------------------------------------------------------------------------
+
 function AddContactModal({
   cards,
   onClose,
@@ -799,8 +940,16 @@ function AddContactModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handle)
+    return () => document.removeEventListener('keydown', handle)
+  }, [onClose])
+
   const inputCls =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none'
+    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+
+  const labelCls = 'block text-xs font-medium text-gray-600 mb-1'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -808,10 +957,7 @@ function AddContactModal({
     setError(null)
     try {
       const token = await getAccessToken()
-      const parsedTags = tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean)
+      const parsedTags = tags.split(',').map((t) => t.trim()).filter(Boolean)
       await apiPost<ContactDetail>(
         '/contacts',
         {
@@ -837,114 +983,206 @@ function AddContactModal({
     }
   }
 
+  const inner = (
+    <div className="overflow-y-auto" style={{ maxHeight: '80vh' }}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Add Contact</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+      )}
+
+      <form
+        noValidate
+        onSubmit={(e) => void handleSubmit(e)}
+        className="mt-4 space-y-3"
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label htmlFor="ac-name" className={labelCls}>Full name <span className="text-red-500">*</span></label>
+            <input
+              id="ac-name"
+              required
+              autoComplete="name"
+              placeholder="Jane Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-email" className={labelCls}>Email</label>
+            <input
+              id="ac-email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              placeholder="jane@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-phone" className={labelCls}>Phone</label>
+            <input
+              id="ac-phone"
+              type="tel"
+              autoComplete="tel"
+              inputMode="tel"
+              placeholder="+1 555 0100"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-company" className={labelCls}>Company</label>
+            <input
+              id="ac-company"
+              autoComplete="organization"
+              placeholder="Acme Inc."
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-title" className={labelCls}>Job title</label>
+            <input
+              id="ac-title"
+              autoComplete="organization-title"
+              placeholder="Founder"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-website" className={labelCls}>Website</label>
+            <input
+              id="ac-website"
+              type="url"
+              inputMode="url"
+              placeholder="https://acme.com"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-address" className={labelCls}>Address</label>
+            <input
+              id="ac-address"
+              autoComplete="street-address"
+              placeholder="New York, NY"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-stage" className={labelCls}>Stage</label>
+            <select
+              id="ac-stage"
+              value={stage}
+              onChange={(e) => setStage(e.target.value as Stage)}
+              className={inputCls}
+            >
+              {STAGES.map((s) => (
+                <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="ac-source" className={labelCls}>Source card</label>
+            <select
+              id="ac-source"
+              value={sourceCardId}
+              onChange={(e) => setSourceCardId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">None</option>
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>/{c.handle}</option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="ac-tags" className={labelCls}>Tags <span className="text-gray-400">(comma-separated)</span></label>
+            <input
+              id="ac-tags"
+              placeholder="prospect, warm-lead"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="ac-notes" className={labelCls}>Notes</label>
+            <textarea
+              id="ac-notes"
+              rows={3}
+              placeholder="Anything worth remembering…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {submitting ? 'Creating…' : 'Create Contact'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-md -translate-y-1/2 overflow-y-auto max-h-[90vh] rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Add Contact</h2>
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-          <input
-            required
-            placeholder="Full Name *"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            placeholder="Phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            placeholder="Company"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            placeholder="Job Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            placeholder="Website (https://...)"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            placeholder="Address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className={inputCls}
-          />
-          <textarea
-            placeholder="Notes"
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            placeholder="Tags (comma-separated)"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            className={inputCls}
-          />
-          <select
-            value={sourceCardId}
-            onChange={(e) => setSourceCardId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">No source card</option>
-            {cards.map((c) => (
-              <option key={c.id} value={c.id}>
-                /{c.handle}
-              </option>
-            ))}
-          </select>
-          <select
-            value={stage}
-            onChange={(e) => setStage(e.target.value as Stage)}
-            className={inputCls}
-          >
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {submitting ? 'Creating...' : 'Create Contact'}
-            </button>
-          </div>
-        </form>
+      <div
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* Mobile: bottom sheet */}
+      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl sm:hidden">
+        <div className="mb-3 h-1 w-10 rounded-full bg-gray-300 mx-auto" />
+        {inner}
+      </div>
+      {/* Desktop: centered modal */}
+      <div className="fixed inset-x-4 top-1/2 z-50 hidden w-full max-w-lg -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl sm:block sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+        {inner}
       </div>
     </>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Import CSV Modal
+// ---------------------------------------------------------------------------
 
 function ImportCsvModal({
   onClose,
@@ -955,14 +1193,23 @@ function ImportCsvModal({
 }): JSX.Element {
   const [csv, setCsv] = useState('')
   const [fileName, setFileName] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportContactsResponse | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handle)
+    return () => document.removeEventListener('keydown', handle)
+  }, [onClose])
+
+  const readFile = (file: File) => {
+    if (!file.name.endsWith('.csv') && file.type !== 'text/csv') {
+      setError('Please select a .csv file')
+      return
+    }
     setFileName(file.name)
     const reader = new FileReader()
     reader.onload = (evt) => {
@@ -974,13 +1221,23 @@ function ImportCsvModal({
     reader.readAsText(file, 'utf-8')
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) readFile(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) readFile(file)
+  }
+
   const handleImport = async () => {
     if (!csv.trim()) return
-
     setSubmitting(true)
     setError(null)
     setResult(null)
-
     try {
       const token = await getAccessToken()
       const response = await apiPost<ImportContactsResponse>('/contacts/import', { csv }, token)
@@ -995,84 +1252,108 @@ function ImportCsvModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-lg -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
-        <h2 className="text-lg font-semibold text-gray-900">Import CSV</h2>
+      <div
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-lg -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Import Contacts</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
         <div className="mt-4 space-y-4">
-          {/* File picker */}
-          <div>
-            <p className="mb-2 text-sm font-medium text-gray-700">Upload a CSV file</p>
-            <div
-              className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-            >
-              <Upload className="mb-2 h-7 w-7 text-gray-400" />
-              {fileName ? (
-                <p className="text-sm font-medium text-indigo-700">{fileName}</p>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-600">Click to select a .csv file</p>
-                  <p className="mt-0.5 text-xs text-gray-400">or paste content below</p>
-                </>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </div>
+          {/* Drop zone */}
+          <div
+            role="button"
+            tabIndex={0}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+            className={[
+              'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors',
+              dragging
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50',
+            ].join(' ')}
+          >
+            <FileText className={`mb-2 h-8 w-8 ${dragging ? 'text-blue-500' : 'text-gray-400'}`} />
+            {fileName ? (
+              <p className="text-sm font-medium text-blue-700">{fileName}</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-700">Drop your CSV here</p>
+                <p className="mt-0.5 text-xs text-gray-400">or click to browse</p>
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
 
           {/* Paste fallback */}
           <div>
-            <label
-              className="block text-sm font-medium text-gray-700 mb-1"
-              htmlFor="contacts-import-csv"
-            >
+            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="import-csv-paste">
               Or paste CSV content
             </label>
             <textarea
-              id="contacts-import-csv"
-              rows={6}
+              id="import-csv-paste"
+              rows={5}
               value={csv}
               onChange={(e) => {
                 setCsv(e.target.value)
                 setFileName(null)
+                setResult(null)
+                setError(null)
               }}
               placeholder={
-                'name,email,phone,company,title,website,address\nJane Doe,jane@example.com,+1-555-0100,Acme,Founder,https://acme.com,New York'
+                'name,email,phone,company,title\nJane Doe,jane@example.com,+1-555-0100,Acme,Founder'
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+
           {result && (
-            <p className="text-sm text-green-700">
-              Created {result.created} contacts, skipped {result.skipped} duplicates
-            </p>
+            <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+              Created {result.created} contact{result.created !== 1 ? 's' : ''}, skipped {result.skipped} duplicate{result.skipped !== 1 ? 's' : ''}
+            </div>
           )}
-          <div className="flex gap-2 pt-2">
+
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {result ? 'Done' : 'Cancel'}
             </button>
-            <button
-              type="button"
-              disabled={submitting || !csv.trim()}
-              onClick={() => void handleImport()}
-              className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {submitting ? 'Importing...' : 'Import'}
-            </button>
+            {!result && (
+              <button
+                type="button"
+                disabled={submitting || !csv.trim()}
+                onClick={() => void handleImport()}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {submitting ? 'Importing…' : 'Import'}
+              </button>
+            )}
           </div>
         </div>
       </div>

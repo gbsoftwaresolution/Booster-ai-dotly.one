@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
+  QrCode,
   Plus,
   Eye,
   MousePointerClick,
@@ -20,6 +21,7 @@ import {
 import { getAccessToken, createClient } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { AppLauncherGrid } from '@/components/shell/AppLauncherGrid'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -398,6 +400,9 @@ export default function DashboardPage(): JSX.Element {
         </p>
       </div>
 
+      {/* ── App Launcher ── */}
+      <AppLauncherGrid />
+
       {/* ── 4-tile stat grid ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -691,7 +696,7 @@ export default function DashboardPage(): JSX.Element {
                   Create your first digital card to start sharing.
                 </p>
                 <Link
-                  href="/cards/create"
+                  href="/qr"
                   className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
                 >
                   <Plus className="h-4 w-4" />
@@ -774,7 +779,7 @@ export default function DashboardPage(): JSX.Element {
           {[
             {
               label: 'New Card',
-              href: '/cards/create',
+              href: '/apps/cards/create',
               icon: CreditCard,
               color: 'text-brand-500',
               bg: 'bg-brand-50',
@@ -815,13 +820,13 @@ export default function DashboardPage(): JSX.Element {
         </div>
       </div>
 
-      {/* ── Mobile FAB ── */}
+      {/* ── Mobile QR FAB ── */}
       <Link
-        href="/cards/create"
+        href="/qr"
         className="fixed bottom-[calc(env(safe-area-inset-bottom)+68px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 shadow-lg shadow-brand-500/30 transition-transform active:scale-95 lg:hidden"
-        aria-label="Create new card"
+        aria-label="Show QR code"
       >
-        <Plus className="h-6 w-6 text-white" aria-hidden="true" />
+        <QrCode className="h-6 w-6 text-white" aria-hidden="true" />
       </Link>
     </div>
   )

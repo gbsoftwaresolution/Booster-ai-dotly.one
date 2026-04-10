@@ -1,6 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
+import type { VcardPolicy } from '@dotly/types'
 import { useState } from 'react'
 import {
   User,
@@ -23,8 +24,10 @@ interface ProfileTabProps {
   cardId: string
   fields: Record<string, string>
   handle: string
+  vcardPolicy: VcardPolicy
   onFieldChange: (key: string, value: string) => void
   onHandleChange: (handle: string) => void
+  onVcardPolicyChange: (policy: VcardPolicy) => void
 }
 
 // ── Reusable icon-prefixed input ────────────────────────────────────────────
@@ -201,8 +204,10 @@ export function ProfileTab({
   cardId,
   fields,
   handle,
+  vcardPolicy,
   onFieldChange,
   onHandleChange,
+  onVcardPolicyChange,
 }: ProfileTabProps): JSX.Element {
   return (
     <div className="space-y-5">
@@ -327,6 +332,75 @@ export function ProfileTab({
         placeholder="https://maps.google.com/?q=..."
         type="url"
       />
+
+      {/* ── Contact Sharing ── */}
+      <SectionHeader label="Contact Sharing" />
+
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Control who can download your vCard (contact file) from your public card page.
+        </p>
+
+        <div className="flex flex-col gap-2">
+          {/* PUBLIC option */}
+          <button
+            type="button"
+            onClick={() => onVcardPolicyChange('PUBLIC')}
+            className={cn(
+              'flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all',
+              vcardPolicy === 'PUBLIC'
+                ? 'border-brand-400 bg-brand-50 ring-2 ring-brand-500/20'
+                : 'border-gray-200 bg-white hover:border-gray-300',
+            )}
+          >
+            <span
+              className={cn(
+                'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                vcardPolicy === 'PUBLIC' ? 'border-brand-500 bg-brand-500' : 'border-gray-300',
+              )}
+            >
+              {vcardPolicy === 'PUBLIC' && (
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              )}
+            </span>
+            <div>
+              <p className={cn('text-sm font-semibold', vcardPolicy === 'PUBLIC' ? 'text-brand-700' : 'text-gray-800')}>
+                Public
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Anyone can download your contact — no sign-in required.</p>
+            </div>
+          </button>
+
+          {/* MEMBERS_ONLY option */}
+          <button
+            type="button"
+            onClick={() => onVcardPolicyChange('MEMBERS_ONLY')}
+            className={cn(
+              'flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all',
+              vcardPolicy === 'MEMBERS_ONLY'
+                ? 'border-brand-400 bg-brand-50 ring-2 ring-brand-500/20'
+                : 'border-gray-200 bg-white hover:border-gray-300',
+            )}
+          >
+            <span
+              className={cn(
+                'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                vcardPolicy === 'MEMBERS_ONLY' ? 'border-brand-500 bg-brand-500' : 'border-gray-300',
+              )}
+            >
+              {vcardPolicy === 'MEMBERS_ONLY' && (
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              )}
+            </span>
+            <div>
+              <p className={cn('text-sm font-semibold', vcardPolicy === 'MEMBERS_ONLY' ? 'text-brand-700' : 'text-gray-800')}>
+                Members only
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Only signed-in Dotly users can download your contact.</p>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

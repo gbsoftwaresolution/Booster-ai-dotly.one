@@ -1,9 +1,54 @@
 'use client'
+
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { apiPost } from '@/lib/api'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Global styles (all keyframes in one place) ───────────────────────────────
+
+const GLOBAL_STYLES = `
+  @keyframes lcm-slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  @keyframes lcm-check-pop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(1);    opacity: 1; }
+  }
+  @keyframes lcm-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+`
+
+// ─── Shared vCard download ────────────────────────────────────────────────────
+
+/** Download a vCard using fetch() + createObjectURL() so that the
+ *  Authorization header can be sent — the vCard endpoint only accepts
+ *  Bearer tokens, not ?token= query params (stripped for security).
+ */
+async function downloadVcardFetch(cardHandle: string, token: string) {
+  const url = `${API_URL}/public/cards/${cardHandle}/vcard`
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) return
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = `${cardHandle}.vcf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    /* non-blocking */
+  }
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type LeadFieldType = 'TEXT' | 'EMAIL' | 'PHONE' | 'URL' | 'TEXTAREA' | 'SELECT'
 
@@ -24,7 +69,6 @@ interface LeadForm {
   fields: LeadField[]
 }
 
-// Default form shown when no custom schema is configured
 const DEFAULT_FORM: LeadForm = {
   title: 'Connect with me',
   description: "Leave your details and I'll be in touch.",
@@ -60,70 +104,44 @@ const DEFAULT_FORM: LeadForm = {
   ],
 }
 
-// ── Field icon map ─────────────────────────────────────────────────────────────
+// ─── Field icon ───────────────────────────────────────────────────────────────
 
 function FieldIcon({ type, focused }: { type: LeadFieldType; focused: boolean }) {
   const color = focused ? '#0ea5e9' : '#94a3b8'
+  const props = {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  }
   switch (type) {
     case 'EMAIL':
       return (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg {...props}>
           <rect width="20" height="16" x="2" y="4" rx="2" />
           <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
         </svg>
       )
     case 'PHONE':
       return (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg {...props}>
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6.53 6.53l1.62-1.62a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
         </svg>
       )
     case 'URL':
       return (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg {...props}>
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       )
     case 'TEXTAREA':
       return (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg {...props}>
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <line x1="8" y1="8" x2="16" y2="8" />
           <line x1="8" y1="12" x2="16" y2="12" />
@@ -132,32 +150,14 @@ function FieldIcon({ type, focused }: { type: LeadFieldType; focused: boolean })
       )
     case 'SELECT':
       return (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg {...props}>
           <path d="M3 6h18M3 12h18M3 18h7" />
           <path d="m16 16 2 2 4-4" />
         </svg>
       )
-    default: // TEXT
+    default:
       return (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg {...props}>
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
           <circle cx="12" cy="7" r="4" />
         </svg>
@@ -165,7 +165,42 @@ function FieldIcon({ type, focused }: { type: LeadFieldType; focused: boolean })
   }
 }
 
-// ── Input components ─────────────────────────────────────────────────────────
+// ─── Dynamic field ────────────────────────────────────────────────────────────
+
+function autoCompleteFor(type: LeadFieldType): string {
+  switch (type) {
+    case 'EMAIL':
+      return 'email'
+    case 'PHONE':
+      return 'tel'
+    case 'URL':
+      return 'url'
+    default:
+      return 'name'
+  }
+}
+
+function inputTypeFor(type: LeadFieldType): string {
+  switch (type) {
+    case 'EMAIL':
+      return 'email'
+    case 'PHONE':
+      return 'tel'
+    case 'URL':
+      return 'url'
+    default:
+      return 'text'
+  }
+}
+
+function inputModeFor(
+  type: LeadFieldType,
+): React.InputHTMLAttributes<HTMLInputElement>['inputMode'] {
+  if (type === 'PHONE') return 'tel'
+  if (type === 'URL') return 'url'
+  if (type === 'EMAIL') return 'email'
+  return 'text'
+}
 
 function DynamicField({
   field,
@@ -182,7 +217,18 @@ function DynamicField({
 }) {
   const [focused, setFocused] = useState(false)
 
-  const baseInputStyle: React.CSSProperties = {
+  const wrapStyle: React.CSSProperties = {
+    position: 'relative',
+    display: 'flex',
+    alignItems: field.fieldType === 'TEXTAREA' ? 'flex-start' : 'center',
+    borderRadius: 10,
+    border: `1.5px solid ${focused ? '#0ea5e9' : '#e2e8f0'}`,
+    background: focused ? '#f0f9ff' : '#f8fafc',
+    transition: 'border-color 0.15s, background 0.15s',
+    boxShadow: focused ? '0 0 0 3px rgba(14,165,233,0.12)' : 'none',
+  }
+
+  const baseInput: React.CSSProperties = {
     width: '100%',
     paddingLeft: 38,
     paddingRight: 12,
@@ -196,15 +242,13 @@ function DynamicField({
     borderRadius: 10,
   }
 
-  const wrapStyle: React.CSSProperties = {
-    position: 'relative',
+  const iconStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: 12,
+    top: field.fieldType === 'TEXTAREA' ? 12 : undefined,
     display: 'flex',
-    alignItems: field.fieldType === 'TEXTAREA' ? 'flex-start' : 'center',
-    borderRadius: 10,
-    border: `1.5px solid ${focused ? '#0ea5e9' : '#e2e8f0'}`,
-    background: focused ? '#f0f9ff' : '#f8fafc',
-    transition: 'border-color 0.15s, background 0.15s',
-    boxShadow: focused ? '0 0 0 3px rgba(14,165,233,0.12)' : 'none',
+    alignItems: 'center',
+    transition: 'color 0.15s',
   }
 
   return (
@@ -230,21 +274,9 @@ function DynamicField({
         {field.required && <span className="sr-only"> (required)</span>}
       </label>
       <div style={wrapStyle}>
-        <span
-          style={{
-            position: 'absolute',
-            left: 12,
-            top: field.fieldType === 'TEXTAREA' ? 12 : undefined,
-            color: focused ? '#0ea5e9' : '#94a3b8',
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'color 0.15s',
-          }}
-          aria-hidden="true"
-        >
+        <span style={iconStyle} aria-hidden="true">
           <FieldIcon type={field.fieldType} focused={focused} />
         </span>
-
         {field.fieldType === 'TEXTAREA' ? (
           <textarea
             id={inputId}
@@ -253,15 +285,9 @@ function DynamicField({
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={field.placeholder}
-            required={field.required}
             rows={3}
             autoFocus={autoFocus}
-            style={{
-              ...baseInputStyle,
-              paddingTop: 10,
-              paddingBottom: 10,
-              resize: 'none',
-            }}
+            style={{ ...baseInput, resize: 'none' }}
           />
         ) : field.fieldType === 'SELECT' ? (
           <select
@@ -270,9 +296,8 @@ function DynamicField({
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            required={field.required}
             autoFocus={autoFocus}
-            style={{ ...baseInputStyle, appearance: 'none', paddingRight: 32 }}
+            style={{ ...baseInput, appearance: 'none', paddingRight: 32 }}
           >
             <option value="">{field.placeholder || `Select ${field.label}`}</option>
             {field.options.map((opt) => (
@@ -284,23 +309,20 @@ function DynamicField({
         ) : (
           <input
             id={inputId}
-            type={
-              field.fieldType === 'EMAIL'
-                ? 'email'
-                : field.fieldType === 'PHONE'
-                  ? 'tel'
-                  : field.fieldType === 'URL'
-                    ? 'url'
-                    : 'text'
+            type={inputTypeFor(field.fieldType)}
+            inputMode={inputModeFor(field.fieldType)}
+            autoComplete={
+              field.fieldType === 'TEXT' && field.id === '__name'
+                ? 'name'
+                : autoCompleteFor(field.fieldType)
             }
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={field.placeholder}
-            required={field.required}
             autoFocus={autoFocus}
-            style={baseInputStyle}
+            style={baseInput}
           />
         )}
       </div>
@@ -308,13 +330,18 @@ function DynamicField({
   )
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 interface LeadCaptureModalProps {
   cardId: string
   cardHandle: string
   ownerName: string
-  /** When provided, the modal is always visible and this is called to close it */
+  /** Whether the visitor is an authenticated Dotly user */
+  isAuth?: boolean
+  /** The visitor's access token (if authenticated) */
+  authToken?: string | null
+  onAnalytics?: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
+  /** When provided, the modal is always visible and this callback closes it */
   onClose?: () => void
 }
 
@@ -322,51 +349,55 @@ export function LeadCaptureModal({
   cardId,
   cardHandle,
   ownerName,
+  isAuth = false,
+  authToken = null,
+  onAnalytics,
   onClose,
 }: LeadCaptureModalProps) {
-  const [open, setOpen] = useState(!onClose)
+  const isControlled = !!onClose
+  const [open, setOpen] = useState(false) // always starts closed — trigger button opens it
   const [form, setForm] = useState<LeadForm>(DEFAULT_FORM)
   const [values, setValues] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-  const dialogRef = useRef<HTMLDivElement>(null)
-  const titleId = `lead-modal-title-${cardHandle}`
+  const titleId = `lcm-title-${cardHandle}`
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Auth-connect state — for authenticated users who skip the form
+  const [authConnecting, setAuthConnecting] = useState(false)
+  const [authConnected, setAuthConnected] = useState(false)
+  const [authConnectError, setAuthConnectError] = useState('')
 
-  const isControlled = !!onClose
   const isOpen = isControlled ? true : open
 
-  // Fetch form schema from public API (with abort on unmount / re-run)
+  // Initialise field values from a form schema
+  function initValues(fields: LeadField[]) {
+    const init: Record<string, string> = {}
+    fields.forEach((f) => {
+      init[f.id] = ''
+    })
+    setValues(init)
+  }
+
+  // Fetch form schema from public API
   useEffect(() => {
     const controller = new AbortController()
     fetch(`${API_URL}/public/cards/${cardHandle}/lead-form`, { signal: controller.signal })
       .then((r) => (r.ok ? (r.json() as Promise<LeadForm>) : Promise.reject()))
       .then((data: LeadForm) => {
-        // Sort fields by displayOrder
         const sorted = [...data.fields].sort((a, b) => a.displayOrder - b.displayOrder)
-        setForm({ ...data, fields: sorted })
-        const init: Record<string, string> = {}
-        sorted.forEach((f) => {
-          init[f.id] = ''
-        })
-        setValues(init)
+        const merged = { ...data, fields: sorted }
+        setForm(merged)
+        initValues(sorted)
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') return
-        // Fallback to defaults — already set, just initialise values
-        const init: Record<string, string> = {}
-        DEFAULT_FORM.fields.forEach((f) => {
-          init[f.id] = ''
-        })
-        setValues(init)
+        initValues(DEFAULT_FORM.fields)
       })
-    return () => {
-      controller.abort()
-    }
+    return () => controller.abort()
   }, [cardHandle])
 
-  // Lock body scroll when modal is open
+  // Body scroll lock while open
   useEffect(() => {
     if (!isOpen) return
     const prev = document.body.style.overflow
@@ -376,54 +407,50 @@ export function LeadCaptureModal({
     }
   }, [isOpen])
 
-  // Escape key closes the dialog
   const handleClose = useCallback(() => {
+    setSuccess(false) // reset success state so next open starts fresh
+    setError('')
+    onAnalytics?.('CLICK', { surface: 'lead_modal', action: 'close' })
     if (isControlled) {
       onClose?.()
     } else {
       setOpen(false)
     }
-  }, [isControlled, onClose])
+  }, [isControlled, onAnalytics, onClose])
 
+  // Escape key
   useEffect(() => {
     if (!isOpen) return
-    function onKeyDown(e: KeyboardEvent) {
+    function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') handleClose()
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, handleClose])
 
-  // Cleanup success timer on unmount
-  useEffect(() => {
-    return () => {
-      if (successTimerRef.current !== null) clearTimeout(successTimerRef.current)
-    }
-  }, [])
+  // Cleanup timer
+  useEffect(
+    () => () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current)
+    },
+    [],
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-
-    // Validate required fields
     for (const field of form.fields) {
       if (field.required && !values[field.id]?.trim()) {
         setError(`${field.label} is required.`)
         return
       }
     }
-
     setSubmitting(true)
     setError('')
 
-    // Map field values to submission payload
     const fieldValues: Record<string, string> = {}
     form.fields.forEach((f) => {
       fieldValues[f.label.toLowerCase().replace(/\s+/g, '_')] = values[f.id] ?? ''
     })
-
-    // Extract well-known keys for the contacts API
     const name = values['__name'] ?? fieldValues['name'] ?? ''
     const email = values['__email'] ?? fieldValues['email'] ?? ''
     const phone = values['__phone'] ?? fieldValues['phone'] ?? ''
@@ -445,13 +472,15 @@ export function LeadCaptureModal({
         const body = (await res.json().catch(() => ({}))) as { message?: string }
         setError(body.message ?? 'Something went wrong. Please try again.')
       } else {
+        onAnalytics?.('SAVE', {
+          surface: 'lead_modal',
+          action: 'lead_submitted',
+          status: 'success',
+        })
         setSuccess(true)
-        if (successTimerRef.current !== null) clearTimeout(successTimerRef.current)
-        successTimerRef.current = setTimeout(() => {
-          handleClose()
-          setSuccess(false)
-          setValues({})
-        }, 2200)
+        // Auto-dismiss after 3s — long enough to read, not annoying
+        if (successTimerRef.current) clearTimeout(successTimerRef.current)
+        successTimerRef.current = setTimeout(() => handleClose(), 3000)
       }
     } catch {
       setError('Network error. Please try again.')
@@ -460,28 +489,65 @@ export function LeadCaptureModal({
     }
   }
 
-  // Personalize title safely using word-boundary replace
+  // Auth-aware direct connect — skips the form for signed-in users
+  async function handleAuthConnect() {
+    if (!authToken) return
+    setAuthConnecting(true)
+    setAuthConnectError('')
+    try {
+      // 1. Save to Dotly CRM (mutual exchange) — use apiPost for consistency
+      await apiPost(
+        '/contacts',
+        { name: ownerName, sourceCardId: cardId, sourceHandle: cardHandle },
+        authToken,
+      )
+      // 2. Download vCard using fetch + Authorization header (endpoint no longer accepts ?token=)
+      await downloadVcardFetch(cardHandle, authToken)
+      onAnalytics?.('SAVE', { surface: 'lead_modal', action: 'auth_connect', status: 'success' })
+      setAuthConnected(true)
+      if (successTimerRef.current) clearTimeout(successTimerRef.current)
+      successTimerRef.current = setTimeout(() => handleClose(), 3000)
+    } catch {
+      setAuthConnectError('Something went wrong. Please try again.')
+    } finally {
+      setAuthConnecting(false)
+    }
+  }
+
+  // Replace "me" with owner name only when it's a standalone pronoun at end of title
   const personalizedTitle = form.title.replace(/\bme\b/gi, ownerName)
 
   return (
     <>
+      <style>{GLOBAL_STYLES}</style>
+
       {/* Standalone trigger — only shown when not externally controlled */}
       {!isControlled && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            onAnalytics?.('CLICK', { surface: 'lead_modal', action: 'open' })
+            setOpen(true)
+          }}
           style={{
             marginTop: 16,
             width: '100%',
             padding: '12px 0',
             borderRadius: 12,
-            background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+            background: 'linear-gradient(135deg,#0ea5e9,#0284c7)',
             color: '#fff',
             fontSize: 14,
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
             boxShadow: '0 4px 14px rgba(14,165,233,0.35)',
+            transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            ;(e.currentTarget as HTMLButtonElement).style.opacity = '0.88'
+          }}
+          onMouseLeave={(e) => {
+            ;(e.currentTarget as HTMLButtonElement).style.opacity = '1'
           }}
         >
           Connect with me
@@ -493,7 +559,6 @@ export function LeadCaptureModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
-          ref={dialogRef}
           style={{
             position: 'fixed',
             inset: 0,
@@ -510,17 +575,21 @@ export function LeadCaptureModal({
           }}
         >
           <div
-            style={{
-              width: '100%',
-              maxWidth: 480,
-              background: '#ffffff',
-              borderRadius: '20px 20px 0 0',
-              padding: '20px 24px 36px',
-              boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
-              animation: 'slideUp 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
-              maxHeight: '90dvh',
-              overflowY: 'auto',
-            }}
+            style={
+              {
+                width: '100%',
+                maxWidth: 480,
+                background: '#ffffff',
+                borderRadius: '20px 20px 0 0',
+                padding: '20px 24px',
+                paddingBottom: 'max(36px, calc(env(safe-area-inset-bottom) + 24px))',
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
+                animation: 'lcm-slide-up 0.25s cubic-bezier(0.32,0.72,0,1)',
+                maxHeight: '90dvh',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              } as React.CSSProperties
+            }
           >
             {/* Drag handle */}
             <div
@@ -593,7 +662,8 @@ export function LeadCaptureModal({
 
             <div style={{ height: 1, background: '#f1f5f9', margin: '16px 0' }} />
 
-            {success ? (
+            {success || authConnected ? (
+              /* ── Success screen (shared for both paths) ── */
               <div
                 style={{
                   display: 'flex',
@@ -609,11 +679,12 @@ export function LeadCaptureModal({
                     width: 56,
                     height: 56,
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    background: 'linear-gradient(135deg,#22c55e,#16a34a)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     boxShadow: '0 4px 16px rgba(34,197,94,0.35)',
+                    animation: 'lcm-check-pop 0.4s cubic-bezier(.32,1.4,.56,1) both',
                   }}
                 >
                   <svg
@@ -633,29 +704,183 @@ export function LeadCaptureModal({
                   You&apos;re connected!
                 </p>
                 <p style={{ fontSize: 13, color: '#64748b', margin: 0, textAlign: 'center' }}>
-                  {ownerName} will be in touch soon.
+                  {authConnected
+                    ? `${ownerName} has been added to your contacts and their vCard has been downloaded.`
+                    : `${ownerName} will be in touch soon.`}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  style={{
+                    marginTop: 4,
+                    padding: '8px 20px',
+                    borderRadius: 10,
+                    background: '#f1f5f9',
+                    border: 'none',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#475569',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : isAuth ? (
+              /* ── Auth-connect UI — skip the form for signed-in users ── */
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 20,
+                  padding: '8px 0 4px',
+                }}
+              >
+                {/* Owner avatar placeholder */}
+                <div
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg,#0ea5e9,#0284c7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 16px rgba(14,165,233,0.3)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontSize: 28, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                    {ownerName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
+                    {ownerName}
+                  </p>
+                  <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+                    Save their contact &amp; add them to your Dotly CRM in one tap.
+                  </p>
+                </div>
+
+                {authConnectError && (
+                  <div
+                    role="alert"
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span style={{ fontSize: 13, color: '#dc2626' }}>{authConnectError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleAuthConnect()}
+                  disabled={authConnecting}
+                  style={{
+                    width: '100%',
+                    padding: '13px 0',
+                    borderRadius: 12,
+                    background: authConnecting
+                      ? '#94a3b8'
+                      : 'linear-gradient(135deg,#0ea5e9,#0284c7)',
+                    color: '#fff',
+                    fontSize: 15,
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: authConnecting ? 'not-allowed' : 'pointer',
+                    boxShadow: authConnecting ? 'none' : '0 4px 14px rgba(14,165,233,0.35)',
+                    transition: 'background 0.15s, box-shadow 0.15s',
+                    letterSpacing: '-0.1px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {authConnecting ? (
+                    <>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        style={{ animation: 'lcm-spin 0.75s linear infinite' }}
+                        aria-hidden="true"
+                      >
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      </svg>
+                      Connecting…
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M11 17a4 4 0 0 1-8 0V7l4-3 4 3v3" />
+                        <path d="M16 3l4 3v10a4 4 0 0 1-8 0v-3l4-3" />
+                      </svg>
+                      Connect with {ownerName}
+                    </>
+                  )}
+                </button>
+
+                <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, textAlign: 'center' }}>
+                  Their vCard will be downloaded to your device.
                 </p>
               </div>
             ) : (
+              /* ── Standard lead-capture form ── */
               <form
-                onSubmit={(e) => {
-                  void handleSubmit(e)
-                }}
+                noValidate
+                onSubmit={(e) => void handleSubmit(e)}
                 style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
               >
-                {form.fields.map((field, index) => {
-                  const inputId = `lead-field-${cardHandle}-${field.id}`
-                  return (
-                    <DynamicField
-                      key={field.id}
-                      field={field}
-                      value={values[field.id] ?? ''}
-                      onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
-                      inputId={inputId}
-                      autoFocus={index === 0}
-                    />
-                  )
-                })}
+                {form.fields.map((field, index) => (
+                  <DynamicField
+                    key={field.id}
+                    field={field}
+                    value={values[field.id] ?? ''}
+                    onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
+                    inputId={`lcm-field-${cardHandle}-${field.id}`}
+                    autoFocus={index === 0}
+                  />
+                ))}
 
                 {error && (
                   <div
@@ -695,9 +920,7 @@ export function LeadCaptureModal({
                     width: '100%',
                     padding: '13px 0',
                     borderRadius: 12,
-                    background: submitting
-                      ? '#94a3b8'
-                      : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                    background: submitting ? '#94a3b8' : 'linear-gradient(135deg,#0ea5e9,#0284c7)',
                     color: '#fff',
                     fontSize: 15,
                     fontWeight: 700,
@@ -713,13 +936,6 @@ export function LeadCaptureModal({
               </form>
             )}
           </div>
-
-          <style>{`
-            @keyframes slideUp {
-              from { transform: translateY(100%); }
-              to   { transform: translateY(0); }
-            }
-          `}</style>
         </div>
       )}
     </>

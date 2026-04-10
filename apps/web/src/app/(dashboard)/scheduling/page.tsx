@@ -13,6 +13,8 @@ import {
   X,
   CheckCircle,
   AlertCircle,
+  Link2,
+  Settings2,
 } from 'lucide-react'
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -28,6 +30,17 @@ interface AvailabilityRule {
   endTime: string
 }
 
+type BookingQuestionType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'SELECT' | 'CHECKBOX'
+
+interface BookingQuestion {
+  id: string
+  label: string
+  type: BookingQuestionType
+  options: string[]
+  required: boolean
+  position: number
+}
+
 interface AppointmentType {
   id: string
   slug: string
@@ -41,6 +54,7 @@ interface AppointmentType {
   isActive: boolean
   timezone: string
   availabilityRules: AvailabilityRule[]
+  questions: BookingQuestion[]
   _count: { bookings: number }
 }
 
@@ -537,6 +551,213 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
   )
 }
 
+
+// ── Questions Builder Modal ───────────────────────────────────────────────────
+
+const QUESTION_TYPE_LABELS: Record<BookingQuestionType, string> = {
+  TEXT: 'Short text',
+  TEXTAREA: 'Long text',
+  EMAIL: 'Email',
+  PHONE: 'Phone',
+  SELECT: 'Dropdown (select)',
+  CHECKBOX: 'Checkbox (yes/no)',
+}
+
+interface QuestionsBuilderProps {
+  appointmentTypeId: string
+  initial: BookingQuestion[]
+  onSave: () => void
+  onClose: () => void
+}
+
+function QuestionsBuilder({ appointmentTypeId, initial, onSave, onClose }: QuestionsBuilderProps): JSX.Element {
+  const [questions, setQuestions] = useState<Omit<BookingQuestion, 'id'>[]>(() =>
+    initial.map((q) => ({ label: q.label, type: q.type, options: q.options, required: q.required, position: q.position })),
+  )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function addQuestion() {
+    setQuestions((prev) => [
+      ...prev,
+      { label: '', type: 'TEXT', options: [], required: false, position: prev.length },
+    ])
+  }
+
+  function removeQuestion(idx: number) {
+    setQuestions((prev) => prev.filter((_, i) => i !== idx).map((q, i) => ({ ...q, position: i })))
+  }
+
+  function updateQuestion(idx: number, patch: Partial<Omit<BookingQuestion, 'id'>>) {
+    setQuestions((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))
+  }
+
+  function updateSelectOption(qIdx: number, optIdx: number, val: string) {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q
+        const opts = [...q.options]
+        opts[optIdx] = val
+        return { ...q, options: opts }
+      }),
+    )
+  }
+
+  function addSelectOption(qIdx: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, ''] } : q)),
+    )
+  }
+
+  function removeSelectOption(qIdx: number, optIdx: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i === qIdx ? { ...q, options: q.options.filter((_, oi) => oi !== optIdx) } : q,
+      ),
+    )
+  }
+
+  async function handleSave() {
+    // Validate
+    for (const [i, q] of questions.entries()) {
+      if (!q.label.trim()) {
+        setError(`Question ${i + 1} needs a label`)
+        return
+      }
+      if (q.type === 'SELECT' && q.options.length === 0) {
+        setError(`Question ${i + 1} (dropdown) needs at least one option`)
+        return
+      }
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const { getAccessToken } = await import('@/lib/supabase/client')
+      const token = await getAccessToken()
+      await apiPut(
+        `/scheduling/appointment-types/${appointmentTypeId}/questions`,
+        { questions: questions.map((q, i) => ({ ...q, position: i })) },
+        token ?? undefined,
+      )
+      onSave()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between border-b border-gray-100 p-5 flex-shrink-0">
+          <h3 className="text-lg font-semibold text-gray-900">Custom Booking Questions</h3>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {questions.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-4">
+              No questions yet. Add one below to collect info from guests before they book.
+            </p>
+          )}
+          {questions.map((q, idx) => (
+            <div key={idx} className="rounded-xl border border-gray-200 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-400 w-5">{idx + 1}</span>
+                <input
+                  value={q.label}
+                  onChange={(e) => updateQuestion(idx, { label: e.target.value })}
+                  placeholder="Question label (e.g. What is your company?)"
+                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                />
+                <button
+                  onClick={() => removeQuestion(idx)}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-3 pl-7">
+                <select
+                  value={q.type}
+                  onChange={(e) => updateQuestion(idx, { type: e.target.value as BookingQuestionType, options: [] })}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none"
+                >
+                  {(Object.keys(QUESTION_TYPE_LABELS) as BookingQuestionType[]).map((t) => (
+                    <option key={t} value={t}>{QUESTION_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={q.required}
+                    onChange={(e) => updateQuestion(idx, { required: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  Required
+                </label>
+              </div>
+              {q.type === 'SELECT' && (
+                <div className="pl-7 space-y-2">
+                  <p className="text-xs font-medium text-gray-500">Options</p>
+                  {q.options.map((opt, oi) => (
+                    <div key={oi} className="flex items-center gap-2">
+                      <input
+                        value={opt}
+                        onChange={(e) => updateSelectOption(idx, oi, e.target.value)}
+                        placeholder={`Option ${oi + 1}`}
+                        className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => removeSelectOption(idx, oi)}
+                        className="rounded p-1 text-gray-400 hover:text-red-500"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => addSelectOption(idx)}
+                    className="flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add option
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={addQuestion}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-500 hover:border-sky-300 hover:text-sky-600"
+          >
+            <Plus className="h-4 w-4" /> Add question
+          </button>
+          {error && (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-100 p-5 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : 'Save Questions'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SchedulingPage(): JSX.Element {
@@ -551,6 +772,11 @@ export default function SchedulingPage(): JSX.Element {
   const [showAptForm, setShowAptForm] = useState(false)
   const [editingApt, setEditingApt] = useState<AppointmentType | null>(null)
   const [availEditorFor, setAvailEditorFor] = useState<AppointmentType | null>(null)
+  const [questionsEditorFor, setQuestionsEditorFor] = useState<AppointmentType | null>(null)
+
+  // Google Calendar
+  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; googleEmail?: string } | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   // Tab: 'types' | 'bookings'
   const [tab, setTab] = useState<'types' | 'bookings'>('types')
@@ -570,18 +796,20 @@ export default function SchedulingPage(): JSX.Element {
     setError(null)
     try {
       const token = await getAccessToken()
-      const [types, bkgs, cardsResp] = await Promise.all([
+      const [types, bkgs, cardsResp, gStatus] = await Promise.all([
         apiGet<AppointmentType[]>('/scheduling/appointment-types', token ?? undefined),
         apiGet<Booking[]>(
           `/scheduling/bookings${showAllBookings ? '' : '?upcoming=true'}`,
           token ?? undefined,
         ),
         apiGet<{ id: string; handle: string }[]>('/cards', token ?? undefined),
+        apiGet<{ connected: boolean; googleEmail?: string }>('/scheduling/google/status', token ?? undefined).catch(() => ({ connected: false })),
       ])
       setAptTypes(types)
       setBookings(bkgs)
       setAllCards(cardsResp)
-      if (cardsResp.length > 0 && cardsResp[0] && !cardHandle) setCardHandle(cardsResp[0].handle)
+      setGoogleStatus(gStatus)
+      if (cardsResp.length > 0 && cardsResp[0]) setCardHandle((prev) => prev ?? (cardsResp[0]?.handle ?? null))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -592,6 +820,22 @@ export default function SchedulingPage(): JSX.Element {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Handle ?google=connected / ?google=error redirect from OAuth callback
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const g = params.get('google')
+    if (g === 'connected') {
+      showToast('Google Calendar connected!')
+      window.history.replaceState({}, '', window.location.pathname)
+      void load()
+    } else if (g === 'error') {
+      showToast('Failed to connect Google Calendar', false)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleCreateOrUpdate(data: {
     name: string
@@ -670,6 +914,21 @@ export default function SchedulingPage(): JSX.Element {
     }
   }
 
+  async function handleGoogleDisconnect() {
+    if (!confirm('Disconnect Google Calendar?')) return
+    setGoogleLoading(true)
+    try {
+      const token = await getAccessToken()
+      await apiDelete('/scheduling/google/disconnect', token ?? undefined)
+      setGoogleStatus({ connected: false })
+      showToast('Google Calendar disconnected')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Error', false)
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL || ''
 
   return (
@@ -690,6 +949,20 @@ export default function SchedulingPage(): JSX.Element {
           initial={availEditorFor.availabilityRules}
           onSave={(rules) => void handleSaveAvailability(availEditorFor, rules)}
           onClose={() => setAvailEditorFor(null)}
+        />
+      )}
+
+      {/* Questions Builder Modal */}
+      {questionsEditorFor && (
+        <QuestionsBuilder
+          appointmentTypeId={questionsEditorFor.id}
+          initial={questionsEditorFor.questions}
+          onSave={() => {
+            setQuestionsEditorFor(null)
+            showToast('Questions saved')
+            void load()
+          }}
+          onClose={() => setQuestionsEditorFor(null)}
         />
       )}
 
@@ -725,6 +998,36 @@ export default function SchedulingPage(): JSX.Element {
             <Plus className="h-4 w-4" /> New Appointment Type
           </button>
         </div>
+
+        {/* Google Calendar connect section */}
+        {googleStatus !== null && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium text-gray-700">Google Calendar</span>
+              {googleStatus.connected && googleStatus.googleEmail && (
+                <span className="ml-2 text-xs text-gray-400">{googleStatus.googleEmail}</span>
+              )}
+            </div>
+            {googleStatus.connected ? (
+              <button
+                onClick={() => void handleGoogleDisconnect()}
+                disabled={googleLoading}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+              >
+                {googleLoading ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            ) : (
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/scheduling/google/connect`}
+                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+              >
+                <Settings2 className="inline h-3.5 w-3.5 mr-1" />
+                Connect Google Calendar
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-xl bg-gray-100 p-1 w-fit">
@@ -858,6 +1161,13 @@ export default function SchedulingPage(): JSX.Element {
                             <Copy className="h-4 w-4" />
                           </button>
                         )}
+                        <button
+                          title="Edit questions"
+                          onClick={() => setQuestionsEditorFor(apt)}
+                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50"
+                        >
+                          Questions{apt.questions.length > 0 ? ` (${apt.questions.length})` : ''}
+                        </button>
                         <button
                           title="Edit availability"
                           onClick={() => setAvailEditorFor(apt)}

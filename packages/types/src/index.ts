@@ -154,6 +154,8 @@ export interface UpdateContactDto {
   tags?: string[]
 }
 
+export type VcardPolicy = 'PUBLIC' | 'MEMBERS_ONLY'
+
 // Shared data shapes (used by CardRenderer)
 export interface CardData {
   id: string
@@ -161,6 +163,7 @@ export interface CardData {
   templateId: CardTemplate
   fields: CardFields
   isActive: boolean
+  vcardPolicy?: VcardPolicy
 }
 
 export interface CardThemeData {

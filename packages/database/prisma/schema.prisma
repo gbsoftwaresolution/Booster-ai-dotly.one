@@ -24,6 +24,11 @@ enum BillingDuration {
   ANNUAL
 }
 
+enum VcardPolicy {
+  PUBLIC
+  MEMBERS_ONLY
+}
+
 enum CardTemplate {
   MINIMAL
   BOLD
@@ -154,6 +159,8 @@ model User {
   contactTasks       ContactTask[]
   appointmentTypes   AppointmentType[]
   bookings           Booking[]
+  googleCalendar     GoogleCalendarConnection?
+  contactMemories    ContactMemory[]
 
   @@map("users")
 }
@@ -164,7 +171,8 @@ model Card {
   handle     String       @unique
   templateId CardTemplate @default(MINIMAL)
   fields     Json         @default("{}")
-  isActive   Boolean      @default(false)
+  isActive     Boolean      @default(false)
+  vcardPolicy  VcardPolicy  @default(PUBLIC)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
@@ -178,6 +186,9 @@ model Card {
   customDomains CustomDomain[]
   leadForm    LeadForm?
   walletPass  WalletPass?
+  messages         CardMessage[]
+  voiceNotes       CardVoiceNote[]
+  dropboxFiles     CardDropboxFile[]
 
   @@index([userId])
   @@map("cards")
@@ -260,6 +271,9 @@ model AnalyticsEvent {
   @@index([cardId, type])
   @@index([cardId, createdAt])
   @@index([createdAt])
+  // Composite index covering the hottest analytics query: filter by card + type + date range.
+  // Eliminates full-table scans on getAnalytics / getSummary for high-traffic cards.
+  @@index([cardId, type, createdAt])
   @@map("analytics_events")
 }
 
@@ -298,6 +312,7 @@ model Contact {
   deals           Deal[]
   tasks           ContactTask[]
   customFieldValues ContactCustomFieldValue[]
+  memories          ContactMemory[]
 
   @@unique([ownerUserId, email])
   @@index([ownerUserId])
@@ -430,7 +445,7 @@ model ContactEmail {
   id             String    @id @default(cuid())
   contactId      String
   subject        String    @db.VarChar(998)
-  body           String    @db.VarChar(5000)
+  body           String    @db.VarChar(50000)
   sentAt         DateTime  @default(now())
   trackingToken  String?   @unique
   openedAt       DateTime?
@@ -790,6 +805,7 @@ model AppointmentType {
   ownerUser         User               @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
+  questions         BookingQuestion[]
 
   @@unique([ownerUserId, slug])
   @@index([ownerUserId])
@@ -835,6 +851,8 @@ model Booking {
   tokenExpiresAt    DateTime?
   /// Set after a 24h-before reminder email is sent — prevents duplicate sends
   reminderSentAt    DateTime?
+  /// Google Calendar event ID — stored after syncing booking to owner's calendar
+  googleEventId     String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -842,9 +860,160 @@ model Booking {
   /// has bookings — the soft-delete path (deletedAt) is the intended delete path.
   appointmentType AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Restrict)
   ownerUser       User            @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  answers         BookingAnswer[]
 
   @@index([ownerUserId, startAt])
   @@index([appointmentTypeId, startAt])
   @@index([token])
   @@map("bookings")
+}
+
+// ─── Booking Questions & Answers ─────────────────────────────────────────────
+
+enum BookingQuestionType {
+  TEXT
+  TEXTAREA
+  EMAIL
+  PHONE
+  SELECT
+  CHECKBOX
+}
+
+/// A custom question attached to an appointment type shown on the booking page
+model BookingQuestion {
+  id                String              @id @default(cuid())
+  appointmentTypeId String
+  /// Display label shown to the guest, e.g. "What company are you from?"
+  label             String              @db.VarChar(300)
+  type              BookingQuestionType @default(TEXT)
+  /// For SELECT type: JSON array of option strings, e.g. ["Sales","Support","Other"]
+  options           String?             @db.VarChar(2000)
+  required          Boolean             @default(false)
+  /// Order in which questions appear on the booking page
+  position          Int                 @default(0)
+  createdAt         DateTime            @default(now())
+
+  appointmentType AppointmentType  @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+  answers         BookingAnswer[]
+
+  @@index([appointmentTypeId, position])
+  @@map("booking_questions")
+}
+
+/// Guest's answer to a custom booking question, stored alongside the booking
+model BookingAnswer {
+  id         String   @id @default(cuid())
+  bookingId  String
+  questionId String
+  value      String   @db.VarChar(5000)
+
+  booking  Booking         @relation(fields: [bookingId],  references: [id], onDelete: Cascade)
+  question BookingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, questionId])
+  @@index([bookingId])
+  @@map("booking_answers")
+}
+
+// ─── Google Calendar Integration ─────────────────────────────────────────────
+
+/// OAuth2 tokens for a user's connected Google Calendar account
+model GoogleCalendarConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  /// Google account email address
+  googleEmail  String   @db.VarChar(254)
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  /// When the current accessToken expires
+  expiresAt    DateTime
+  /// Primary calendar ID to create events on (usually the google email)
+  calendarId   String   @default("primary") @db.VarChar(254)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("google_calendar_connections")
+}
+
+// ─── Card Inbox: Messages ─────────────────────────────────────────────────────
+
+/// A text message sent by any visitor to a card owner via the public card page
+model CardMessage {
+  id          String   @id @default(cuid())
+  cardId      String
+  senderName  String   @db.VarChar(200)
+  senderEmail String?  @db.VarChar(254)
+  message     String   @db.VarChar(5000)
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([cardId, createdAt])
+  @@map("card_messages")
+}
+
+// ─── Card Inbox: Voice Notes ──────────────────────────────────────────────────
+
+/// An audio voice note recorded by a visitor and uploaded to R2
+model CardVoiceNote {
+  id          String   @id @default(cuid())
+  cardId      String
+  senderName  String   @db.VarChar(200)
+  senderEmail String?  @db.VarChar(254)
+  audioUrl    String   @db.VarChar(2048)
+  durationSec Int?
+  mimeType    String   @db.VarChar(100)
+  fileSize    Int?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([cardId, createdAt])
+  @@map("card_voice_notes")
+}
+
+// ─── Card Inbox: Dropbox Files ────────────────────────────────────────────────
+
+/// A file dropped by a visitor via the card's public dropbox
+model CardDropboxFile {
+  id          String   @id @default(cuid())
+  cardId      String
+  senderName  String   @db.VarChar(200)
+  senderEmail String?  @db.VarChar(254)
+  fileName    String   @db.VarChar(500)
+  fileUrl     String   @db.VarChar(2048)
+  mimeType    String   @db.VarChar(100)
+  fileSize    Int?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([cardId, createdAt])
+  @@map("card_dropbox_files")
+}
+
+// ─── CRM: Meeting Memories ────────────────────────────────────────────────────
+
+/// A short memory/note tied to a contact, created during or after a meeting
+model ContactMemory {
+  id          String   @id @default(cuid())
+  contactId   String
+  ownerUserId String
+  content     String   @db.VarChar(2000)
+  createdAt   DateTime @default(now())
+
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerUser User    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([ownerUserId])
+  @@map("contact_memories")
 }

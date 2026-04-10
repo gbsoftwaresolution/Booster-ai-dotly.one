@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 
-export default function CardsNewPage() {
-  redirect('/cards/create')
+// Middleware redirects /cards/new → /apps/cards/create (308).
+// This stub handles the rare case where Next.js renders the route before middleware runs.
+export default function CardsNewLegacyPage() {
+  redirect('/apps/cards/create')
 }

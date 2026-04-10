@@ -18,8 +18,21 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+type BookingQuestionType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'SELECT' | 'CHECKBOX'
+
+interface BookingQuestion {
+  id: string
+  label: string
+  type: BookingQuestionType
+  options: string[]
+  required: boolean
+  position: number
+}
+
 interface AptType {
   id: string
+  cardId: string | null
+  cardHandle: string | null
   name: string
   description: string | null
   durationMins: number
@@ -27,11 +40,20 @@ interface AptType {
   location: string | null
   timezone: string
   owner: { name: string | null; avatarUrl: string | null }
+  questions: BookingQuestion[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+function postAnalytics(body: Record<string, unknown>) {
+  fetch(`${API_URL}/public/analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => {})
+}
 
 const MONTHS = [
   'January',
@@ -243,6 +265,7 @@ export default function BookingPage(): JSX.Element {
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [guestNotes, setGuestNotes] = useState('')
+  const [answers, setAnswers] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmedBooking, setConfirmedBooking] = useState<{ startAt: string } | null>(null)
@@ -259,7 +282,18 @@ export default function BookingPage(): JSX.Element {
           )
         }
         const data = (await res.json()) as AptType
-        setApt(data)
+        setApt({ ...data, questions: data.questions ?? [] })
+        if (data.cardId) {
+          postAnalytics({
+            cardId: data.cardId,
+            type: 'CLICK',
+            metadata: {
+              surface: 'booking_page',
+              action: 'booking_page_view',
+              status: slug,
+            },
+          })
+        }
       } catch (e) {
         setAptError(e instanceof Error ? e.message : 'Not found')
       } finally {
@@ -310,13 +344,36 @@ export default function BookingPage(): JSX.Element {
       const res = await fetch(`${API_URL}/scheduling/public/${handle}/${slug}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startAt: selectedSlot, guestName, guestEmail, guestNotes }),
+        body: JSON.stringify({
+          startAt: selectedSlot,
+          guestName,
+          guestEmail,
+          guestNotes,
+          answers:
+            apt?.questions
+              ?.map((q) => ({
+                questionId: q.id,
+                value: answers[q.id] ?? '',
+              }))
+              .filter((a) => a.value !== '') ?? [],
+        }),
       })
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
         throw new Error(typeof err['message'] === 'string' ? err['message'] : `Error ${res.status}`)
       }
       const booking = (await res.json()) as { startAt: string }
+      if (apt?.cardId) {
+        postAnalytics({
+          cardId: apt.cardId,
+          type: 'SAVE',
+          metadata: {
+            surface: 'booking_page',
+            action: 'booking_submitted',
+            status: slug,
+          },
+        })
+      }
       setConfirmedBooking(booking)
       setStep('confirmed')
     } catch (e) {
@@ -611,6 +668,71 @@ export default function BookingPage(): JSX.Element {
                   placeholder="Anything you'd like to share before the meeting…"
                 />
               </div>
+              {/* Custom questions */}
+              {apt.questions &&
+                apt.questions.length > 0 &&
+                apt.questions.map((q) => (
+                  <div key={q.id}>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      {q.label}
+                      {q.required && <span className="ml-1 text-red-500">*</span>}
+                    </label>
+                    {q.type === 'TEXTAREA' ? (
+                      <textarea
+                        required={q.required}
+                        value={answers[q.id] ?? ''}
+                        onChange={(e) =>
+                          setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                        }
+                        rows={3}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    ) : q.type === 'SELECT' ? (
+                      <select
+                        required={q.required}
+                        value={answers[q.id] ?? ''}
+                        onChange={(e) =>
+                          setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      >
+                        <option value="">Select an option…</option>
+                        {q.options.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    ) : q.type === 'CHECKBOX' ? (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          required={q.required}
+                          checked={answers[q.id] === 'true'}
+                          onChange={(e) =>
+                            setAnswers((prev) => ({
+                              ...prev,
+                              [q.id]: e.target.checked ? 'true' : 'false',
+                            }))
+                          }
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm text-gray-600">{q.label}</span>
+                      </label>
+                    ) : (
+                      <input
+                        type={q.type === 'EMAIL' ? 'email' : q.type === 'PHONE' ? 'tel' : 'text'}
+                        required={q.required}
+                        value={answers[q.id] ?? ''}
+                        onChange={(e) =>
+                          setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    )}
+                  </div>
+                ))}
+
               {submitError && (
                 <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" /> {submitError}

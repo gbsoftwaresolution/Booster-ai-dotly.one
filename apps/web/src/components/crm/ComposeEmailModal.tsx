@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useId, useRef } from 'react'
 import { X, Send, Mail, ChevronDown } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost, apiGet } from '@/lib/api'
@@ -37,7 +37,11 @@ export function ComposeEmailModal({
   const [error, setError] = useState<string | null>(null)
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
+  const [activeTemplateIndex, setActiveTemplateIndex] = useState(0)
   const subjectRef = useRef<HTMLInputElement>(null)
+  const templateButtonRef = useRef<HTMLButtonElement>(null)
+  const templateListRef = useRef<HTMLDivElement>(null)
+  const templateListId = useId()
 
   // Auto-focus subject on open
   useEffect(() => {
@@ -46,15 +50,19 @@ export function ComposeEmailModal({
 
   // Load email templates
   useEffect(() => {
+    const controller = new AbortController()
+
     void (async () => {
       try {
         const token = await getToken()
-        const data = await apiGet<EmailTemplate[]>('/email-templates', token)
+        const data = await apiGet<EmailTemplate[]>('/email-templates', token, controller.signal)
         setTemplates(data)
       } catch {
         // Non-critical — templates just won't show
       }
     })()
+
+    return () => controller.abort()
   }, [])
 
   // Auto-close after success
@@ -68,16 +76,115 @@ export function ComposeEmailModal({
   // Escape key closes modal
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (showTemplates) {
+          setShowTemplates(false)
+          templateButtonRef.current?.focus()
+          return
+        }
+        onClose()
+      }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [onClose, showTemplates])
+
+  useEffect(() => {
+    if (!showTemplates) return
+    const option = templateListRef.current?.querySelector<HTMLButtonElement>(
+      `[data-template-index="${activeTemplateIndex}"]`,
+    )
+    option?.focus()
+  }, [activeTemplateIndex, showTemplates])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (
+        showTemplates &&
+        !templateButtonRef.current?.contains(target) &&
+        !templateListRef.current?.contains(target)
+      ) {
+        setShowTemplates(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [showTemplates])
 
   const applyTemplate = (tpl: EmailTemplate) => {
     setSubject(tpl.subject)
     setBody(tpl.body)
     setShowTemplates(false)
+    templateButtonRef.current?.focus()
+  }
+
+  const moveTemplateSelection = (direction: 1 | -1) => {
+    if (templates.length === 0) return
+    setActiveTemplateIndex((prev) => (prev + direction + templates.length) % templates.length)
+  }
+
+  const openTemplateMenu = (startIndex = 0) => {
+    setActiveTemplateIndex(startIndex)
+    setShowTemplates(true)
+  }
+
+  const handleTemplateTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (templates.length === 0) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      openTemplateMenu(0)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      openTemplateMenu(templates.length - 1)
+    }
+  }
+
+  const handleTemplateOptionKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      moveTemplateSelection(1)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      moveTemplateSelection(-1)
+      return
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault()
+      setActiveTemplateIndex(0)
+      return
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault()
+      setActiveTemplateIndex(templates.length - 1)
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setShowTemplates(false)
+      templateButtonRef.current?.focus()
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      const template = templates[index]
+      if (template) applyTemplate(template)
+    }
   }
 
   const handleSend = async () => {
@@ -151,21 +258,44 @@ export function ComposeEmailModal({
           {templates.length > 0 && (
             <div className="relative">
               <button
+                ref={templateButtonRef}
                 type="button"
-                onClick={() => setShowTemplates((v) => !v)}
+                onClick={() => {
+                  if (showTemplates) {
+                    setShowTemplates(false)
+                    return
+                  }
+                  openTemplateMenu(0)
+                }}
+                onKeyDown={handleTemplateTriggerKeyDown}
+                aria-haspopup="listbox"
+                aria-expanded={showTemplates}
+                aria-controls={templateListId}
                 className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
                 Use template
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               {showTemplates && (
-                <div className="absolute left-0 top-full z-10 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {templates.map((tpl) => (
+                <div
+                  id={templateListId}
+                  ref={templateListRef}
+                  role="listbox"
+                  aria-label="Email templates"
+                  className="absolute left-0 top-full z-10 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg"
+                >
+                  {templates.map((tpl, index) => (
                     <button
                       key={tpl.id}
                       type="button"
+                      role="option"
+                      aria-selected={activeTemplateIndex === index}
+                      data-template-index={index}
                       onClick={() => applyTemplate(tpl)}
-                      className="block w-full px-4 py-2.5 text-left hover:bg-gray-50"
+                      onKeyDown={(event) => handleTemplateOptionKeyDown(event, index)}
+                      onMouseEnter={() => setActiveTemplateIndex(index)}
+                      tabIndex={activeTemplateIndex === index ? 0 : -1}
+                      className="block w-full px-4 py-2.5 text-left hover:bg-gray-50 aria-selected:bg-gray-50"
                     >
                       <p className="text-sm font-medium text-gray-800">{tpl.name}</p>
                       <p className="truncate text-xs text-gray-500">{tpl.subject}</p>
@@ -217,12 +347,17 @@ export function ComposeEmailModal({
 
           {/* Error */}
           {error && (
-            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+            <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
           )}
 
           {/* Success */}
           {sent && (
-            <div className="rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+            <div
+              aria-live="polite"
+              className="rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700"
+            >
               Email sent! Closing...
             </div>
           )}

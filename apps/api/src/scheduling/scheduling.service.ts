@@ -8,11 +8,13 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
+import { GoogleCalendarService } from './google-calendar.service'
 import { CreateAppointmentTypeDto } from './dto/create-appointment-type.dto'
 import { UpdateAppointmentTypeDto } from './dto/update-appointment-type.dto'
 import { SetAvailabilityDto } from './dto/set-availability.dto'
 import { CreateBookingDto } from './dto/create-booking.dto'
-import { BookingStatus } from '@dotly/database'
+import { SetBookingQuestionsDto } from './dto/manage-booking-questions.dto'
+import { BookingStatus, Prisma } from '@dotly/database'
 
 // Day-of-week index: 0=Sunday, 1=Monday, ... 6=Saturday (JS Date.getDay())
 const DOW_MAP: Record<string, number> = {
@@ -179,6 +181,7 @@ export class SchedulingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly googleCalendar: GoogleCalendarService,
   ) {}
 
   // ── Appointment Types ──────────────────────────────────────────────────────
@@ -210,7 +213,11 @@ export class SchedulingService {
   async getAppointmentTypes(userId: string) {
     return this.prisma.appointmentType.findMany({
       where: { ownerUserId: userId, deletedAt: null },
-      include: { availabilityRules: true, _count: { select: { bookings: true } } },
+      include: {
+        availabilityRules: true,
+        questions: { orderBy: { position: 'asc' } },
+        _count: { select: { bookings: true } },
+      },
       orderBy: { createdAt: 'asc' },
     })
   }
@@ -293,6 +300,38 @@ export class SchedulingService {
     return this.prisma.availabilityRule.findMany({ where: { appointmentTypeId } })
   }
 
+  // ── Booking Questions ──────────────────────────────────────────────────────
+
+  async setBookingQuestions(
+    userId: string,
+    appointmentTypeId: string,
+    dto: SetBookingQuestionsDto,
+  ) {
+    const apt = await this.prisma.appointmentType.findUnique({ where: { id: appointmentTypeId } })
+    if (!apt || apt.ownerUserId !== userId) throw new ForbiddenException()
+
+    // Replace all questions atomically
+    await this.prisma.$transaction([
+      this.prisma.bookingQuestion.deleteMany({ where: { appointmentTypeId } }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.prisma.bookingQuestion.createMany({
+        data: dto.questions.map((q, idx) => ({
+          appointmentTypeId,
+          label: q.label,
+          type: q.type,
+          options: q.options ?? [],
+          required: q.required ?? false,
+          position: q.position ?? idx,
+        })) as any,
+      }),
+    ])
+
+    return this.prisma.bookingQuestion.findMany({
+      where: { appointmentTypeId },
+      orderBy: { position: 'asc' },
+    })
+  }
+
   // ── Available Slots ─────────────────────────────────────────────────────────
 
   /**
@@ -303,7 +342,7 @@ export class SchedulingService {
   async getAvailableSlots(ownerUserId: string, slug: string, date: string, guestTz?: string) {
     const apt = await this.prisma.appointmentType.findUnique({
       where: { ownerUserId_slug: { ownerUserId, slug } },
-      include: { availabilityRules: true },
+      include: { availabilityRules: true, questions: { orderBy: { position: 'asc' } } },
     })
     if (!apt || !apt.isActive || apt.deletedAt !== null) throw new NotFoundException()
 
@@ -401,9 +440,14 @@ export class SchedulingService {
       },
     })
 
+    // Fetch Google Calendar busy times for the day (best-effort, don't block on failure)
+    const googleBusy = await this.googleCalendar.getBusyTimes(ownerUserId, dayStart, dayEnd)
+
     const freeSlots = allSlots.filter((slot) => {
       const slotEnd = new Date(slot.getTime() + slotDuration * 60_000)
-      return !existingBookings.some((b) => b.startAt < slotEnd && b.endAt > slot)
+      const blockedByDb = existingBookings.some((b) => b.startAt < slotEnd && b.endAt > slot)
+      const blockedByGoogle = googleBusy.some((b) => b.start < slotEnd && b.end > slot)
+      return !blockedByDb && !blockedByGoogle
     })
 
     // Also filter out slots in the past
@@ -502,6 +546,47 @@ export class SchedulingService {
       throw new ConflictException('This time slot is no longer available')
     }
 
+    // Save custom question answers
+    if (dto.answers && dto.answers.length > 0) {
+      await this.prisma.bookingAnswer.createMany({
+        data: dto.answers.map((a) => ({
+          bookingId: booking.id,
+          questionId: a.questionId,
+          value: a.value,
+        })),
+        skipDuplicates: true,
+      })
+    }
+
+    // Create Google Calendar event (best-effort, don't block)
+    void (async () => {
+      try {
+        const eventId = await this.googleCalendar.createEvent(ownerUserId, {
+          summary: `${dto.guestName} — ${apt.name}`,
+          description: [
+            dto.guestNotes ? `Guest notes: ${dto.guestNotes}` : '',
+            apt.description ?? '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          location: apt.location ?? undefined,
+          start: { dateTime: startAt.toISOString(), timeZone: apt.timezone },
+          end: { dateTime: endAt.toISOString(), timeZone: apt.timezone },
+          attendees: [{ email: dto.guestEmail, displayName: dto.guestName }],
+        })
+        if (eventId) {
+          await this.prisma.booking.update({
+            where: { id: booking.id },
+            data: { googleEventId: eventId },
+          })
+        }
+      } catch (err) {
+        this.logger.error(
+          `Google Calendar createEvent failed: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    })()
+
     // Send emails async (don't block response)
     void this.email
       .sendBookingConfirmationToGuest(booking, apt, owner)
@@ -554,6 +639,17 @@ export class SchedulingService {
     })
     if (count === 0) throw new ConflictException('Booking already cancelled')
 
+    // Delete Google Calendar event (best-effort)
+    if (booking.googleEventId) {
+      void this.googleCalendar
+        .deleteEvent(booking.ownerUserId, booking.googleEventId)
+        .catch((err: unknown) =>
+          this.logger.error(
+            `Google deleteEvent failed: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        )
+    }
+
     // Re-fetch the updated booking for the return value and emails
     const updated = await this.prisma.booking.findUnique({ where: { token } })
 
@@ -598,6 +694,17 @@ export class SchedulingService {
       data: { status: BookingStatus.CANCELLED, cancelReason: reason ?? null },
     })
     if (count === 0) throw new ConflictException('Booking already cancelled')
+
+    // Delete Google Calendar event (best-effort)
+    if (booking.googleEventId) {
+      void this.googleCalendar
+        .deleteEvent(userId, booking.googleEventId)
+        .catch((err: unknown) =>
+          this.logger.error(
+            `Google deleteEvent (owner cancel) failed: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        )
+    }
 
     // Re-fetch for return value and emails
     const updated = await this.prisma.booking.findUnique({ where: { id: bookingId } })
@@ -697,6 +804,20 @@ export class SchedulingService {
       throw new ConflictException('This time slot is no longer available')
     }
 
+    // Update Google Calendar event (best-effort)
+    if (booking.googleEventId) {
+      void this.googleCalendar
+        .updateEvent(booking.ownerUserId, booking.googleEventId, {
+          start: { dateTime: newStartAt.toISOString(), timeZone: apt.timezone },
+          end: { dateTime: newEndAt.toISOString(), timeZone: apt.timezone },
+        })
+        .catch((err: unknown) =>
+          this.logger.error(
+            `Google updateEvent failed: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        )
+    }
+
     // Fetch owner for emails
     const owner = await this.prisma.user.findUnique({
       where: { id: booking.ownerUserId },
@@ -734,10 +855,10 @@ export class SchedulingService {
     return card.userId
   }
 
-  async getPublicAppointmentType(ownerUserId: string, slug: string) {
+  async getPublicAppointmentType(ownerUserId: string, slug: string, sourceHandle?: string) {
     const apt = await this.prisma.appointmentType.findUnique({
       where: { ownerUserId_slug: { ownerUserId, slug } },
-      include: { availabilityRules: true },
+      include: { availabilityRules: true, questions: { orderBy: { position: 'asc' } } },
     })
     if (!apt || !apt.isActive || apt.deletedAt !== null) throw new NotFoundException()
 
@@ -746,11 +867,28 @@ export class SchedulingService {
       select: { name: true, avatarUrl: true },
     })
 
+    const sourceCard = sourceHandle
+      ? await this.prisma.card.findFirst({
+          where: { userId: ownerUserId, handle: sourceHandle, isActive: true },
+          select: { id: true, handle: true },
+        })
+      : null
+
+    const primaryCard =
+      sourceCard ??
+      (await this.prisma.card.findFirst({
+        where: { userId: ownerUserId, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, handle: true },
+      }))
+
     // MED-3: Return only the fields the public booking page needs.
     // ownerUserId, bufferDays, bufferAfterMins, createdAt, updatedAt, deletedAt
     // are internal fields that should never appear in a public unauthenticated response.
     return {
       id: apt.id,
+      cardId: primaryCard?.id ?? null,
+      cardHandle: primaryCard?.handle ?? null,
       name: apt.name,
       slug: apt.slug,
       description: apt.description,
@@ -760,6 +898,7 @@ export class SchedulingService {
       timezone: apt.timezone,
       isActive: apt.isActive,
       availabilityRules: apt.availabilityRules,
+      questions: apt.questions,
       owner: owner ?? { name: null, avatarUrl: null },
     }
   }

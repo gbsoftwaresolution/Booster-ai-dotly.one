@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import {
@@ -42,7 +42,7 @@ interface AnalyticsData {
     totalClicks: number
     totalLeads: number
     uniqueVisitors: number
-    conversionRate: string
+    conversionRate: number
   }
   charts: {
     viewsByDay: { date: string; count: number }[]
@@ -52,6 +52,16 @@ interface AnalyticsData {
     clicksByLink: { name: string; value: number }[]
     referrers: { name: string; value: number }[]
   }
+}
+
+interface DashboardSummary {
+  totalViews: number
+  totalClicks: number
+  totalLeads: number
+  totalCards: number
+  activeCards: number
+  interactionsByAction: { name: string; value: number }[]
+  truncated: boolean
 }
 
 const DEVICE_COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#10b981']
@@ -89,14 +99,23 @@ function StatCard({
   )
 }
 
+function fmtActionLabel(name: string) {
+  return name
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 export default function AnalyticsPage(): JSX.Element {
   const [cards, setCards] = useState<CardSummary[]>([])
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [dateRangeDays, setDateRangeDays] = useState(30)
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(false)
   const [cardsLoading, setCardsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // Load cards
   useEffect(() => {
@@ -104,7 +123,9 @@ export default function AnalyticsPage(): JSX.Element {
       try {
         const token = await getAccessToken()
         const data = await apiGet<CardSummary[]>('/cards', token)
+        const summary = await apiGet<DashboardSummary>('/analytics/dashboard-summary', token)
         setCards(data)
+        setDashboardSummary(summary)
         const first = data[0]
         if (first) setSelectedCardId(first.id)
       } catch (err) {
@@ -119,21 +140,29 @@ export default function AnalyticsPage(): JSX.Element {
   // Load analytics when card or date range changes
   const loadAnalytics = useCallback(async () => {
     if (!selectedCardId) return
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     setError(null)
     try {
       const token = await getAccessToken()
       const to = new Date()
+      to.setUTCHours(23, 59, 59, 999)
       const from = new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000)
+      from.setUTCHours(0, 0, 0, 0)
       const data = await apiGet<AnalyticsData>(
-        `/cards/${selectedCardId}/analytics?from=${from.toISOString()}&to=${to.toISOString()}`,
+        `/cards/${selectedCardId}/analytics?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
         token,
+        controller.signal,
       )
+      if (controller.signal.aborted) return
       setAnalyticsData(data)
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Failed to load analytics')
     } finally {
-      setLoading(false)
+      if (!abortRef.current?.signal.aborted) setLoading(false)
     }
   }, [selectedCardId, dateRangeDays])
 
@@ -141,13 +170,18 @@ export default function AnalyticsPage(): JSX.Element {
     void loadAnalytics()
   }, [loadAnalytics])
 
+  const [exportWarning, setExportWarning] = useState<string | null>(null)
+
   const exportLeadsCSV = useCallback(async () => {
+    setExportWarning(null)
     try {
       const token = await getAccessToken()
       const params = new URLSearchParams()
       if (selectedCardId) params.set('cardId', selectedCardId)
       const to = new Date()
+      to.setUTCHours(23, 59, 59, 999)
       const from = new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000)
+      from.setUTCHours(0, 0, 0, 0)
       params.set('from', from.toISOString())
       params.set('to', to.toISOString())
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -155,6 +189,13 @@ export default function AnalyticsPage(): JSX.Element {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       })
       if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      // Surface truncation notice if the server capped the export
+      if (res.headers.get('x-export-truncated') === 'true') {
+        const count = res.headers.get('x-export-row-count') ?? '10000'
+        setExportWarning(
+          `Export limited to ${Number(count).toLocaleString()} rows. Use the API for full data.`,
+        )
+      }
       const csv = await res.text()
       const blob = new Blob([csv], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
@@ -166,7 +207,7 @@ export default function AnalyticsPage(): JSX.Element {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Export failed')
+      setError(err instanceof Error ? err.message : 'Export failed')
     }
   }, [selectedCardId, dateRangeDays])
 
@@ -198,6 +239,7 @@ export default function AnalyticsPage(): JSX.Element {
             <select
               value={selectedCardId ?? ''}
               onChange={(e) => setSelectedCardId(e.target.value)}
+              aria-label="Select card"
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
               {cards.map((card) => (
@@ -215,6 +257,7 @@ export default function AnalyticsPage(): JSX.Element {
                 key={opt.days}
                 type="button"
                 onClick={() => setDateRangeDays(opt.days)}
+                aria-pressed={dateRangeDays === opt.days}
                 className={[
                   'px-3 py-2 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg',
                   dateRangeDays === opt.days
@@ -240,9 +283,29 @@ export default function AnalyticsPage(): JSX.Element {
         </div>
       </div>
 
+      {/* Export truncation warning */}
+      {exportWarning && (
+        <div
+          role="status"
+          className="flex items-center justify-between rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700"
+        >
+          <span>{exportWarning}</span>
+          <button
+            type="button"
+            onClick={() => setExportWarning(null)}
+            className="ml-4 font-semibold underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
-        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          role="alert"
+          className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
           <span>{error}</span>
           <button
             type="button"
@@ -316,6 +379,29 @@ export default function AnalyticsPage(): JSX.Element {
         )
       ) : null}
 
+      {dashboardSummary && dashboardSummary.interactionsByAction.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-base font-semibold text-gray-900">Interaction actions</h2>
+          <div className="space-y-3">
+            {dashboardSummary.interactionsByAction.slice(0, 10).map((item) => {
+              const max = Math.max(...dashboardSummary.interactionsByAction.map((a) => a.value), 1)
+              const pct = (item.value / max) * 100
+              return (
+                <div key={item.name} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">{fmtActionLabel(item.name)}</span>
+                    <span className="font-medium text-gray-900">{item.value}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100">
+                    <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Charts and detail sections — only shown when there is actual data */}
       {analyticsData &&
         (analyticsData.summary.totalViews > 0 ||
@@ -353,6 +439,40 @@ export default function AnalyticsPage(): JSX.Element {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Clicks over time line chart */}
+            {analyticsData.charts.clicksByDay.some((d) => d.count > 0) && (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks over time</h2>
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart
+                    data={analyticsData.charts.clicksByDay}
+                    margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(d) => {
+                        const parts = (d as string).split('-')
+                        return `${parts[1]}/${parts[2]}`
+                      }}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip labelFormatter={(d) => String(d)} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      name="Clicks"
+                      stroke="#a855f7"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             {/* Clicks by platform + Device donut */}
             <div className="grid gap-6 lg:grid-cols-2">

@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Param, Body, Req, Query, UseGuards, BadRequestException } from '@nestjs/common'
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Req,
+  Query,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
@@ -12,7 +22,7 @@ import type { Request } from 'express'
 import { Plan } from '@dotly/types'
 
 const VALID_EVENT_TYPES = ['VIEW', 'CLICK', 'SAVE', 'LEAD_SUBMIT'] as const
-type EventType = typeof VALID_EVENT_TYPES[number]
+type EventType = (typeof VALID_EVENT_TYPES)[number]
 
 // HIGH-02: Strict allowlisted metadata schema for the @Public analytics endpoint.
 // The previous `Record<string, unknown>` accepted arbitrary data of any shape and
@@ -31,6 +41,22 @@ class EventMetadataDto {
   @IsOptional()
   @IsString()
   linkPlatform?: string
+
+  @IsOptional()
+  @IsString()
+  linkUrl?: string
+
+  @IsOptional()
+  @IsString()
+  action?: string
+
+  @IsOptional()
+  @IsString()
+  surface?: string
+
+  @IsOptional()
+  @IsString()
+  status?: string
 }
 
 class RecordEventDto {
@@ -79,10 +105,7 @@ export class AnalyticsController {
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('public/analytics')
   @ApiOperation({ summary: 'Record a public analytics event (no auth)' })
-  async record(
-    @Body() body: RecordEventDto,
-    @Req() req: Request,
-  ) {
+  async record(@Body() body: RecordEventDto, @Req() req: Request) {
     // Validate that the cardId references a real, published card so that
     // arbitrary callers cannot pollute the analytics table with phantom IDs.
     const card = await this.prisma.card.findUnique({
@@ -94,12 +117,24 @@ export class AnalyticsController {
     }
 
     const forwarded = req.headers['x-forwarded-for']
-    const ip =
-      (Array.isArray(forwarded) ? forwarded[0] : forwarded) ??
-      req.socket?.remoteAddress
+    const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded) ?? req.socket?.remoteAddress
     const country = req.headers['x-vercel-ip-country'] as string | undefined
     const ua = req.headers['user-agent'] ?? ''
-    const device = ua.toLowerCase().includes('mobile') ? 'mobile' : 'desktop'
+    // Order matters: check tablet before mobile — many tablet UAs also contain
+    // 'mobile' (e.g. "iPad; CPU OS … Mobile Safari"). A tablet match wins.
+    const uaLower = ua.toLowerCase()
+    const device =
+      uaLower.includes('tablet') ||
+      uaLower.includes('ipad') ||
+      uaLower.includes('kindle') ||
+      uaLower.includes('playbook')
+        ? 'tablet'
+        : uaLower.includes('mobile') ||
+            uaLower.includes('android') ||
+            uaLower.includes('iphone') ||
+            uaLower.includes('ipod')
+          ? 'mobile'
+          : 'desktop'
     await this.analyticsService.record({
       cardId: body.cardId,
       type: body.type,
@@ -110,6 +145,15 @@ export class AnalyticsController {
       referrer: req.headers['referer'],
     })
     return { success: true }
+  }
+
+  @ApiBearerAuth()
+  @Get('analytics/dashboard-summary')
+  @ApiOperation({
+    summary: 'Get aggregate analytics across all cards for the current user (dashboard)',
+  })
+  getDashboardSummary(@CurrentUser() user: { id: string }) {
+    return this.analyticsService.getDashboardSummary(user.id)
   }
 
   @ApiBearerAuth()
@@ -130,8 +174,10 @@ export class AnalyticsController {
     // F-02: Enforce plan-based maximum date range so FREE users cannot query
     // unlimited history.  The plan limit is read from the canonical source
     // (BillingService.getPlanLimits) so it stays in sync with billing changes.
-    const dbUser = await this.prisma.user.findUnique({
-      where: { id: user.id },
+    // Resolve supabaseId → internal DB user to ensure the plan lookup succeeds
+    // even when the JWT sub (user.id) is the Supabase UUID, not the DB primary key.
+    const dbUser = await this.prisma.user.findFirst({
+      where: { OR: [{ id: user.id }, { supabaseId: user.id }] },
       select: { plan: true },
     })
     const plan: Plan = (dbUser?.plan as Plan | undefined) ?? Plan.FREE

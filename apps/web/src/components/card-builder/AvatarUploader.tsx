@@ -13,13 +13,18 @@
  */
 
 import type { JSX } from 'react'
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 import { X, Link2, Upload, Camera, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
+
+// ─── Module-level constants ──────────────────────────────────────────────────
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +35,67 @@ interface AvatarUploaderProps {
   currentAvatarUrl?: string
   onAvatarChange: (url: string) => void
   onClose: () => void
+}
+
+// ─── useFocusTrap: traps Tab/Shift-Tab inside a container, handles Escape ───
+
+function useFocusTrap(
+  ref: React.RefObject<HTMLElement | null>,
+  active: boolean,
+  onEscape?: () => void,
+) {
+  useEffect(() => {
+    if (!active || !ref.current) return
+    const el = ref.current
+    const focusable = el.querySelectorAll<HTMLElement>(
+      'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+    )
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+
+    // Auto-focus first focusable element
+    first?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onEscape?.()
+        return
+      }
+      if (e.key !== 'Tab') return
+      if (focusable.length === 0) {
+        e.preventDefault()
+        return
+      }
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault()
+          last?.focus()
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault()
+          first?.focus()
+        }
+      }
+    }
+    el.addEventListener('keydown', onKeyDown)
+    return () => el.removeEventListener('keydown', onKeyDown)
+  }, [active, ref, onEscape])
+}
+
+// ─── ErrorBanner ─────────────────────────────────────────────────────────────
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600"
+    >
+      <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {message}
+    </div>
+  )
 }
 
 // ─── Canvas helper: crop a loaded image to a circular/square area ────────────
@@ -88,7 +154,7 @@ async function uploadBlobToR2(cardId: string, blob: Blob, mimeType: string): Pro
   const filename = `avatar-${Date.now()}.${ext}`
   const { uploadUrl, publicUrl } = await apiPost<{ uploadUrl: string; publicUrl: string }>(
     `/cards/${cardId}/upload-url`,
-    { filename, contentType: mimeType },
+    { filename, contentType: mimeType, fileSizeBytes: blob.size },
     token,
   )
   const res = await fetch(uploadUrl, {
@@ -116,13 +182,15 @@ function TabBtn({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={cn(
         'flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all',
         active ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700',
       )}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {label}
     </button>
   )
@@ -166,25 +234,21 @@ function CropPane({
 
       {/* Zoom slider */}
       <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-400 w-8 text-right">–</span>
+        <span className="text-xs text-gray-400 w-8 text-right" aria-hidden="true">–</span>
         <input
           type="range"
           min={1}
           max={3}
           step={0.01}
           value={zoom}
+          aria-label="Zoom level"
           onChange={(e) => setZoom(Number(e.target.value))}
           className="flex-1 accent-brand-500"
         />
-        <span className="text-xs text-gray-400 w-8">+</span>
+        <span className="text-xs text-gray-400 w-8" aria-hidden="true">+</span>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
       <div className="flex gap-2">
         <button
@@ -203,11 +267,11 @@ function CropPane({
         >
           {uploading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Uploading…
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Uploading…
             </>
           ) : (
             <>
-              <Check className="h-4 w-4" /> Use Photo
+              <Check className="h-4 w-4" aria-hidden="true" /> Use Photo
             </>
           )}
         </button>
@@ -220,7 +284,7 @@ function CropPane({
 
 function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: string) => void }) {
   const [value, setValue] = useState(current)
-  const [preview, setPreview] = useState(current ? true : false)
+  const [preview, setPreview] = useState(!!current)
   const [imgError, setImgError] = useState(false)
 
   function handleBlur() {
@@ -240,7 +304,7 @@ function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: stri
           'focus-within:border-brand-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/20',
         )}
       >
-        <Link2 className="h-4 w-4 shrink-0 text-gray-400" />
+        <Link2 className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
         <input
           type="url"
           value={value}
@@ -250,6 +314,7 @@ function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: stri
           }}
           onBlur={handleBlur}
           placeholder="https://example.com/photo.jpg"
+          aria-label="Image URL"
           className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
         />
       </div>
@@ -257,14 +322,12 @@ function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: stri
       {preview && value && (
         <div className="flex justify-center">
           {imgError ? (
-            <div className="flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
-              <AlertCircle className="h-3.5 w-3.5" /> Could not load image — check the URL
-            </div>
+            <ErrorBanner message="Could not load image — check the URL" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={value}
-              alt="preview"
+              alt="URL preview"
               onError={() => setImgError(true)}
               className="h-28 w-28 rounded-full object-cover ring-4 ring-brand-100"
             />
@@ -278,7 +341,7 @@ function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: stri
         onClick={() => onConfirm(value.trim())}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
       >
-        <Check className="h-4 w-4" /> Use this URL
+        <Check className="h-4 w-4" aria-hidden="true" /> Use this URL
       </button>
     </div>
   )
@@ -288,18 +351,17 @@ function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: stri
 
 function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: string) => void }) {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const ALLOWED = ['image/jpeg', 'image/png', 'image/webp']
-
-  async function handleFile(file: File) {
-    if (!ALLOWED.includes(file.type)) {
+  const handleFile = useCallback(async (file: File) => {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type as typeof ALLOWED_IMAGE_TYPES[number])) {
       setError('Only JPEG, PNG, and WebP images are supported.')
       return
     }
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
       setError('File is too large. Maximum size is 10 MB.')
       return
     }
@@ -307,9 +369,9 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
     const reader = new FileReader()
     reader.onload = () => setImageSrc(reader.result as string)
     reader.readAsDataURL(file)
-  }
+  }, [])
 
-  async function handleCropConfirm(pixels: Area) {
+  const handleCropConfirm = useCallback(async (pixels: Area) => {
     if (!imageSrc) return
     setUploading(true)
     setError(null)
@@ -322,7 +384,7 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
     } finally {
       setUploading(false)
     }
-  }
+  }, [imageSrc, cardId, onConfirm])
 
   if (imageSrc) {
     return (
@@ -338,44 +400,46 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
 
   return (
     <div className="flex flex-col gap-4">
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
+        aria-label="Click or drag an image to upload"
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
-        onDragOver={(e) => e.preventDefault()}
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+        onDragLeave={() => setDragActive(false)}
         onDrop={(e) => {
           e.preventDefault()
+          setDragActive(false)
           const file = e.dataTransfer.files[0]
-          if (file) handleFile(file)
+          if (file) void handleFile(file)
         }}
         className={cn(
-          'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50',
-          'cursor-pointer py-10 text-center transition-colors hover:border-brand-400 hover:bg-brand-50',
+          'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed py-10 text-center transition-colors',
+          dragActive
+            ? 'border-brand-400 bg-brand-50'
+            : 'border-gray-200 bg-gray-50 cursor-pointer hover:border-brand-400 hover:bg-brand-50',
         )}
       >
-        <Upload className="h-8 w-8 text-gray-300" />
+        <Upload className="h-8 w-8 text-gray-300" aria-hidden="true" />
         <div>
           <p className="text-sm font-semibold text-gray-700">Click or drag an image here</p>
           <p className="text-xs text-gray-400 mt-0.5">JPEG · PNG · WebP up to 10 MB</p>
         </div>
-      </div>
+      </button>
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
       <input
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        aria-hidden="true"
+        tabIndex={-1}
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
-          if (f) handleFile(f)
+          if (f) void handleFile(f)
+          // Reset so same file can be selected again
+          e.target.value = ''
         }}
       />
     </div>
@@ -386,43 +450,42 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
 
 function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [stream, setStream] = useState<MediaStream | null>(null)
+  // Use ref to avoid stale-closure issues in cleanup
+  const streamRef = useRef<MediaStream | null>(null)
+  const [cameraReady, setCameraReady] = useState(false)
   const [captured, setCaptured] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
-  // Start camera when tab mounts
-  useEffect(() => {
-    let active = true
-    async function startCamera() {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        })
-        if (!active) {
-          s.getTracks().forEach((t) => t.stop())
-          return
-        }
-        setStream(s)
-        if (videoRef.current) videoRef.current.srcObject = s
-      } catch {
-        if (active) setCameraError('Camera access denied or not available on this device.')
+  const startCamera = useCallback(async () => {
+    setCameraError(null)
+    setCameraReady(false)
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      })
+      streamRef.current = s
+      if (videoRef.current) {
+        videoRef.current.srcObject = s
+        videoRef.current.onloadedmetadata = () => setCameraReady(true)
       }
+    } catch {
+      setCameraError('Camera access denied or not available on this device.')
     }
-    startCamera()
-    return () => {
-      active = false
-      stream?.getTracks().forEach((t) => t.stop())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Stop stream when leaving
-  function stopStream() {
-    stream?.getTracks().forEach((t) => t.stop())
-    setStream(null)
-  }
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    setCameraReady(false)
+  }, [])
+
+  // Start camera when tab mounts, stop on unmount
+  useEffect(() => {
+    void startCamera()
+    return () => stopStream()
+  }, [startCamera, stopStream])
 
   function capture() {
     const video = videoRef.current
@@ -438,7 +501,7 @@ function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
     setCaptured(dataUrl)
   }
 
-  async function handleCropConfirm(pixels: Area) {
+  const handleCropConfirm = useCallback(async (pixels: Area) => {
     if (!captured) return
     setUploading(true)
     setUploadError(null)
@@ -451,23 +514,11 @@ function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
     } finally {
       setUploading(false)
     }
-  }
+  }, [captured, cardId, onConfirm])
 
   function retake() {
     setCaptured(null)
-    // restart camera
-    async function restart() {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        })
-        setStream(s)
-        if (videoRef.current) videoRef.current.srcObject = s
-      } catch {
-        setCameraError('Camera access denied or not available.')
-      }
-    }
-    restart()
+    void startCamera()
   }
 
   if (captured) {
@@ -485,7 +536,7 @@ function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
   if (cameraError) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-red-50 px-4 py-10 text-center">
-        <AlertCircle className="h-8 w-8 text-red-400" />
+        <AlertCircle className="h-8 w-8 text-red-400" aria-hidden="true" />
         <p className="text-sm text-red-600">{cameraError}</p>
       </div>
     )
@@ -498,7 +549,20 @@ function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
         style={{ aspectRatio: '4/3' }}
       >
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          aria-label="Camera preview"
+          className="h-full w-full object-cover"
+        />
+        {/* Loading overlay while camera initialises */}
+        {!cameraReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <Loader2 className="h-8 w-8 animate-spin text-white" aria-hidden="true" />
+          </div>
+        )}
         {/* Guide circle overlay */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-48 w-48 rounded-full border-2 border-white/60 shadow-inner" />
@@ -508,9 +572,10 @@ function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
       <button
         type="button"
         onClick={capture}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+        disabled={!cameraReady}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Camera className="h-4 w-4" /> Take Photo
+        <Camera className="h-4 w-4" aria-hidden="true" /> Take Photo
       </button>
     </div>
   )
@@ -525,20 +590,15 @@ export function AvatarUploader({
   onClose,
 }: AvatarUploaderProps): JSX.Element {
   const [tab, setTab] = useState<Tab>('upload')
+  const panelRef = useRef<HTMLDivElement>(null)
 
-  function handleConfirm(url: string) {
+  const handleConfirm = useCallback((url: string) => {
     onAvatarChange(url)
     onClose()
-  }
+  }, [onAvatarChange, onClose])
 
-  // Close on Escape
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Focus trap + Escape key inside the panel
+  useFocusTrap(panelRef, true, onClose)
 
   return (
     /* Backdrop */
@@ -548,19 +608,28 @@ export function AvatarUploader({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="avatar-dialog-title"
+        className="relative z-10 w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-gray-900">Profile Photo</h2>
+          <h2 id="avatar-dialog-title" className="text-base font-bold text-gray-900">
+            Profile Photo
+          </h2>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close profile photo dialog"
             className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -579,20 +648,20 @@ export function AvatarUploader({
             </div>
             <button
               type="button"
-              title="Remove photo"
+              aria-label="Remove current photo"
               onClick={() => {
                 onAvatarChange('')
                 onClose()
               }}
               className="rounded-full p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         )}
 
         {/* Tab switcher */}
-        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 mb-4">
+        <div role="tablist" aria-label="Photo source" className="flex gap-1 rounded-xl bg-gray-100 p-1 mb-4">
           <TabBtn
             active={tab === 'upload'}
             onClick={() => setTab('upload')}

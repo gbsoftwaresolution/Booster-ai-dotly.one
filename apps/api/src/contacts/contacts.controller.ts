@@ -21,6 +21,7 @@ import { ContactsService } from './contacts.service'
 import {
   IsString,
   IsOptional,
+  IsNotEmpty,
   IsEmail,
   IsArray,
   IsInt,
@@ -34,6 +35,7 @@ import {
   IsBoolean,
   IsNumber,
   IsDateString,
+  MinLength,
 } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
 import { SendEmailDto } from './dto/send-email.dto'
@@ -455,32 +457,50 @@ class UpdateDealDto {
 
 // Gap 6: Email Templates
 class CreateEmailTemplateDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
   @MaxLength(200)
   name!: string
 
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
   @MaxLength(998)
   subject!: string
 
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
   @MaxLength(50000)
   body!: string
 }
 
 class UpdateEmailTemplateDto {
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
   @MaxLength(200)
   name?: string
 
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
   @MaxLength(998)
   subject?: string
 
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
   @MaxLength(50000)
   body?: string
 }
@@ -965,14 +985,24 @@ export class ContactsController {
 
   @ApiBearerAuth()
   @Get('contacts/export')
-  @ApiOperation({ summary: 'Export all contacts as CSV file' })
-  async exportContacts(@CurrentUser() user: { id: string }, @Res() res: Response) {
-    const csv = await this.contactsService.exportContacts(user.id)
+  @ApiOperation({ summary: 'Export contacts as CSV — supports cardId, from, to filters' })
+  async exportContacts(
+    @CurrentUser() user: { id: string },
+    @Res() res: Response,
+    @Query('cardId') cardId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const result = await this.contactsService.exportContacts(user.id, { cardId, from, to })
     const filename = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Cache-Control', 'no-store')
-    res.end('\uFEFF' + csv) // BOM for Excel compatibility
+    if (result.truncated) {
+      res.setHeader('X-Export-Truncated', 'true')
+      res.setHeader('X-Export-Row-Count', String(result.total))
+    }
+    res.end('\uFEFF' + result.csv) // BOM for Excel compatibility
   }
 
   // ─── Contact Email History ────────────────────────────────────────────────

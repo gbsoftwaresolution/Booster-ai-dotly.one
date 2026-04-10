@@ -726,7 +726,7 @@ function AddSheet({
             publicUrl: string
           }>(
             `/cards/${cardId}/upload-url`,
-            { filename: uploadFilename, contentType: uploadMime },
+            { filename: uploadFilename, contentType: uploadMime, fileSizeBytes: uploadBlob.size },
             token,
           )
           const res = await fetch(uploadUrl, {
@@ -744,7 +744,7 @@ function AddSheet({
             publicUrl: string
           }>(
             `/cards/${cardId}/upload-url`,
-            { filename: uploadFilename, contentType: resolvedType },
+            { filename: uploadFilename, contentType: resolvedType, fileSizeBytes: file.size },
             token,
           )
           const res = await fetch(uploadUrl, {
@@ -755,8 +755,23 @@ function AddSheet({
           if (!res.ok) throw new Error('Upload failed — please try again')
           publicUrl = pub
         } else if (isVideo || isAudio) {
-          // Video/audio: use object URL (not uploaded to R2)
-          publicUrl = URL.createObjectURL(file)
+          const token = await getAccessToken()
+          const uploadFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+          const { uploadUrl, publicUrl: pub } = await apiPost<{
+            uploadUrl: string
+            publicUrl: string
+          }>(
+            `/cards/${cardId}/upload-url`,
+            { filename: uploadFilename, contentType: resolvedType, fileSizeBytes: file.size },
+            token,
+          )
+          const res = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': resolvedType },
+          })
+          if (!res.ok) throw new Error('Upload failed — please try again')
+          publicUrl = pub
         } else {
           publicUrl = URL.createObjectURL(file)
         }
@@ -1101,7 +1116,6 @@ interface GroupCardProps {
   setDragOver: (i: number | null) => void
   onRenameGroup: (groupId: string, newName: string) => void
   onDeleteGroup: (groupId: string) => void
-  onAddToGroup: (groupId: string) => void
   cardId: string
   mediaBlocksAll: MediaBlockData[]
   onAddBlock: (block: MediaBlockData) => void
@@ -1677,7 +1691,6 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
                 handleDeleteGroup(gid)
                 if (pendingGroup?.id === gid) setPendingGroup(null)
               }}
-              onAddToGroup={() => setActiveAddSheet(group.id)}
               cardId={cardId}
               mediaBlocksAll={mediaBlocks}
               onAddBlock={(block) => {

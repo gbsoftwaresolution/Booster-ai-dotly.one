@@ -1,0 +1,2 @@
+ALTER TABLE "contact_emails"
+ALTER COLUMN "body" TYPE VARCHAR(50000);

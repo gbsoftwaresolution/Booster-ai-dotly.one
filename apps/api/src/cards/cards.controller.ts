@@ -8,6 +8,7 @@ import {
   Param,
   Body,
   Res,
+  Req,
   UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
@@ -27,6 +28,9 @@ const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'imag
 
 const ALLOWED_MIME_TYPES = [
   ...ALLOWED_IMAGE_MIME_TYPES,
+  // Video
+  'video/mp4',
+  'video/webm',
   // Audio
   'audio/mpeg',
   'audio/wav',
@@ -104,7 +108,7 @@ export class CardsController {
   @ApiOperation({ summary: 'List all cards for the authenticated user' })
   @ApiResponse({
     status: 200,
-    description: 'Array of cards with themes, social links and qr codes',
+    description: 'Array of card summaries (id, handle, templateId, isActive, fields, viewCount)',
   })
   @Get('cards')
   findAll(@CurrentUser() user: { id: string }) {
@@ -263,19 +267,24 @@ export class CardsController {
   }
 
   @Public()
-  @ApiOperation({ summary: 'Download vCard for a published card (no auth)' })
+  @ApiOperation({ summary: 'Download vCard for a published card (no auth required for public cards)' })
   @ApiResponse({ status: 200, description: 'vCard 3.0 file attachment' })
   @Get('public/cards/:handle/vcard')
-  async getVcard(@Param('handle') handle: string, @Res() res: Response) {
-    // F-17: getVcard() fetches the card from DB and attaches the DB-validated
-    // handle as `_handle` on the returned string. We use that value in the
-    // Content-Disposition header instead of the raw URL param so an attacker
-    // cannot inject characters like `"` or `\n` into the header by crafting a
-    // handle that was never stored in the DB.
-    const vcard = await this.cardsService.getVcard(handle)
-    const safeHandle = (vcard as unknown as { _handle?: string })._handle ?? handle
+  async getVcard(@Param('handle') handle: string, @Res() res: Response, @Req() req: { headers: Record<string, string | undefined> }) {
+    // SEC-01: Extract Bearer token from the Authorization header only.
+    // Previously the endpoint also accepted a ?token= query parameter so
+    // <a download> links could authenticate without setting headers. This is
+    // removed because query parameters appear in server access logs, Referer
+    // headers, and browser history — all of which would leak the JWT.
+    // Clients that need to download MEMBERS_ONLY vCards must set the
+    // Authorization header (e.g. via a fetch() + createObjectURL approach).
+    // Signature verification is delegated to CardsService.getVcard() which
+    // calls verifySupabaseJwt() — same logic as SupabaseStrategy.
+    const authHeader = req.headers['authorization'] ?? ''
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined
+    const { content, handle: safeHandle } = await this.cardsService.getVcard(handle, bearerToken)
     res.setHeader('Content-Type', 'text/vcard')
     res.setHeader('Content-Disposition', `attachment; filename="${safeHandle}.vcf"`)
-    res.send(vcard)
+    res.send(content)
   }
 }

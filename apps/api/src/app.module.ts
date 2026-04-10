@@ -26,6 +26,7 @@ import { WebhooksModule } from './webhooks/webhooks.module'
 import { LeadFormModule } from './lead-form/lead-form.module'
 import { WalletPassesModule } from './wallet-passes/wallet-passes.module'
 import { SchedulingModule } from './scheduling/scheduling.module'
+import { InboxModule } from './inbox/inbox.module'
 import { validate } from './config/env.validation'
 
 @Module({
@@ -78,6 +79,7 @@ import { validate } from './config/env.validation'
     LeadFormModule,
     WalletPassesModule,
     SchedulingModule,
+    InboxModule,
   ],
   providers: [
     // ThrottlerGuard MUST run first (before JwtAuthGuard) so that every

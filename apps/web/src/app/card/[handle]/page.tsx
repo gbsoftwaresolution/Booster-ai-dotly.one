@@ -24,6 +24,7 @@ interface RawCard {
   templateId: string
   fields: Record<string, string>
   isActive: boolean
+  vcardPolicy?: string
   theme?: {
     primaryColor?: string
     secondaryColor?: string
@@ -48,6 +49,11 @@ interface RawCard {
     groupName?: string | null
   }>
   teamBrand?: TeamBrand | null
+  bookableAppointment?: {
+    slug: string
+    name: string
+    durationMins: number
+  } | null
 }
 
 /** Validate that a value is a safe CSS hex color (e.g. #fff or #0ea5e9) */
@@ -296,6 +302,8 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
             mode="web"
             cardHandle={rawCard.handle}
             ownerName={fields.name ?? 'this person'}
+            vcardPolicy={(rawCard.vcardPolicy ?? 'PUBLIC') as 'PUBLIC' | 'MEMBERS_ONLY'}
+            bookableAppointment={rawCard.bookableAppointment ?? null}
           />
         </div>
 

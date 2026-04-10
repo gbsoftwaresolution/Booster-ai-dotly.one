@@ -66,6 +66,12 @@ interface UpdateContactDto {
   tags?: string[]
 }
 
+function trimRequiredTemplateField(value: string, fieldName: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) throw new BadRequestException(`${fieldName} is required`)
+  return trimmed
+}
+
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
@@ -669,29 +675,45 @@ export class ContactsService {
     // Generate tracking token BEFORE sending so it can be embedded in the email pixel.
     const trackingToken = randomBytes(16).toString('hex')
 
-    // Send the email (with tracking pixel)
-    await this.emailService.sendDirectCrmEmail(
-      contact.email,
-      resolvedSubject,
-      resolvedBody,
-      fromName,
-      trackingToken,
-    )
+    const emailRecord = await this.prisma.contactEmail.create({
+      data: {
+        contactId,
+        subject: resolvedSubject,
+        body: resolvedBody,
+        trackingToken,
+      },
+    })
 
-    // M10: Wrap timeline + ContactEmail writes in a single transaction so
-    // both are created atomically — or neither is, on failure.
-    await this.prisma.$transaction([
-      this.prisma.contactTimeline.create({
+    try {
+      await this.emailService.sendDirectCrmEmail(
+        contact.email,
+        resolvedSubject,
+        resolvedBody,
+        fromName,
+        trackingToken,
+      )
+    } catch (error) {
+      await this.prisma.contactEmail
+        .delete({ where: { id: emailRecord.id } })
+        .catch((cleanupError) =>
+          this.logger.warn('Failed to roll back email history after send failure', cleanupError),
+        )
+      throw error
+    }
+
+    const sentAt = new Date().toISOString()
+
+    await this.prisma.contactTimeline
+      .create({
         data: {
           contactId,
           event: 'EMAIL_SENT',
-          metadata: { subject, sentAt: new Date().toISOString() },
+          metadata: { subject: resolvedSubject, sentAt },
         },
-      }),
-      this.prisma.contactEmail.create({
-        data: { contactId, subject, body, trackingToken },
-      }),
-    ])
+      })
+      .catch((timelineError: unknown) =>
+        this.logger.warn('Email timeline write failed after successful send', timelineError),
+      )
 
     // H8: Fire-and-forget webhook: contact.email_sent
     void this.webhooksService
@@ -699,7 +721,7 @@ export class ContactsService {
         contactId,
         name: contact.name,
         email: contact.email,
-        subject,
+        subject: resolvedSubject,
       })
       .catch((err: unknown) => this.logger.warn('Webhook fan-out failed (contact.email_sent)', err))
 
@@ -1140,8 +1162,12 @@ export class ContactsService {
   // ─── Gap 6: Email Templates ──────────────────────────────────────────────────
 
   async createEmailTemplate(userId: string, dto: { name: string; subject: string; body: string }) {
+    const name = trimRequiredTemplateField(dto.name, 'name')
+    const subject = trimRequiredTemplateField(dto.subject, 'subject')
+    const body = trimRequiredTemplateField(dto.body, 'body')
+
     return this.prisma.emailTemplate.create({
-      data: { ownerUserId: userId, name: dto.name, subject: dto.subject, body: dto.body },
+      data: { ownerUserId: userId, name, subject, body },
     })
   }
 
@@ -1149,6 +1175,7 @@ export class ContactsService {
     return this.prisma.emailTemplate.findMany({
       where: { ownerUserId: userId },
       orderBy: { updatedAt: 'desc' },
+      take: 200,
     })
   }
 
@@ -1159,7 +1186,14 @@ export class ContactsService {
   ) {
     const tpl = await this.prisma.emailTemplate.findUnique({ where: { id: templateId } })
     if (!tpl || tpl.ownerUserId !== userId) throw new ForbiddenException()
-    return this.prisma.emailTemplate.update({ where: { id: templateId }, data: dto })
+
+    const data: { name?: string; subject?: string; body?: string } = {}
+
+    if (dto.name !== undefined) data.name = trimRequiredTemplateField(dto.name, 'name')
+    if (dto.subject !== undefined) data.subject = trimRequiredTemplateField(dto.subject, 'subject')
+    if (dto.body !== undefined) data.body = trimRequiredTemplateField(dto.body, 'body')
+
+    return this.prisma.emailTemplate.update({ where: { id: templateId }, data })
   }
 
   async deleteEmailTemplate(templateId: string, userId: string) {
@@ -1422,8 +1456,17 @@ export class ContactsService {
 
     // Build optional date filter for the contact's createdAt via the contact relation
     const dateFilter: { gte?: Date; lte?: Date } = {}
-    if (opts?.dateFrom) dateFilter.gte = new Date(opts.dateFrom)
-    if (opts?.dateTo) dateFilter.lte = new Date(opts.dateTo)
+    if (opts?.dateFrom) {
+      const from = new Date(opts.dateFrom)
+      from.setUTCHours(0, 0, 0, 0)
+      dateFilter.gte = from
+    }
+    if (opts?.dateTo) {
+      // Include the full selected day — midnight of YYYY-MM-DD would cut off most of it
+      const to = new Date(opts.dateTo)
+      to.setUTCHours(23, 59, 59, 999)
+      dateFilter.lte = to
+    }
     const hasDateFilter = Object.keys(dateFilter).length > 0
 
     const where = {
@@ -1477,23 +1520,45 @@ export class ContactsService {
     return { stages: stageCounts, conversions, totalActive, sourceBreakdown }
   }
 
-  async exportContacts(userId: string): Promise<string> {
+  async exportContacts(
+    userId: string,
+    opts?: { cardId?: string; from?: string; to?: string },
+  ): Promise<{ csv: string; truncated: boolean; total: number }> {
+    const EXPORT_CAP = 10_000
+    // Build date filter. Use end-of-day for `to` so the full selected day is included.
+    const dateFilter: { gte?: Date; lte?: Date } = {}
+    if (opts?.from) dateFilter.gte = new Date(opts.from)
+    if (opts?.to) {
+      const toDate = new Date(opts.to)
+      toDate.setUTCHours(23, 59, 59, 999)
+      dateFilter.lte = toDate
+    }
+
+    const where: import('@dotly/database').Prisma.ContactWhereInput = {
+      ownerUserId: userId,
+      ...(opts?.cardId ? { sourceCardId: opts.cardId } : {}),
+      ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+    }
+
+    // Fetch one extra to detect truncation without a separate COUNT query
     const contacts = await this.prisma.contact.findMany({
-      where: { ownerUserId: userId },
+      where,
       include: { crmPipeline: { select: { stage: true } } },
       orderBy: { createdAt: 'desc' },
-      take: 10000,
+      take: EXPORT_CAP + 1,
     })
+    const truncated = contacts.length > EXPORT_CAP
+    const page = truncated ? contacts.slice(0, EXPORT_CAP) : contacts
 
-    const csvHeader = 'name,email,phone,company,title,website,address,stage,tags,createdAt'
+    const csvHeader =
+      'name,email,phone,company,title,website,address,stage,tags,createdAt,sourceCard'
     const escapeField = (value: string | null | undefined): string => {
       if (!value) return ''
-      // Wrap in quotes if the value contains commas, quotes, or newlines
       if (/[,"\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
       return value
     }
 
-    const rows = contacts.map((c) => {
+    const rows = page.map((c) => {
       const fields = [
         escapeField(c.name),
         escapeField(c.email),
@@ -1505,11 +1570,15 @@ export class ContactsService {
         escapeField(c.crmPipeline?.stage ?? 'NEW'),
         escapeField(c.tags.join('|')),
         escapeField(c.createdAt.toISOString()),
+        escapeField(
+          (c as Record<string, unknown> & { sourceCardId?: string | null }).sourceCardId ?? '',
+        ),
       ]
       return fields.join(',')
     })
 
-    return [csvHeader, ...rows].join('\n')
+    const csv = [csvHeader, ...rows].join('\n')
+    return { csv, truncated, total: page.length }
   }
 
   async getContactEmails(contactId: string, userId: string) {

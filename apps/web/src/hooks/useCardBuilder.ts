@@ -7,6 +7,7 @@ import type {
   SocialLinkData,
   MediaBlockData,
   CardTemplate,
+  VcardPolicy,
 } from '@dotly/types'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut, apiPatch } from '@/lib/api'
@@ -16,6 +17,7 @@ export interface CardBuilderState {
   theme: CardThemeData
   socialLinks: SocialLinkData[]
   mediaBlocks: MediaBlockData[]
+  vcardPolicy: VcardPolicy
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   loading: boolean
   error: string | null
@@ -70,6 +72,7 @@ export function useCardBuilder(cardId: string) {
     theme: DEFAULT_THEME,
     socialLinks: [],
     mediaBlocks: [],
+    vcardPolicy: 'PUBLIC',
     saveStatus: 'idle',
     loading: true,
     error: null,
@@ -96,6 +99,7 @@ export function useCardBuilder(cardId: string) {
           templateId: string
           fields: Record<string, string>
           isActive: boolean
+          vcardPolicy?: VcardPolicy
           theme?: CardThemeData
           socialLinks?: SocialLinkData[]
           mediaBlocks?: MediaBlockData[]
@@ -113,10 +117,12 @@ export function useCardBuilder(cardId: string) {
             templateId: data.templateId as CardTemplate,
             fields,
             isActive: data.isActive,
+            vcardPolicy: data.vcardPolicy ?? 'PUBLIC',
           },
           theme: data.theme ?? DEFAULT_THEME,
           socialLinks: data.socialLinks ?? [],
           mediaBlocks: data.mediaBlocks ?? [],
+          vcardPolicy: data.vcardPolicy ?? 'PUBLIC',
         }))
       } catch (err) {
         setState((prev) => ({
@@ -316,6 +322,28 @@ export function useCardBuilder(cardId: string) {
     }
   }, [cardId])
 
+  const updateVcardPolicy = useCallback(
+    (policy: VcardPolicy) => {
+      setState((prev) => ({
+        ...prev,
+        vcardPolicy: policy,
+        card: prev.card ? { ...prev.card, vcardPolicy: policy } : prev.card,
+      }))
+      void (async () => {
+        setState((prev) => ({ ...prev, saveStatus: 'saving' }))
+        try {
+          const token = await getAccessToken()
+          await apiPut(`/cards/${cardId}`, { vcardPolicy: policy }, token)
+          setState((prev) => ({ ...prev, saveStatus: 'saved' }))
+          setTimeout(() => setState((prev) => ({ ...prev, saveStatus: 'idle' })), 2000)
+        } catch {
+          setState((prev) => ({ ...prev, saveStatus: 'error' }))
+        }
+      })()
+    },
+    [cardId],
+  )
+
   return {
     ...state,
     updateField,
@@ -324,6 +352,7 @@ export function useCardBuilder(cardId: string) {
     updateTemplate,
     updateSocialLinks,
     updateMediaBlocks,
+    updateVcardPolicy,
     publishCard,
     unpublishCard,
     saveNow,

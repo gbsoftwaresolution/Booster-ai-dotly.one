@@ -1,5 +1,17 @@
 import Link from 'next/link'
 
+// ─── Global styles (all keyframes at module level per project convention) ─────
+const GLOBAL_STYLES = `
+  @keyframes nf-fade {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes nf-card {
+    from { opacity: 0; transform: translateY(12px) scale(.96); }
+    to   { opacity: 1; transform: none; }
+  }
+`
+
 export default function CardNotFound() {
   return (
     <main
@@ -28,16 +40,7 @@ export default function CardNotFound() {
         className="relative flex flex-col items-center text-center"
         style={{ maxWidth: 360, animation: 'nf-fade 0.6s ease both' }}
       >
-        <style>{`
-          @keyframes nf-fade {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: none; }
-          }
-          @keyframes nf-card {
-            from { opacity: 0; transform: translateY(12px) scale(.96); }
-            to   { opacity: 1; transform: none; }
-          }
-        `}</style>
+        <style>{GLOBAL_STYLES}</style>
 
         {/* Illustration — stylised card with broken link */}
         <div

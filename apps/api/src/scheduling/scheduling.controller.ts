@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Put, Param, Body, Query } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Put, Param, Body, Query, Res } from '@nestjs/common'
+import type { Response } from 'express'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
@@ -10,11 +11,16 @@ import { SetAvailabilityDto } from './dto/set-availability.dto'
 import { CreateBookingDto } from './dto/create-booking.dto'
 import { CancelBookingDto } from './dto/cancel-booking.dto'
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto'
+import { SetBookingQuestionsDto } from './dto/manage-booking-questions.dto'
+import { GoogleCalendarService } from './google-calendar.service'
 
 @ApiTags('scheduling')
 @Controller('scheduling')
 export class SchedulingController {
-  constructor(private readonly schedulingService: SchedulingService) {}
+  constructor(
+    private readonly schedulingService: SchedulingService,
+    private readonly googleCalendar: GoogleCalendarService,
+  ) {}
 
   // ── Appointment Types (authenticated) ─────────────────────────────────────
 
@@ -85,6 +91,78 @@ export class SchedulingController {
     return this.schedulingService.ownerCancelBooking(user.id, id, dto.reason)
   }
 
+  // ── Booking Questions (authenticated) ─────────────────────────────────────
+
+  /**
+   * PUT /scheduling/appointment-types/:id/questions
+   * Replace all custom questions for an appointment type.
+   */
+  @ApiBearerAuth()
+  @Put('appointment-types/:id/questions')
+  setBookingQuestions(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: SetBookingQuestionsDto,
+  ) {
+    return this.schedulingService.setBookingQuestions(user.id, id, dto)
+  }
+
+  // ── Google Calendar OAuth (authenticated) ──────────────────────────────────
+
+  /**
+   * GET /scheduling/google/status
+   * Returns whether the authenticated user has connected Google Calendar.
+   */
+  @ApiBearerAuth()
+  @Get('google/status')
+  getGoogleStatus(@CurrentUser() user: { id: string }) {
+    return this.googleCalendar.getConnectionStatus(user.id)
+  }
+
+  /**
+   * GET /scheduling/google/connect
+   * Redirects the user to the Google OAuth2 authorization page.
+   */
+  @ApiBearerAuth()
+  @Get('google/connect')
+  async connectGoogle(@CurrentUser() user: { id: string }, @Res() res: Response) {
+    const url = this.googleCalendar.getAuthUrl(user.id)
+    res.redirect(url)
+  }
+
+  /**
+   * GET /scheduling/google/callback
+   * Handles the OAuth2 callback from Google. Exchanges code for tokens,
+   * saves the connection, and redirects back to the scheduling dashboard.
+   */
+  @Public()
+  @Get('google/callback')
+  async googleCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    const webUrl = process.env.WEB_URL ?? 'http://localhost:3000'
+    try {
+      const tokens = await this.googleCalendar.exchangeCode(code)
+      const googleEmail = await this.googleCalendar.getGoogleEmail(tokens.access_token)
+      await this.googleCalendar.saveConnection(state, tokens, googleEmail)
+      res.redirect(`${webUrl}/scheduling?google=connected`)
+    } catch {
+      res.redirect(`${webUrl}/scheduling?google=error`)
+    }
+  }
+
+  /**
+   * DELETE /scheduling/google/disconnect
+   * Removes the user's Google Calendar connection.
+   */
+  @ApiBearerAuth()
+  @Delete('google/disconnect')
+  disconnectGoogle(@CurrentUser() user: { id: string }) {
+    return this.googleCalendar.disconnect(user.id)
+  }
+
   // ── Public Endpoints ──────────────────────────────────────────────────────
 
   /**
@@ -95,7 +173,7 @@ export class SchedulingController {
   @Get('public/:handle/:slug')
   async getPublicAppointmentType(@Param('handle') handle: string, @Param('slug') slug: string) {
     const ownerUserId = await this.schedulingService.resolveOwnerByHandle(handle)
-    return this.schedulingService.getPublicAppointmentType(ownerUserId, slug)
+    return this.schedulingService.getPublicAppointmentType(ownerUserId, slug, handle)
   }
 
   /**

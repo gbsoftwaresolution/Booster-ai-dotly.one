@@ -3,6 +3,19 @@
 import { useEffect, useState } from 'react'
 import * as Sentry from '@sentry/nextjs'
 
+// ─── Global styles (all keyframes at module level per project convention) ─────
+const GLOBAL_STYLES = `
+  @keyframes err-fade {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes err-icon {
+    from { opacity: 0; transform: translateY(12px) scale(.96); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes spin { to { transform: rotate(360deg) } }
+`
+
 export default function CardError({
   error,
   reset,
@@ -52,17 +65,7 @@ export default function CardError({
         className="relative flex flex-col items-center text-center"
         style={{ maxWidth: 360, animation: 'err-fade 0.6s ease both' }}
       >
-        <style>{`
-          @keyframes err-fade {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: none; }
-          }
-          @keyframes err-icon {
-            from { opacity: 0; transform: translateY(12px) scale(.96); }
-            to   { opacity: 1; transform: none; }
-          }
-          @keyframes spin { to { transform: rotate(360deg) } }
-        `}</style>
+        <style>{GLOBAL_STYLES}</style>
 
         {/* Icon */}
         <div

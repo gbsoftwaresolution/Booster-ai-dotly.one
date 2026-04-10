@@ -3,6 +3,7 @@ import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { CardTemplate } from '@dotly/types'
 import { CardFieldsDto } from './create-card.dto'
+import { VcardPolicy } from '@dotly/database'
 
 export class UpdateCardDto {
   @ApiPropertyOptional({ description: 'Unique handle (lowercase alphanumeric with hyphens)' })
@@ -29,4 +30,9 @@ export class UpdateCardDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean
+
+  @ApiPropertyOptional({ enum: VcardPolicy, description: 'Who can download the vCard: PUBLIC or MEMBERS_ONLY' })
+  @IsOptional()
+  @IsEnum(VcardPolicy)
+  vcardPolicy?: VcardPolicy
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import DOMPurify from 'dompurify'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
@@ -13,10 +13,34 @@ import {
   type SignatureOptions,
 } from './signature-utils'
 
+const STYLES: { value: SignatureStyle; label: string; desc: string }[] = [
+  { value: 'minimal', label: 'Minimal', desc: 'Clean, text-only' },
+  { value: 'professional', label: 'Professional', desc: 'Photo + divider' },
+  { value: 'branded', label: 'Branded', desc: 'Accent color + left border' },
+]
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function getToken(): Promise<string | undefined> {
   return (await getAccessToken()) ?? undefined
+}
+
+function encodeSvgData(svgData: string): string {
+  const bytes = new TextEncoder().encode(svgData)
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return window.btoa(binary)
+}
+
+function getCopyToastText(copyToast: 'html' | 'gmail' | 'gmail-plain' | null): string {
+  if (copyToast === 'html') return 'HTML copied to the clipboard.'
+  if (copyToast === 'gmail') return 'Styled signature copied for Gmail.'
+  if (copyToast === 'gmail-plain') {
+    return 'Signature copied as plain text. Styled paste is not supported in this browser.'
+  }
+  return ''
 }
 
 // ─── Page component ────────────────────────────────────────────────────────────
@@ -32,8 +56,9 @@ export default function EmailSignaturePage(): JSX.Element {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [copyToast, setCopyToast] = useState<'html' | 'gmail' | null>(null)
+  const [copyToast, setCopyToast] = useState<'html' | 'gmail' | 'gmail-plain' | null>(null)
   const [copyError, setCopyError] = useState<string | null>(null)
+  const toastTimeoutRef = useRef<number | null>(null)
 
   // Load cards with full detail
   useEffect(() => {
@@ -67,7 +92,7 @@ export default function EmailSignaturePage(): JSX.Element {
         // Prefer pngDataUrl; fall back to an SVG data URL constructed from svgData
         const imageUrl =
           data.pngDataUrl ??
-          (data.svgData ? `data:image/svg+xml;base64,${btoa(data.svgData)}` : null)
+          (data.svgData ? `data:image/svg+xml;base64,${encodeSvgData(data.svgData)}` : null)
         setCards((prev) =>
           prev.map((c) => (c.id === selectedCardId ? { ...c, qrImageUrl: imageUrl } : c)),
         )
@@ -82,9 +107,20 @@ export default function EmailSignaturePage(): JSX.Element {
 
   const signatureHtml = selectedCard ? generateSignatureHtml(selectedCard, style, options) : ''
 
-  const showToast = useCallback((type: 'html' | 'gmail') => {
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        window.clearTimeout(toastTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const showToast = useCallback((type: 'html' | 'gmail' | 'gmail-plain') => {
     setCopyToast(type)
-    setTimeout(() => setCopyToast(null), 2000)
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = window.setTimeout(() => setCopyToast(null), 2000)
   }, [])
 
   const handleCopyHtml = useCallback(async () => {
@@ -108,18 +144,12 @@ export default function EmailSignaturePage(): JSX.Element {
       // Fallback to plain text copy
       try {
         await navigator.clipboard.writeText(signatureHtml)
-        showToast('gmail')
+        showToast('gmail-plain')
       } catch {
         setCopyError('Failed to copy to clipboard. Please copy manually.')
       }
     }
   }, [signatureHtml, showToast])
-
-  const STYLES: { value: SignatureStyle; label: string; desc: string }[] = [
-    { value: 'minimal', label: 'Minimal', desc: 'Clean, text-only' },
-    { value: 'professional', label: 'Professional', desc: 'Photo + divider' },
-    { value: 'branded', label: 'Branded', desc: 'Accent color + left border' },
-  ]
 
   if (loading) {
     return (
@@ -140,11 +170,21 @@ export default function EmailSignaturePage(): JSX.Element {
         </p>
       </div>
 
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {copyError && (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">{copyError}</div>
+        <div role="alert" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          {copyError}
+        </div>
       )}
+
+      <div aria-live="polite" className="sr-only">
+        {getCopyToastText(copyToast)}
+      </div>
 
       {cards.length === 0 && !error ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
@@ -161,6 +201,7 @@ export default function EmailSignaturePage(): JSX.Element {
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Card</h2>
               <select
+                aria-label="Select a card for this signature"
                 value={selectedCardId ?? ''}
                 onChange={(e) => setSelectedCardId(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -183,6 +224,7 @@ export default function EmailSignaturePage(): JSX.Element {
                     key={s.value}
                     type="button"
                     onClick={() => setStyle(s.value)}
+                    aria-pressed={style === s.value}
                     className={[
                       'flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-colors',
                       style === s.value
@@ -232,6 +274,7 @@ export default function EmailSignaturePage(): JSX.Element {
                 type="button"
                 onClick={() => void handleCopyHtml()}
                 disabled={!selectedCard}
+                aria-live="polite"
                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 {copyToast === 'html' ? (
@@ -251,12 +294,13 @@ export default function EmailSignaturePage(): JSX.Element {
                 type="button"
                 onClick={() => void handleCopyForGmail()}
                 disabled={!selectedCard}
+                aria-live="polite"
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {copyToast === 'gmail' ? (
+                {copyToast === 'gmail' || copyToast === 'gmail-plain' ? (
                   <>
                     <Check className="h-4 w-4" />
-                    Copied!
+                    {copyToast === 'gmail-plain' ? 'Plain Text Copied' : 'Copied!'}
                   </>
                 ) : (
                   <>
@@ -267,7 +311,9 @@ export default function EmailSignaturePage(): JSX.Element {
               </button>
 
               <p className="text-center text-xs text-gray-400">
-                &ldquo;Copy for Gmail&rdquo; pastes styled HTML directly into Gmail compose.
+                {copyToast === 'gmail-plain'
+                  ? 'This browser only allowed plain-text copy. Paste styling may be lost.'
+                  : '“Copy for Gmail” pastes styled HTML directly into Gmail compose.'}
               </p>
             </div>
           </div>

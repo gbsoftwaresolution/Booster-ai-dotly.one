@@ -4,9 +4,23 @@ import { useState, useEffect, useRef } from 'react'
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
 
+// ─── Global styles (all keyframes in one place) ───────────────────────────────
+const GLOBAL_STYLES = `
+  @keyframes check-bounce {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+  @keyframes copy-fade {
+    from { opacity: 0; transform: scale(.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+`
+
 interface ShareBarProps {
   handle: string
   ownerName: string
+  onAnalytics?: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
 }
 
 // ── Device detection ─────────────────────────────────────────────────────────
@@ -31,7 +45,7 @@ function useWalletSupport() {
   return { appleSupported, googleSupported }
 }
 
-export function ShareBar({ handle, ownerName }: ShareBarProps) {
+export function ShareBar({ handle, ownerName, onAnalytics }: ShareBarProps) {
   const [copied, setCopied] = useState(false)
   const { appleSupported, googleSupported } = useWalletSupport()
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -60,6 +74,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
       document.body.removeChild(input)
     }
     setCopied(true)
+    onAnalytics?.('CLICK', { surface: 'share_bar', action: 'copy_link' })
     if (copiedTimerRef.current !== null) clearTimeout(copiedTimerRef.current)
     copiedTimerRef.current = setTimeout(() => setCopied(false), 2200)
   }
@@ -68,6 +83,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({ title: `${ownerName}'s digital card`, url })
+        onAnalytics?.('CLICK', { surface: 'share_bar', action: 'native_share' })
         return
       } catch {
         // user cancelled or API not available
@@ -77,6 +93,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
   }
 
   async function handleAppleWallet() {
+    onAnalytics?.('SAVE', { surface: 'share_bar', action: 'apple_wallet_open' })
     // Triggers a .pkpass download — navigate directly
     window.location.href = `${API_URL}/public/cards/${handle}/wallet/apple`
   }
@@ -86,6 +103,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
       const res = await fetch(`${API_URL}/public/cards/${handle}/wallet/google`)
       if (res.ok) {
         const { url: saveUrl } = (await res.json()) as { url: string }
+        onAnalytics?.('SAVE', { surface: 'share_bar', action: 'google_wallet_open' })
         window.open(saveUrl, '_blank', 'noopener,noreferrer')
       }
     } catch {
@@ -107,17 +125,7 @@ export function ShareBar({ handle, ownerName }: ShareBarProps) {
         WebkitBackdropFilter: 'blur(16px)',
       }}
     >
-      <style>{`
-        @keyframes check-bounce {
-          0%   { transform: scale(0.6); opacity: 0; }
-          60%  { transform: scale(1.2); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes copy-fade {
-          from { opacity: 0; transform: scale(.8); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
+      <style>{GLOBAL_STYLES}</style>
 
       {/* Main share row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -1,12 +1,19 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/tz'
 import { useUserTimezone } from '@/hooks/useUserLocale'
+
+const MERGE_TAGS = [
+  '{{contact.name}}',
+  '{{contact.email}}',
+  '{{contact.company}}',
+  '{{contact.title}}',
+] as const
 
 interface EmailTemplate {
   id: string
@@ -42,6 +49,7 @@ export default function EmailTemplatesPage(): JSX.Element {
   const [showModal, setShowModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
@@ -63,11 +71,13 @@ export default function EmailTemplatesPage(): JSX.Element {
 
   const openCreateModal = () => {
     setEditingTemplate(null)
+    setDeleteError(null)
     setShowModal(true)
   }
 
   const openEditModal = (template: EmailTemplate) => {
     setEditingTemplate(template)
+    setDeleteError(null)
     setShowModal(true)
   }
 
@@ -103,13 +113,16 @@ export default function EmailTemplatesPage(): JSX.Element {
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return
+    setDeleteError(null)
     try {
       const token = await getAccessToken()
       await apiDelete(`/email-templates/${deleteTarget.id}`, token)
       setTemplates((prev) => prev.filter((template) => template.id !== deleteTarget.id))
       setDeleteTarget(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete template')
+      const message = err instanceof Error ? err.message : 'Failed to delete template'
+      setDeleteError(message)
+      setError(message)
     }
   }, [deleteTarget])
 
@@ -132,7 +145,11 @@ export default function EmailTemplatesPage(): JSX.Element {
         </button>
       </div>
 
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -226,7 +243,11 @@ export default function EmailTemplatesPage(): JSX.Element {
         <ConfirmDeleteDialog
           title="Delete template"
           message={`Delete "${deleteTarget.name}"? This cannot be undone.`}
-          onCancel={() => setDeleteTarget(null)}
+          error={deleteError}
+          onCancel={() => {
+            setDeleteTarget(null)
+            setDeleteError(null)
+          }}
           onConfirm={() => void handleDelete()}
         />
       )}
@@ -251,9 +272,73 @@ function TemplateModal({
 }): JSX.Element {
   const [values, setValues] = useState<TemplateFormValues>(initialValues)
   const [error, setError] = useState<string | null>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+  const errorId = useId()
 
   const inputClass =
     'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none'
+
+  useEffect(() => {
+    nameInputRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+        return
+      }
+
+      if (event.key !== 'Tab' || !modalRef.current) return
+
+      const focusableElements = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled])',
+        ),
+      )
+
+      if (focusableElements.length === 0) return
+
+      const first = focusableElements[0]
+      const last = focusableElements[focusableElements.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  const insertMergeTag = (tag: string) => {
+    const textarea = bodyTextareaRef.current
+    if (!textarea) {
+      setValues((prev) => ({ ...prev, body: `${prev.body}${tag}` }))
+      return
+    }
+
+    const start = textarea.selectionStart ?? values.body.length
+    const end = textarea.selectionEnd ?? values.body.length
+    const nextBody = `${values.body.slice(0, start)}${tag}${values.body.slice(end)}`
+
+    setValues((prev) => ({ ...prev, body: nextBody }))
+
+    queueMicrotask(() => {
+      textarea.focus()
+      const cursor = start + tag.length
+      textarea.setSelectionRange(cursor, cursor)
+    })
+  }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -274,45 +359,81 @@ function TemplateModal({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-2xl -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        <p className="mt-1 text-sm text-gray-500">Save a reusable draft for future email sends.</p>
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="fixed inset-x-4 top-1/2 z-50 w-full max-w-2xl -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+      >
+        <h2 id={titleId} className="text-lg font-semibold text-gray-900">
+          {title}
+        </h2>
+        <p id={descriptionId} className="mt-1 text-sm text-gray-500">
+          Save a reusable draft for future email sends.
+        </p>
         {error && (
-          <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div
+            id={errorId}
+            role="alert"
+            className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {error}
+          </div>
         )}
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <input
-            value={values.name}
-            onChange={(event) => setValues((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="Template name"
-            className={inputClass}
-          />
-          <input
-            value={values.subject}
-            onChange={(event) => setValues((prev) => ({ ...prev, subject: event.target.value }))}
-            placeholder="Email subject"
-            className={inputClass}
-          />
-          <textarea
-            rows={12}
-            value={values.body}
-            onChange={(event) => setValues((prev) => ({ ...prev, body: event.target.value }))}
-            placeholder="Write the email body..."
-            className={inputClass}
-          />
+          <div>
+            <label htmlFor="template-name" className="mb-1 block text-sm font-medium text-gray-700">
+              Template name
+            </label>
+            <input
+              ref={nameInputRef}
+              id="template-name"
+              value={values.name}
+              onChange={(event) => setValues((prev) => ({ ...prev, name: event.target.value }))}
+              className={inputClass}
+              aria-describedby={error ? errorId : undefined}
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="template-subject"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Email subject
+            </label>
+            <input
+              id="template-subject"
+              value={values.subject}
+              onChange={(event) => setValues((prev) => ({ ...prev, subject: event.target.value }))}
+              className={inputClass}
+              aria-describedby={error ? errorId : undefined}
+            />
+          </div>
+          <div>
+            <label htmlFor="template-body" className="mb-1 block text-sm font-medium text-gray-700">
+              Email body
+            </label>
+            <textarea
+              ref={bodyTextareaRef}
+              id="template-body"
+              rows={12}
+              value={values.body}
+              onChange={(event) => setValues((prev) => ({ ...prev, body: event.target.value }))}
+              placeholder="Write the email body..."
+              className={inputClass}
+              aria-describedby={error ? errorId : undefined}
+            />
+          </div>
           <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
             <p className="mb-1.5 text-xs font-semibold text-indigo-700">Available merge tags</p>
             <div className="flex flex-wrap gap-2">
-              {[
-                '{{contact.name}}',
-                '{{contact.email}}',
-                '{{contact.company}}',
-                '{{contact.title}}',
-              ].map((tag) => (
+              {MERGE_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"
-                  onClick={() => setValues((prev) => ({ ...prev, body: prev.body + tag }))}
+                  onClick={() => insertMergeTag(tag)}
                   className="rounded bg-white px-2 py-0.5 font-mono text-xs text-indigo-600 shadow-sm ring-1 ring-indigo-200 hover:bg-indigo-100"
                 >
                   {tag}
@@ -348,22 +469,77 @@ function TemplateModal({
 function ConfirmDeleteDialog({
   title,
   message,
+  error,
   onCancel,
   onConfirm,
 }: {
   title: string
   message: string
+  error?: string | null
   onCancel: () => void
   onConfirm: () => void
 }): JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const titleId = useId()
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return
+
+      const focusableElements = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'),
+      )
+      if (focusableElements.length === 0) return
+
+      const first = focusableElements[0]
+      const last = focusableElements[focusableElements.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+      >
+        <h2 id={titleId} className="text-base font-semibold text-gray-900">
+          {title}
+        </h2>
         <p className="mt-2 text-sm text-gray-500">{message}</p>
+        {error && (
+          <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button
+            ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
