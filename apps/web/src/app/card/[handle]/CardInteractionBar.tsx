@@ -345,9 +345,8 @@ function VoiceTab({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
       if (blobUrl) URL.revokeObjectURL(blobUrl)
-    },
-    [blobUrl],
-  )
+    }
+  }, [blobUrl])
 
   async function startRecording() {
     setError('')

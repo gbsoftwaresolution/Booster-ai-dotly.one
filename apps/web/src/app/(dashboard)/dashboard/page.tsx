@@ -146,6 +146,7 @@ function StatCard({
   icon: Icon,
   color,
   bg,
+  hint,
   href,
 }: {
   label: string
@@ -153,19 +154,26 @@ function StatCard({
   icon: React.ElementType
   color: string
   bg: string
+  hint?: string
   href: string
 }): JSX.Element {
   return (
     <Link
       href={href}
-      className="app-panel flex flex-col gap-3 rounded-[26px] p-4 transition-shadow hover:shadow-[0_28px_60px_-36px_rgba(15,23,42,0.25)] active:shadow-none"
+      className="app-panel flex flex-col gap-4 rounded-[26px] p-4 transition-shadow hover:shadow-[0_28px_60px_-36px_rgba(15,23,42,0.25)] active:shadow-none"
     >
-      <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', bg)}>
-        <Icon className={cn('h-4 w-4', color)} aria-hidden="true" />
+      <div className="flex items-start justify-between gap-3">
+        <div className={cn('flex h-10 w-10 items-center justify-center rounded-2xl', bg)}>
+          <Icon className={cn('h-4 w-4', color)} aria-hidden="true" />
+        </div>
+        <span className="rounded-full bg-gray-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+          Live
+        </span>
       </div>
       <div>
         <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{label}</p>
         <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', color)}>{value}</p>
+        {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
       </div>
     </Link>
   )
@@ -374,6 +382,15 @@ export default function DashboardPage(): JSX.Element {
   const pipelineValue = openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
   const overdueTasks = tasks.filter((t) => t.dueAt && new Date(t.dueAt) < new Date())
   const funnelMax = funnel ? Math.max(...funnel.stages.map((s) => s.count), 1) : 1
+  const activeCards = cards.filter((card) => card.isActive).length
+  const focusMessage =
+    overdueTasks.length > 0
+      ? `${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} need attention today.`
+      : openDeals.length > 0
+        ? `${openDeals.length} active deal${openDeals.length === 1 ? '' : 's'} moving through your pipeline.`
+        : activeCards > 0
+          ? `${activeCards} card${activeCards === 1 ? '' : 's'} live and ready to share.`
+          : 'Everything is calm. Use this space to build your next move.'
 
   return (
     <div className="space-y-5">
@@ -392,15 +409,147 @@ export default function DashboardPage(): JSX.Element {
       )}
 
       {/* ── Greeting ── */}
-      <div className="app-panel rounded-[30px] px-5 py-5 sm:px-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">{greeting}</p>
-        <div className="mt-1 flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-950">{userName}</h1>
-          <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-            <Hand className="h-4 w-4" />
-          </span>
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-5 py-5 sm:px-6 sm:py-6">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(56,189,248,0.14), transparent 34%), radial-gradient(circle at right center, rgba(168,85,247,0.12), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.92), rgba(248,250,252,0.96))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.9fr] xl:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">
+              {greeting}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-950 sm:text-[2rem]">{userName}</h1>
+              <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
+                <Hand className="h-4 w-4" />
+              </span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Here&apos;s your business overview for today, with the areas that need attention and
+              the momentum already building.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'Live Cards', value: loading ? '—' : activeCards },
+                { label: 'Leads Captured', value: loading ? '—' : totalStats.leads },
+                {
+                  label: 'Pipeline Value',
+                  value: loading ? '—' : formatCurrency(pipelineValue),
+                },
+                { label: 'Active Booking Types', value: loading ? '—' : appointmentTypes.length },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.24)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                href="/apps/cards/create"
+                className="inline-flex items-center gap-2 rounded-2xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(15,23,42,0.5)] transition-transform hover:-translate-y-0.5"
+              >
+                <Plus className="h-4 w-4" />
+                Create Card
+              </Link>
+              <Link
+                href="/analytics"
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <TrendingUp className="h-4 w-4 text-brand-500" />
+                View Analytics
+              </Link>
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/85 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-brand-500">
+                <AlertCircle className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
+          </div>
+
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Today At A Glance
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">Your operating snapshot</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-500 shadow-sm">
+                Overview
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  label: 'Revenue pipeline',
+                  value: loading ? '—' : formatCurrency(pipelineValue),
+                  detail: `${openDeals.length} open deal${openDeals.length === 1 ? '' : 's'}`,
+                  icon: Briefcase,
+                  tone: 'bg-green-50 text-green-600',
+                },
+                {
+                  label: 'Task pressure',
+                  value: loading ? '—' : `${tasks.length}`,
+                  detail:
+                    overdueTasks.length > 0
+                      ? `${overdueTasks.length} overdue right now`
+                      : 'No overdue tasks',
+                  icon: CheckSquare,
+                  tone:
+                    overdueTasks.length > 0
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-orange-50 text-orange-600',
+                },
+                {
+                  label: 'CRM activity',
+                  value: loading ? '—' : `${funnel?.totalActive ?? contacts.length}`,
+                  detail: funnel ? 'Active contacts in funnel' : 'Recent contacts loaded',
+                  icon: Users,
+                  tone: 'bg-purple-50 text-purple-600',
+                },
+              ].map(({ label, value, detail, icon: Icon, tone }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                >
+                  <span
+                    className={cn(
+                      'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl',
+                      tone,
+                    )}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {label}
+                    </p>
+                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <p className="mt-2 text-sm text-gray-500">Here&apos;s your business overview for today.</p>
       </div>
 
       {/* ── App Launcher ── */}
@@ -414,6 +563,11 @@ export default function DashboardPage(): JSX.Element {
           icon={Eye}
           color="text-blue-600"
           bg="bg-blue-50"
+          hint={
+            loading
+              ? 'Loading performance'
+              : `${activeCards} live card${activeCards === 1 ? '' : 's'}`
+          }
           href="/analytics"
         />
         <StatCard
@@ -422,6 +576,11 @@ export default function DashboardPage(): JSX.Element {
           icon={Users}
           color="text-purple-600"
           bg="bg-purple-50"
+          hint={
+            loading
+              ? 'Loading CRM activity'
+              : `${funnel?.totalActive ?? contacts.length} active in CRM`
+          }
           href="/contacts"
         />
         <StatCard
@@ -430,6 +589,7 @@ export default function DashboardPage(): JSX.Element {
           icon={Briefcase}
           color="text-green-600"
           bg="bg-green-50"
+          hint={loading ? 'Loading pipeline' : formatCurrency(pipelineValue)}
           href="/deals"
         />
         <StatCard
@@ -438,6 +598,13 @@ export default function DashboardPage(): JSX.Element {
           icon={CheckSquare}
           color={overdueTasks.length > 0 ? 'text-red-600' : 'text-orange-600'}
           bg={overdueTasks.length > 0 ? 'bg-red-50' : 'bg-orange-50'}
+          hint={
+            loading
+              ? 'Loading tasks'
+              : overdueTasks.length > 0
+                ? `${overdueTasks.length} overdue`
+                : 'Everything on track'
+          }
           href="/tasks"
         />
       </div>

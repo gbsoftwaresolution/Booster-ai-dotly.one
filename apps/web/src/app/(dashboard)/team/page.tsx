@@ -112,6 +112,17 @@ export default function TeamPage(): JSX.Element {
 
   // Prevent concurrent action submissions
   const actionInFlightRef = useRef(false)
+  const memberCount = team?.members.length ?? 0
+  const adminCount = team?.members.filter((member) => member.role === 'ADMIN').length ?? 0
+  const pendingInvites = team?.invites.length ?? 0
+  const latestInvite = team?.invites
+    ?.slice()
+    .sort((a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime())[0]
+  const focusMessage = team
+    ? pendingInvites > 0
+      ? `${pendingInvites} invite${pendingInvites === 1 ? '' : 's'} still need acceptance.`
+      : `${memberCount} team member${memberCount === 1 ? '' : 's'} are active in your workspace.`
+    : 'Create your team to centralize members, invites, and shared ownership.'
 
   const loadTeam = useCallback(
     async (id?: string) => {
@@ -276,30 +287,152 @@ export default function TeamPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
-            <Users className="h-6 w-6" />
-          </div>
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(14,165,233,0.12), transparent 34%), radial-gradient(circle at right center, rgba(99,102,241,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+            <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">
+              <Users className="h-3.5 w-3.5" />
               Collaboration
+            </div>
+            <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
+              Manage your shared workspace with more clarity
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Keep team membership, admin ownership, and outstanding invites visible in one place as
+              your collaborative workspace grows.
             </p>
-            <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
-            <p className="mt-2 text-sm text-gray-500">
-              Manage your team members and brand settings.
-            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'Members', value: loading ? '—' : memberCount },
+                { label: 'Admins', value: loading ? '—' : adminCount },
+                { label: 'Pending Invites', value: loading ? '—' : pendingInvites },
+                {
+                  label: 'Latest Invite',
+                  value: loading
+                    ? '—'
+                    : latestInvite
+                      ? formatDate(latestInvite.expiresAt, userTz)
+                      : 'None',
+                },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              {team ? (
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(14,165,233,0.42)] transition-transform hover:-translate-y-0.5 hover:bg-brand-600"
+                >
+                  <Users className="h-4 w-4" />
+                  Invite Member
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(14,165,233,0.42)] transition-transform hover:-translate-y-0.5 hover:bg-brand-600"
+                >
+                  <Users className="h-4 w-4" />
+                  Create Team
+                </button>
+              )}
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+                <Users className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
+          </div>
+
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Team Snapshot
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  Workspace health at a glance
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-600 shadow-sm">
+                {team ? 'Active' : 'Setup'}
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  label: 'Workspace state',
+                  value: loading ? '—' : team ? 'Active' : 'Not set',
+                  detail: team ? team.name : 'No team workspace created yet',
+                  tone: 'bg-sky-50 text-sky-600',
+                },
+                {
+                  label: 'Admin coverage',
+                  value: loading ? '—' : `${adminCount}`,
+                  detail: team
+                    ? 'Admins with workspace management access'
+                    : 'Create a team to assign admins',
+                  tone: 'bg-indigo-50 text-indigo-600',
+                },
+                {
+                  label: 'Invite queue',
+                  value: loading ? '—' : `${pendingInvites}`,
+                  detail:
+                    pendingInvites > 0
+                      ? 'Invites still waiting for acceptance'
+                      : 'No pending invites right now',
+                  tone:
+                    pendingInvites > 0
+                      ? 'bg-amber-50 text-amber-600'
+                      : 'bg-green-50 text-green-600',
+                },
+              ].map(({ label, value, detail, tone }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                >
+                  <span
+                    className={`${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}
+                  >
+                    <Users className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {label}
+                    </p>
+                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        {team && (
-          <button
-            type="button"
-            onClick={() => setShowInviteModal(true)}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-          >
-            Invite Member
-          </button>
-        )}
       </div>
 
       {actionMsg && (

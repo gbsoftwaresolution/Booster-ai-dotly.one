@@ -484,6 +484,12 @@ export default function WebhooksPage(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
+  const enabledCount = endpoints.filter((endpoint) => endpoint.enabled).length
+  const focusMessage = loading
+    ? 'Loading webhook endpoints and delivery tooling.'
+    : endpoints.length === 0
+      ? 'Add your first endpoint to start receiving real-time events.'
+      : `${enabledCount} endpoint${enabledCount === 1 ? '' : 's'} are enabled and ready to receive Dotly events.`
 
   const load = useCallback(async () => {
     try {
@@ -566,29 +572,135 @@ export default function WebhooksPage(): JSX.Element {
         </div>
       )}
       {/* Header */}
-      <div className="app-panel flex items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
-            <RadioTower className="h-6 w-6" />
-          </div>
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(14,165,233,0.12), transparent 34%), radial-gradient(circle at right center, rgba(99,102,241,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+            <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">
+              <RadioTower className="h-3.5 w-3.5" />
               Developer Tools
+            </div>
+            <h1 className="mt-3 text-2xl font-bold tracking-tight text-gray-900 sm:text-[2rem]">
+              Manage event delivery with more confidence
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Control endpoint activation, test event delivery, and keep server-to-server
+              automations visible in one place.
             </p>
-            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Webhooks</h1>
-            <p className="mt-2 text-sm text-gray-500">
-              Receive real-time HTTP POST requests when events happen in Dotly.
-            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'Endpoints', value: loading ? '—' : endpoints.length },
+                { label: 'Enabled', value: loading ? '—' : enabledCount },
+                { label: 'Disabled', value: loading ? '—' : endpoints.length - enabledCount },
+                { label: 'Events', value: ALL_EVENTS.length },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(14,165,233,0.42)] transition-transform hover:-translate-y-0.5 hover:bg-brand-600"
+              >
+                <Plus className="h-4 w-4" />
+                Add endpoint
+              </button>
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+                <RadioTower className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
+          </div>
+
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Delivery Snapshot
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  Automation health at a glance
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-600 shadow-sm">
+                Live
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  label: 'Enabled delivery',
+                  value: loading ? '—' : `${enabledCount}`,
+                  detail:
+                    enabledCount > 0
+                      ? 'Endpoints currently accepting event traffic'
+                      : 'No active endpoint is enabled yet',
+                  tone:
+                    enabledCount > 0
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-amber-50 text-amber-600',
+                },
+                {
+                  label: 'Endpoint coverage',
+                  value: loading ? '—' : `${endpoints.length}`,
+                  detail:
+                    endpoints.length > 0
+                      ? 'Server destinations configured for automation'
+                      : 'No webhook destination configured',
+                  tone: 'bg-indigo-50 text-indigo-600',
+                },
+                {
+                  label: 'Security model',
+                  value: 'HMAC',
+                  detail: 'Requests include X-Dotly-Sig-256 for signature verification',
+                  tone: 'bg-sky-50 text-sky-600',
+                },
+              ].map(({ label, value, detail, tone }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                >
+                  <span
+                    className={`${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}
+                  >
+                    <RadioTower className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {label}
+                    </p>
+                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 transition-all hover:bg-brand-600 active:scale-95"
-        >
-          <Plus className="h-4 w-4" />
-          Add endpoint
-        </button>
       </div>
 
       {/* Info strip */}

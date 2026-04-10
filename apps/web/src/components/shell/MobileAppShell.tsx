@@ -147,7 +147,7 @@ export function MobileAppRail(): JSX.Element {
             onClick={() => setDrawerOpen(false)}
           />
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-[32px] border-t border-white/70 bg-white/96 shadow-2xl lg:hidden"
+            className="fixed bottom-0 left-0 right-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-[32px] border-t border-slate-200 bg-white shadow-2xl lg:hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             {/* Handle + header */}
@@ -273,7 +273,7 @@ export function MobileAppTopBar(): JSX.Element {
             onClick={() => setOpen(false)}
           />
           <aside
-            className="fixed inset-y-0 left-0 z-50 w-[84vw] max-w-[340px] border-r border-white/70 bg-white/96 shadow-2xl lg:hidden"
+            className="fixed inset-y-0 left-0 z-50 w-[84vw] max-w-[340px] border-r border-slate-200 bg-white shadow-2xl lg:hidden"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">

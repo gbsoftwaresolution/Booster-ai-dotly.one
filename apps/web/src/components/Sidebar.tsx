@@ -124,11 +124,8 @@ function MobileBottomNav(): JSX.Element {
         aria-label="Mobile navigation"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        {/* Frosted glass backing — same as iOS tab bar */}
-        <div
-          className="flex items-stretch border-t border-gray-200/70 bg-white/85"
-          style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
-        >
+        {/* Solid backing for clear mobile nav contrast */}
+        <div className="flex items-stretch border-t border-gray-200 bg-white">
           {visibleBottomTabs.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/')
             return (

@@ -383,48 +383,178 @@ export default function ContactsPage(): JSX.Element {
   )
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
+  const visibleWithEmail = displayedContacts.filter((contact) => Boolean(contact.email)).length
+  const visibleTagged = displayedContacts.filter(
+    (contact) => (contact.tags?.length ?? 0) > 0,
+  ).length
+  const visibleFromCards = displayedContacts.filter((contact) => Boolean(contact.sourceCard)).length
+  const visibleQualified = displayedContacts.filter((contact) => {
+    const stage = (contact.crmPipeline?.stage ?? 'NEW') as Stage
+    return stage === 'QUALIFIED' || stage === 'CLOSED'
+  }).length
+  const visibleStageCounts = displayedContacts.reduce<Record<Stage, number>>(
+    (acc, contact) => {
+      const stage = (contact.crmPipeline?.stage ?? 'NEW') as Stage
+      acc[stage] += 1
+      return acc
+    },
+    { NEW: 0, CONTACTED: 0, QUALIFIED: 0, CLOSED: 0, LOST: 0 },
+  )
+  const focusMessage =
+    selectedIds.size > 0
+      ? `${selectedIds.size} contact${selectedIds.size === 1 ? '' : 's'} selected for bulk actions.`
+      : search.trim()
+        ? `Search is narrowing your CRM to ${total} matching contact${total === 1 ? '' : 's'}.`
+        : stageFilter !== 'ALL'
+          ? `${total} contact${total === 1 ? '' : 's'} currently sit in the ${stageFilter.toLowerCase()} stage.`
+          : total > 0
+            ? `${total} contact${total === 1 ? '' : 's'} in your CRM and ${visibleWithEmail} on this page are ready for outreach.`
+            : 'Add your first contact to start building your pipeline.'
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-3">
-            <p className="text-sm text-gray-500">{total} total</p>
-            <Link
-              href="/crm/analytics"
-              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              View Funnel Analytics
-            </Link>
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(59,130,246,0.14), transparent 34%), radial-gradient(circle at right center, rgba(168,85,247,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">
+              <Users className="h-3.5 w-3.5" />
+              Contacts
+            </div>
+            <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
+              Grow and manage your relationship pipeline
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Keep your contact database clean, spot qualification momentum, and move quickly
+              between import, follow-up, and pipeline work.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'Total Contacts', value: loading ? '—' : total },
+                { label: 'Visible Qualified', value: loading ? '—' : visibleQualified },
+                { label: 'Tagged On Page', value: loading ? '—' : visibleTagged },
+                { label: 'Source Cards', value: loading ? '—' : visibleFromCards },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(37,99,235,0.42)] transition-transform hover:-translate-y-0.5 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add Contact
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4 text-blue-500" />
+                Import CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleExportCSV()}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4 text-violet-500" />
+                Export CSV
+              </button>
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void handleExportCSV()}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            Import CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Contact
-          </button>
+
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Current Snapshot
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">CRM health on this page</p>
+              </div>
+              <Link
+                href="/crm/analytics"
+                className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 shadow-sm"
+              >
+                Analytics
+              </Link>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  label: 'Qualified momentum',
+                  value: loading
+                    ? '—'
+                    : `${visibleStageCounts.QUALIFIED + visibleStageCounts.CLOSED}`,
+                  detail: 'Qualified and closed contacts in current results',
+                  icon: CheckCircle2,
+                  tone: 'bg-green-50 text-green-600',
+                },
+                {
+                  label: 'Reachable contacts',
+                  value: loading ? '—' : `${visibleWithEmail}`,
+                  detail: 'Visible contacts with an email address ready to use',
+                  icon: FileText,
+                  tone: 'bg-violet-50 text-violet-600',
+                },
+                {
+                  label: 'New intake',
+                  value: loading ? '—' : `${visibleStageCounts.NEW}`,
+                  detail: 'Fresh contacts still waiting for first-touch action',
+                  icon: AlertTriangle,
+                  tone: 'bg-amber-50 text-amber-600',
+                },
+              ].map(({ label, value, detail, icon: Icon, tone }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                >
+                  <span
+                    className={`${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {label}
+                    </p>
+                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

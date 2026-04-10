@@ -172,6 +172,19 @@ export default function AnalyticsPage(): JSX.Element {
 
   const [exportWarning, setExportWarning] = useState<string | null>(null)
 
+  const selectedCard = cards.find((card) => card.id === selectedCardId) ?? null
+  const selectedCardLabel =
+    selectedCard?.fields['name']?.trim() ||
+    (selectedCard ? `/${selectedCard.handle}` : 'No card selected')
+  const selectedCardHandle = selectedCard ? `/${selectedCard.handle}` : 'No card selected'
+  const focusMessage = analyticsData
+    ? analyticsData.summary.totalViews > 0
+      ? `${selectedCardLabel} generated ${analyticsData.summary.totalViews} views and ${analyticsData.summary.totalClicks} clicks in the last ${dateRangeDays} days.`
+      : `No traffic yet in the last ${dateRangeDays} days. Share ${selectedCardHandle} to start collecting data.`
+    : cards.length > 0
+      ? `Tracking ${cards.length} card${cards.length === 1 ? '' : 's'} with ${dashboardSummary?.activeCards ?? 0} active right now.`
+      : 'Create and share a card to begin collecting analytics.'
+
   const exportLeadsCSV = useCallback(async () => {
     setExportWarning(null)
     try {
@@ -234,58 +247,154 @@ export default function AnalyticsPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="app-panel flex flex-wrap items-center justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="mt-2 text-sm text-gray-500">Insights into how your cards are performing.</p>
-        </div>
-        <div className="app-panel-subtle flex flex-wrap items-center gap-3 rounded-[24px] p-2">
-          {/* Card selector */}
-          {cards.length > 0 && (
-            <select
-              value={selectedCardId ?? ''}
-              onChange={(e) => setSelectedCardId(e.target.value)}
-              aria-label="Select card"
-              className="rounded-xl border border-gray-300 bg-white/85 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              {cards.map((card) => (
-                <option key={card.id} value={card.id}>
-                  /{card.handle} {card.fields['name'] ? `— ${card.fields['name']}` : ''}
-                </option>
-              ))}
-            </select>
-          )}
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(99,102,241,0.14), transparent 34%), radial-gradient(circle at right center, rgba(34,211,238,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_1fr] xl:items-start">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-600">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Analytics
+            </div>
+            <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
+              See what is driving card performance
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Monitor traffic, spot engagement patterns, and compare how your shared cards convert
+              views into clicks and leads.
+            </p>
 
-          {/* Date range picker */}
-          <div className="flex rounded-xl border border-gray-300 bg-white/85">
-            {DATE_RANGE_OPTIONS.map((opt) => (
-              <button
-                key={opt.days}
-                type="button"
-                onClick={() => setDateRangeDays(opt.days)}
-                aria-pressed={dateRangeDays === opt.days}
-                className={[
-                  'px-3 py-2 text-sm font-medium transition-colors first:rounded-l-xl last:rounded-r-xl',
-                  dateRangeDays === opt.days
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-50',
-                ].join(' ')}
-              >
-                {opt.label}
-              </button>
-            ))}
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'Tracked Cards', value: cardsLoading ? '—' : cards.length },
+                {
+                  label: 'Active Cards',
+                  value: cardsLoading ? '—' : (dashboardSummary?.activeCards ?? 0),
+                },
+                {
+                  label: 'Total Views',
+                  value: cardsLoading ? '—' : (dashboardSummary?.totalViews ?? 0),
+                },
+                {
+                  label: 'Total Leads',
+                  value: cardsLoading ? '—' : (dashboardSummary?.totalLeads ?? 0),
+                },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <Eye className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
           </div>
 
-          {/* Retry/refresh */}
-          <button
-            type="button"
-            onClick={() => void loadAnalytics()}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white/85 px-3 py-2 text-sm text-gray-700 hover:bg-white disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Filters & Context
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  Change the lens on your data
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadAnalytics()}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-600 shadow-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {cards.length > 0 && (
+                <select
+                  value={selectedCardId ?? ''}
+                  onChange={(e) => setSelectedCardId(e.target.value)}
+                  aria-label="Select card"
+                  className="w-full rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {cards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      /{card.handle} {card.fields['name'] ? `— ${card.fields['name']}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <div className="flex rounded-2xl border border-gray-300 bg-white">
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.days}
+                    type="button"
+                    onClick={() => setDateRangeDays(opt.days)}
+                    aria-pressed={dateRangeDays === opt.days}
+                    className={[
+                      'flex-1 px-3 py-3 text-sm font-medium transition-colors first:rounded-l-2xl last:rounded-r-2xl',
+                      dateRangeDays === opt.days
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-50',
+                    ].join(' ')}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[24px] border border-white/80 bg-white/80 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Selected card
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold text-gray-900">
+                    {selectedCardLabel}
+                  </p>
+                  <p className="truncate text-xs text-gray-400">{selectedCardHandle}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/80 bg-white/80 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Range context
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    Last {dateRangeDays} days
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Comparing views, clicks, leads, and traffic sources
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void exportLeadsCSV()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4 text-emerald-500" />
+                Export Leads CSV
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

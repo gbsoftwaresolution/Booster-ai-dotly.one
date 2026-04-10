@@ -61,7 +61,7 @@ export function MobileAppBarSidebar(): React.JSX.Element {
 
           <aside
             id="mobile-dashboard-sidebar"
-            className="fixed inset-y-0 left-0 z-50 flex w-[84vw] max-w-[320px] flex-col border-r border-sky-100 bg-white shadow-2xl lg:hidden"
+            className="fixed inset-y-0 left-0 z-50 flex w-[84vw] max-w-[320px] flex-col border-r border-slate-200 bg-white shadow-2xl lg:hidden"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile navigation menu"

@@ -2,7 +2,16 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckSquare, Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  CheckSquare,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
+} from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -84,6 +93,22 @@ export default function TasksPage(): JSX.Element {
   }, [loadTasks])
 
   const overdueCount = useMemo(() => tasks.filter(isOverdue).length, [tasks])
+  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed).length, [tasks])
+  const completedCount = useMemo(() => tasks.filter((task) => task.completed).length, [tasks])
+  const dueTodayCount = useMemo(
+    () =>
+      tasks.filter((task) => {
+        if (!task.dueAt || task.completed) return false
+        const due = new Date(task.dueAt)
+        const now = new Date()
+        return (
+          due.getFullYear() === now.getFullYear() &&
+          due.getMonth() === now.getMonth() &&
+          due.getDate() === now.getDate()
+        )
+      }).length,
+    [tasks],
+  )
 
   const filteredTasks = useMemo(() => {
     if (activeFilter === 'PENDING') return tasks.filter((task) => !task.completed)
@@ -91,6 +116,20 @@ export default function TasksPage(): JSX.Element {
     if (activeFilter === 'OVERDUE') return tasks.filter(isOverdue)
     return tasks
   }, [activeFilter, tasks])
+  const nextTask = useMemo(
+    () =>
+      tasks
+        .filter((task) => !task.completed && task.dueAt)
+        .sort((a, b) => new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime())[0],
+    [tasks],
+  )
+  const focusMessage = nextTask?.dueAt
+    ? `${nextTask.title} is your next scheduled task due ${formatDueDate(nextTask.dueAt, userTz)}.`
+    : overdueCount > 0
+      ? `${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} need attention.`
+      : pendingCount > 0
+        ? `${pendingCount} pending task${pendingCount === 1 ? '' : 's'} are in motion.`
+        : 'You are caught up. Create a task to keep follow-ups moving.'
 
   const mutateTaskBusyState = (taskId: string, busy: boolean) => {
     setBusyTaskIds((prev) => {
@@ -244,24 +283,144 @@ export default function TasksPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500/80">
-            Follow-ups
-          </p>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Track follow-ups, due dates, and completed work in one place.
-          </p>
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(99,102,241,0.14), transparent 34%), radial-gradient(circle at right center, rgba(14,165,233,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-600">
+              <CheckSquare className="h-3.5 w-3.5" />
+              Follow-ups
+            </div>
+            <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
+              Keep follow-ups moving without losing priority
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Track due dates, clear overdue work, and keep daily execution visible across your open
+              relationship tasks.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'All Tasks', value: loading ? '—' : tasks.length },
+                { label: 'Pending', value: loading ? '—' : pendingCount },
+                { label: 'Overdue', value: loading ? '—' : overdueCount },
+                { label: 'Due Today', value: loading ? '—' : dueTodayCount },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(79,70,229,0.42)] transition-transform hover:-translate-y-0.5 hover:bg-indigo-700"
+              >
+                <Plus className="h-4 w-4" />
+                New Task
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('OVERDUE')}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                Review Overdue
+              </button>
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <Clock3 className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
+          </div>
+
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Today Snapshot
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  Execution health at a glance
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-600 shadow-sm">
+                Live
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  label: 'Completion flow',
+                  value: loading ? '—' : `${completedCount}`,
+                  detail: 'Tasks already completed and cleared from active work',
+                  icon: CheckCircle2,
+                  tone: 'bg-green-50 text-green-600',
+                },
+                {
+                  label: 'Urgent queue',
+                  value: loading ? '—' : `${overdueCount}`,
+                  detail:
+                    overdueCount > 0
+                      ? 'Overdue work needing immediate action'
+                      : 'No overdue tasks right now',
+                  icon: AlertCircle,
+                  tone: overdueCount > 0 ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600',
+                },
+                {
+                  label: 'Next due item',
+                  value: loading
+                    ? '—'
+                    : nextTask?.dueAt
+                      ? formatDueDate(nextTask.dueAt, userTz)
+                      : 'None',
+                  detail: nextTask ? nextTask.title : 'No upcoming due task scheduled',
+                  icon: Clock3,
+                  tone: 'bg-indigo-50 text-indigo-600',
+                },
+              ].map(({ label, value, detail, icon: Icon, tone }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                >
+                  <span
+                    className={`${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {label}
+                    </p>
+                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" />
-          New Task
-        </button>
       </div>
 
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

@@ -2,7 +2,16 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BriefcaseBusiness, Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  BriefcaseBusiness,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+  Target,
+  TrendingUp,
+  CircleDollarSign,
+} from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -590,6 +599,17 @@ export default function DealsPage(): JSX.Element {
   const winRate = closedDeals.length > 0 ? (wonDeals.length / closedDeals.length) * 100 : null
 
   const pipelineCurrency = deals[0]?.currency || 'USD'
+  const activeDeals = deals.filter(
+    (deal) => deal.stage !== 'CLOSED_WON' && deal.stage !== 'CLOSED_LOST',
+  )
+  const nextClosingDeal = [...activeDeals]
+    .filter((deal) => Boolean(deal.closeDate))
+    .sort((a, b) => new Date(a.closeDate ?? 0).getTime() - new Date(b.closeDate ?? 0).getTime())[0]
+  const focusMessage = nextClosingDeal?.closeDate
+    ? `${nextClosingDeal.title} is the nearest close target on ${formatDate(nextClosingDeal.closeDate, userTz)}.`
+    : activeDeals.length > 0
+      ? `${activeDeals.length} live deal${activeDeals.length === 1 ? '' : 's'} are moving through your pipeline.`
+      : 'Create your first deal to start tracking revenue opportunities.'
 
   const setBusy = (dealId: string, busy: boolean) => {
     setBusyDealIds((prev) => {
@@ -641,24 +661,152 @@ export default function DealsPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500/80">
-            Revenue
-          </p>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">Deals</h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Manage your sales pipeline across prospecting, proposals, and closed revenue.
-          </p>
+      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+        <div
+          className="absolute inset-0 opacity-90"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(99,102,241,0.14), transparent 34%), radial-gradient(circle at right center, rgba(59,130,246,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
+          }}
+        />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-600">
+              <BriefcaseBusiness className="h-3.5 w-3.5" />
+              Revenue
+            </div>
+            <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
+              Manage your sales pipeline with clearer momentum
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+              Track live opportunities, surface likely wins, and keep your team focused on the deals
+              that are closest to revenue.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
+              {[
+                { label: 'Active Deals', value: loading ? '—' : activeDeals.length },
+                {
+                  label: 'Pipeline Value',
+                  value: loading ? '—' : formatCurrency(totalPipelineValue, pipelineCurrency),
+                },
+                {
+                  label: 'Weighted Value',
+                  value: loading ? '—' : formatCurrency(weightedPipelineValue, pipelineCurrency),
+                },
+                {
+                  label: 'Win Rate',
+                  value: loading ? '—' : winRate != null ? `${Math.round(winRate)}%` : '—',
+                },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(79,70,229,0.42)] transition-transform hover:-translate-y-0.5 hover:bg-indigo-700"
+              >
+                <Plus className="h-4 w-4" />
+                New Deal
+              </button>
+              <button
+                type="button"
+                onClick={() => setStageFilter('ALL')}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Target className="h-4 w-4 text-indigo-500" />
+                View Full Pipeline
+              </button>
+            </div>
+
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <TrendingUp className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">Focus: {focusMessage}</span>
+            </div>
+          </div>
+
+          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                  Pipeline Snapshot
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  Revenue health at a glance
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-600 shadow-sm">
+                Live
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  label: 'Likely revenue',
+                  value: loading ? '—' : formatCurrency(weightedPipelineValue, pipelineCurrency),
+                  detail: 'Probability-adjusted pipeline based on current deal stages',
+                  icon: CircleDollarSign,
+                  tone: 'bg-indigo-50 text-indigo-600',
+                },
+                {
+                  label: 'Closed wins',
+                  value: loading ? '—' : `${wonDeals.length}`,
+                  detail: 'Deals already converted into revenue',
+                  icon: TrendingUp,
+                  tone: 'bg-green-50 text-green-600',
+                },
+                {
+                  label: 'Nearest close target',
+                  value: loading
+                    ? '—'
+                    : nextClosingDeal?.closeDate
+                      ? formatDate(nextClosingDeal.closeDate, userTz)
+                      : 'None',
+                  detail: nextClosingDeal
+                    ? nextClosingDeal.title
+                    : 'No dated close target in active deals',
+                  icon: Target,
+                  tone: 'bg-amber-50 text-amber-600',
+                },
+              ].map(({ label, value, detail, icon: Icon, tone }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                >
+                  <span
+                    className={`${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {label}
+                    </p>
+                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                  </div>
+                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" />
-          New Deal
-        </button>
       </div>
 
       {/* KPI cards */}

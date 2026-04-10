@@ -57,7 +57,7 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
 
       {open && (
         <div
-          className="app-shell-surface absolute right-0 z-50 mt-3 w-60 origin-top-right overflow-hidden rounded-[24px]"
+          className="absolute right-0 z-50 mt-3 w-60 origin-top-right overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_80px_-42px_rgba(15,23,42,0.38)]"
           style={{ animation: 'avatar-menu 0.18s cubic-bezier(.32,1.2,.56,1) both' }}
         >
           {/* User info header */}
