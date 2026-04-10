@@ -74,8 +74,9 @@ export default function TermsPage() {
             <h2>6. Payments and subscriptions</h2>
             <ul>
               <li>
-                Paid plans are billed in USDT via the BoosterAI PaymentVault smart contract on
-                Arbitrum/Polygon.
+                Published self-serve plans and payment methods may change over time. The checkout
+                flow presented in-product at purchase time controls the currency, network, renewal,
+                and billing method for your subscription.
               </li>
               <li>
                 All payments are final. We do not offer refunds except where required by applicable
@@ -90,23 +91,25 @@ export default function TermsPage() {
                 access is maintained until then.
               </li>
               <li>
-                We reserve the right to change pricing with 30 days&apos; notice to registered users.
+                We reserve the right to change pricing with 30 days&apos; notice to registered
+                users.
               </li>
             </ul>
 
             <h2>7. Service availability</h2>
             <p>
-              We target 99.9% uptime for paid plans. Scheduled maintenance will be communicated in
-              advance. We are not liable for downtime beyond planned windows. Free plan users have
-              no uptime guarantee.
+              We work to keep the Service available and communicate major maintenance when
+              practical, but we do not guarantee uninterrupted availability unless we explicitly
+              agree to that in a separate written enterprise contract.
             </p>
 
             <h2>8. Termination</h2>
             <p>
               We may suspend or terminate your account at our discretion if you violate these Terms
-              or engage in activity harmful to other users or the Service. You may delete your
-              account at any time from the dashboard settings. Upon deletion, your public card URL
-              will return a 404.
+              or engage in activity harmful to other users or the Service. If the in-product delete
+              flow is available for your account, you may use it to request deletion; otherwise
+              contact support for assistance. After account deletion is processed, public card URLs
+              associated with that account may stop resolving.
             </p>
 
             <h2>9. Disclaimers and limitation of liability</h2>

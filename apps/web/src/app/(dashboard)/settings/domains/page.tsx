@@ -5,6 +5,7 @@ import type { JSX } from 'react'
 import { AlertTriangle, Globe, Plus } from 'lucide-react'
 import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
+import { SelectField } from '@/components/ui/SelectField'
 import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -35,14 +36,18 @@ const STATUS_STYLES: Record<string, string> = {
   FAILED: 'bg-red-100 text-red-800',
 }
 
+const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i
+
 export default function DomainsPage(): JSX.Element {
   const { plan, loading: planLoading } = useBillingPlan()
   const [domains, setDomains] = useState<CustomDomain[]>([])
   const [cards, setCards] = useState<CardOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [adding, setAdding] = useState(false)
   const [domainInput, setDomainInput] = useState('')
   const [error, setError] = useState('')
+  const [domainFieldError, setDomainFieldError] = useState('')
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [assigningId, setAssigningId] = useState<string | null>(null)
@@ -56,8 +61,13 @@ export default function DomainsPage(): JSX.Element {
       const token = await getAccessToken()
       const data = await apiGet<CustomDomain[]>('/custom-domains', token ?? undefined)
       setDomains(data)
-    } catch {
-      setError('Failed to load domains.')
+    } catch (err) {
+      if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        setPermissionDenied(true)
+        setError('You do not have permission to manage custom domains.')
+      } else {
+        setError('Failed to load domains.')
+      }
     } finally {
       setLoading(false)
     }
@@ -72,7 +82,10 @@ export default function DomainsPage(): JSX.Element {
         const token = await getAccessToken()
         const data = await apiGet<CardOption[]>('/cards', token ?? undefined)
         setCards(data)
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+          setPermissionDenied(true)
+        }
         // non-fatal — card selector will just be empty
       }
     })()
@@ -96,12 +109,26 @@ export default function DomainsPage(): JSX.Element {
 
   async function handleAddDomain(e: React.FormEvent) {
     e.preventDefault()
-    if (!domainInput.trim()) return
+    if (adding) return
+    const normalizedDomain = domainInput
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '')
+    if (!normalizedDomain) {
+      setDomainFieldError('Domain is required.')
+      return
+    }
+    if (!DOMAIN_REGEX.test(normalizedDomain)) {
+      setDomainFieldError('Enter a valid hostname like card.yourcompany.com.')
+      return
+    }
     setAdding(true)
     setError('')
+    setDomainFieldError('')
     try {
       const token = await getAccessToken()
-      await apiPost('/custom-domains', { domain: domainInput.trim() }, token ?? undefined)
+      await apiPost('/custom-domains', { domain: normalizedDomain }, token ?? undefined)
       setDomainInput('')
       await fetchDomains()
     } catch {
@@ -303,9 +330,18 @@ export default function DomainsPage(): JSX.Element {
           <input
             type="text"
             value={domainInput}
-            onChange={(e) => setDomainInput(e.target.value)}
+            onChange={(e) => {
+              setDomainInput(e.target.value)
+              if (domainFieldError) setDomainFieldError('')
+            }}
             placeholder="card.yourcompany.com"
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            aria-invalid={domainFieldError ? 'true' : 'false'}
+            aria-describedby={domainFieldError ? 'domain-input-error' : 'domain-input-help'}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 ${domainFieldError ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300'}`}
           />
           <button
             type="submit"
@@ -316,9 +352,25 @@ export default function DomainsPage(): JSX.Element {
             {adding ? 'Adding...' : 'Add Domain'}
           </button>
         </form>
+        <div className="mt-2 min-h-5 text-xs">
+          {domainFieldError ? (
+            <p id="domain-input-error" className="text-red-600">
+              {domainFieldError}
+            </p>
+          ) : (
+            <p id="domain-input-help" className="text-gray-400">
+              Enter the hostname only, without `http://` or path segments.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Error */}
+      {permissionDenied && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Custom domain management is not available for your current account access.
+        </div>
+      )}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
@@ -366,13 +418,13 @@ export default function DomainsPage(): JSX.Element {
                     <label className="text-xs font-medium text-gray-500 shrink-0">
                       Assign to card:
                     </label>
-                    <select
+                    <SelectField
                       value={domain.card?.id ?? ''}
                       disabled={assigningId === domain.id}
                       onChange={(e) => {
                         void handleAssignCard(domain.id, e.target.value || null)
                       }}
-                      className="flex-1 rounded-xl border border-gray-300/80 bg-white/85 px-3 py-2 text-xs text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                      className="flex-1 rounded-xl border-gray-300/80 bg-white/85 px-3 py-2.5 pr-9 text-xs focus:border-brand-500 focus:ring-brand-100"
                     >
                       <option value="">— None —</option>
                       {cards.map((c) => (
@@ -381,7 +433,7 @@ export default function DomainsPage(): JSX.Element {
                           {c.fields?.name ? ` (${c.fields.name})` : ''}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                     {assigningId === domain.id && (
                       <span className="text-xs text-gray-400">Saving…</span>
                     )}

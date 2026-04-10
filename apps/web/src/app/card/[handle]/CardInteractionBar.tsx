@@ -52,21 +52,22 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
  */
 async function downloadVcardFetch(cardHandle: string, token: string) {
   const url = `${API_URL}/public/cards/${cardHandle}/vcard`
-  try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!res.ok) return
-    const blob = await res.blob()
-    const objectUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = objectUrl
-    a.download = `${cardHandle}.vcf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(objectUrl)
-  } catch {
-    /* non-blocking */
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) {
+    throw new Error(
+      res.status === 403 ? 'Sign in to download this contact.' : 'Failed to download contact.',
+    )
   }
+
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = `${cardHandle}.vcf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(objectUrl)
 }
 
 type Tab = 'contact' | 'message' | 'voice' | 'dropbox'
@@ -850,13 +851,13 @@ function SignInPromptTab({ ownerName }: { ownerName: string }) {
       </div>
       <div className="flex w-full gap-2">
         <a
-          href={`${SITE_URL}/auth/login`}
+          href={`${SITE_URL}/auth?mode=signin&next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/dashboard')}`}
           className="flex-1 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700 transition-opacity active:opacity-70"
         >
           Sign in
         </a>
         <a
-          href={`${SITE_URL}/auth/signup`}
+          href={`${SITE_URL}/auth?mode=signup&next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/dashboard')}`}
           className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition-opacity active:opacity-70"
           style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}
         >
@@ -911,15 +912,13 @@ function SaveContactTab({
         },
         token,
       )
+      await downloadVcardFetch(cardHandle, token)
       vibrate([20, 30, 60])
       try {
         localStorage.setItem(SAVED_KEY(cardHandle), '1')
       } catch {
         /* ignore */
       }
-      // 2. Also download the vCard so the contact lands in their phone's address book.
-      //    Uses fetch + Authorization header (the endpoint no longer accepts ?token=).
-      await downloadVcardFetch(cardHandle, token)
       onAnalytics?.('SAVE', {
         surface: 'interaction_bar',
         action: 'save_contact',
@@ -937,8 +936,8 @@ function SaveContactTab({
     return (
       <SuccessCard
         title={`${ownerName} saved!`}
-        subtitle="Contact saved to your CRM. They'll be notified you connected."
-        onReset={() => {}} // can't un-save; button navigates nowhere but label should be non-empty
+        subtitle="Contact saved to your CRM and downloaded to your device."
+        onReset={() => setSaved(false)}
         resetLabel="Done"
         shareUrl={shareUrl}
       />
@@ -958,7 +957,7 @@ function SaveContactTab({
       <div className="text-center">
         <p className="text-base font-bold text-slate-800">Save {ownerName}</p>
         <p className="mt-1 text-sm text-slate-500">
-          Add to your Dotly CRM. {ownerName} gets notified and can add you back.
+          Add to your Dotly CRM and download their contact card to your device.
         </p>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}

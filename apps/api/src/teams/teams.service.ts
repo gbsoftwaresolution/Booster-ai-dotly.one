@@ -245,23 +245,41 @@ export class TeamsService {
     const inviter = await this.prisma.user.findUnique({ where: { id: userId } })
     const token = randomUUID()
     const webUrl = this.config.getOrThrow<string>('WEB_URL')
-
-    await this.prisma.teamInvite.create({
-      data: {
+    const existingInvite = await this.prisma.teamInvite.findFirst({
+      where: {
         teamId,
         email: normalizedEmail,
-        role,
-        token,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        accepted: false,
+        expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: 'desc' },
     })
+
+    const invite = existingInvite
+      ? await this.prisma.teamInvite.update({
+          where: { id: existingInvite.id },
+          data: {
+            role,
+            token,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        })
+      : await this.prisma.teamInvite.create({
+          data: {
+            teamId,
+            email: normalizedEmail,
+            role,
+            token,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        })
 
     void this.email
       .sendTeamInvite(
         normalizedEmail,
         team.name,
         inviter?.name || inviter?.email || 'A team member',
-        `${webUrl}/team/accept?token=${token}`,
+        `${webUrl}/team/accept?token=${invite.token}`,
       )
       // LOW-03: Log delivery failures so they are visible in monitoring/alerting.
       // Previously this was .catch(() => void 0) — a completely silent swallow —
@@ -272,8 +290,7 @@ export class TeamsService {
           err instanceof Error ? err.message : err,
         ),
       )
-
-    return { message: 'Invitation sent' }
+    return { message: existingInvite ? 'Invitation resent' : 'Invitation sent' }
   }
 
   async acceptInvite(token: string, userId: string) {

@@ -6,15 +6,10 @@ const FOOTER_LINKS = {
     { label: 'Pricing', href: '/pricing' },
     { label: 'Dashboard', href: '/dashboard' },
   ],
-  Company: [
-    { label: 'About', href: '/about' },
-    { label: 'Blog', href: '#' },
-    { label: 'Careers', href: '#' },
-  ],
+  Company: [{ label: 'About', href: '/about' }],
   Legal: [
     { label: 'Privacy Policy', href: '/privacy' },
     { label: 'Terms of Service', href: '/terms' },
-    { label: 'Security', href: '#' },
   ],
   Connect: [
     { label: 'Twitter / X', href: 'https://twitter.com/dotlyone' },
@@ -53,7 +48,7 @@ export function Footer() {
               Dotly<span className="text-brand-500">.one</span>
             </Link>
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
-              Digital business cards with NFC, QR, analytics, and Web3 payments.
+              Digital business cards with NFC, QR, analytics, CRM, and scheduling.
             </p>
             <p className="mt-4 text-xs text-gray-400">Powered by BoosterAI PaymentVault</p>
           </div>

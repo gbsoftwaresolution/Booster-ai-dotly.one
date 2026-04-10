@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { CardRenderer } from '@dotly/ui'
 import type { CardRendererProps } from '@dotly/types'
+import Link from 'next/link'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost } from '@/lib/api'
+import { sanitizeNextPath } from '@/lib/app-url'
 import { getPublicApiUrl } from '@/lib/public-env'
 import { AnalyticsBeacon } from './AnalyticsBeacon'
 import { LeadCaptureModal } from './LeadCaptureModal'
@@ -40,21 +42,22 @@ function postAnalytics(body: Record<string, unknown>) {
 async function downloadVcardFetch(cardHandle: string, token?: string | null) {
   const url = `${API_URL}/public/cards/${cardHandle}/vcard`
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-  try {
-    const res = await fetch(url, { headers })
-    if (!res.ok) return
-    const blob = await res.blob()
-    const objectUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = objectUrl
-    a.download = `${cardHandle}.vcf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(objectUrl)
-  } catch {
-    /* non-blocking */
+  const res = await fetch(url, { headers })
+  if (!res.ok) {
+    throw new Error(
+      res.status === 403 ? 'Sign in to save this contact.' : 'Failed to download contact.',
+    )
   }
+
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = `${cardHandle}.vcf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(objectUrl)
 }
 
 export function CardView({
@@ -68,6 +71,7 @@ export function CardView({
   const [isAuth, setIsAuth] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [vcardBlocked, setVcardBlocked] = useState(false) // shown when MEMBERS_ONLY + not auth
+  const [vcardError, setVcardError] = useState<string | null>(null)
   const tokenRef = useRef<string | null>(null)
   const allowAnonymousExport = vcardPolicy !== 'MEMBERS_ONLY'
 
@@ -103,6 +107,7 @@ export function CardView({
   }
 
   async function handleSaveContact() {
+    setVcardError(null)
     trackInteraction('SAVE', {
       surface: 'card',
       action: 'save_contact_attempt',
@@ -127,7 +132,13 @@ export function CardView({
 
     // Download the vCard — token sent as Authorization header (Bearer),
     // which is the only method the server accepts for MEMBERS_ONLY cards.
-    await downloadVcardFetch(cardHandle, token)
+    try {
+      await downloadVcardFetch(cardHandle, token)
+    } catch (error) {
+      setVcardError(error instanceof Error ? error.message : 'Failed to download contact.')
+      return
+    }
+
     trackInteraction('SAVE', {
       surface: 'card',
       action: 'vcard_downloaded',
@@ -160,6 +171,14 @@ export function CardView({
         onSocialLinkClick={handleSocialLinkClick}
         onSaveContact={() => void handleSaveContact()}
       />
+
+      {vcardError && (
+        <div className="px-4 pt-3">
+          <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {vcardError}
+          </p>
+        </div>
+      )}
 
       {bookableAppointment && (
         <BookMeetingBar
@@ -257,7 +276,9 @@ function BookMeetingBar({
 
 function MembersOnlySheet({ ownerName, onClose }: { ownerName: string; onClose: () => void }) {
   const firstName = ownerName.split(' ')[0] ?? ownerName
-  const SITE_URL_LOCAL = SITE_URL
+  const next = encodeURIComponent(
+    sanitizeNextPath(typeof window !== 'undefined' ? window.location.pathname : '/dashboard'),
+  )
 
   return (
     <>
@@ -292,18 +313,18 @@ function MembersOnlySheet({ ownerName, onClose }: { ownerName: string; onClose: 
             {firstName} has enabled member-only contact saving. Create a free Dotly account to
             download their contact and exchange details.
           </p>
-          <a
-            href={`${SITE_URL_LOCAL}/auth?mode=signup`}
+          <Link
+            href={`/auth?mode=signup&next=${next}`}
             className="mt-2 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white text-center block"
           >
             Create free account
-          </a>
-          <a
-            href={`${SITE_URL_LOCAL}/auth?mode=login`}
+          </Link>
+          <Link
+            href={`/auth?mode=signin&next=${next}`}
             className="w-full rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 text-center block"
           >
             Sign in
-          </a>
+          </Link>
           <button
             type="button"
             onClick={onClose}

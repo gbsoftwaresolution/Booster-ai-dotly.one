@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAppUrl, sanitizeNextPath } from '@/lib/app-url'
 import { NextRequest, NextResponse } from 'next/server'
 
 // LOW-07: Allowlist regex for the Supabase PKCE authorization code.
@@ -13,24 +14,14 @@ const SUPABASE_CODE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const rawNext = searchParams.get('next') ?? '/dashboard'
-
-  // Guard against open redirect: only allow same-origin relative paths.
-  // Reject protocol-relative URLs (//evil.com) and absolute URLs.
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard'
+  const next = sanitizeNextPath(searchParams.get('next'), '/dashboard')
 
   // F-01: Pin the origin to NEXT_PUBLIC_APP_URL rather than deriving it from
   // `request.url`. The Host header can be spoofed by a reverse proxy or a
   // malicious request, turning `new URL(request.url).origin` into an open
   // redirect gadget. NEXT_PUBLIC_APP_URL is set at build time and is not
   // attacker-controlled.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  if (!appUrl) {
-    // Fail closed: if the env var is missing we cannot safely redirect.
-    return new Response('Server misconfiguration: NEXT_PUBLIC_APP_URL is not set', { status: 500 })
-  }
-  // Strip any trailing slash so we can safely append paths.
-  const origin = appUrl.replace(/\/$/, '')
+  const origin = getAppUrl()
 
   if (code) {
     // LOW-07: Validate code format before forwarding to Supabase.

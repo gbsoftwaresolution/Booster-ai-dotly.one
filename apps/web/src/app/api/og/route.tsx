@@ -17,11 +17,14 @@ const H = 630
 
 interface RawCard {
   fields: Record<string, string>
-  theme?: { primaryColor?: string; secondaryColor?: string }
+  theme?: { primaryColor?: string; secondaryColor?: string; fontFamily?: string; logoUrl?: string }
   teamBrand?: {
     brandName?: string | null
     brandLogoUrl?: string | null
     brandColor?: string | null
+    secondaryColor?: string | null
+    fontFamily?: string | null
+    brandLock?: boolean
   } | null
 }
 
@@ -83,12 +86,21 @@ export async function GET(req: NextRequest) {
   const jobTitle: string = fields.title ?? ''
   const company: string = fields.company ?? ''
   const rawAvatarUrl: string | null = fields.avatarUrl ?? null
+  const teamBrandLocked = card?.teamBrand?.brandLock ?? false
 
   const accentRaw = card?.teamBrand?.brandColor ?? card?.theme?.primaryColor ?? '#0ea5e9'
   const accent = safeBrandColor(accentRaw)
+  const secondary = safeBrandColor(
+    (teamBrandLocked ? card?.teamBrand?.secondaryColor : null) ??
+      card?.theme?.secondaryColor ??
+      '#ffffff',
+  )
   const [r, g, b] = hexToRgb(accent)
   const bgTint = `rgba(${r},${g},${b},0.08)`
   const accentLight = `rgba(${r},${g},${b},0.20)`
+  const fontFamily = teamBrandLocked
+    ? (card?.teamBrand?.fontFamily ?? 'system-ui, -apple-system, sans-serif')
+    : 'system-ui, -apple-system, sans-serif'
 
   const subtitle = [jobTitle, company].filter(Boolean).join(' · ')
 
@@ -102,7 +114,7 @@ export async function GET(req: NextRequest) {
         height: H,
         display: 'flex',
         background: '#ffffff',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily,
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -206,7 +218,7 @@ export async function GET(req: NextRequest) {
             style={{
               fontSize: avatarDataUri ? 70 : 78,
               fontWeight: 800,
-              color: '#0f172a',
+              color: accent,
               lineHeight: 1.05,
               letterSpacing: '-2px',
               overflow: 'hidden',
@@ -223,7 +235,7 @@ export async function GET(req: NextRequest) {
               style={{
                 fontSize: 30,
                 fontWeight: 500,
-                color: '#64748b',
+                color: secondary,
                 letterSpacing: '-0.4px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',

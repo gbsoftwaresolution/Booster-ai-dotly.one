@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react'
+import { SelectField } from '@/components/ui/SelectField'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import {
@@ -279,19 +280,19 @@ export default function CustomFieldsPage(): JSX.Element {
               {/* Field Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Field Type</label>
-                <select
+                <SelectField
                   value={form.fieldType}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, fieldType: e.target.value as FieldType }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="focus:border-blue-500 focus:ring-blue-100"
                 >
                   {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
                     <option key={t} value={t}>
                       {FIELD_TYPE_LABELS[t]}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
 
               {/* Options (only for SELECT) */}

@@ -231,6 +231,26 @@ export async function updateCard(id: string, data: Record<string, unknown>): Pro
   })
 }
 
+export async function updateCardTheme(
+  id: string,
+  data: { primaryColor?: string },
+): Promise<unknown> {
+  return apiFetch(`/cards/${id}/theme`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function replaceCardSocialLinks(
+  id: string,
+  links: Array<{ platform: string; url: string; displayOrder: number }>,
+): Promise<unknown> {
+  return apiFetch(`/cards/${id}/social-links`, {
+    method: 'PUT',
+    body: JSON.stringify({ links }),
+  })
+}
+
 export async function checkHandleAvailable(
   handle: string,
 ): Promise<{ available: boolean | 'unknown' }> {
@@ -290,7 +310,7 @@ export async function scanBusinessCard(base64: string, mimeType: string): Promis
 }
 
 export async function createContact(
-  cardId: string,
+  cardId: string | null | undefined,
   data: {
     name: string
     email?: string | null
@@ -317,7 +337,7 @@ export async function createContact(
       stage: data.stage ?? undefined,
       notes: data.notes ?? undefined,
       tags: data.tags ?? undefined,
-      sourceCardId: cardId,
+      ...(cardId ? { sourceCardId: cardId } : {}),
     }),
   })
 }

@@ -1,2 +1,4 @@
 import { redirect } from 'next/navigation'
-export default function Page() { redirect('/scheduling') }
+export default function Page() {
+  redirect('/apps/scheduling?tab=bookings')
+}

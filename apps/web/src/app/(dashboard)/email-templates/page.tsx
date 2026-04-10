@@ -30,6 +30,14 @@ interface TemplateFormValues {
   body: string
 }
 
+type TemplateField = keyof TemplateFormValues
+
+const TEMPLATE_LIMITS: Record<TemplateField, number> = {
+  name: 120,
+  subject: 200,
+  body: 5000,
+}
+
 const EMPTY_FORM: TemplateFormValues = {
   name: '',
   subject: '',
@@ -45,6 +53,7 @@ export default function EmailTemplatesPage(): JSX.Element {
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -72,12 +81,14 @@ export default function EmailTemplatesPage(): JSX.Element {
   const openCreateModal = () => {
     setEditingTemplate(null)
     setDeleteError(null)
+    setModalError(null)
     setShowModal(true)
   }
 
   const openEditModal = (template: EmailTemplate) => {
     setEditingTemplate(template)
     setDeleteError(null)
+    setModalError(null)
     setShowModal(true)
   }
 
@@ -85,6 +96,7 @@ export default function EmailTemplatesPage(): JSX.Element {
     async (values: TemplateFormValues) => {
       setSubmitting(true)
       setError(null)
+      setModalError(null)
       try {
         const token = await getAccessToken()
         if (editingTemplate) {
@@ -103,7 +115,8 @@ export default function EmailTemplatesPage(): JSX.Element {
         setShowModal(false)
         setEditingTemplate(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to save template')
+        const message = err instanceof Error ? err.message : 'Failed to save template'
+        setModalError(message)
       } finally {
         setSubmitting(false)
       }
@@ -231,7 +244,9 @@ export default function EmailTemplatesPage(): JSX.Element {
             if (submitting) return
             setShowModal(false)
             setEditingTemplate(null)
+            setModalError(null)
           }}
+          submitError={modalError}
           onSubmit={(values) => void handleSave(values)}
         />
       )}
@@ -257,6 +272,7 @@ function TemplateModal({
   title,
   submitLabel,
   submitting,
+  submitError,
   onClose,
   onSubmit,
 }: {
@@ -264,11 +280,13 @@ function TemplateModal({
   title: string
   submitLabel: string
   submitting: boolean
+  submitError?: string | null
   onClose: () => void
   onSubmit: (values: TemplateFormValues) => void
 }): JSX.Element {
   const [values, setValues] = useState<TemplateFormValues>(initialValues)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<TemplateField, string>>>({})
   const modalRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const bodyTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -279,9 +297,27 @@ function TemplateModal({
   const inputClass =
     'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none'
 
+  const getInputClass = (field: TemplateField) =>
+    `${inputClass} ${fieldErrors[field] ? 'border-red-300 focus:border-red-500' : ''}`
+
+  const updateField = (field: TemplateField, value: string) => {
+    setValues((prev) => ({ ...prev, [field]: value }))
+    setError(null)
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
   useEffect(() => {
     nameInputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    setError(submitError ?? null)
+  }, [submitError])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -340,17 +376,46 @@ function TemplateModal({
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!values.name.trim() || !values.subject.trim() || !values.body.trim()) {
-      setError('Name, subject, and body are required.')
-      return
-    }
+    if (submitting) return
 
-    setError(null)
-    onSubmit({
+    const nextValues = {
       name: values.name.trim(),
       subject: values.subject.trim(),
       body: values.body.trim(),
-    })
+    }
+    const nextFieldErrors: Partial<Record<TemplateField, string>> = {}
+
+    if (!nextValues.name) {
+      nextFieldErrors.name = 'Template name is required.'
+    } else if (nextValues.name.length < 2) {
+      nextFieldErrors.name = 'Template name must be at least 2 characters.'
+    } else if (nextValues.name.length > TEMPLATE_LIMITS.name) {
+      nextFieldErrors.name = `Template name must be ${TEMPLATE_LIMITS.name} characters or less.`
+    }
+
+    if (!nextValues.subject) {
+      nextFieldErrors.subject = 'Email subject is required.'
+    } else if (nextValues.subject.length > TEMPLATE_LIMITS.subject) {
+      nextFieldErrors.subject = `Email subject must be ${TEMPLATE_LIMITS.subject} characters or less.`
+    }
+
+    if (!nextValues.body) {
+      nextFieldErrors.body = 'Email body is required.'
+    } else if (nextValues.body.length < 5) {
+      nextFieldErrors.body = 'Email body must be at least 5 characters.'
+    } else if (nextValues.body.length > TEMPLATE_LIMITS.body) {
+      nextFieldErrors.body = `Email body must be ${TEMPLATE_LIMITS.body} characters or less.`
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setError('Fix the highlighted fields before saving.')
+      return
+    }
+
+    setFieldErrors({})
+    setError(null)
+    onSubmit(nextValues)
   }
 
   return (
@@ -388,10 +453,19 @@ function TemplateModal({
               ref={nameInputRef}
               id="template-name"
               value={values.name}
-              onChange={(event) => setValues((prev) => ({ ...prev, name: event.target.value }))}
-              className={inputClass}
-              aria-describedby={error ? errorId : undefined}
+              onChange={(event) => updateField('name', event.target.value)}
+              maxLength={TEMPLATE_LIMITS.name}
+              className={getInputClass('name')}
+              aria-invalid={fieldErrors.name ? 'true' : 'false'}
+              aria-describedby={
+                fieldErrors.name ? 'template-name-error' : error ? errorId : undefined
+              }
             />
+            {fieldErrors.name && (
+              <p id="template-name-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
           <div>
             <label
@@ -403,10 +477,25 @@ function TemplateModal({
             <input
               id="template-subject"
               value={values.subject}
-              onChange={(event) => setValues((prev) => ({ ...prev, subject: event.target.value }))}
-              className={inputClass}
-              aria-describedby={error ? errorId : undefined}
+              onChange={(event) => updateField('subject', event.target.value)}
+              maxLength={TEMPLATE_LIMITS.subject}
+              className={getInputClass('subject')}
+              aria-invalid={fieldErrors.subject ? 'true' : 'false'}
+              aria-describedby={
+                fieldErrors.subject ? 'template-subject-error' : error ? errorId : undefined
+              }
             />
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-gray-400">
+              <span>What recipients see in their inbox.</span>
+              <span>
+                {values.subject.length}/{TEMPLATE_LIMITS.subject}
+              </span>
+            </div>
+            {fieldErrors.subject && (
+              <p id="template-subject-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.subject}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="template-body" className="mb-1 block text-sm font-medium text-gray-700">
@@ -417,11 +506,26 @@ function TemplateModal({
               id="template-body"
               rows={12}
               value={values.body}
-              onChange={(event) => setValues((prev) => ({ ...prev, body: event.target.value }))}
+              onChange={(event) => updateField('body', event.target.value)}
               placeholder="Write the email body..."
-              className={inputClass}
-              aria-describedby={error ? errorId : undefined}
+              maxLength={TEMPLATE_LIMITS.body}
+              className={getInputClass('body')}
+              aria-invalid={fieldErrors.body ? 'true' : 'false'}
+              aria-describedby={
+                fieldErrors.body ? 'template-body-error' : error ? errorId : undefined
+              }
             />
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-gray-400">
+              <span>Use merge tags where you want contact details inserted automatically.</span>
+              <span>
+                {values.body.length}/{TEMPLATE_LIMITS.body}
+              </span>
+            </div>
+            {fieldErrors.body && (
+              <p id="template-body-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.body}
+              </p>
+            )}
           </div>
           <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
             <p className="mb-1.5 text-xs font-semibold text-indigo-700">Available merge tags</p>

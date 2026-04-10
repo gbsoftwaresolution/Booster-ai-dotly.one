@@ -1,54 +1,106 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
+import { getAuthCallbackUrl, sanitizeNextPath } from '@/lib/app-url'
 
-const DOTLY_AUTH_CALLBACK_URL = 'https://dotly.one/auth/callback'
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function AuthPage(): JSX.Element {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
-  const next = (() => {
-    const raw =
-      typeof window !== 'undefined'
-        ? (new URLSearchParams(window.location.search).get('next') ?? '/dashboard')
-        : '/dashboard'
-    return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
-  })()
+  const next = useMemo(
+    () => sanitizeNextPath(searchParams.get('next'), '/dashboard'),
+    [searchParams],
+  )
+  const authCallbackUrl = useMemo(() => getAuthCallbackUrl(), [])
+
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode')
+    if (requestedMode === 'signup' || requestedMode === 'signin' || requestedMode === 'reset') {
+      setMode(requestedMode)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const authError = searchParams.get('error')
+    if (!authError) return
+
+    if (authError === 'invalid_code') {
+      setError('This sign-in link is invalid. Start again and request a new one.')
+      return
+    }
+
+    if (authError === 'auth_callback_failed') {
+      setError('We could not complete sign-in. Try again.')
+      return
+    }
+
+    setError(authError)
+  }, [searchParams])
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return
+
+    const trimmedEmail = email.trim().toLowerCase()
+    const nextFieldErrors: { email?: string; password?: string } = {}
+
+    if (!trimmedEmail) {
+      nextFieldErrors.email = 'Email address is required.'
+    } else if (!EMAIL_REGEX.test(trimmedEmail)) {
+      nextFieldErrors.email = 'Enter a valid email address.'
+    }
+
+    if (mode !== 'reset') {
+      if (!password) {
+        nextFieldErrors.password = 'Password is required.'
+      } else if (mode === 'signup' && password.trim().length < 8) {
+        nextFieldErrors.password = 'Password must be at least 8 characters.'
+      }
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setError('Fix the highlighted fields before continuing.')
+      return
+    }
+
+    setFieldErrors({})
+    setEmail(trimmedEmail)
     setError(null)
     setSuccessMessage(null)
     setLoading(true)
 
     try {
       if (mode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${DOTLY_AUTH_CALLBACK_URL}?next=${encodeURIComponent('/settings')}`,
+        const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+          redirectTo: `${authCallbackUrl}?next=${encodeURIComponent('/settings')}`,
         })
         if (error) throw error
         setSuccessMessage('Password reset link sent — check your email.')
       } else if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
         if (error) throw error
         router.push(next)
         router.refresh()
       } else {
         const { error } = await supabase.auth.signUp({
-          email,
+          email: trimmedEmail,
           password,
           options: {
-            emailRedirectTo: `${DOTLY_AUTH_CALLBACK_URL}?next=${encodeURIComponent(next)}`,
+            emailRedirectTo: `${authCallbackUrl}?next=${encodeURIComponent(next)}`,
           },
         })
         if (error) throw error
@@ -66,7 +118,7 @@ export default function AuthPage(): JSX.Element {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${DOTLY_AUTH_CALLBACK_URL}?next=${encodeURIComponent(next)}`,
+        redirectTo: `${authCallbackUrl}?next=${encodeURIComponent(next)}`,
       },
     })
     if (error) setError(error.message)
@@ -199,10 +251,20 @@ export default function AuthPage(): JSX.Element {
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setFieldErrors((prev) => ({ ...prev, email: undefined }))
+                  }}
+                  aria-invalid={fieldErrors.email ? 'true' : 'false'}
+                  aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+                  className={`mt-1 block w-full rounded-2xl border bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 ${fieldErrors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 focus:border-brand-500 focus:ring-brand-500'}`}
                   placeholder="you@example.com"
                 />
+                {fieldErrors.email && (
+                  <p id="auth-email-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.email}
+                  </p>
+                )}
               </div>
 
               {mode !== 'reset' && (
@@ -218,6 +280,7 @@ export default function AuthPage(): JSX.Element {
                           setMode('reset')
                           setError(null)
                           setSuccessMessage(null)
+                          setFieldErrors({})
                         }}
                         className="text-xs font-medium text-brand-500 hover:text-brand-600"
                       >
@@ -232,10 +295,20 @@ export default function AuthPage(): JSX.Element {
                     required
                     minLength={mode === 'signup' ? 8 : undefined}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="mt-1 block w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setFieldErrors((prev) => ({ ...prev, password: undefined }))
+                    }}
+                    aria-invalid={fieldErrors.password ? 'true' : 'false'}
+                    aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+                    className={`mt-1 block w-full rounded-2xl border bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 focus:border-brand-500 focus:ring-brand-500'}`}
                     placeholder={mode === 'signup' ? 'Min. 8 characters' : '••••••••'}
                   />
+                  {fieldErrors.password && (
+                    <p id="auth-password-error" className="mt-1 text-xs text-red-600">
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -279,6 +352,7 @@ export default function AuthPage(): JSX.Element {
                       setMode('signin')
                       setError(null)
                       setSuccessMessage(null)
+                      setFieldErrors({})
                     }}
                     className="font-medium text-brand-500 hover:text-brand-600"
                   >
@@ -294,6 +368,7 @@ export default function AuthPage(): JSX.Element {
                       setMode('signup')
                       setError(null)
                       setSuccessMessage(null)
+                      setFieldErrors({})
                     }}
                     className="font-medium text-brand-500 hover:text-brand-600"
                   >
@@ -309,6 +384,7 @@ export default function AuthPage(): JSX.Element {
                       setMode('signin')
                       setError(null)
                       setSuccessMessage(null)
+                      setFieldErrors({})
                     }}
                     className="font-medium text-brand-500 hover:text-brand-600"
                   >

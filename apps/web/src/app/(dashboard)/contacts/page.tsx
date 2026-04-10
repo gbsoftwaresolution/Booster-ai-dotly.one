@@ -5,6 +5,8 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
+import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { ContactDetailDrawer, type ContactDetail } from '@/components/crm/ContactDetailDrawer'
 import { useUserTimezone } from '@/hooks/useUserLocale'
 import { formatDate } from '@/lib/tz'
@@ -89,6 +91,21 @@ const STAGE_FILTER_ACTIVE: Record<string, string> = {
   LOST: 'bg-red-600 text-white',
 }
 
+const FORM_CONTROL_CLASS =
+  'w-full rounded-[18px] border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-700 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.22)] outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_REGEX = /^[+]?[0-9()\-\s]{7,20}$/
+
+function isValidUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -137,6 +154,7 @@ export default function ContactsPage(): JSX.Element {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
   const [search, setSearch] = useState('')
@@ -196,7 +214,12 @@ export default function ContactsPage(): JSX.Element {
         setTotal(data.total)
         setPage(p)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load contacts')
+        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+          setPermissionDenied(true)
+          setError('You do not have permission to view contacts.')
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to load contacts')
+        }
       } finally {
         setLoading(false)
       }
@@ -413,8 +436,8 @@ export default function ContactsPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="app-panel relative overflow-hidden rounded-[34px] px-5 py-6 sm:px-8 sm:py-7">
+      {/* Desktop header */}
+      <div className="app-panel relative hidden overflow-hidden rounded-[34px] px-5 py-6 md:block md:px-8 md:py-7">
         <div
           className="absolute inset-0 opacity-90"
           aria-hidden="true"
@@ -558,6 +581,70 @@ export default function ContactsPage(): JSX.Element {
         </div>
       </div>
 
+      {/* Mobile header */}
+      <div className="space-y-3 md:hidden">
+        <div className="app-panel rounded-[26px] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600">
+                <Users className="h-3.5 w-3.5" />
+                CRM Contacts
+              </div>
+              <h1 className="mt-3 text-xl font-bold text-gray-900">Contacts</h1>
+              <p className="mt-1 text-sm text-gray-500">{focusMessage}</p>
+            </div>
+            <Link
+              href="/crm/analytics"
+              className="shrink-0 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600"
+            >
+              Analytics
+            </Link>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { label: 'Total', value: loading ? '—' : total },
+              { label: 'Qualified', value: loading ? '—' : visibleQualified },
+              { label: 'Reachable', value: loading ? '—' : visibleWithEmail },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-2xl bg-gray-50 px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                  {label}
+                </p>
+                <p className="mt-1 text-base font-bold text-gray-900">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_-24px_rgba(37,99,235,0.45)]"
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-700"
+          >
+            <Upload className="h-4 w-4 text-blue-500" />
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportCSV()}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-700"
+          >
+            <Download className="h-4 w-4 text-violet-500" />
+            Export
+          </button>
+        </div>
+      </div>
+
       {/* Export error */}
       {exportError && (
         <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -579,7 +666,7 @@ export default function ContactsPage(): JSX.Element {
             placeholder="Search contacts…"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`${FORM_CONTROL_CLASS} pl-9`}
           />
         </div>
 
@@ -587,11 +674,11 @@ export default function ContactsPage(): JSX.Element {
         {allTags.length > 0 && (
           <div className="relative w-full sm:w-auto">
             <Tag className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-            <select
+            <SelectField
               aria-label="Filter by tag"
               value={tagFilter}
               onChange={(e) => handleTagFilter(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
+              className="sm:w-auto"
             >
               <option value="">All tags</option>
               {allTags.map((tag) => (
@@ -599,24 +686,24 @@ export default function ContactsPage(): JSX.Element {
                   {tag}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
 
         {/* Sort — client-side on current page */}
         <div className="relative w-full sm:w-auto">
           <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-          <select
+          <SelectField
             aria-label="Sort contacts"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'stage' | 'score')}
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
+            className="sm:w-auto"
           >
             <option value="date">Newest first</option>
             <option value="name">Name A–Z</option>
             <option value="stage">By stage</option>
             <option value="score">By score</option>
-          </select>
+          </SelectField>
         </div>
       </div>
 
@@ -646,97 +733,120 @@ export default function ContactsPage(): JSX.Element {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <span className="text-sm font-semibold text-blue-700">{selectedIds.size} selected</span>
-
-          {/* Stage change */}
-          <select
-            value={bulkStage}
-            onChange={(e) => setBulkStage(e.target.value)}
-            className="w-full rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
-          >
-            <option value="">Change stage…</option>
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s.charAt(0) + s.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
-          {bulkStage && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50/80 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-blue-700">{selectedIds.size} selected</span>
             <button
               type="button"
-              onClick={() => void handleBulkStageChange()}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded-md p-1.5 text-blue-500 hover:bg-blue-100 sm:hidden"
+              aria-label="Clear selection"
             >
-              Apply
+              <X className="h-4 w-4" />
             </button>
-          )}
+          </div>
 
-          {/* Bulk edit */}
-          <select
-            value={bulkEditMode}
-            onChange={(e) => {
-              setBulkEditMode(e.target.value as 'company' | 'tagsAdd' | 'tagsRemove' | '')
-              setBulkEditValue('')
-            }}
-            className="w-full rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
-          >
-            <option value="">Bulk edit…</option>
-            <option value="company">Set company</option>
-            <option value="tagsAdd">Add tags</option>
-            <option value="tagsRemove">Remove tags</option>
-          </select>
-          {bulkEditMode && (
-            <>
-              <input
-                type="text"
-                value={bulkEditValue}
-                onChange={(e) => setBulkEditValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleBulkEdit()
-                }}
-                placeholder={bulkEditMode === 'company' ? 'Company name' : 'Tags (comma-separated)'}
-                className="w-full rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none sm:w-auto"
-              />
-              <button
-                type="button"
-                onClick={() => void handleBulkEdit()}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+            {/* Stage change */}
+            <div className="flex w-full flex-col sm:flex-row sm:items-center sm:gap-2">
+              <SelectField
+                value={bulkStage}
+                onChange={(e) => setBulkStage(e.target.value)}
+                className="sm:w-auto"
               >
-                Confirm
-              </button>
-            </>
-          )}
+                <option value="">Change stage…</option>
+                {STAGES.map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0) + s.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </SelectField>
+              {bulkStage && (
+                <button
+                  type="button"
+                  onClick={() => void handleBulkStageChange()}
+                  className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:mt-0 sm:w-auto"
+                >
+                  Apply
+                </button>
+              )}
+            </div>
 
-          <button
-            type="button"
-            onClick={() => void handleBulkDelete()}
-            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </button>
+            {/* Bulk edit */}
+            <div className="flex w-full flex-col sm:flex-row sm:items-center sm:gap-2">
+              <SelectField
+                value={bulkEditMode}
+                onChange={(e) => {
+                  setBulkEditMode(e.target.value as 'company' | 'tagsAdd' | 'tagsRemove' | '')
+                  setBulkEditValue('')
+                }}
+                className="sm:w-auto"
+              >
+                <option value="">Bulk edit…</option>
+                <option value="company">Set company</option>
+                <option value="tagsAdd">Add tags</option>
+                <option value="tagsRemove">Remove tags</option>
+              </SelectField>
+              {bulkEditMode && (
+                <div className="mt-2 flex w-full flex-col sm:mt-0 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
+                  <input
+                    type="text"
+                    value={bulkEditValue}
+                    onChange={(e) => setBulkEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleBulkEdit()
+                    }}
+                    placeholder={
+                      bulkEditMode === 'company' ? 'Company name' : 'Tags (comma-separated)'
+                    }
+                    className={`${FORM_CONTROL_CLASS} sm:w-auto`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkEdit()}
+                    className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:mt-0 sm:w-auto"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setSelectedIds(new Set())}
-            className="self-end rounded-md p-1.5 text-blue-500 hover:bg-blue-100 sm:ml-auto"
-            aria-label="Clear selection"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center justify-between sm:ml-auto sm:justify-start">
+            <button
+              type="button"
+              onClick={() => void handleBulkDelete()}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors sm:w-auto"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="hidden rounded-lg p-2 text-blue-500 hover:bg-blue-100 sm:block ml-2"
+              aria-label="Clear selection"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Error banner */}
-      {error && (
-        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Dismiss error">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {permissionDenied ? (
+        <StatusNotice tone="warning" message="You do not have permission to view contacts." />
+      ) : error ? (
+        <StatusNotice
+          message={error}
+          action={
+            <button type="button" onClick={() => setError(null)} aria-label="Dismiss error">
+              <X className="h-4 w-4" />
+            </button>
+          }
+        />
+      ) : null}
 
       {/* Table */}
       <div>
@@ -773,35 +883,37 @@ export default function ContactsPage(): JSX.Element {
               {displayedContacts.map((contact) => {
                 const stage = (contact.crmPipeline?.stage ?? 'NEW') as Stage
                 return (
-                  <div key={contact.id} className="app-panel rounded-[24px] p-4">
-                    <div className="flex items-start gap-3">
+                  <div key={contact.id} className="app-panel rounded-[24px] p-4 sm:p-5">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       <input
                         type="checkbox"
                         aria-label={`Select ${contact.name}`}
                         checked={selectedIds.has(contact.id)}
                         onChange={() => toggleSelect(contact.id)}
-                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="mt-1.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <button
                         type="button"
                         onClick={() => setDrawerContactId(contact.id)}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-3">
                           <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColour(contact.name)}`}
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${avatarColour(contact.name)}`}
                           >
                             {getInitials(contact.name)}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-semibold text-gray-900">{contact.name}</p>
+                            <p className="truncate text-base font-semibold text-gray-900">
+                              {contact.name}
+                            </p>
                             <p className="truncate text-sm text-gray-500">
                               {contact.email ?? contact.phone ?? 'No email or phone'}
                             </p>
                           </div>
                         </div>
 
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-3.5 flex flex-wrap gap-1.5">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${STAGE_BADGE[stage]}`}
                           >
@@ -814,30 +926,40 @@ export default function ContactsPage(): JSX.Element {
                             Score {contact.enrichmentScore ?? '—'}
                           </span>
                           {contact.sourceCard && (
-                            <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                            <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 border border-blue-100">
                               /{contact.sourceCard.handle}
                             </span>
                           )}
                         </div>
 
-                        <div className="mt-3 space-y-1 text-sm text-gray-500">
-                          <p>{contact.company ?? 'No company added'}</p>
-                          <p>Added {formatDate(contact.createdAt, userTz)}</p>
-                          {contact.tags && contact.tags.length > 0 && (
-                            <p className="truncate">
-                              {contact.tags.slice(0, 2).join(', ')}
-                              {contact.tags.length > 2 && ` +${contact.tags.length - 2}`}
+                        <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 bg-gray-50/50 rounded-xl p-3">
+                          <div className="space-y-1">
+                            <p className="flex items-center gap-1.5 text-gray-600">
+                              <span className="font-medium text-gray-900">Company:</span>{' '}
+                              {contact.company ?? 'None'}
                             </p>
-                          )}
+                            {contact.tags && contact.tags.length > 0 && (
+                              <p className="truncate">
+                                <span className="font-medium text-gray-900">Tags:</span>{' '}
+                                {contact.tags.slice(0, 2).join(', ')}
+                                {contact.tags.length > 2 && ` +${contact.tags.length - 2}`}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right text-[11px] text-gray-400">
+                            Added
+                            <br />
+                            {formatDate(contact.createdAt, userTz)}
+                          </div>
                         </div>
                       </button>
                       <button
                         type="button"
                         aria-label={`Delete ${contact.name}`}
                         onClick={() => void handleDelete(contact.id)}
-                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        className="mt-1 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-5 w-5" />
                       </button>
                     </div>
                   </div>
@@ -1211,6 +1333,9 @@ function AddContactModal({
   const [stage, setStage] = useState<Stage>('NEW')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<'name' | 'email' | 'phone' | 'website' | 'notes', string>>
+  >({})
 
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
@@ -1220,13 +1345,74 @@ function AddContactModal({
     return () => document.removeEventListener('keydown', handle)
   }, [onClose])
 
-  const inputCls =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+  const inputCls = FORM_CONTROL_CLASS.replace('text-gray-700', 'text-gray-900')
 
   const labelCls = 'block text-xs font-medium text-gray-600 mb-1'
 
+  const getInputClass = (field: keyof typeof fieldErrors) =>
+    `${inputCls} ${fieldErrors[field] ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`
+
+  const setFieldValue = (
+    field: keyof typeof fieldErrors,
+    setter: (value: string) => void,
+    value: string,
+  ) => {
+    setter(value)
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting) return
+
+    const trimmedName = name.trim()
+    const trimmedEmail = email.trim()
+    const trimmedPhone = phone.trim()
+    const trimmedCompany = company.trim()
+    const trimmedTitle = title.trim()
+    const trimmedWebsite = website.trim()
+    const trimmedAddress = address.trim()
+    const trimmedNotes = notes.trim()
+    const nextFieldErrors: Partial<
+      Record<'name' | 'email' | 'phone' | 'website' | 'notes', string>
+    > = {}
+
+    if (!trimmedName) {
+      nextFieldErrors.name = 'Full name is required.'
+    } else if (trimmedName.length < 2) {
+      nextFieldErrors.name = 'Full name must be at least 2 characters.'
+    } else if (trimmedName.length > 120) {
+      nextFieldErrors.name = 'Full name must be 120 characters or less.'
+    }
+
+    if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) {
+      nextFieldErrors.email = 'Enter a valid email address.'
+    }
+
+    if (trimmedPhone && !PHONE_REGEX.test(trimmedPhone)) {
+      nextFieldErrors.phone = 'Enter a valid phone number.'
+    }
+
+    if (trimmedWebsite && !isValidUrl(trimmedWebsite)) {
+      nextFieldErrors.website = 'Enter a valid website URL starting with http:// or https://.'
+    }
+
+    if (trimmedNotes.length > 1000) {
+      nextFieldErrors.notes = 'Notes must be 1000 characters or less.'
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setError('Fix the highlighted fields before submitting.')
+      return
+    }
+
+    setFieldErrors({})
     setSubmitting(true)
     setError(null)
     try {
@@ -1238,14 +1424,14 @@ function AddContactModal({
       await apiPost<ContactDetail>(
         '/contacts',
         {
-          name,
-          email: email || undefined,
-          phone: phone || undefined,
-          company: company || undefined,
-          title: title || undefined,
-          website: website || undefined,
-          address: address || undefined,
-          notes: notes || undefined,
+          name: trimmedName,
+          email: trimmedEmail || undefined,
+          phone: trimmedPhone || undefined,
+          company: trimmedCompany || undefined,
+          title: trimmedTitle || undefined,
+          website: trimmedWebsite || undefined,
+          address: trimmedAddress || undefined,
+          notes: trimmedNotes || undefined,
           tags: parsedTags.length > 0 ? parsedTags : undefined,
           sourceCardId: sourceCardId || undefined,
           stage,
@@ -1287,12 +1473,21 @@ function AddContactModal({
             <input
               id="ac-name"
               required
+              minLength={2}
+              maxLength={120}
               autoComplete="name"
               placeholder="Jane Doe"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputCls}
+              onChange={(e) => setFieldValue('name', setName, e.target.value)}
+              aria-invalid={fieldErrors.name ? 'true' : 'false'}
+              aria-describedby={fieldErrors.name ? 'ac-name-error' : undefined}
+              className={getInputClass('name')}
             />
+            {fieldErrors.name && (
+              <p id="ac-name-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="ac-email" className={labelCls}>
@@ -1305,9 +1500,17 @@ function AddContactModal({
               inputMode="email"
               placeholder="jane@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputCls}
+              maxLength={254}
+              onChange={(e) => setFieldValue('email', setEmail, e.target.value)}
+              aria-invalid={fieldErrors.email ? 'true' : 'false'}
+              aria-describedby={fieldErrors.email ? 'ac-email-error' : undefined}
+              className={getInputClass('email')}
             />
+            {fieldErrors.email && (
+              <p id="ac-email-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.email}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="ac-phone" className={labelCls}>
@@ -1320,9 +1523,17 @@ function AddContactModal({
               inputMode="tel"
               placeholder="+1 555 0100"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className={inputCls}
+              maxLength={20}
+              onChange={(e) => setFieldValue('phone', setPhone, e.target.value)}
+              aria-invalid={fieldErrors.phone ? 'true' : 'false'}
+              aria-describedby={fieldErrors.phone ? 'ac-phone-error' : undefined}
+              className={getInputClass('phone')}
             />
+            {fieldErrors.phone && (
+              <p id="ac-phone-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.phone}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="ac-company" className={labelCls}>
@@ -1331,6 +1542,7 @@ function AddContactModal({
             <input
               id="ac-company"
               autoComplete="organization"
+              maxLength={120}
               placeholder="Acme Inc."
               value={company}
               onChange={(e) => setCompany(e.target.value)}
@@ -1344,6 +1556,7 @@ function AddContactModal({
             <input
               id="ac-title"
               autoComplete="organization-title"
+              maxLength={120}
               placeholder="Founder"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -1360,9 +1573,17 @@ function AddContactModal({
               inputMode="url"
               placeholder="https://acme.com"
               value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              className={inputCls}
+              maxLength={2048}
+              onChange={(e) => setFieldValue('website', setWebsite, e.target.value)}
+              aria-invalid={fieldErrors.website ? 'true' : 'false'}
+              aria-describedby={fieldErrors.website ? 'ac-website-error' : undefined}
+              className={getInputClass('website')}
             />
+            {fieldErrors.website && (
+              <p id="ac-website-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.website}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="ac-address" className={labelCls}>
@@ -1371,6 +1592,7 @@ function AddContactModal({
             <input
               id="ac-address"
               autoComplete="street-address"
+              maxLength={200}
               placeholder="New York, NY"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -1381,28 +1603,28 @@ function AddContactModal({
             <label htmlFor="ac-stage" className={labelCls}>
               Stage
             </label>
-            <select
+            <SelectField
               id="ac-stage"
               value={stage}
               onChange={(e) => setStage(e.target.value as Stage)}
-              className={inputCls}
+              className=""
             >
               {STAGES.map((s) => (
                 <option key={s} value={s}>
                   {s.charAt(0) + s.slice(1).toLowerCase()}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
             <label htmlFor="ac-source" className={labelCls}>
               Source card
             </label>
-            <select
+            <SelectField
               id="ac-source"
               value={sourceCardId}
               onChange={(e) => setSourceCardId(e.target.value)}
-              className={inputCls}
+              className=""
             >
               <option value="">None</option>
               {cards.map((c) => (
@@ -1410,7 +1632,7 @@ function AddContactModal({
                   /{c.handle}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div className="sm:col-span-2">
             <label htmlFor="ac-tags" className={labelCls}>
@@ -1419,6 +1641,7 @@ function AddContactModal({
             <input
               id="ac-tags"
               placeholder="prospect, warm-lead"
+              maxLength={300}
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               className={inputCls}
@@ -1431,11 +1654,27 @@ function AddContactModal({
             <textarea
               id="ac-notes"
               rows={3}
+              maxLength={1000}
               placeholder="Anything worth remembering…"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className={inputCls}
+              onChange={(e) => setFieldValue('notes', setNotes, e.target.value)}
+              aria-invalid={fieldErrors.notes ? 'true' : 'false'}
+              aria-describedby={fieldErrors.notes ? 'ac-notes-error' : 'ac-notes-help'}
+              className={getInputClass('notes')}
             />
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs">
+              <span id="ac-notes-help" className="text-gray-400">
+                Optional notes for internal context.
+              </span>
+              <span className={notes.length > 1000 ? 'text-red-600' : 'text-gray-400'}>
+                {notes.length}/1000
+              </span>
+            </div>
+            {fieldErrors.notes && (
+              <p id="ac-notes-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.notes}
+              </p>
+            )}
           </div>
         </div>
 

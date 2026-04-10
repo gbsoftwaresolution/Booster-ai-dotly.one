@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { getPublicApiUrl } from '@/lib/public-env'
+import { SelectField } from '@/components/ui/SelectField'
 import {
   Calendar,
   Clock,
@@ -690,13 +691,13 @@ export default function BookingPage(): JSX.Element {
                         className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                       />
                     ) : q.type === 'SELECT' ? (
-                      <select
+                      <SelectField
                         required={q.required}
                         value={answers[q.id] ?? ''}
                         onChange={(e) =>
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                         }
-                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        className="rounded-xl px-4 py-3 pr-10 focus:border-sky-500 focus:ring-sky-100"
                       >
                         <option value="">Select an option…</option>
                         {q.options.map((opt) => (
@@ -704,7 +705,7 @@ export default function BookingPage(): JSX.Element {
                             {opt}
                           </option>
                         ))}
-                      </select>
+                      </SelectField>
                     ) : q.type === 'CHECKBOX' ? (
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input

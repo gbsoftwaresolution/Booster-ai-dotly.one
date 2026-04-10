@@ -17,6 +17,8 @@ import {
 } from '@dnd-kit/core'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch } from '@/lib/api'
+import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
 
 interface PipelineContact {
@@ -208,6 +210,7 @@ export default function CrmPage(): JSX.Element {
   const [truncated, setTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -275,7 +278,12 @@ export default function CrmPage(): JSX.Element {
         setTruncated(data.truncated)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load pipeline')
+      if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        setPermissionDenied(true)
+        setError('You do not have permission to view the CRM pipeline.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load pipeline')
+      }
     } finally {
       setLoading(false)
     }
@@ -389,10 +397,10 @@ export default function CrmPage(): JSX.Element {
         {namedPipelines.length > 0 && (
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600 font-medium">Pipeline:</label>
-            <select
+            <SelectField
               value={selectedPipelineId}
               onChange={(e) => setSelectedPipelineId(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="min-w-[190px] rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100"
             >
               <option value="">Default stages</option>
               {namedPipelines.map((p) => (
@@ -401,24 +409,31 @@ export default function CrmPage(): JSX.Element {
                   {p.isDefault ? ' (default)' : ''}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => void loadPipeline()}
-            className="font-semibold underline"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {permissionDenied ? (
+        <StatusNotice
+          tone="warning"
+          message="You do not have permission to view the CRM pipeline."
+        />
+      ) : error ? (
+        <StatusNotice
+          message={error}
+          action={
+            <button
+              type="button"
+              onClick={() => void loadPipeline()}
+              className="font-semibold underline"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : null}
 
       {/* Truncation warning */}
       {truncated && !loading && (

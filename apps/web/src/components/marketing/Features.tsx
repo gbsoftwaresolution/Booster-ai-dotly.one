@@ -37,7 +37,7 @@ const FEATURES = [
     ),
     title: 'Real-time analytics',
     description:
-      'See every tap, scan, link click, and contact save. Know who engaged, when, and from where — up to unlimited history on higher plans.',
+      'See every tap, scan, link click, and contact save. Know who engaged, when, and from where with the analytics surfaces available in the app today.',
   },
   {
     icon: (
@@ -97,7 +97,7 @@ const FEATURES = [
     ),
     title: 'Web3 USDT payments',
     description:
-      'Accept payments in USDT via MetaMask or WalletConnect. Settled on Arbitrum through the BoosterAI PaymentVault — no credit cards, no middlemen.',
+      'Wallet-based USDT payments are still being rolled out and are not part of the published self-serve plan surface today.',
   },
   {
     icon: (
@@ -117,7 +117,7 @@ const FEATURES = [
     ),
     title: 'Team & multi-workspace',
     description:
-      'Manage cards across your whole team or multiple client accounts from one dashboard. White-label and SSO available for Agency and Enterprise.',
+      'Team management is being rolled out in stages. Advanced multi-workspace, white-label, and SSO controls are not published yet.',
   },
 ]
 

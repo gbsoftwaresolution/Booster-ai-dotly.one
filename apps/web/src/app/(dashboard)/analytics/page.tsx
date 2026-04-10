@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
+import { SelectField } from '@/components/ui/SelectField'
 import {
   LineChart,
   Line,
@@ -329,18 +330,18 @@ export default function AnalyticsPage(): JSX.Element {
 
             <div className="mt-4 space-y-3">
               {cards.length > 0 && (
-                <select
+                <SelectField
                   value={selectedCardId ?? ''}
                   onChange={(e) => setSelectedCardId(e.target.value)}
                   aria-label="Select card"
-                  className="w-full rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="focus:border-indigo-500 focus:ring-indigo-100"
                 >
                   {cards.map((card) => (
                     <option key={card.id} value={card.id}>
                       /{card.handle} {card.fields['name'] ? `— ${card.fields['name']}` : ''}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               )}
 
               <div className="flex rounded-2xl border border-gray-300 bg-white">

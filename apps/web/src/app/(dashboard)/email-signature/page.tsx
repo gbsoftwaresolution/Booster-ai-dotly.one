@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import DOMPurify from 'dompurify'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
+import { SelectField } from '@/components/ui/SelectField'
 import { Copy, Check, Mail } from 'lucide-react'
 import {
   generateSignatureHtml,
@@ -200,11 +201,11 @@ export default function EmailSignaturePage(): JSX.Element {
             {/* Card selector */}
             <div className="app-panel rounded-[24px] p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Card</h2>
-              <select
+              <SelectField
                 aria-label="Select a card for this signature"
                 value={selectedCardId ?? ''}
                 onChange={(e) => setSelectedCardId(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100"
               >
                 {cards.map((card) => (
                   <option key={card.id} value={card.id}>
@@ -212,7 +213,7 @@ export default function EmailSignaturePage(): JSX.Element {
                     {card.fields['name'] ? ` — ${card.fields['name']}` : ''}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
 
             {/* Style selector */}

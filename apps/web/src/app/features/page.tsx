@@ -7,7 +7,7 @@ import { Footer } from '@/components/marketing/Footer'
 export const metadata: Metadata = {
   title: 'Features',
   description:
-    'Explore every feature of Dotly.one: NFC & QR sharing, real-time analytics, CRM, Web3 USDT payments, portfolio blocks, and team management.',
+    'Explore Dotly.one features available today: NFC & QR sharing, analytics, CRM, portfolio blocks, scheduling, and the currently published plan surface.',
 }
 
 // ─── Feature detail sections ──────────────────────────────────────────────────
@@ -79,7 +79,7 @@ const SECTIONS = [
       'Every contact who taps your card and saves their details lands automatically in your CRM. No manual data entry. Add private notes, set follow-up reminders, tag contacts by event or category, and export your full contact list to CSV at any time.',
     bullets: [
       'Auto-populated lead cards from the contact capture form',
-      'Tags, notes, and follow-up date per contact',
+      'Tags, notes, and follow-up workflows inside the CRM',
       'CSV export (Pro and above)',
       'Integrations via Zapier and webhooks (coming soon)',
     ],
@@ -105,12 +105,12 @@ const SECTIONS = [
     tag: 'Web3 payments',
     title: 'Accept USDT — no bank required',
     description:
-      'Connect MetaMask or WalletConnect and accept USDT payments directly from your card. Powered by the BoosterAI PaymentVault smart contract on Arbitrum. Transactions are on-chain, instant, and irreversible. No credit card processing fees, no chargebacks, no geographic restrictions.',
+      'Wallet-connected USDT checkout is still being rolled out. Published plans today focus on cards, analytics, CRM, inbox, and scheduling rather than production payment acceptance.',
     bullets: [
-      'USDT on Arbitrum and Polygon networks',
-      'MetaMask, WalletConnect, and any EVM wallet supported',
-      'BoosterAI PaymentVault — audited, open-source contract',
-      'Sub-2-second settlement; gas covered by protocol',
+      'Payment infrastructure is under active development',
+      'Published plan pages reflect the product surface available today',
+      'Do not rely on the marketing site as a promise of current payment availability',
+      'Contact the team before using Dotly for production payment collection',
     ],
     icon: (
       <svg
@@ -143,8 +143,8 @@ export default function FeaturesPage() {
           Everything in one card
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-gray-500">
-          NFC sharing, analytics, CRM, portfolio blocks, and on-chain payments — built for
-          professionals who take networking seriously.
+          NFC sharing, analytics, CRM, portfolio blocks, and scheduling — built for professionals
+          who take networking seriously.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link

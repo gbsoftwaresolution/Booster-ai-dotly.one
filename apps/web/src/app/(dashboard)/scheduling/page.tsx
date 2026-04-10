@@ -2,6 +2,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getPublicApiUrl } from '@/lib/public-env'
 import {
   Calendar,
@@ -17,6 +18,7 @@ import {
   Link2,
   Settings2,
 } from 'lucide-react'
+import { SelectField } from '@/components/ui/SelectField'
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { useUserTimezone } from '@/hooks/useUserLocale'
@@ -58,6 +60,9 @@ interface AppointmentType {
   questions: BookingQuestion[]
   _count: { bookings: number }
 }
+
+const SCHEDULING_CONTROL_CLASS =
+  'w-full rounded-[18px] border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] outline-none transition placeholder:text-gray-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100'
 
 interface Booking {
   id: string
@@ -345,7 +350,7 @@ interface AptTypeFormProps {
     location: string
     isActive: boolean
     timezone: string
-  }) => void
+  }) => Promise<void>
   onClose: () => void
 }
 
@@ -363,6 +368,34 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
     initial?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
   )
   const [slugTouched, setSlugTouched] = useState(!!initial?.slug)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<
+      Record<
+        | 'name'
+        | 'slug'
+        | 'description'
+        | 'durationMins'
+        | 'bufferDays'
+        | 'bufferAfterMins'
+        | 'location',
+        string
+      >
+    >
+  >({})
+
+  const inputClass = (field?: keyof typeof fieldErrors) =>
+    `${SCHEDULING_CONTROL_CLASS} ${field && fieldErrors[field] ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`
+
+  const clearFieldError = (field: keyof typeof fieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
 
   function handleNameChange(val: string) {
     setName(val)
@@ -376,20 +409,103 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    onSave({
-      name,
-      slug,
-      description,
-      durationMins,
-      color,
-      bufferDays,
-      bufferAfterMins,
-      location,
-      isActive,
-      timezone,
-    })
+    if (saving) return
+
+    const trimmedName = name.trim()
+    const normalizedSlug = slug
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+    const trimmedDescription = description.trim()
+    const trimmedLocation = location.trim()
+    const nextFieldErrors: Partial<
+      Record<
+        | 'name'
+        | 'slug'
+        | 'description'
+        | 'durationMins'
+        | 'bufferDays'
+        | 'bufferAfterMins'
+        | 'location',
+        string
+      >
+    > = {}
+
+    if (!trimmedName) {
+      nextFieldErrors.name = 'Name is required.'
+    } else if (trimmedName.length < 2) {
+      nextFieldErrors.name = 'Name must be at least 2 characters.'
+    } else if (trimmedName.length > 80) {
+      nextFieldErrors.name = 'Name must be 80 characters or less.'
+    }
+
+    if (!normalizedSlug) {
+      nextFieldErrors.slug = 'Slug is required.'
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+      nextFieldErrors.slug = 'Use lowercase letters, numbers, and hyphens only.'
+    } else if (normalizedSlug.length > 80) {
+      nextFieldErrors.slug = 'Slug must be 80 characters or less.'
+    }
+
+    if (trimmedDescription.length > 300) {
+      nextFieldErrors.description = 'Description must be 300 characters or less.'
+    }
+
+    if (!Number.isFinite(durationMins) || durationMins < 5 || durationMins > 480) {
+      nextFieldErrors.durationMins = 'Duration must be between 5 and 480 minutes.'
+    }
+
+    if (!Number.isFinite(bufferDays) || bufferDays < 0 || bufferDays > 365) {
+      nextFieldErrors.bufferDays = 'Booking window must be between 0 and 365 days.'
+    }
+
+    if (!Number.isFinite(bufferAfterMins) || bufferAfterMins < 0 || bufferAfterMins > 240) {
+      nextFieldErrors.bufferAfterMins = 'Buffer after must be between 0 and 240 minutes.'
+    }
+
+    if (trimmedLocation.length > 200) {
+      nextFieldErrors.location = 'Location must be 200 characters or less.'
+    }
+
+    if (!timezone || !ALL_TIMEZONES.includes(timezone)) {
+      setError('Select a valid timezone.')
+      return
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setError('Fix the highlighted fields before saving.')
+      setSlug(normalizedSlug)
+      return
+    }
+
+    setFieldErrors({})
+    setError(null)
+    setSlug(normalizedSlug)
+    setSaving(true)
+    try {
+      await onSave({
+        name: trimmedName,
+        slug: normalizedSlug,
+        description: trimmedDescription,
+        durationMins,
+        color,
+        bufferDays,
+        bufferAfterMins,
+        location: trimmedLocation,
+        isActive,
+        timezone,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save appointment type.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -405,37 +521,89 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="overflow-y-auto flex-1 space-y-4 p-5">
+            {error && (
+              <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
               <input
                 required
+                minLength={2}
+                maxLength={80}
                 value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                onChange={(e) => {
+                  clearFieldError('name')
+                  handleNameChange(e.target.value)
+                }}
+                aria-invalid={fieldErrors.name ? 'true' : 'false'}
+                aria-describedby={fieldErrors.name ? 'apt-name-error' : undefined}
+                className={inputClass('name')}
                 placeholder="30-min Call"
               />
+              {fieldErrors.name && (
+                <p id="apt-name-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Slug (URL)</label>
               <input
                 required
+                pattern="[a-z0-9-]+"
+                maxLength={80}
                 value={slug}
                 onChange={(e) => {
-                  setSlug(e.target.value)
+                  clearFieldError('slug')
+                  setSlug(
+                    e.target.value
+                      .toLowerCase()
+                      .replace(/\s+/g, '-')
+                      .replace(/[^a-z0-9-]/g, ''),
+                  )
                   setSlugTouched(true)
                 }}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm focus:border-sky-500 focus:outline-none"
+                aria-invalid={fieldErrors.slug ? 'true' : 'false'}
+                aria-describedby={fieldErrors.slug ? 'apt-slug-error' : 'apt-slug-help'}
+                className={`${inputClass('slug')} font-mono`}
                 placeholder="30-min-call"
               />
+              <p id="apt-slug-help" className="mt-1 text-xs text-gray-400">
+                Lowercase letters, numbers, and hyphens only.
+              </p>
+              {fieldErrors.slug && (
+                <p id="apt-slug-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.slug}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
               <textarea
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                maxLength={300}
+                onChange={(e) => {
+                  clearFieldError('description')
+                  setDescription(e.target.value)
+                }}
                 rows={2}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                aria-invalid={fieldErrors.description ? 'true' : 'false'}
+                aria-describedby={
+                  fieldErrors.description ? 'apt-description-error' : 'apt-description-help'
+                }
+                className={inputClass('description')}
               />
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-gray-400">
+                <span id="apt-description-help">Optional summary shown on your booking page.</span>
+                <span>{description.length}/300</span>
+              </div>
+              {fieldErrors.description && (
+                <p id="apt-description-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.description}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -448,9 +616,19 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
                   min={5}
                   max={480}
                   value={durationMins}
-                  onChange={(e) => setDurationMins(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                  onChange={(e) => {
+                    clearFieldError('durationMins')
+                    setDurationMins(Number(e.target.value))
+                  }}
+                  aria-invalid={fieldErrors.durationMins ? 'true' : 'false'}
+                  aria-describedby={fieldErrors.durationMins ? 'apt-duration-error' : undefined}
+                  className={inputClass('durationMins')}
                 />
+                {fieldErrors.durationMins && (
+                  <p id="apt-duration-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.durationMins}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
@@ -468,24 +646,35 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
               </label>
               <input
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                maxLength={200}
+                onChange={(e) => {
+                  clearFieldError('location')
+                  setLocation(e.target.value)
+                }}
+                aria-invalid={fieldErrors.location ? 'true' : 'false'}
+                aria-describedby={fieldErrors.location ? 'apt-location-error' : undefined}
+                className={inputClass('location')}
                 placeholder="https://meet.google.com/xxx or Office address"
               />
+              {fieldErrors.location && (
+                <p id="apt-location-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.location}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
-              <select
+              <SelectField
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                className="focus:border-sky-500 focus:ring-sky-100"
               >
                 {ALL_TIMEZONES.map((tz) => (
                   <option key={tz} value={tz}>
                     {tz}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               <p className="mt-1 text-xs text-gray-400">
                 Availability windows are interpreted in this timezone.
               </p>
@@ -500,12 +689,22 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
                   min={0}
                   max={365}
                   value={bufferDays}
-                  onChange={(e) => setBufferDays(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                  onChange={(e) => {
+                    clearFieldError('bufferDays')
+                    setBufferDays(Number(e.target.value))
+                  }}
+                  aria-invalid={fieldErrors.bufferDays ? 'true' : 'false'}
+                  aria-describedby={fieldErrors.bufferDays ? 'apt-buffer-days-error' : undefined}
+                  className={inputClass('bufferDays')}
                 />
                 <p className="mt-1 text-xs text-gray-400">
                   How far ahead guests can book. 0 = unlimited.
                 </p>
+                {fieldErrors.bufferDays && (
+                  <p id="apt-buffer-days-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.bufferDays}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -516,9 +715,21 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
                   min={0}
                   max={240}
                   value={bufferAfterMins}
-                  onChange={(e) => setBufferAfterMins(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                  onChange={(e) => {
+                    clearFieldError('bufferAfterMins')
+                    setBufferAfterMins(Number(e.target.value))
+                  }}
+                  aria-invalid={fieldErrors.bufferAfterMins ? 'true' : 'false'}
+                  aria-describedby={
+                    fieldErrors.bufferAfterMins ? 'apt-buffer-after-error' : undefined
+                  }
+                  className={inputClass('bufferAfterMins')}
                 />
+                {fieldErrors.bufferAfterMins && (
+                  <p id="apt-buffer-after-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.bufferAfterMins}
+                  </p>
+                )}
               </div>
             </div>
             <label className="flex cursor-pointer items-center gap-2">
@@ -535,15 +746,17 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
             <button
               type="button"
               onClick={onClose}
+              disabled={saving}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+              disabled={saving}
+              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </form>
@@ -691,7 +904,7 @@ function QuestionsBuilder({
                 </button>
               </div>
               <div className="flex items-center gap-3 pl-7">
-                <select
+                <SelectField
                   value={q.type}
                   onChange={(e) =>
                     updateQuestion(idx, {
@@ -699,14 +912,14 @@ function QuestionsBuilder({
                       options: [],
                     })
                   }
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none"
+                  className="min-w-[190px] rounded-xl px-3 py-2.5 pr-10 focus:border-sky-500 focus:ring-sky-100"
                 >
                   {(Object.keys(QUESTION_TYPE_LABELS) as BookingQuestionType[]).map((t) => (
                     <option key={t} value={t}>
                       {QUESTION_TYPE_LABELS[t]}
                     </option>
                   ))}
-                </select>
+                </SelectField>
                 <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
                   <input
                     type="checkbox"
@@ -778,6 +991,8 @@ function QuestionsBuilder({
 
 export default function SchedulingPage(): JSX.Element {
   const userTz = useUserTimezone()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [aptTypes, setAptTypes] = useState<AppointmentType[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -841,6 +1056,23 @@ export default function SchedulingPage(): JSX.Element {
   }, [showAllBookings])
 
   useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab === 'types' || requestedTab === 'bookings') {
+      setTab(requestedTab)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', tab)
+    const nextUrl = `${window.location.pathname}?${params.toString()}`
+    const currentUrl = `${window.location.pathname}${window.location.search}`
+    if (nextUrl !== currentUrl) {
+      router.replace(nextUrl, { scroll: false })
+    }
+  }, [router, searchParams, tab])
+
+  useEffect(() => {
     void load()
   }, [load])
 
@@ -885,7 +1117,9 @@ export default function SchedulingPage(): JSX.Element {
       setEditingApt(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Error', false)
+      const message = e instanceof Error ? e.message : 'Error'
+      showToast(message, false)
+      throw e instanceof Error ? e : new Error(message)
     }
   }
 
@@ -993,7 +1227,7 @@ export default function SchedulingPage(): JSX.Element {
       {showAptForm && (
         <AptTypeForm
           initial={editingApt ?? undefined}
-          onSave={(d) => void handleCreateOrUpdate(d)}
+          onSave={handleCreateOrUpdate}
           onClose={() => {
             setShowAptForm(false)
             setEditingApt(null)
@@ -1084,17 +1318,17 @@ export default function SchedulingPage(): JSX.Element {
         {allCards.length > 1 && (
           <div className="app-panel flex flex-col gap-3 rounded-[24px] px-4 py-3 sm:flex-row sm:items-center">
             <span className="text-sm font-medium text-gray-600">Booking links use card:</span>
-            <select
+            <SelectField
               value={cardHandle ?? ''}
               onChange={(e) => setCardHandle(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="rounded-xl px-3 py-2.5 pr-10 focus:border-sky-500 focus:ring-sky-100"
             >
               {allCards.map((c) => (
                 <option key={c.id} value={c.handle}>
                   /{c.handle}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
 

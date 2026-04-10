@@ -8,8 +8,8 @@ import { cn } from '@/lib/cn'
 interface PublishBarProps {
   handle: string
   isActive: boolean
-  onPublish: () => Promise<void>
-  onUnpublish: () => Promise<void>
+  onPublish: () => Promise<boolean>
+  onUnpublish: () => Promise<boolean>
 }
 
 export function PublishBar({
@@ -30,8 +30,8 @@ export function PublishBar({
       if (isActive) {
         await onUnpublish()
       } else {
-        await onPublish()
-        setShowModal(true)
+        const published = await onPublish()
+        if (published) setShowModal(true)
       }
     } finally {
       setLoading(false)

@@ -22,6 +22,7 @@ import {
   Pencil,
   Check,
 } from 'lucide-react'
+import { SelectField } from '@/components/ui/SelectField'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut, apiPatch, apiPost, apiDelete } from '@/lib/api'
 import { ComposeEmailModal } from './ComposeEmailModal'
@@ -1138,18 +1139,18 @@ export function ContactDetailDrawer({
                           </div>
 
                           <div className="mt-3 flex items-center gap-2">
-                            <select
+                            <SelectField
                               value={deal.stage}
                               onChange={(e) => void updateDealStage(deal.id, e.target.value)}
                               disabled={updatingDealId === deal.id}
-                              className="app-touch-target rounded-xl border border-gray-200 px-3 py-2 text-xs text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                              className="app-touch-target rounded-xl px-3 py-2.5 pr-9 text-xs focus:border-indigo-400 focus:ring-indigo-100"
                             >
                               {DEAL_STAGES.map((stage) => (
                                 <option key={stage} value={stage}>
                                   {stage}
                                 </option>
                               ))}
-                            </select>
+                            </SelectField>
                             {deal.probability != null && (
                               <span className="text-xs text-gray-400">
                                 {deal.probability}% probability
@@ -1185,32 +1186,32 @@ export function ContactDetailDrawer({
                           placeholder="Value"
                           className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                         />
-                        <select
+                        <SelectField
                           value={dealForm.currency}
                           onChange={(e) =>
                             setDealForm((prev) => ({ ...prev, currency: e.target.value }))
                           }
-                          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          className="rounded-xl px-3 py-2.5 pr-9 focus:border-indigo-400 focus:ring-indigo-100"
                         >
                           {['USD', 'EUR', 'GBP'].map((currency) => (
                             <option key={currency} value={currency}>
                               {currency}
                             </option>
                           ))}
-                        </select>
-                        <select
+                        </SelectField>
+                        <SelectField
                           value={dealForm.stage}
                           onChange={(e) =>
                             setDealForm((prev) => ({ ...prev, stage: e.target.value }))
                           }
-                          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          className="rounded-xl px-3 py-2.5 pr-9 focus:border-indigo-400 focus:ring-indigo-100"
                         >
                           {DEAL_STAGES.map((stage) => (
                             <option key={stage} value={stage}>
                               {stage}
                             </option>
                           ))}
-                        </select>
+                        </SelectField>
                         <input
                           type="date"
                           value={dealForm.closeDate}
@@ -1628,7 +1629,7 @@ function EditableCustomField({
           {field.label}
         </p>
         {field.fieldType === 'SELECT' ? (
-          <select
+          <SelectField
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -1636,7 +1637,7 @@ function EditableCustomField({
               setEditing(false)
               onSave(draft)
             }}
-            className="w-full rounded border border-indigo-300 px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="rounded-xl border-indigo-300 px-3 py-2.5 pr-9 text-sm focus:border-indigo-500 focus:ring-indigo-100"
           >
             <option value="">Select an option</option>
             {(field.options ?? []).map((option) => (
@@ -1644,7 +1645,7 @@ function EditableCustomField({
                 {option}
               </option>
             ))}
-          </select>
+          </SelectField>
         ) : (
           <input
             autoFocus

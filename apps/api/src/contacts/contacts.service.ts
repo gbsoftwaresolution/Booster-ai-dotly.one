@@ -134,22 +134,6 @@ export class ContactsService {
       )
     }
 
-    // HIGH-05: Explicit deduplication before creating the contact.
-    // If the same email is submitted for the same card, skip the entire
-    // notification + enrichment pipeline and return silently so the card
-    // owner is not flooded with emails/push notifications from repeat submits
-    // (e.g. a browser refresh on the thank-you page).
-    if (dto.email) {
-      const duplicate = await this.prisma.contact.findFirst({
-        where: { ownerUserId: card.userId, email: dto.email },
-        select: { id: true },
-      })
-      if (duplicate) {
-        // Return success-shaped response so the submitter's UX is unaffected.
-        return { success: true, contactId: duplicate.id }
-      }
-    }
-
     // C1: Resolve the contact name. Priority:
     //   1. dto.name (set by standard 3-field form)
     //   2. Fuzzy match from dto.fields — custom forms may label it "Full Name",
@@ -206,23 +190,33 @@ export class ContactsService {
     let contact: Awaited<ReturnType<typeof this.prisma.contact.create>>
     try {
       contact = await this.prisma.$transaction(async (tx) => {
-        const c = await tx.contact.create({
-          data: {
-            ownerUserId: card.userId,
-            name: resolvedName,
-            email: resolvedEmail,
-            phone: resolvedPhone,
-            sourceCardId: dto.cardId,
-          },
-        })
+        const existingContact = resolvedEmail
+          ? await tx.contact.findFirst({
+              where: { ownerUserId: card.userId, email: resolvedEmail },
+            })
+          : null
 
-        await tx.crmPipeline.create({
-          data: {
-            contactId: c.id,
-            stage: 'NEW',
-            ownerUserId: card.userId,
-          },
-        })
+        const c =
+          existingContact ??
+          (await tx.contact.create({
+            data: {
+              ownerUserId: card.userId,
+              name: resolvedName,
+              email: resolvedEmail,
+              phone: resolvedPhone,
+              sourceCardId: dto.cardId,
+            },
+          }))
+
+        if (!existingContact) {
+          await tx.crmPipeline.create({
+            data: {
+              contactId: c.id,
+              stage: 'NEW',
+              ownerUserId: card.userId,
+            },
+          })
+        }
 
         await tx.contactTimeline.create({
           data: {
@@ -427,9 +421,9 @@ export class ContactsService {
     // Use a raw query to unnest the PostgreSQL tags array and return distinct values.
     const rows = await this.prisma.$queryRaw<{ tag: string }[]>`
       SELECT DISTINCT unnest(tags) AS tag
-      FROM "Contact"
+      FROM "contacts"
       WHERE "ownerUserId" = ${userId}
-        AND array_length(tags, 1) > 0
+        AND COALESCE(array_length(tags, 1), 0) > 0
       ORDER BY tag ASC
     `
     return rows.map((r) => r.tag)

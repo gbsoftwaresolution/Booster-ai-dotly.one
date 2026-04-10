@@ -64,7 +64,7 @@ function AcceptInviteContent(): JSX.Element {
   }
 
   if (status === 'unauthenticated') {
-    const returnUrl = encodeURIComponent(`/team/accept?token=${token ?? ''}`)
+    const next = encodeURIComponent(`/team/accept?token=${token ?? ''}`)
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="app-panel w-full max-w-md rounded-[28px] p-8 text-center">
@@ -77,13 +77,13 @@ function AcceptInviteContent(): JSX.Element {
           </p>
           <div className="mt-6 flex flex-col gap-3">
             <Link
-              href={`/auth?returnUrl=${returnUrl}`}
+              href={`/auth?next=${next}`}
               className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 text-center"
             >
               Sign In
             </Link>
             <Link
-              href={`/auth?mode=signup&returnUrl=${returnUrl}`}
+              href={`/auth?mode=signup&next=${next}`}
               className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 text-center"
             >
               Create Account

@@ -15,7 +15,13 @@ import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'
 import { useLayoutEffect } from 'react'
 import * as ImagePicker from 'expo-image-picker'
 import { Feather } from '@expo/vector-icons'
-import { api, updateCard, uploadAvatar } from '../../../lib/api'
+import {
+  api,
+  replaceCardSocialLinks,
+  updateCard,
+  updateCardTheme,
+  uploadAvatar,
+} from '../../../lib/api'
 
 type Template = 'MINIMAL' | 'BOLD' | 'CREATIVE' | 'CORPORATE'
 
@@ -72,7 +78,9 @@ export default function EditCardScreen() {
   const router = useRouter()
   const navigation = useNavigation()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('profile')
 
   // Profile fields
@@ -93,10 +101,13 @@ export default function EditCardScreen() {
 
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isInitialLoad = useRef(true)
+  const [reloadToken, setReloadToken] = useState(0)
 
   // Load card data
   useEffect(() => {
     if (!id) return
+    setLoadError(null)
+    setLoading(true)
     void api
       .getCard(id)
       .then((data) => {
@@ -116,27 +127,52 @@ export default function EditCardScreen() {
           isInitialLoad.current = false
         }, 100)
       })
-      .catch(() => setLoading(false))
-  }, [id])
+      .catch(() => {
+        setLoadError('Could not load this card. Please try again.')
+        setLoading(false)
+      })
+  }, [id, reloadToken])
+
+  const saveChanges = useCallback(async () => {
+    if (isInitialLoad.current || !id) return true
+
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await Promise.all([
+        updateCard(id, {
+          templateId: template,
+          fields: { name, title: tagline, bio, phone, email, website },
+        }),
+        updateCardTheme(id, { primaryColor }),
+        replaceCardSocialLinks(
+          id,
+          socialLinks
+            .filter((link) => link.url.trim().length > 0)
+            .map((link, index) => ({
+              platform: link.platform.trim().toUpperCase(),
+              url: link.url.trim(),
+              displayOrder: index,
+            })),
+        ),
+      ])
+      return true
+    } catch {
+      setSaveError('Could not save your latest changes.')
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }, [id, template, name, tagline, bio, phone, email, website, primaryColor, socialLinks])
 
   // Auto-save debounced
   const triggerAutoSave = useCallback(() => {
     if (isInitialLoad.current || !id) return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
-    autoSaveRef.current = setTimeout(async () => {
-      setSaving(true)
-      try {
-        await updateCard(id, {
-          templateId: template,
-          fields: { name, title: tagline, bio, phone, email, website },
-        })
-      } catch {
-        // Silent auto-save failure
-      } finally {
-        setSaving(false)
-      }
+    autoSaveRef.current = setTimeout(() => {
+      void saveChanges()
     }, 1500)
-  }, [id, name, tagline, bio, phone, email, website, template])
+  }, [id, saveChanges])
 
   useEffect(() => {
     triggerAutoSave()
@@ -146,17 +182,32 @@ export default function EditCardScreen() {
   }, [triggerAutoSave])
 
   // Header "Done" button
+  const handleDone = useCallback(async () => {
+    if (autoSaveRef.current) {
+      clearTimeout(autoSaveRef.current)
+      autoSaveRef.current = null
+    }
+
+    const ok = await saveChanges()
+    if (!ok) {
+      Alert.alert('Save failed', 'Please retry before leaving this screen.')
+      return
+    }
+
+    router.back()
+  }, [router, saveChanges])
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
       headerTitle: 'Edit Card',
       headerRight: () => (
-        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
+        <TouchableOpacity onPress={() => void handleDone()} style={{ marginRight: 12 }}>
           <Text style={{ color: '#0ea5e9', fontSize: 16, fontWeight: '600' }}>Done</Text>
         </TouchableOpacity>
       ),
     })
-  }, [navigation, router])
+  }, [handleDone, navigation])
 
   async function pickAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -210,6 +261,35 @@ export default function EditCardScreen() {
     )
   }
 
+  if (loadError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}
+        >
+          <Text style={{ color: '#dc2626', fontSize: 15, textAlign: 'center' }}>{loadError}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setLoadError(null)
+              setLoading(true)
+              isInitialLoad.current = true
+              setReloadToken((value) => value + 1)
+            }}
+            style={{
+              marginTop: 16,
+              backgroundColor: '#0ea5e9',
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
   const inputStyle = {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -238,6 +318,11 @@ export default function EditCardScreen() {
         {saving && (
           <View style={{ backgroundColor: '#f0fdf4', paddingVertical: 4, alignItems: 'center' }}>
             <Text style={{ color: '#16a34a', fontSize: 12 }}>Saving…</Text>
+          </View>
+        )}
+        {saveError && (
+          <View style={{ backgroundColor: '#fef2f2', paddingVertical: 8, paddingHorizontal: 16 }}>
+            <Text style={{ color: '#dc2626', fontSize: 12, textAlign: 'center' }}>{saveError}</Text>
           </View>
         )}
 

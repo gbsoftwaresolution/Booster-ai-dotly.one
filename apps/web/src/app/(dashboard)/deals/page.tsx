@@ -13,6 +13,7 @@ import {
   CircleDollarSign,
 } from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
+import { SelectField } from '@/components/ui/SelectField'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/tz'
@@ -57,6 +58,9 @@ const STAGE_HEADER_COLORS: Record<DealStage, string> = {
   CLOSED_WON: 'bg-green-50 border-green-200',
   CLOSED_LOST: 'bg-gray-100 border-gray-200',
 }
+
+const DEAL_INPUT_CLASS =
+  'w-full rounded-[18px] border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.22)] outline-none transition placeholder:text-gray-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
 
 const STAGE_BADGES: Record<DealStage, string> = {
   PROSPECT: 'bg-blue-100 text-blue-700',
@@ -244,39 +248,39 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className={DEAL_INPUT_CLASS}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <select
+              <SelectField
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="focus:border-indigo-500 focus:ring-indigo-100"
               >
                 {['USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD', 'JPY'].map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
 
           {/* Stage */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
-            <select
+            <SelectField
               value={stage}
               onChange={(e) => setStage(e.target.value as DealStage)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="focus:border-indigo-500 focus:ring-indigo-100"
             >
               {DEAL_STAGES.map((s) => (
                 <option key={s} value={s}>
                   {STAGE_LABELS[s]}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {/* Probability + Close date */}
@@ -292,7 +296,7 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
                 value={probability}
                 onChange={(e) => setProbability(e.target.value)}
                 placeholder="50"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className={DEAL_INPUT_CLASS}
               />
             </div>
             <div>
@@ -301,7 +305,7 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
                 type="date"
                 value={closeDate}
                 onChange={(e) => setCloseDate(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className={DEAL_INPUT_CLASS}
               />
             </div>
           </div>
@@ -427,38 +431,38 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className={DEAL_INPUT_CLASS}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <select
+              <SelectField
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="focus:border-indigo-500 focus:ring-indigo-100"
               >
                 {['USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD', 'JPY'].map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
-            <select
+            <SelectField
               value={stage}
               onChange={(e) => setStage(e.target.value as DealStage)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="focus:border-indigo-500 focus:ring-indigo-100"
             >
               {DEAL_STAGES.map((s) => (
                 <option key={s} value={s}>
                   {STAGE_LABELS[s]}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -473,7 +477,7 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
                 value={probability}
                 onChange={(e) => setProbability(e.target.value)}
                 placeholder="50"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className={DEAL_INPUT_CLASS}
               />
             </div>
             <div>
@@ -482,7 +486,7 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
                 type="date"
                 value={closeDate}
                 onChange={(e) => setCloseDate(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className={DEAL_INPUT_CLASS}
               />
               {closeDate && (
                 <button
@@ -857,10 +861,10 @@ export default function DealsPage(): JSX.Element {
             className="w-64 rounded-xl border border-gray-300 py-2 pl-3 pr-4 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
-        <select
+        <SelectField
           value={stageFilter}
           onChange={(e) => setStageFilter(e.target.value as DealStage | 'ALL')}
-          className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100"
         >
           <option value="ALL">All stages</option>
           {DEAL_STAGES.map((s) => (
@@ -868,7 +872,7 @@ export default function DealsPage(): JSX.Element {
               {STAGE_LABELS[s]}
             </option>
           ))}
-        </select>
+        </SelectField>
       </div>
 
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -990,20 +994,20 @@ export default function DealsPage(): JSX.Element {
                             )}
                           </div>
 
-                          <select
+                          <SelectField
                             value={deal.stage}
                             disabled={busy}
                             onChange={(event) =>
                               void handleStageChange(deal, event.target.value as DealStage)
                             }
-                            className="mt-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+                            className="mt-4 rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100"
                           >
                             {DEAL_STAGES.map((option) => (
                               <option key={option} value={option}>
                                 {STAGE_LABELS[option]}
                               </option>
                             ))}
-                          </select>
+                          </SelectField>
                         </div>
                       )
                     })

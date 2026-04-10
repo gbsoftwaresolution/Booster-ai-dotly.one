@@ -236,8 +236,33 @@ export class SchedulingService {
     })
   }
 
+  private parseQuestionOptions(options: string | null | undefined): string[] {
+    if (!options) return []
+
+    try {
+      const parsed = JSON.parse(options) as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      )
+    } catch {
+      return []
+    }
+  }
+
+  private serializeQuestionOptions<T extends { options?: string | null }>(
+    question: T,
+  ): Omit<T, 'options'> & {
+    options: string[]
+  } {
+    return {
+      ...question,
+      options: this.parseQuestionOptions(question.options),
+    }
+  }
+
   async getAppointmentTypes(userId: string) {
-    return this.prisma.appointmentType.findMany({
+    const appointmentTypes = await this.prisma.appointmentType.findMany({
       where: { ownerUserId: userId, deletedAt: null },
       include: {
         availabilityRules: true,
@@ -246,15 +271,25 @@ export class SchedulingService {
       },
       orderBy: { createdAt: 'asc' },
     })
+
+    return appointmentTypes.map((appointmentType) => ({
+      ...appointmentType,
+      questions: appointmentType.questions.map((question) =>
+        this.serializeQuestionOptions(question),
+      ),
+    }))
   }
 
   async getAppointmentType(userId: string, id: string) {
     const apt = await this.prisma.appointmentType.findUnique({
       where: { id },
-      include: { availabilityRules: true },
+      include: { availabilityRules: true, questions: { orderBy: { position: 'asc' } } },
     })
     if (!apt || apt.ownerUserId !== userId || apt.deletedAt !== null) throw new NotFoundException()
-    return apt
+    return {
+      ...apt,
+      questions: apt.questions.map((question) => this.serializeQuestionOptions(question)),
+    }
   }
 
   async updateAppointmentType(userId: string, id: string, dto: UpdateAppointmentTypeDto) {
@@ -351,10 +386,12 @@ export class SchedulingService {
       }),
     ])
 
-    return this.prisma.bookingQuestion.findMany({
+    const questions = await this.prisma.bookingQuestion.findMany({
       where: { appointmentTypeId },
       orderBy: { position: 'asc' },
     })
+
+    return questions.map((question) => this.serializeQuestionOptions(question))
   }
 
   // ── Available Slots ─────────────────────────────────────────────────────────
@@ -532,7 +569,10 @@ export class SchedulingService {
     const busyUntil = new Date(endAt.getTime() + apt.bufferAfterMins * 60_000)
 
     const answers = dto.answers ?? []
-    const questionsById = new Map(apt.questions.map((question) => [question.id, question]))
+    const normalizedQuestions = apt.questions.map((question) =>
+      this.serializeQuestionOptions(question),
+    )
+    const questionsById = new Map(normalizedQuestions.map((question) => [question.id, question]))
     const seenQuestionIds = new Set<string>()
     for (const answer of answers) {
       const question = questionsById.get(answer.questionId)
@@ -545,7 +585,7 @@ export class SchedulingService {
       seenQuestionIds.add(answer.questionId)
     }
 
-    const missingRequiredQuestion = apt.questions.find(
+    const missingRequiredQuestion = normalizedQuestions.find(
       (question) =>
         question.required &&
         (!seenQuestionIds.has(question.id) ||
@@ -953,7 +993,7 @@ export class SchedulingService {
       timezone: apt.timezone,
       isActive: apt.isActive,
       availabilityRules: apt.availabilityRules,
-      questions: apt.questions,
+      questions: apt.questions.map((question) => this.serializeQuestionOptions(question)),
       owner: owner
         ? { name: owner.name, avatarUrl: this.sanitizeAvatarUrl(owner.avatarUrl) }
         : { name: null, avatarUrl: null },

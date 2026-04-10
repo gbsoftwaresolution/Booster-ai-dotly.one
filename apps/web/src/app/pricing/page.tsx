@@ -342,10 +342,11 @@ export default function PricingPage() {
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
             <ShieldCheck className="h-6 w-6" />
           </span>
-          <h3 className="text-lg font-bold text-gray-950">Pay with USDT</h3>
+          <h3 className="text-lg font-bold text-gray-950">Payment roadmap</h3>
           <p className="mt-3 text-sm leading-7 text-gray-500">
-            Connect MetaMask, WalletConnect, or any EVM-compatible wallet. Payments settle via the
-            BoosterAI PaymentVault on Arbitrum. Your private key never leaves your wallet.
+            Dotly&apos;s published plans today focus on cards, analytics, CRM, inbox, and
+            scheduling. Wallet-based USDT payments are not part of the current self-serve pricing
+            surface.
           </p>
         </div>
       </section>

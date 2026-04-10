@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { cn } from '@/lib/cn'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
@@ -29,7 +30,7 @@ interface WebhookEndpoint {
   id: string
   url: string
   events: string[]
-  secret: string
+  secret?: string
   enabled: boolean
   createdAt: string
 }
@@ -41,7 +42,14 @@ interface WebhookDelivery {
   success: boolean
   durationMs: number | null
   attemptNumber: number
-  createdAt: string
+  deliveredAt: string
+}
+
+interface WebhookTestResult {
+  success: boolean
+  statusCode: number | null
+  durationMs: number
+  responseBody: string
 }
 
 const ALL_EVENTS = [
@@ -104,6 +112,15 @@ function SecretDisplay({ secret }: { secret: string }) {
   )
 }
 
+function SecretUnavailable() {
+  return (
+    <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+      Secret is only shown when created or regenerated. Regenerate it to reveal a new signing
+      secret.
+    </p>
+  )
+}
+
 function StatusBadge({ success, code }: { success: boolean; code: number | null }) {
   return (
     <span
@@ -155,7 +172,7 @@ function DeliveryLog({ endpointId }: { endpointId: string }) {
           {d.durationMs !== null && (
             <span className="text-[10px] text-gray-400">{d.durationMs}ms</span>
           )}
-          <span className="text-[10px] text-gray-300">{formatDateTime(d.createdAt, userTz)}</span>
+          <span className="text-[10px] text-gray-300">{formatDateTime(d.deliveredAt, userTz)}</span>
         </div>
       ))}
     </div>
@@ -175,7 +192,7 @@ function EndpointCard({
   onToggle: (enabled: boolean) => void
   onDelete: () => void
   onRegenerateSecret: () => Promise<void>
-  onTestFire: () => Promise<void>
+  onTestFire: () => Promise<WebhookTestResult>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [showLog, setShowLog] = useState(false)
@@ -187,7 +204,12 @@ function EndpointCard({
     setTesting(true)
     setTestResult(null)
     try {
-      await onTestFire()
+      const result = await onTestFire()
+      if (!result.success) {
+        throw new Error(
+          result.responseBody || `Delivery failed with status ${result.statusCode ?? 'unknown'}`,
+        )
+      }
       setTestResult('ok')
     } catch {
       setTestResult('err')
@@ -281,7 +303,7 @@ function EndpointCard({
             <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
               Signing secret
             </p>
-            <SecretDisplay secret={endpoint.secret} />
+            {endpoint.secret ? <SecretDisplay secret={endpoint.secret} /> : <SecretUnavailable />}
             <button
               type="button"
               onClick={() => void handleRegenerate()}
@@ -484,6 +506,7 @@ export default function WebhooksPage(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const enabledCount = endpoints.filter((endpoint) => endpoint.enabled).length
   const focusMessage = loading
     ? 'Loading webhook endpoints and delivery tooling.'
@@ -497,7 +520,12 @@ export default function WebhooksPage(): JSX.Element {
       const data = await apiGet<WebhookEndpoint[]>('/webhooks', token)
       setEndpoints(data)
     } catch (e) {
-      setPageError(e instanceof Error ? e.message : 'Failed to load webhooks.')
+      if (e instanceof Error && (e.message.includes('403') || e.message.includes('401'))) {
+        setPermissionDenied(true)
+        setPageError('You do not have permission to manage webhooks.')
+      } else {
+        setPageError(e instanceof Error ? e.message : 'Failed to load webhooks.')
+      }
     } finally {
       setLoading(false)
     }
@@ -553,24 +581,28 @@ export default function WebhooksPage(): JSX.Element {
 
   async function handleTestFire(id: string) {
     const token = await getAccessToken()
-    await apiPost(`/webhooks/${id}/test`, {}, token)
+    return apiPost<WebhookTestResult>(`/webhooks/${id}/test`, {}, token)
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 sm:py-8">
       {/* Error banner */}
-      {pageError && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{pageError}</span>
-          <button
-            type="button"
-            onClick={() => setPageError(null)}
-            className="ml-4 rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {permissionDenied ? (
+        <StatusNotice tone="warning" message="You do not have permission to manage webhooks." />
+      ) : pageError ? (
+        <StatusNotice
+          message={pageError}
+          action={
+            <button
+              type="button"
+              onClick={() => setPageError(null)}
+              className="rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          }
+        />
+      ) : null}
       {/* Header */}
       <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
         <div

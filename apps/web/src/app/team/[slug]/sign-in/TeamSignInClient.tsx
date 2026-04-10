@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 const DOTLY_AUTH_CALLBACK_URL = 'https://dotly.one/auth/callback'
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 interface TeamBrandData {
   id: string
@@ -25,6 +26,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -33,10 +35,35 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return
+
+    const trimmedEmail = email.trim().toLowerCase()
+    const nextFieldErrors: { email?: string; password?: string } = {}
+
+    if (!trimmedEmail) {
+      nextFieldErrors.email = 'Email address is required.'
+    } else if (!EMAIL_REGEX.test(trimmedEmail)) {
+      nextFieldErrors.email = 'Enter a valid email address.'
+    }
+
+    if (!password) {
+      nextFieldErrors.password = 'Password is required.'
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setError('Fix the highlighted fields before continuing.')
+      return
+    }
+
+    setFieldErrors({})
     setError(null)
     setLoading(true)
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      })
       if (authError) throw authError
       router.push('/dashboard')
       router.refresh()
@@ -90,10 +117,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
         {/* Card */}
         <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           {/* Color accent bar */}
-          <div
-            className="mb-6 h-1 rounded-full"
-            style={{ backgroundColor: brandColor }}
-          />
+          <div className="mb-6 h-1 rounded-full" style={{ backgroundColor: brandColor }} />
 
           {/* Google OAuth */}
           <button
@@ -143,10 +167,20 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, email: undefined }))
+                }}
+                aria-invalid={fieldErrors.email ? 'true' : 'false'}
+                aria-describedby={fieldErrors.email ? 'team-signin-email-error' : undefined}
+                className={`mt-1 block w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 ${fieldErrors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-sky-500 focus:ring-sky-500'}`}
                 placeholder="you@example.com"
               />
+              {fieldErrors.email && (
+                <p id="team-signin-email-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             <div>
@@ -159,10 +193,20 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
                 autoComplete="current-password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, password: undefined }))
+                }}
+                aria-invalid={fieldErrors.password ? 'true' : 'false'}
+                aria-describedby={fieldErrors.password ? 'team-signin-password-error' : undefined}
+                className={`mt-1 block w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-sky-500 focus:ring-sky-500'}`}
                 placeholder="••••••••"
               />
+              {fieldErrors.password && (
+                <p id="team-signin-password-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {error && (

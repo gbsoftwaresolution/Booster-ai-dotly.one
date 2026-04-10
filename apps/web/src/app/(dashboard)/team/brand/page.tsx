@@ -6,11 +6,12 @@ import Image from 'next/image'
 import { Palette } from 'lucide-react'
 import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
+import { SelectField } from '@/components/ui/SelectField'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
 
-const FONT_OPTIONS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Playfair Display', 'Lato']
+const FONT_OPTIONS = ['Inter', 'Roboto', 'Playfair Display', 'Lato', 'Montserrat', 'Space Grotesk']
 
 interface BrandConfig {
   logoUrl: string
@@ -26,6 +27,7 @@ export default function TeamBrandPage(): JSX.Element {
   // teamId is fetched on mount from the user's first team
   const [teamId, setTeamId] = useState<string>('')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [brand, setBrand] = useState<BrandConfig>({
     logoUrl: '',
     primaryColor: '#0ea5e9',
@@ -45,7 +47,6 @@ export default function TeamBrandPage(): JSX.Element {
       try {
         const token = await getAccessToken()
         if (!token) return
-        // GET /teams/mine returns the user's primary team with full fields including brandLock
         const team = await apiGet<{
           id: string
           brandLock?: boolean
@@ -53,7 +54,6 @@ export default function TeamBrandPage(): JSX.Element {
         } | null>('/teams/mine', token)
         if (!team) return
         setTeamId(team.id)
-        // Pre-populate form from existing brand config AND top-level brandLock
         const cfg = team.brandConfig ?? {}
         setBrand((prev) => ({
           ...prev,
@@ -61,11 +61,16 @@ export default function TeamBrandPage(): JSX.Element {
           primaryColor: (cfg['primaryColor'] as string | undefined) ?? prev.primaryColor,
           secondaryColor: (cfg['secondaryColor'] as string | undefined) ?? prev.secondaryColor,
           fontFamily: (cfg['fontFamily'] as string | undefined) ?? prev.fontFamily,
+          brandLock: team.brandLock ?? prev.brandLock,
           hideDotlyBranding:
             (cfg['hideDotlyBranding'] as boolean | undefined) ?? prev.hideDotlyBranding,
-          brandLock: team.brandLock ?? prev.brandLock,
         }))
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+          setPermissionDenied(true)
+          setLoadError('You do not have permission to manage team branding.')
+          return
+        }
         setLoadError('Could not load team settings.')
       }
     }
@@ -112,7 +117,12 @@ export default function TeamBrandPage(): JSX.Element {
       )
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        setPermissionDenied(true)
+        setSaveError('Only team admins can change team branding.')
+        return
+      }
       setSaveError('Failed to save brand settings. Please try again.')
     } finally {
       setSaving(false)
@@ -132,11 +142,18 @@ export default function TeamBrandPage(): JSX.Element {
             </p>
             <h1 className="mt-2 text-2xl font-bold text-gray-900">Brand Settings</h1>
             <p className="mt-2 text-sm text-gray-500">
-              Configure shared brand settings for all team member cards.
+              Configure the shared brand system your public team cards use when brand lock is
+              enabled.
             </p>
           </div>
         </div>
       </div>
+
+      {permissionDenied && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Team branding is admin-only. Ask a team admin to make these changes.
+        </div>
+      )}
 
       {loadError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -184,7 +201,6 @@ export default function TeamBrandPage(): JSX.Element {
             </div>
           </div>
 
-          {/* Secondary color */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
             <div className="flex items-center gap-3">
@@ -203,29 +219,28 @@ export default function TeamBrandPage(): JSX.Element {
             </div>
           </div>
 
-          {/* Font family */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
-            <select
+            <SelectField
               value={brand.fontFamily}
               onChange={(e) => setBrand({ ...brand, fontFamily: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="focus:border-brand-500 focus:ring-brand-100"
             >
-              {FONT_OPTIONS.map((f) => (
-                <option key={f} value={f}>
-                  {f}
+              {FONT_OPTIONS.map((font) => (
+                <option key={font} value={font}>
+                  {font}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
-          {/* Brand lock */}
-          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-gray-900 text-sm">Brand Lock</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  When enabled, all team member cards will use these brand settings.
+                  Force team public cards to use this logo, colors, and font instead of per-card
+                  theme settings.
                 </p>
               </div>
               <button
@@ -241,11 +256,10 @@ export default function TeamBrandPage(): JSX.Element {
                 />
               </button>
             </div>
-            {brand.brandLock && (
-              <p className="mt-2 text-xs text-yellow-700">
-                Warning: Individual card theme changes will be overridden by these brand settings.
-              </p>
-            )}
+            <p className="mt-2 text-xs text-gray-500">
+              Team logo above the card and the Dotly footer preference apply independently; brand
+              lock controls in-card theme enforcement.
+            </p>
           </div>
 
           {/* Hide Dotly Branding */}
@@ -256,7 +270,7 @@ export default function TeamBrandPage(): JSX.Element {
                   Hide &quot;Powered by Dotly&quot;
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Remove the Dotly branding footer from all team member public cards.
+                  Remove the Dotly footer on public card pages using team branding.
                 </p>
               </div>
               <button
@@ -319,10 +333,7 @@ export default function TeamBrandPage(): JSX.Element {
                 </span>
               </div>
             )}
-            <h4
-              className="text-xl font-bold"
-              style={{ color: brand.secondaryColor, fontFamily: brand.fontFamily }}
-            >
+            <h4 className="text-xl font-bold" style={{ color: brand.secondaryColor }}>
               Your Name
             </h4>
             <p className="text-sm mt-1 opacity-80" style={{ color: brand.secondaryColor }}>
@@ -339,7 +350,7 @@ export default function TeamBrandPage(): JSX.Element {
             </div>
           </div>
           <p className="mt-3 text-xs text-gray-400">
-            Preview of how your brand settings will appear on team member cards.
+            Preview of the team theme used on public cards when brand lock is enabled.
           </p>
         </div>
       </div>

@@ -296,12 +296,14 @@ export function useCardBuilder(cardId: string) {
         ...prev,
         card: prev.card ? { ...prev.card, isActive: true } : prev.card,
       }))
+      return true
     } catch (err) {
       setState((prev) => ({
         ...prev,
         saveStatus: 'error',
         error: err instanceof Error ? err.message : 'Failed to publish card',
       }))
+      return false
     }
   }, [cardId])
 
@@ -313,12 +315,14 @@ export function useCardBuilder(cardId: string) {
         ...prev,
         card: prev.card ? { ...prev.card, isActive: false } : prev.card,
       }))
+      return true
     } catch (err) {
       setState((prev) => ({
         ...prev,
         saveStatus: 'error',
         error: err instanceof Error ? err.message : 'Failed to unpublish card',
       }))
+      return false
     }
   }, [cardId])
 

@@ -561,6 +561,7 @@ export default function SettingsPage(): JSX.Element {
 
   // ── Profile state ─────────────────────────────────────────────────────────
   const [profileLoading, setProfileLoading] = useState(true)
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [country, setCountry] = useState('')
@@ -572,10 +573,12 @@ export default function SettingsPage(): JSX.Element {
   const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS)
   const [notifSaving, setNotifSaving] = useState(false)
   const [notifSaved, setNotifSaved] = useState(false)
+  const [notifError, setNotifError] = useState<string | null>(null)
 
   // ── Billing state ─────────────────────────────────────────────────────────
   const [billing, setBilling] = useState<BillingSubscription | null>(null)
   const [billingLoading, setBillingLoading] = useState(false)
+  const [billingError, setBillingError] = useState<string | null>(null)
   const enabledNotifCount = Object.values(notifPrefs).filter(Boolean).length
   const billingPlan = billing?.plan ?? billing?.user?.plan ?? 'Free'
   const billingStatus = billing?.status ?? 'No subscription'
@@ -583,53 +586,57 @@ export default function SettingsPage(): JSX.Element {
     activeTab === 'Profile'
       ? profileStatus === 'saved'
         ? 'Profile changes were saved successfully.'
-        : profileLoading
-          ? 'Loading your account profile and preferences.'
-          : 'Keep your personal profile complete for better account setup.'
+        : profileLoadError
+          ? profileLoadError
+          : profileLoading
+            ? 'Loading your account profile and preferences.'
+            : 'Keep your personal profile complete for better account setup.'
       : activeTab === 'Billing'
         ? billingLoading
           ? 'Loading your billing subscription details.'
-          : `${billingPlan} plan currently shows ${billingStatus.toLowerCase()}.`
+          : billingError
+            ? billingError
+            : `${billingPlan} plan currently shows ${billingStatus.toLowerCase()}.`
         : notifSaving
           ? 'Saving your notification preferences.'
-          : `${enabledNotifCount} notification preference${enabledNotifCount === 1 ? '' : 's'} enabled.`
+          : notifError
+            ? notifError
+            : `${enabledNotifCount} notification preference${enabledNotifCount === 1 ? '' : 's'} enabled.`
 
-  // Load user profile on mount
-  useEffect(() => {
-    async function load() {
-      try {
-        const token = await getToken()
-        if (!token) return
-        const user = await apiGet<{
-          name?: string
-          email?: string
-          country?: string | null
-          timezone?: string | null
-          notifLeadCaptured?: boolean
-          notifWeeklyDigest?: boolean
-          notifProductUpdates?: boolean
-        }>('/users/me', token)
-        setName(user.name ?? '')
-        setEmail(user.email ?? '')
-        // If the user has no country saved yet, pre-fill from browser locale
-        setCountry(user.country ?? detectBrowserCountry())
-        // If the user has no timezone saved yet, pre-fill from browser
-        setTimezone(user.timezone ?? detectBrowserTimezone())
-        // Load notification prefs from server (fall back to localStorage then defaults)
-        setNotifPrefs({
-          leadCaptured: user.notifLeadCaptured ?? notifPrefs.leadCaptured,
-          weeklyDigest: user.notifWeeklyDigest ?? notifPrefs.weeklyDigest,
-          productUpdates: user.notifProductUpdates ?? notifPrefs.productUpdates,
-        })
-      } catch {
-        // H-4: Surface load errors so the user sees "error" rather than blank fields
-        setProfileStatus('error')
-      } finally {
-        setProfileLoading(false)
-      }
+  const loadProfile = useCallback(async () => {
+    setProfileLoading(true)
+    setProfileLoadError(null)
+    try {
+      const token = await getToken()
+      if (!token) return
+      const user = await apiGet<{
+        name?: string
+        email?: string
+        country?: string | null
+        timezone?: string | null
+        notifLeadCaptured?: boolean
+        notifWeeklyDigest?: boolean
+        notifProductUpdates?: boolean
+      }>('/users/me', token)
+      setName(user.name ?? '')
+      setEmail(user.email ?? '')
+      setCountry(user.country ?? detectBrowserCountry())
+      setTimezone(user.timezone ?? detectBrowserTimezone())
+      setNotifPrefs((prev) => ({
+        leadCaptured: user.notifLeadCaptured ?? prev.leadCaptured,
+        weeklyDigest: user.notifWeeklyDigest ?? prev.weeklyDigest,
+        productUpdates: user.notifProductUpdates ?? prev.productUpdates,
+      }))
+    } catch {
+      setProfileLoadError('Could not load your profile. Retry before making changes.')
+    } finally {
+      setProfileLoading(false)
     }
-    void load()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    void loadProfile()
+  }, [loadProfile])
 
   // Load notification prefs from localStorage on mount
   useEffect(() => {
@@ -646,6 +653,7 @@ export default function SettingsPage(): JSX.Element {
     if (activeTab !== 'Billing') return
     if (billing !== null) return // already loaded
     setBillingLoading(true)
+    setBillingError(null)
     void (async () => {
       try {
         const token = await getToken()
@@ -653,7 +661,7 @@ export default function SettingsPage(): JSX.Element {
         const data = await apiGet<BillingSubscription>('/billing', token)
         setBilling(data)
       } catch {
-        setBilling({}) // set to empty object so we know it loaded (just no subscription)
+        setBillingError('Could not load billing details.')
       } finally {
         setBillingLoading(false)
       }
@@ -681,6 +689,7 @@ export default function SettingsPage(): JSX.Element {
 
   const handleNotifSave = useCallback(async () => {
     setNotifSaving(true)
+    setNotifError(null)
     try {
       const token = await getToken()
       await apiPatch(
@@ -701,7 +710,7 @@ export default function SettingsPage(): JSX.Element {
       setNotifSaved(true)
       setTimeout(() => setNotifSaved(false), 3000)
     } catch {
-      // silent — show saved anyway since we'll retry on next open
+      setNotifError('Could not save notification preferences. Please retry.')
     } finally {
       setNotifSaving(false)
     }
@@ -915,7 +924,15 @@ export default function SettingsPage(): JSX.Element {
             {profileStatus === 'saved' && (
               <p className="text-sm text-green-600">Profile saved successfully.</p>
             )}
-            {profileStatus === 'error' && (
+            {profileLoadError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {profileLoadError}
+                <button type="button" onClick={() => void loadProfile()} className="ml-3 underline">
+                  Retry
+                </button>
+              </div>
+            )}
+            {profileStatus === 'error' && !profileLoadError && (
               <p className="text-sm text-red-600">Failed to save profile. Please try again.</p>
             )}
 
@@ -937,6 +954,10 @@ export default function SettingsPage(): JSX.Element {
             {billingLoading ? (
               <div className="space-y-3">
                 <div className="h-20 animate-pulse rounded-lg bg-gray-100" />
+              </div>
+            ) : billingError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {billingError}
               </div>
             ) : (
               <>
@@ -1029,6 +1050,7 @@ export default function SettingsPage(): JSX.Element {
             </div>
 
             {notifSaved && <p className="text-sm text-green-600">Preferences saved.</p>}
+            {notifError && <p className="text-sm text-red-600">{notifError}</p>}
 
             <button
               type="button"

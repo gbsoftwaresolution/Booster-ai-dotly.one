@@ -713,6 +713,42 @@ export class ContactsController {
     })
   }
 
+  // ─── Contact Tags ─────────────────────────────────────────────────────────
+
+  @ApiBearerAuth()
+  @Get('contacts/tags')
+  @ApiOperation({
+    summary: 'Get all distinct tags used across contacts for the authenticated user',
+  })
+  getContactTags(@CurrentUser() user: { id: string }) {
+    return this.contactsService.getAllTags(user.id)
+  }
+
+  // ─── Contact Export (CSV) ─────────────────────────────────────────────────
+
+  @ApiBearerAuth()
+  @Get('contacts/export')
+  @ApiOperation({ summary: 'Export contacts as CSV — supports cardId, from, to filters' })
+  async exportContacts(
+    @CurrentUser() user: { id: string },
+    @Res() res: Response,
+    @Query('cardId') cardId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    await this.assertCsvExportAccess(user.id)
+    const result = await this.contactsService.exportContacts(user.id, { cardId, from, to })
+    const filename = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Cache-Control', 'no-store')
+    if (result.truncated) {
+      res.setHeader('X-Export-Truncated', 'true')
+      res.setHeader('X-Export-Row-Count', String(result.total))
+    }
+    res.end('\uFEFF' + result.csv) // BOM for Excel compatibility
+  }
+
   @ApiBearerAuth()
   @Get('contacts/:id')
   @ApiOperation({ summary: 'Get a single contact' })
@@ -729,6 +765,13 @@ export class ContactsController {
     @Body() dto: UpdateContactDto,
   ) {
     return this.contactsService.update(id, user.id, dto)
+  }
+
+  @ApiBearerAuth()
+  @Delete('contacts/bulk')
+  @ApiOperation({ summary: 'Delete multiple contacts at once' })
+  bulkDelete(@CurrentUser() user: { id: string }, @Body() dto: BulkDeleteDto) {
+    return this.contactsService.bulkDelete(user.id, dto.ids)
   }
 
   @ApiBearerAuth()
@@ -798,14 +841,6 @@ export class ContactsController {
   @ApiOperation({ summary: 'Update CRM stage for multiple contacts at once' })
   bulkUpdateStage(@CurrentUser() user: { id: string }, @Body() dto: BulkStageDto) {
     return this.contactsService.bulkUpdateStage(user.id, dto.ids, dto.stage)
-  }
-
-  // M1: Real bulk delete — single DB transaction instead of N individual requests.
-  @ApiBearerAuth()
-  @Delete('contacts/bulk')
-  @ApiOperation({ summary: 'Delete multiple contacts at once' })
-  bulkDelete(@CurrentUser() user: { id: string }, @Body() dto: BulkDeleteDto) {
-    return this.contactsService.bulkDelete(user.id, dto.ids)
   }
 
   // H1: Lead submissions list for a card — shows all LeadSubmission records
@@ -983,53 +1018,6 @@ export class ContactsController {
     return this.contactsService.importContacts(user.id, rows)
   }
 
-  // ─── Contact Tags ─────────────────────────────────────────────────────────
-
-  @ApiBearerAuth()
-  @Get('contacts/tags')
-  @ApiOperation({
-    summary: 'Get all distinct tags used across contacts for the authenticated user',
-  })
-  getContactTags(@CurrentUser() user: { id: string }) {
-    return this.contactsService.getAllTags(user.id)
-  }
-
-  // ─── Contact Export (CSV) ─────────────────────────────────────────────────
-
-  @ApiBearerAuth()
-  @Get('contacts/export')
-  @ApiOperation({ summary: 'Export contacts as CSV — supports cardId, from, to filters' })
-  async exportContacts(
-    @CurrentUser() user: { id: string },
-    @Res() res: Response,
-    @Query('cardId') cardId?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    await this.assertCsvExportAccess(user.id)
-    const result = await this.contactsService.exportContacts(user.id, { cardId, from, to })
-    const filename = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-    res.setHeader('Cache-Control', 'no-store')
-    if (result.truncated) {
-      res.setHeader('X-Export-Truncated', 'true')
-      res.setHeader('X-Export-Row-Count', String(result.total))
-    }
-    res.end('\uFEFF' + result.csv) // BOM for Excel compatibility
-  }
-
-  // ─── Contact Email History ────────────────────────────────────────────────
-
-  @ApiBearerAuth()
-  @Get('contacts/:id/emails')
-  @ApiOperation({ summary: 'Get sent email history for a contact' })
-  getContactEmails(@Param('id') id: string, @CurrentUser() user: { id: string }) {
-    return this.contactsService.getContactEmails(id, user.id)
-  }
-
-  // ─── Gap 5: Email tracking public endpoints ───────────────────────────────
-
   @Public()
   @Get('track/open/:token')
   @ApiOperation({ summary: 'Track email open (1x1 pixel)' })
@@ -1079,6 +1067,13 @@ export class ContactsController {
   @ApiOperation({ summary: 'List all email templates for the user' })
   getEmailTemplates(@CurrentUser() user: { id: string }) {
     return this.contactsService.getEmailTemplates(user.id)
+  }
+
+  @ApiBearerAuth()
+  @Get('contacts/:id/emails')
+  @ApiOperation({ summary: 'Get sent email history for a contact' })
+  getContactEmails(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.contactsService.getContactEmails(id, user.id)
   }
 
   @ApiBearerAuth()

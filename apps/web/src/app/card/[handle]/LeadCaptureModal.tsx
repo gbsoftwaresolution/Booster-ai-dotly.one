@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiPost } from '@/lib/api'
+import { ChevronDown } from 'lucide-react'
 import { getPublicApiUrl } from '@/lib/public-env'
 
 const API_URL = getPublicApiUrl()
@@ -32,21 +33,22 @@ const GLOBAL_STYLES = `
  */
 async function downloadVcardFetch(cardHandle: string, token: string) {
   const url = `${API_URL}/public/cards/${cardHandle}/vcard`
-  try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!res.ok) return
-    const blob = await res.blob()
-    const objectUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = objectUrl
-    a.download = `${cardHandle}.vcf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(objectUrl)
-  } catch {
-    /* non-blocking */
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) {
+    throw new Error(
+      res.status === 403 ? 'Sign in to download this contact.' : 'Failed to download contact.',
+    )
   }
+
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = `${cardHandle}.vcf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(objectUrl)
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,6 +70,63 @@ interface LeadForm {
   description: string
   buttonText: string
   fields: LeadField[]
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_REGEX = /^[+]?[0-9()\-\s]{7,20}$/
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function normalizeFieldValue(field: LeadField, value: string): string {
+  if (field.fieldType === 'TEXTAREA') return value.trim()
+  return value.trim()
+}
+
+function validateFieldValue(field: LeadField, value: string): string | null {
+  const trimmed = value.trim()
+
+  if (field.required && !trimmed) {
+    return `${field.label} is required.`
+  }
+
+  if (!trimmed) return null
+
+  if (trimmed.length > 500) {
+    return `${field.label} must be 500 characters or less.`
+  }
+
+  if ((field.id === '__name' || field.fieldType === 'TEXT') && trimmed.length < 2) {
+    return `${field.label} must be at least 2 characters.`
+  }
+
+  if (field.fieldType === 'EMAIL' && !EMAIL_REGEX.test(trimmed)) {
+    return 'Enter a valid email address.'
+  }
+
+  if (field.fieldType === 'PHONE' && !PHONE_REGEX.test(trimmed)) {
+    return 'Enter a valid phone number.'
+  }
+
+  if (field.fieldType === 'URL' && !isValidHttpUrl(trimmed)) {
+    return 'Enter a valid URL starting with http:// or https://.'
+  }
+
+  if (
+    field.fieldType === 'SELECT' &&
+    field.options.length > 0 &&
+    !field.options.includes(trimmed)
+  ) {
+    return `Select a valid ${field.label.toLowerCase()}.`
+  }
+
+  return null
 }
 
 const DEFAULT_FORM: LeadForm = {
@@ -209,24 +268,31 @@ function DynamicField({
   onChange,
   inputId,
   autoFocus,
+  error,
 }: {
   field: LeadField
   value: string
   onChange: (v: string) => void
   inputId: string
   autoFocus?: boolean
+  error?: string
 }) {
   const [focused, setFocused] = useState(false)
+  const errorId = `${inputId}-error`
 
   const wrapStyle: React.CSSProperties = {
     position: 'relative',
     display: 'flex',
     alignItems: field.fieldType === 'TEXTAREA' ? 'flex-start' : 'center',
     borderRadius: 10,
-    border: `1.5px solid ${focused ? '#0ea5e9' : '#e2e8f0'}`,
+    border: `1.5px solid ${error ? '#ef4444' : focused ? '#0ea5e9' : '#e2e8f0'}`,
     background: focused ? '#f0f9ff' : '#f8fafc',
     transition: 'border-color 0.15s, background 0.15s',
-    boxShadow: focused ? '0 0 0 3px rgba(14,165,233,0.12)' : 'none',
+    boxShadow: error
+      ? '0 0 0 3px rgba(239,68,68,0.12)'
+      : focused
+        ? '0 0 0 3px rgba(14,165,233,0.12)'
+        : 'none',
   }
 
   const baseInput: React.CSSProperties = {
@@ -288,25 +354,46 @@ function DynamicField({
             placeholder={field.placeholder}
             rows={3}
             autoFocus={autoFocus}
+            maxLength={500}
+            aria-invalid={error ? 'true' : 'false'}
+            aria-describedby={error ? errorId : undefined}
             style={{ ...baseInput, resize: 'none' }}
           />
         ) : field.fieldType === 'SELECT' ? (
-          <select
-            id={inputId}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            autoFocus={autoFocus}
-            style={{ ...baseInput, appearance: 'none', paddingRight: 32 }}
-          >
-            <option value="">{field.placeholder || `Select ${field.label}`}</option>
-            {field.options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              id={inputId}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              autoFocus={autoFocus}
+              aria-invalid={error ? 'true' : 'false'}
+              aria-describedby={error ? errorId : undefined}
+              style={{ ...baseInput, appearance: 'none', paddingRight: 40 }}
+            >
+              <option value="">{field.placeholder || `Select ${field.label}`}</option>
+              {field.options.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                color: '#94a3b8',
+                pointerEvents: 'none',
+              }}
+            >
+              <ChevronDown size={16} />
+            </span>
+          </>
         ) : (
           <input
             id={inputId}
@@ -323,10 +410,18 @@ function DynamicField({
             onBlur={() => setFocused(false)}
             placeholder={field.placeholder}
             autoFocus={autoFocus}
+            maxLength={field.fieldType === 'PHONE' ? 20 : field.fieldType === 'EMAIL' ? 254 : 500}
+            aria-invalid={error ? 'true' : 'false'}
+            aria-describedby={error ? errorId : undefined}
             style={baseInput}
           />
         )}
       </div>
+      {error && (
+        <p id={errorId} style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>
+          {error}
+        </p>
+      )}
     </div>
   )
 }
@@ -362,6 +457,9 @@ export function LeadCaptureModal({
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [schemaLoading, setSchemaLoading] = useState(true)
+  const [schemaError, setSchemaError] = useState('')
   const titleId = `lcm-title-${cardHandle}`
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Auth-connect state — for authenticated users who skip the form
@@ -378,13 +476,21 @@ export function LeadCaptureModal({
       init[f.id] = ''
     })
     setValues(init)
+    setFieldErrors({})
   }
 
   // Fetch form schema from public API
   useEffect(() => {
     const controller = new AbortController()
+    setSchemaLoading(true)
+    setSchemaError('')
     fetch(`${API_URL}/public/cards/${cardHandle}/lead-form`, { signal: controller.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<LeadForm>) : Promise.reject()))
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(r.status === 404 ? 'missing' : 'failed')
+        }
+        return (await r.json()) as LeadForm
+      })
       .then((data: LeadForm) => {
         const sorted = [...data.fields].sort((a, b) => a.displayOrder - b.displayOrder)
         const merged = { ...data, fields: sorted }
@@ -393,8 +499,14 @@ export function LeadCaptureModal({
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') return
-        initValues(DEFAULT_FORM.fields)
+        if (err instanceof Error && err.message === 'missing') {
+          setForm(DEFAULT_FORM)
+          initValues(DEFAULT_FORM.fields)
+          return
+        }
+        setSchemaError('We could not load this contact form. Please retry.')
       })
+      .finally(() => setSchemaLoading(false))
     return () => controller.abort()
   }, [cardHandle])
 
@@ -439,31 +551,44 @@ export function LeadCaptureModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
+
+    const nextValues: Record<string, string> = {}
+    const nextFieldErrors: Record<string, string> = {}
+
     for (const field of form.fields) {
-      if (field.required && !values[field.id]?.trim()) {
-        setError(`${field.label} is required.`)
-        return
+      const normalized = normalizeFieldValue(field, values[field.id] ?? '')
+      const validationError = validateFieldValue(field, normalized)
+      nextValues[field.id] = normalized
+      if (validationError) {
+        nextFieldErrors[field.id] = validationError
       }
     }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setValues((prev) => ({ ...prev, ...nextValues }))
+      setError('Fix the highlighted fields before submitting.')
+      return
+    }
+
+    setValues((prev) => ({ ...prev, ...nextValues }))
+    setFieldErrors({})
     setSubmitting(true)
     setError('')
 
     const fieldValues: Record<string, string> = {}
     form.fields.forEach((f) => {
-      fieldValues[f.label.toLowerCase().replace(/\s+/g, '_')] = values[f.id] ?? ''
+      fieldValues[f.label.toLowerCase().replace(/\s+/g, '_')] = nextValues[f.id] ?? ''
     })
-    const name = values['__name'] ?? fieldValues['name'] ?? ''
-    const email = values['__email'] ?? fieldValues['email'] ?? ''
-    const phone = values['__phone'] ?? fieldValues['phone'] ?? ''
-
     try {
       const res = await fetch(`${API_URL}/public/contacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          email,
-          phone,
+          name: nextValues['__name'] ?? fieldValues['name'] ?? '',
+          email: nextValues['__email'] ?? fieldValues['email'] ?? '',
+          phone: nextValues['__phone'] ?? fieldValues['phone'] ?? '',
           cardId,
           sourceHandle: cardHandle,
           fields: fieldValues,
@@ -663,7 +788,43 @@ export function LeadCaptureModal({
 
             <div style={{ height: 1, background: '#f1f5f9', margin: '16px 0' }} />
 
-            {success || authConnected ? (
+            {schemaLoading ? (
+              <div
+                style={{ padding: '12px 0', textAlign: 'center', color: '#64748b', fontSize: 13 }}
+              >
+                Loading contact form…
+              </div>
+            ) : schemaError ? (
+              <div
+                role="alert"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '16px 0',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: 13, color: '#dc2626', margin: 0 }}>{schemaError}</p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 10,
+                    border: '1px solid #cbd5e1',
+                    background: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : success || authConnected ? (
               /* ── Success screen (shared for both paths) ── */
               <div
                 style={{
@@ -877,9 +1038,18 @@ export function LeadCaptureModal({
                     key={field.id}
                     field={field}
                     value={values[field.id] ?? ''}
-                    onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
+                    onChange={(v) => {
+                      setValues((prev) => ({ ...prev, [field.id]: v }))
+                      setFieldErrors((prev) => {
+                        if (!prev[field.id]) return prev
+                        const next = { ...prev }
+                        delete next[field.id]
+                        return next
+                      })
+                    }}
                     inputId={`lcm-field-${cardHandle}-${field.id}`}
                     autoFocus={index === 0}
+                    error={fieldErrors[field.id]}
                   />
                 ))}
 

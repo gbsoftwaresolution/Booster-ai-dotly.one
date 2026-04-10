@@ -46,10 +46,49 @@ export class WalletPassesService {
   private async getPublishedCardByHandle(handle: string) {
     const card = await this.prisma.card.findUnique({
       where: { handle, isActive: true },
-      include: { theme: true, socialLinks: true, user: { select: { id: true } } },
+      include: {
+        theme: true,
+        socialLinks: true,
+        user: {
+          select: {
+            id: true,
+            teamMemberships: {
+              take: 1,
+              orderBy: { joinedAt: 'asc' },
+              include: { team: { select: { brandLock: true, brandConfig: true } } },
+            },
+          },
+        },
+      },
     })
     if (!card) throw new NotFoundException('Card not found')
     return card
+  }
+
+  private resolveEffectiveTheme(
+    card:
+      | Awaited<ReturnType<typeof this.getPublishedCardByHandle>>
+      | Awaited<ReturnType<typeof this.assertCardOwnerAndFetch>>,
+  ) {
+    const firstMembership = 'user' in card ? card.user?.teamMemberships?.[0] : undefined
+    const team = firstMembership?.team
+    const cfg = ((team?.brandConfig ?? {}) as Record<string, unknown>) || {}
+    const brandLock = team?.brandLock ?? false
+
+    return {
+      primaryColor:
+        (brandLock ? (cfg['primaryColor'] as string | undefined) : undefined) ??
+        card.theme?.primaryColor ??
+        '#0ea5e9',
+      secondaryColor:
+        (brandLock ? (cfg['secondaryColor'] as string | undefined) : undefined) ??
+        card.theme?.secondaryColor ??
+        '#ffffff',
+      logoUrl:
+        (brandLock ? (cfg['logoUrl'] as string | undefined) : undefined) ??
+        card.theme?.logoUrl ??
+        null,
+    }
   }
 
   private async assertPublicExportAllowed(handle: string, requestUserId: string | null) {
@@ -82,6 +121,15 @@ export class WalletPassesService {
       include: {
         theme: true,
         socialLinks: { orderBy: { displayOrder: 'asc' } },
+        user: {
+          select: {
+            teamMemberships: {
+              take: 1,
+              orderBy: { joinedAt: 'asc' },
+              include: { team: { select: { brandLock: true, brandConfig: true } } },
+            },
+          },
+        },
       },
     })
     if (!card) throw new NotFoundException('Card not found')
@@ -122,10 +170,10 @@ export class WalletPassesService {
     }
 
     const fields = card.fields as Record<string, string>
-    const theme = card.theme
+    const theme = this.resolveEffectiveTheme(card)
 
-    const primaryColor = theme?.primaryColor ?? '#0ea5e9'
-    const secondaryColor = theme?.secondaryColor ?? '#ffffff'
+    const primaryColor = theme.primaryColor
+    const secondaryColor = theme.secondaryColor
     const cardUrl = `${this.webUrl}/card/${card.handle}`
 
     // ── pass.json ───────────────────────────────────────────────────────────────
@@ -221,6 +269,9 @@ export class WalletPassesService {
     const card = await this.assertCardOwnerAndFetch(cardId, userId)
     const fields = card.fields as Record<string, string>
     const cardUrl = `${this.webUrl}/card/${card.handle}`
+    const theme = this.resolveEffectiveTheme(
+      card as Awaited<ReturnType<typeof this.assertCardOwnerAndFetch>>,
+    )
 
     const objectId = `${issuerId}.dotly-${card.id.replace(/-/g, '')}`
     const classId = `${issuerId}.dotly-business-card`
@@ -239,6 +290,7 @@ export class WalletPassesService {
       header: {
         defaultValue: { language: 'en-US', value: fields['company'] || 'Dotly' },
       },
+      hexBackgroundColor: theme.primaryColor,
       textModulesData: [
         { id: 'email', header: 'Email', body: fields['email'] || '' },
         { id: 'phone', header: 'Phone', body: fields['phone'] || '' },

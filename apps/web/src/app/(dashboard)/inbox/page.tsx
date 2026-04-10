@@ -191,10 +191,14 @@ function MessageCard({
   item,
   onMarkRead,
   onDelete,
+  markReadPending,
+  deletePending,
 }: {
   item: Message
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
+  markReadPending: boolean
+  deletePending: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -252,17 +256,19 @@ function MessageCard({
           <button
             type="button"
             onClick={() => onMarkRead(item.id)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-sky-600 hover:bg-sky-50 transition-colors"
+            disabled={markReadPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-sky-600 hover:bg-sky-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <MailOpen className="h-3.5 w-3.5" /> Mark read
+            <MailOpen className="h-3.5 w-3.5" /> {markReadPending ? 'Saving…' : 'Mark read'}
           </button>
         )}
         <button
           type="button"
           onClick={() => onDelete(item.id)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"
+          disabled={deletePending}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Delete
+          <Trash2 className="h-3.5 w-3.5" /> {deletePending ? 'Deleting…' : 'Delete'}
         </button>
       </div>
     </div>
@@ -273,10 +279,14 @@ function VoiceNoteCard({
   item,
   onMarkRead,
   onDelete,
+  markReadPending,
+  deletePending,
 }: {
   item: VoiceNote
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
+  markReadPending: boolean
+  deletePending: boolean
 }) {
   return (
     <div
@@ -318,9 +328,10 @@ function VoiceNoteCard({
           <button
             type="button"
             onClick={() => onMarkRead(item.id)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-colors"
+            disabled={markReadPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <MailOpen className="h-3.5 w-3.5" /> Mark read
+            <MailOpen className="h-3.5 w-3.5" /> {markReadPending ? 'Saving…' : 'Mark read'}
           </button>
         )}
         <a
@@ -333,9 +344,10 @@ function VoiceNoteCard({
         <button
           type="button"
           onClick={() => onDelete(item.id)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"
+          disabled={deletePending}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Delete
+          <Trash2 className="h-3.5 w-3.5" /> {deletePending ? 'Deleting…' : 'Delete'}
         </button>
       </div>
     </div>
@@ -346,10 +358,14 @@ function DropboxFileCard({
   item,
   onMarkRead,
   onDelete,
+  markReadPending,
+  deletePending,
 }: {
   item: DropboxFile
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
+  markReadPending: boolean
+  deletePending: boolean
 }) {
   const MimeIcon = mimeIcon(item.mimeType)
 
@@ -397,9 +413,10 @@ function DropboxFileCard({
           <button
             type="button"
             onClick={() => onMarkRead(item.id)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
+            disabled={markReadPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <MailOpen className="h-3.5 w-3.5" /> Mark read
+            <MailOpen className="h-3.5 w-3.5" /> {markReadPending ? 'Saving…' : 'Mark read'}
           </button>
         )}
         <a
@@ -412,9 +429,10 @@ function DropboxFileCard({
         <button
           type="button"
           onClick={() => onDelete(item.id)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"
+          disabled={deletePending}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Delete
+          <Trash2 className="h-3.5 w-3.5" /> {deletePending ? 'Deleting…' : 'Delete'}
         </button>
       </div>
     </div>
@@ -464,6 +482,8 @@ export default function InboxPage(): JSX.Element {
   const [data, setData] = useState<InboxData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
 
@@ -486,6 +506,9 @@ export default function InboxPage(): JSX.Element {
   }, [load])
 
   async function markRead(type: 'messages' | 'voice-notes' | 'dropbox', id: string) {
+    const actionKey = `read:${type}:${id}`
+    setPendingAction(actionKey)
+    setActionError('')
     try {
       const token = await getAccessToken()
       await apiPatch(`/inbox/${type}/${id}/read`, {}, token)
@@ -502,11 +525,16 @@ export default function InboxPage(): JSX.Element {
         }
       })
     } catch {
-      /* ignore */
+      setActionError('Could not mark this item as read. Please retry.')
+    } finally {
+      setPendingAction(null)
     }
   }
 
   async function del(type: 'messages' | 'voice-notes' | 'dropbox', id: string) {
+    const actionKey = `delete:${type}:${id}`
+    setPendingAction(actionKey)
+    setActionError('')
     try {
       const token = await getAccessToken()
       await apiDelete(`/inbox/${type}/${id}`, token)
@@ -523,12 +551,13 @@ export default function InboxPage(): JSX.Element {
           unreadCount: {
             ...prev.unreadCount,
             [key]: wasUnread ? Math.max(0, prev.unreadCount[key] - 1) : prev.unreadCount[key],
-            [key]: wasUnread ? Math.max(0, prev.unreadCount[key] - 1) : prev.unreadCount[key],
           },
         }
       })
     } catch {
-      /* ignore */
+      setActionError('Could not delete this item. Please retry.')
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -694,6 +723,11 @@ export default function InboxPage(): JSX.Element {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6">
+        {actionError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
         {loading && !data ? (
           <div className="space-y-3 py-6">
             {[1, 2, 3].map((i) => (
@@ -734,6 +768,8 @@ export default function InboxPage(): JSX.Element {
                       item={item as Message}
                       onMarkRead={(id) => void markRead('messages', id)}
                       onDelete={(id) => void del('messages', id)}
+                      markReadPending={pendingAction === `read:messages:${item.id}`}
+                      deletePending={pendingAction === `delete:messages:${item.id}`}
                     />
                   )
                 if (type === 'voice')
@@ -743,6 +779,8 @@ export default function InboxPage(): JSX.Element {
                       item={item as VoiceNote}
                       onMarkRead={(id) => void markRead('voice-notes', id)}
                       onDelete={(id) => void del('voice-notes', id)}
+                      markReadPending={pendingAction === `read:voice-notes:${item.id}`}
+                      deletePending={pendingAction === `delete:voice-notes:${item.id}`}
                     />
                   )
                 return (
@@ -751,6 +789,8 @@ export default function InboxPage(): JSX.Element {
                     item={item as DropboxFile}
                     onMarkRead={(id) => void markRead('dropbox', id)}
                     onDelete={(id) => void del('dropbox', id)}
+                    markReadPending={pendingAction === `read:dropbox:${item.id}`}
+                    deletePending={pendingAction === `delete:dropbox:${item.id}`}
                   />
                 )
               })}
@@ -763,6 +803,8 @@ export default function InboxPage(): JSX.Element {
                   item={m}
                   onMarkRead={(id) => void markRead('messages', id)}
                   onDelete={(id) => void del('messages', id)}
+                  markReadPending={pendingAction === `read:messages:${m.id}`}
+                  deletePending={pendingAction === `delete:messages:${m.id}`}
                 />
               ))}
 
@@ -774,6 +816,8 @@ export default function InboxPage(): JSX.Element {
                   item={v}
                   onMarkRead={(id) => void markRead('voice-notes', id)}
                   onDelete={(id) => void del('voice-notes', id)}
+                  markReadPending={pendingAction === `read:voice-notes:${v.id}`}
+                  deletePending={pendingAction === `delete:voice-notes:${v.id}`}
                 />
               ))}
 
@@ -785,6 +829,8 @@ export default function InboxPage(): JSX.Element {
                   item={f}
                   onMarkRead={(id) => void markRead('dropbox', id)}
                   onDelete={(id) => void del('dropbox', id)}
+                  markReadPending={pendingAction === `read:dropbox:${f.id}`}
+                  deletePending={pendingAction === `delete:dropbox:${f.id}`}
                 />
               ))}
           </div>

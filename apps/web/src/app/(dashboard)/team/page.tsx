@@ -6,6 +6,8 @@ import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
+import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { hasPlanAccess } from '@/lib/billing-plans'
 import { AlertTriangle, Users } from 'lucide-react'
 import { formatDate } from '@/lib/tz'
@@ -40,6 +42,10 @@ interface Team {
   brandConfig: Record<string, unknown>
   members: TeamMember[]
   invites: TeamInvite[]
+}
+
+interface CurrentUser {
+  id: string
 }
 
 // Shared confirmation dialog
@@ -92,6 +98,7 @@ export default function TeamPage(): JSX.Element {
   const [team, setTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
@@ -100,6 +107,7 @@ export default function TeamPage(): JSX.Element {
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
   const [teamId, setTeamId] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -132,8 +140,13 @@ export default function TeamPage(): JSX.Element {
         const token = await getAccessToken()
         const data = await apiGet<Team>(`/teams/${resolvedId}`, token)
         setTeam(data)
-      } catch {
-        setError('Failed to load team')
+      } catch (err) {
+        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+          setPermissionDenied(true)
+          setError('You do not have permission to view this team.')
+        } else {
+          setError('Failed to load team')
+        }
       }
     },
     [teamId],
@@ -149,8 +162,11 @@ export default function TeamPage(): JSX.Element {
     const init = async () => {
       try {
         const token = await getAccessToken()
-        // GET /teams/mine returns the user's team or null if they have none
-        const myTeam = await apiGet<Team | null>('/teams/mine', token)
+        const [myTeam, me] = await Promise.all([
+          apiGet<Team | null>('/teams/mine', token),
+          apiGet<CurrentUser>('/users/me', token),
+        ])
+        setCurrentUserId(me.id)
         if (myTeam) {
           setTeamId(myTeam.id)
           setTeam(myTeam)
@@ -159,6 +175,12 @@ export default function TeamPage(): JSX.Element {
         // Distinguish "no team" (404) from real errors
         if (err instanceof Error && err.message.includes('404')) {
           // No team yet — show the "Create Team" empty state (not an error)
+        } else if (
+          err instanceof Error &&
+          (err.message.includes('403') || err.message.includes('401'))
+        ) {
+          setPermissionDenied(true)
+          setError('You do not have permission to access team management.')
         } else {
           setError(err instanceof Error ? err.message : 'Failed to load team data')
         }
@@ -257,6 +279,11 @@ export default function TeamPage(): JSX.Element {
     [teamId, resendState],
   )
 
+  const currentMember = currentUserId
+    ? team?.members.find((member) => member.userId === currentUserId)
+    : null
+  const canManageTeam = currentMember?.role === 'ADMIN'
+
   if (planLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -337,7 +364,7 @@ export default function TeamPage(): JSX.Element {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-3">
-              {team ? (
+              {team && canManageTeam ? (
                 <button
                   type="button"
                   onClick={() => setShowInviteModal(true)}
@@ -346,6 +373,10 @@ export default function TeamPage(): JSX.Element {
                   <Users className="h-4 w-4" />
                   Invite Member
                 </button>
+              ) : team ? (
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                  Admins only can invite members and manage roles.
+                </div>
               ) : (
                 <button
                   type="button"
@@ -448,11 +479,14 @@ export default function TeamPage(): JSX.Element {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {permissionDenied ? (
+        <StatusNotice
+          tone="warning"
+          message="You do not have permission to access team management."
+        />
+      ) : error ? (
+        <StatusNotice message={error} />
+      ) : null}
 
       {!team ? (
         <div className="app-empty-state">
@@ -504,23 +538,23 @@ export default function TeamPage(): JSX.Element {
                   >
                     {member.role}
                   </span>
-                  {member.userId !== team.ownerUserId ? (
-                    <select
+                  {member.userId !== team.ownerUserId && canManageTeam ? (
+                    <SelectField
                       value={member.role}
                       onChange={(e) =>
                         void handleRoleChange(member.userId, e.target.value as 'ADMIN' | 'MEMBER')
                       }
-                      className="rounded-md border border-gray-200 px-2 py-1 text-sm"
+                      className="w-[132px] rounded-lg px-2.5 py-2 pr-8 text-sm focus:ring-brand-100"
                     >
                       <option value="MEMBER">Member</option>
                       <option value="ADMIN">Admin</option>
-                    </select>
+                    </SelectField>
                   ) : (
                     <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-xs text-gray-400">
                       Owner
                     </span>
                   )}
-                  {member.userId !== team.ownerUserId && (
+                  {member.userId !== team.ownerUserId && canManageTeam && (
                     <button
                       type="button"
                       onClick={() => handleRemove(member.userId)}
@@ -552,18 +586,24 @@ export default function TeamPage(): JSX.Element {
                     <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
                       {invite.role}
                     </span>
-                    <button
-                      type="button"
-                      disabled={resendState[invite.id] === 'loading'}
-                      onClick={() => void handleResend(invite)}
-                      className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      {resendState[invite.id] === 'loading'
-                        ? 'Sending…'
-                        : resendState[invite.id] === 'done'
-                          ? 'Sent!'
-                          : 'Resend'}
-                    </button>
+                    {canManageTeam ? (
+                      <button
+                        type="button"
+                        disabled={resendState[invite.id] === 'loading'}
+                        onClick={() => void handleResend(invite)}
+                        className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {resendState[invite.id] === 'loading'
+                          ? 'Sending…'
+                          : resendState[invite.id] === 'done'
+                            ? 'Sent!'
+                            : 'Resend'}
+                      </button>
+                    ) : (
+                      <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-xs text-gray-400">
+                        Admins only
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -635,14 +675,14 @@ export default function TeamPage(): JSX.Element {
                 placeholder="Email address"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
-              <select
+              <SelectField
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as 'ADMIN' | 'MEMBER')}
-                className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="mt-3 focus:border-brand-500 focus:ring-brand-100"
               >
                 <option value="MEMBER">Member</option>
                 <option value="ADMIN">Admin</option>
-              </select>
+              </SelectField>
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
               <button

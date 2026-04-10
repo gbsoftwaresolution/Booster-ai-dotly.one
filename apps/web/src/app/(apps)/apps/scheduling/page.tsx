@@ -40,17 +40,20 @@ export default function SchedulingDashboard(): JSX.Element {
   const [appointmentTypes, setAppointmentTypes] = useState<AppointmentType[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
       const token = await getAccessToken()
       const [aptTypes, bookingsArr] = await Promise.all([
-        apiGet<AppointmentType[]>('/scheduling/appointment-types', token).catch(() => []),
-        apiGet<Booking[]>('/scheduling/bookings', token).catch(() => []),
+        apiGet<AppointmentType[]>('/scheduling/appointment-types', token),
+        apiGet<Booking[]>('/scheduling/bookings', token),
       ])
       setAppointmentTypes(Array.isArray(aptTypes) ? aptTypes : [])
       setBookings(Array.isArray(bookingsArr) ? bookingsArr : [])
-    } catch {
-      // silently handled
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load scheduling data.')
     } finally {
       setLoading(false)
     }
@@ -78,6 +81,15 @@ export default function SchedulingDashboard(): JSX.Element {
 
   return (
     <div className="space-y-8">
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+          <button type="button" onClick={() => void fetchData()} className="ml-3 underline">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
         <div
@@ -295,7 +307,7 @@ export default function SchedulingDashboard(): JSX.Element {
               <div key={i} className="h-16 animate-pulse rounded-2xl bg-gray-100" />
             ))}
           </div>
-        ) : appointmentTypes.length === 0 ? (
+        ) : error ? null : appointmentTypes.length === 0 ? (
           <div className="app-empty-state">
             <CalendarCheck className="h-10 w-10 text-gray-200 mb-3" />
             <p className="text-sm font-semibold text-gray-900">No appointment types</p>
@@ -362,7 +374,7 @@ export default function SchedulingDashboard(): JSX.Element {
               <div key={i} className="h-14 animate-pulse rounded-2xl bg-gray-100" />
             ))}
           </div>
-        ) : upcomingBookings.length === 0 ? (
+        ) : error ? null : upcomingBookings.length === 0 ? (
           <div className="app-empty-state">
             <CalendarClock className="h-8 w-8 text-gray-200 mb-2" />
             <p className="text-sm text-gray-400">No upcoming bookings</p>

@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
+import { SelectField } from '@/components/ui/SelectField'
 import { formatDate } from '@/lib/tz'
 import { useUserTimezone } from '@/hooks/useUserLocale'
 
@@ -210,10 +211,10 @@ export default function LeadsPage(): JSX.Element {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Card filter */}
-          <select
+          <SelectField
             value={cardFilter}
             onChange={(e) => handleCardFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none"
+            className="min-w-[170px] rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100"
           >
             <option value="">All cards</option>
             {cards.map((c) => (
@@ -221,7 +222,7 @@ export default function LeadsPage(): JSX.Element {
                 /{c.handle}
               </option>
             ))}
-          </select>
+          </SelectField>
 
           <button
             type="button"

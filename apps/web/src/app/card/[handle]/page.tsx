@@ -14,6 +14,9 @@ interface TeamBrand {
   brandName: string | null
   brandLogoUrl: string | null
   brandColor: string | null
+  secondaryColor: string | null
+  fontFamily: string | null
+  brandLock: boolean
   hideDotlyBranding: boolean
 }
 
@@ -69,13 +72,12 @@ function safeBrandColor(color: string | null | undefined): string | null {
  */
 async function getCard(handle: string): Promise<RawCard | null> {
   const apiUrl = getServerApiUrl()
-  try {
-    const res = await fetch(`${apiUrl}/public/cards/${handle}`)
-    if (!res.ok) return null
-    return (await res.json()) as RawCard
-  } catch {
-    return null
+  const res = await fetch(`${apiUrl}/public/cards/${handle}`)
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw new Error(`Failed to load card (${res.status})`)
   }
+  return (await res.json()) as RawCard
 }
 
 export async function generateMetadata({
@@ -169,6 +171,9 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
 
   const teamBrand = rawCard.teamBrand ?? null
   const fields = rawCard.fields
+  const teamBrandPrimary = safeBrandColor(teamBrand?.brandColor)
+  const teamBrandSecondary = safeBrandColor(teamBrand?.secondaryColor)
+  const teamBrandLocked = teamBrand?.brandLock ?? false
 
   const card = {
     id: rawCard.id,
@@ -192,11 +197,16 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
   }
 
   const cardTheme = {
-    primaryColor: safeBrandColor(teamBrand?.brandColor) ?? theme.primaryColor ?? '#0ea5e9',
-    secondaryColor: theme.secondaryColor ?? '#ffffff',
-    fontFamily: theme.fontFamily ?? 'Inter',
+    primaryColor:
+      (teamBrandLocked ? teamBrandPrimary : null) ??
+      teamBrandPrimary ??
+      theme.primaryColor ??
+      '#0ea5e9',
+    secondaryColor:
+      (teamBrandLocked ? teamBrandSecondary : null) ?? theme.secondaryColor ?? '#ffffff',
+    fontFamily: (teamBrandLocked ? teamBrand?.fontFamily : null) ?? theme.fontFamily ?? 'Inter',
     backgroundUrl: theme.backgroundUrl,
-    logoUrl: theme.logoUrl,
+    logoUrl: (teamBrandLocked ? teamBrand?.brandLogoUrl : null) ?? theme.logoUrl,
     buttonStyle: (theme.buttonStyle ?? 'filled-icon-text') as import('@dotly/types').ButtonStyle,
     socialButtonStyle: (theme.socialButtonStyle ??
       'follow') as import('@dotly/types').SocialButtonStyle,
@@ -239,7 +249,7 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
     }),
   )
 
-  const brandColor = safeBrandColor(teamBrand?.brandColor)
+  const brandColor = teamBrandPrimary
   const canonicalUrl = `${SITE_URL}/card/${encodeURIComponent(handle)}`
 
   // JSON-LD structured data injected into the page <head>

@@ -642,6 +642,9 @@ export class CardsService {
       brandName: string | null
       brandLogoUrl: string | null
       brandColor: string | null
+      secondaryColor: string | null
+      fontFamily: string | null
+      brandLock: boolean
       hideDotlyBranding: boolean
     } | null = null
 
@@ -651,6 +654,9 @@ export class CardsService {
         brandName: (cfg['brandName'] as string | undefined) ?? team.name ?? null,
         brandLogoUrl: (cfg['logoUrl'] as string | undefined) ?? null,
         brandColor: (cfg['primaryColor'] as string | undefined) ?? null,
+        secondaryColor: (cfg['secondaryColor'] as string | undefined) ?? null,
+        fontFamily: (cfg['fontFamily'] as string | undefined) ?? null,
+        brandLock: team.brandLock ?? false,
         hideDotlyBranding: (cfg['hideDotlyBranding'] as boolean | undefined) ?? false,
       }
     }
