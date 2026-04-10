@@ -62,6 +62,9 @@ class CreateBoosterAiOrderDto {
 
 class ActivateBoosterAiOrderDto {
   @IsString()
+  @Matches(/^[A-Za-z0-9_-]{8,128}$/, {
+    message: 'orderId must be 8-128 URL-safe characters',
+  })
   orderId!: string
 }
 

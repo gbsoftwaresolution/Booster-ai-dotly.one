@@ -91,7 +91,7 @@ export class ContactsService {
       where: { id: dto.cardId },
       include: { user: true },
     })
-    if (!card) throw new NotFoundException('Card not found')
+    if (!card || !card.isActive) throw new NotFoundException('Card not found')
 
     // C-03: Per-card rate limit — max 10 lead submissions per card per hour.
     // The global ThrottlerGuard already rate-limits by IP (5 req/min), but a
@@ -124,7 +124,7 @@ export class ContactsService {
     // (e.g. a browser refresh on the thank-you page).
     if (dto.email) {
       const duplicate = await this.prisma.contact.findFirst({
-        where: { ownerUserId: card.userId, email: dto.email, sourceCardId: dto.cardId },
+        where: { ownerUserId: card.userId, email: dto.email },
         select: { id: true },
       })
       if (duplicate) {
@@ -306,6 +306,16 @@ export class ContactsService {
     let contact: Awaited<ReturnType<typeof this.prisma.contact.create>>
     try {
       contact = await this.prisma.$transaction(async (tx) => {
+        if (dto.sourceCardId) {
+          const sourceCard = await tx.card.findUnique({
+            where: { id: dto.sourceCardId },
+            select: { userId: true },
+          })
+          if (!sourceCard || sourceCard.userId !== userId) {
+            throw new ForbiddenException('Invalid source card')
+          }
+        }
+
         const c = await tx.contact.create({
           data: {
             ownerUserId: userId,

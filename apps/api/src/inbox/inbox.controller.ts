@@ -1,13 +1,15 @@
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common'
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, UseGuards,
-} from '@nestjs/common'
-import {
-  ApiTags, ApiBearerAuth, ApiOperation, ApiResponse,
-} from '@nestjs/swagger'
-import {
-  IsString, IsEmail, IsOptional, IsInt, IsUrl,
-  MaxLength, MinLength, Min, Max, IsIn,
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsInt,
+  MaxLength,
+  MinLength,
+  Min,
+  Max,
+  IsIn,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
@@ -18,88 +20,108 @@ import { InboxService } from './inbox.service'
 // ─── Public DTOs ─────────────────────────────────────────────────────────────
 
 class SendMessageDto {
-  @IsString() @MinLength(1) @MaxLength(200)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
   senderName!: string
 
-  @IsOptional() @IsEmail()
+  @IsOptional()
+  @IsEmail()
   senderEmail?: string
 
-  @IsString() @MinLength(1) @MaxLength(5000)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(5000)
   message!: string
 }
 
 class GetVoiceUploadUrlDto {
-  @IsString() @MaxLength(500)
+  @IsString()
+  @MaxLength(500)
   filename!: string
 
-  @IsString() @IsIn([
-    'audio/webm','audio/ogg','audio/mpeg','audio/mp4',
-    'audio/wav','audio/x-wav','audio/aac',
+  @IsString()
+  @IsIn([
+    'audio/webm',
+    'audio/ogg',
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/aac',
   ])
   contentType!: string
 
-  @IsInt() @Min(1) @Max(20 * 1024 * 1024)
+  @IsInt()
+  @Min(1)
+  @Max(20 * 1024 * 1024)
   @Type(() => Number)
   fileSizeBytes!: number
 }
 
 class ConfirmVoiceNoteDto {
-  @IsString() @MinLength(1) @MaxLength(200)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
   senderName!: string
 
-  @IsOptional() @IsEmail()
+  @IsOptional()
+  @IsEmail()
   senderEmail?: string
 
-  @IsUrl() @MaxLength(2048)
-  audioUrl!: string
+  @IsString()
+  @MinLength(20)
+  @MaxLength(2048)
+  uploadToken!: string
 
-  @IsString() @MaxLength(100)
-  mimeType!: string
-
-  @IsOptional() @IsInt() @Min(0)
-  @Type(() => Number)
-  fileSize?: number
-
-  @IsOptional() @IsInt() @Min(0)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
   @Type(() => Number)
   durationSec?: number
 }
 
 class GetDropboxUploadUrlDto {
-  @IsString() @MaxLength(500)
+  @IsString()
+  @MaxLength(500)
   filename!: string
 
-  @IsString() @MaxLength(100)
+  @IsString()
+  @MaxLength(100)
   contentType!: string
 
-  @IsInt() @Min(1) @Max(50 * 1024 * 1024)
+  @IsInt()
+  @Min(1)
+  @Max(50 * 1024 * 1024)
   @Type(() => Number)
   fileSizeBytes!: number
 }
 
 class ConfirmDropboxFileDto {
-  @IsString() @MinLength(1) @MaxLength(200)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
   senderName!: string
 
-  @IsOptional() @IsEmail()
+  @IsOptional()
+  @IsEmail()
   senderEmail?: string
 
-  @IsString() @MinLength(1) @MaxLength(500)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
   fileName!: string
 
-  @IsUrl() @MaxLength(2048)
-  fileUrl!: string
-
-  @IsString() @MaxLength(100)
-  mimeType!: string
-
-  @IsOptional() @IsInt() @Min(0)
-  @Type(() => Number)
-  fileSize?: number
+  @IsString()
+  @MinLength(20)
+  @MaxLength(2048)
+  uploadToken!: string
 }
 
 class CreateMemoryDto {
-  @IsString() @MinLength(1) @MaxLength(2000)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
   content!: string
 }
 
@@ -118,10 +140,7 @@ export class InboxController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Send a text message to a card owner' })
   @ApiResponse({ status: 201, description: 'Message sent' })
-  async sendMessage(
-    @Param('handle') handle: string,
-    @Body() dto: SendMessageDto,
-  ) {
+  async sendMessage(@Param('handle') handle: string, @Body() dto: SendMessageDto) {
     return this.inbox.sendMessage(handle, dto.senderName, dto.senderEmail, dto.message)
   }
 
@@ -132,10 +151,7 @@ export class InboxController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get presigned URL to upload a voice note' })
-  async getVoiceUploadUrl(
-    @Param('handle') handle: string,
-    @Body() dto: GetVoiceUploadUrlDto,
-  ) {
+  async getVoiceUploadUrl(@Param('handle') handle: string, @Body() dto: GetVoiceUploadUrlDto) {
     return this.inbox.getVoiceUploadUrl(handle, dto.filename, dto.contentType, dto.fileSizeBytes)
   }
 
@@ -146,13 +162,13 @@ export class InboxController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Confirm voice note after direct R2 upload' })
-  async confirmVoiceNote(
-    @Param('handle') handle: string,
-    @Body() dto: ConfirmVoiceNoteDto,
-  ) {
+  async confirmVoiceNote(@Param('handle') handle: string, @Body() dto: ConfirmVoiceNoteDto) {
     return this.inbox.confirmVoiceNote(
-      handle, dto.senderName, dto.senderEmail,
-      dto.audioUrl, dto.mimeType, dto.fileSize, dto.durationSec,
+      handle,
+      dto.senderName,
+      dto.senderEmail,
+      dto.uploadToken,
+      dto.durationSec,
     )
   }
 
@@ -163,10 +179,7 @@ export class InboxController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get presigned URL to upload a dropbox file' })
-  async getDropboxUploadUrl(
-    @Param('handle') handle: string,
-    @Body() dto: GetDropboxUploadUrlDto,
-  ) {
+  async getDropboxUploadUrl(@Param('handle') handle: string, @Body() dto: GetDropboxUploadUrlDto) {
     return this.inbox.getDropboxUploadUrl(handle, dto.filename, dto.contentType, dto.fileSizeBytes)
   }
 
@@ -177,13 +190,13 @@ export class InboxController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Confirm dropbox file after direct R2 upload' })
-  async confirmDropboxFile(
-    @Param('handle') handle: string,
-    @Body() dto: ConfirmDropboxFileDto,
-  ) {
+  async confirmDropboxFile(@Param('handle') handle: string, @Body() dto: ConfirmDropboxFileDto) {
     return this.inbox.confirmDropboxFile(
-      handle, dto.senderName, dto.senderEmail,
-      dto.fileName, dto.fileUrl, dto.mimeType, dto.fileSize,
+      handle,
+      dto.senderName,
+      dto.senderEmail,
+      dto.fileName,
+      dto.uploadToken,
     )
   }
 

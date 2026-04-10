@@ -29,6 +29,9 @@ const DOTLY_ABI = [
 // Any index outside 0-3 is treated as FREE to avoid silent privilege escalation.
 const PLAN_INDEX_MAP: Plan[] = [Plan.FREE, Plan.PRO, Plan.BUSINESS, Plan.ENTERPRISE]
 
+const FINALIZED_BOOSTERAI_STATUSES = new Set(['FINALIZED_ONCHAIN'])
+const REFUNDED_BOOSTERAI_STATUSES = new Set(['REFUNDED_ONCHAIN'])
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name)
@@ -51,6 +54,16 @@ export class BillingService {
     txHash: string,
     chainId: number,
   ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { walletAddress: true },
+    })
+    if (!user?.walletAddress || user.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      throw new BadRequestException(
+        'Provided wallet address does not match the wallet on your account',
+      )
+    }
+
     // F-10: Verify that the transaction was sent FROM the claimed walletAddress.
     // Without this check, any user could submit a tx hash from another wallet,
     // claim that wallet's on-chain plan, and upgrade their account for free.
@@ -154,14 +167,12 @@ export class BillingService {
     walletAddress: string,
     chainId: number,
   ): Promise<{ plan: Plan; expiresAt: Date }> {
-    const fallback = { plan: Plan.FREE, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
     try {
       const contractAddress = this.config.get<string>('DOTLY_CONTRACT_ADDRESS') as
         | Address
         | undefined
       if (!contractAddress) {
-        this.logger.warn('DOTLY_CONTRACT_ADDRESS not set — defaulting to FREE plan')
-        return fallback
+        throw new BadRequestException('Billing contract is not configured')
       }
 
       const polygonRpc = this.config.get<string>('POLYGON_RPC_URL')
@@ -170,8 +181,7 @@ export class BillingService {
       const chain = chainId === 137 ? polygon : base
       const rpcUrl = chainId === 137 ? polygonRpc : baseRpc
       if (!rpcUrl) {
-        this.logger.warn(`No RPC URL configured for chainId ${chainId} — defaulting to FREE plan`)
-        return fallback
+        throw new BadRequestException(`No RPC URL configured for chainId ${chainId}`)
       }
 
       const client = createPublicClient({ chain, transport: http(rpcUrl) })
@@ -183,7 +193,10 @@ export class BillingService {
       })
 
       if (!active || expiresAtRaw <= BigInt(Math.floor(Date.now() / 1000))) {
-        return fallback
+        return {
+          plan: Plan.FREE,
+          expiresAt: new Date(Number(expiresAtRaw) * 1000),
+        }
       }
 
       return {
@@ -191,9 +204,23 @@ export class BillingService {
         expiresAt: new Date(Number(expiresAtRaw) * 1000),
       }
     } catch (err) {
+      if (err instanceof BadRequestException) throw err
       this.logger.error('Failed to read on-chain subscription', err)
-      return fallback
+      throw new BadRequestException('Could not verify on-chain subscription state')
     }
+  }
+
+  private getPlanForBoosterPlanId(planId: number): Plan {
+    const planMap = new Map<number, Plan>([
+      [this.boosterAi.getPlanId(Plan.STARTER), Plan.STARTER],
+      [this.boosterAi.getPlanId(Plan.PRO), Plan.PRO],
+      [this.boosterAi.getPlanId(Plan.BUSINESS), Plan.BUSINESS],
+      [this.boosterAi.getPlanId(Plan.AGENCY), Plan.AGENCY],
+      [this.boosterAi.getPlanId(Plan.ENTERPRISE), Plan.ENTERPRISE],
+    ])
+    const plan = planMap.get(planId)
+    if (!plan) throw new BadRequestException(`Unknown BoosterAI planId: ${planId}`)
+    return plan
   }
 
   async getUserSubscription(userId: string) {
@@ -247,6 +274,12 @@ export class BillingService {
     }
 
     const amountUsdt = this.boosterAi.getAmountUsdt(params.plan, params.duration)
+    const normalizedWallet = params.walletAddress.toLowerCase()
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { walletAddress: normalizedWallet },
+    })
 
     // Persist the pending order on the Subscription record so we can resume
     // polling even if the user closes the tab.
@@ -260,12 +293,16 @@ export class BillingService {
         boosterAiPartnerId: null,
         billingDuration: params.duration,
         amountUsdt,
+        contractSubscriptionId: normalizedWallet,
       },
       update: {
         plan: params.plan,
         boosterAiOrderId: orderRes.orderId,
         billingDuration: params.duration,
         amountUsdt,
+        contractSubscriptionId: normalizedWallet,
+        status: 'TRIALING',
+        boosterAiPartnerId: null,
       },
     })
 
@@ -285,6 +322,22 @@ export class BillingService {
    * Returns { status: 'ACTIVE' | 'PENDING' | 'CANCELLED' }.
    */
   async activateBoosterAiOrder(userId: string, orderId: string) {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: {
+        plan: true,
+        boosterAiOrderId: true,
+        billingDuration: true,
+        amountUsdt: true,
+      },
+    })
+
+    if (!sub?.boosterAiOrderId || sub.boosterAiOrderId !== orderId) {
+      throw new BadRequestException(
+        'Order does not match the pending BoosterAI order for this account',
+      )
+    }
+
     let status: Awaited<ReturnType<BoosterAiClient['getOrderStatus']>>
     try {
       status = await this.boosterAi.getOrderStatus(orderId)
@@ -295,22 +348,27 @@ export class BillingService {
       )
     }
 
-    if (status.orderStatus === 'FINALIZED_ONCHAIN') {
+    if (FINALIZED_BOOSTERAI_STATUSES.has(status.orderStatus)) {
+      const expectedPlan = this.getPlanForBoosterPlanId(status.planId)
+      const duration = (sub.billingDuration ?? BillingDuration.MONTHLY) as BillingDuration
+      const expectedAmount = this.boosterAi.getAmountUsdt(expectedPlan, duration)
+
+      if (sub.plan !== expectedPlan) {
+        throw new BadRequestException(
+          'BoosterAI order plan does not match the pending subscription plan',
+        )
+      }
+      if (sub.amountUsdt !== expectedAmount || status.amountUsdt !== expectedAmount) {
+        throw new BadRequestException(
+          'BoosterAI order amount does not match the pending subscription',
+        )
+      }
+
       const paidAt = status.paidAt ? new Date(status.paidAt) : new Date()
-      const sub = await this.prisma.subscription.findUnique({ where: { userId } })
-      const dur = (sub?.billingDuration ?? 'MONTHLY') as BillingDuration
+      const dur = duration as BillingDuration
       const days = DURATION_DAYS[dur] ?? 30
       const periodEnd = new Date(paidAt.getTime() + days * 24 * 60 * 60 * 1000)
-
-      // Resolve the plan from the BoosterAI planId (reverse lookup)
-      const planByBoosterId: Record<number, Plan> = {
-        1: Plan.STARTER,
-        2: Plan.PRO,
-        3: Plan.BUSINESS,
-        4: Plan.AGENCY,
-        5: Plan.ENTERPRISE,
-      }
-      const plan = planByBoosterId[status.planId] ?? Plan.STARTER
+      const plan = expectedPlan
 
       await this.prisma.subscription.update({
         where: { userId },
@@ -320,6 +378,7 @@ export class BillingService {
           boosterAiPartnerId: status.partnerId ?? undefined,
           currentPeriodEnd: periodEnd,
           cancelAtPeriodEnd: false,
+          boosterAiOrderId: null,
         },
       })
 
@@ -337,10 +396,15 @@ export class BillingService {
       return { status: 'ACTIVE', plan, currentPeriodEnd: periodEnd }
     }
 
-    if (status.orderStatus === 'REFUNDED_ONCHAIN') {
+    if (REFUNDED_BOOSTERAI_STATUSES.has(status.orderStatus)) {
       await this.prisma.subscription.update({
         where: { userId },
-        data: { status: 'CANCELLED', plan: Plan.FREE, cancelAtPeriodEnd: false },
+        data: {
+          status: 'CANCELLED',
+          plan: Plan.FREE,
+          cancelAtPeriodEnd: false,
+          boosterAiOrderId: null,
+        },
       })
       await this.prisma.user.update({ where: { id: userId }, data: { plan: Plan.FREE } })
 

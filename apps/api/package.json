@@ -8,6 +8,7 @@
     "predev": "pnpm --filter @dotly/database run db:generate",
     "dev": "nest start --watch",
     "start": "node dist/src/main",
+    "migrate:webhook-secrets": "tsx src/scripts/migrate-webhook-secrets.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "pretypecheck": "pnpm --filter @dotly/database run db:generate",
     "typecheck": "tsc --noEmit",

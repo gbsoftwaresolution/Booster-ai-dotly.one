@@ -420,9 +420,9 @@ function VoiceTab({
         )
         return
       }
-      const { uploadUrl, publicUrl } = (await urlRes.json()) as {
+      const { uploadUrl, uploadToken } = (await urlRes.json()) as {
         uploadUrl: string
-        publicUrl: string
+        uploadToken: string
       }
 
       // Step 2 — PUT directly to R2
@@ -442,9 +442,7 @@ function VoiceTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           senderName: senderName.trim(),
-          audioUrl: publicUrl,
-          mimeType: mime,
-          fileSize: blob.size,
+          uploadToken,
           durationSec: seconds,
         }),
       })
@@ -686,9 +684,9 @@ function DropboxTab({
         )
         return
       }
-      const { uploadUrl, publicUrl } = (await urlRes.json()) as {
+      const { uploadUrl, uploadToken } = (await urlRes.json()) as {
         uploadUrl: string
-        publicUrl: string
+        uploadToken: string
       }
 
       // Step 2 — PUT directly to R2
@@ -709,9 +707,7 @@ function DropboxTab({
         body: JSON.stringify({
           senderName: senderName.trim(),
           fileName: file.name,
-          fileUrl: publicUrl,
-          mimeType,
-          fileSize: file.size,
+          uploadToken,
         }),
       })
       if (!confirmRes.ok) {

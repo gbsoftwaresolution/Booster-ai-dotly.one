@@ -23,16 +23,104 @@ function toSlug(name: string): string {
 @Injectable()
 export class TeamsService {
   private readonly logger = new Logger(TeamsService.name)
+  private readonly allowedAssetHosts: Set<string>
 
   constructor(
     private prisma: PrismaService,
     private email: EmailService,
     private config: ConfigService,
-  ) {}
+  ) {
+    const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
+    const allowedAssetHosts = new Set<string>(['cdn.dotly.one'])
+    try {
+      const normalized = r2Url.startsWith('http') ? r2Url : `https://${r2Url}`
+      allowedAssetHosts.add(new URL(normalized).hostname)
+    } catch {
+      /* ignore invalid config */
+    }
+    this.allowedAssetHosts = allowedAssetHosts
+  }
+
+  private sanitizeAvatarUrl(value: string | null | undefined): string | null {
+    if (!value) return null
+    try {
+      const url = new URL(value)
+      if (['http:', 'https:'].includes(url.protocol) && this.allowedAssetHosts.has(url.hostname)) {
+        return url.toString()
+      }
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
+
+  private sanitizeTeamUsers<
+    T extends { members?: Array<{ user?: { avatarUrl?: string | null } | null }> },
+  >(team: T): T {
+    return {
+      ...team,
+      members: team.members?.map((member) => ({
+        ...member,
+        user: member.user
+          ? {
+              ...member.user,
+              avatarUrl: this.sanitizeAvatarUrl(member.user.avatarUrl ?? null),
+            }
+          : member.user,
+      })),
+    }
+  }
+
+  private getTeamMemberLimit(plan: string): number {
+    const TEAM_MEMBER_LIMITS: Record<string, number> = {
+      FREE: 0,
+      PRO: 0,
+      BUSINESS: 10,
+      AGENCY: 50,
+      ENTERPRISE: Infinity,
+    }
+    return TEAM_MEMBER_LIMITS[plan] ?? 0
+  }
+
+  private async assertTeamHasSeatCapacity(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    options?: { includePendingInvites?: boolean },
+  ): Promise<void> {
+    const team = await tx.team.findUnique({
+      where: { id: teamId },
+      select: { id: true, ownerUserId: true },
+    })
+    if (!team) throw new NotFoundException('Team not found')
+
+    const owner = await tx.user.findUnique({
+      where: { id: team.ownerUserId },
+      select: { plan: true },
+    })
+    const memberLimit = this.getTeamMemberLimit(owner?.plan ?? 'FREE')
+    if (memberLimit === Infinity) return
+
+    const memberCount = await tx.teamMember.count({ where: { teamId } })
+    const pendingInviteCount = options?.includePendingInvites
+      ? await tx.teamInvite.count({
+          where: {
+            teamId,
+            accepted: false,
+            expiresAt: { gt: new Date() },
+          },
+        })
+      : 0
+
+    if (memberCount + pendingInviteCount >= memberLimit) {
+      throw new ForbiddenException(
+        `Your plan allows a maximum of ${memberLimit} team member(s). Upgrade to add more.`,
+      )
+    }
+  }
 
   async createTeam(userId: string, name: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!user || !(['BUSINESS', 'ENTERPRISE'] as string[]).includes(user.plan)) {
+    if (!user || !(['BUSINESS', 'AGENCY', 'ENTERPRISE'] as string[]).includes(user.plan)) {
       throw new ForbiddenException('Team management requires Business plan or higher')
     }
     const slug = toSlug(name)
@@ -73,7 +161,7 @@ export class TeamsService {
     if (!team) throw new NotFoundException('Team not found')
     const member = team.members.find((m) => m.userId === userId)
     if (!member) throw new ForbiddenException('Not a team member')
-    return team
+    return this.sanitizeTeamUsers(team)
   }
 
   async getTeamBySlug(slug: string) {
@@ -93,7 +181,11 @@ export class TeamsService {
     }
   }
 
-  async updateTeam(teamId: string, userId: string, data: { name?: string; brandConfig?: Record<string, unknown> }) {
+  async updateTeam(
+    teamId: string,
+    userId: string,
+    data: { name?: string; brandConfig?: Record<string, unknown> },
+  ) {
     const member = await this.prisma.teamMember.findUnique({
       where: { teamId_userId: { teamId, userId } },
     })
@@ -115,7 +207,12 @@ export class TeamsService {
     }
   }
 
-  async inviteMember(teamId: string, userId: string, inviteeEmail: string, role: 'ADMIN' | 'MEMBER' = 'MEMBER') {
+  async inviteMember(
+    teamId: string,
+    userId: string,
+    inviteeEmail: string,
+    role: 'ADMIN' | 'MEMBER' = 'MEMBER',
+  ) {
     // Use the composite unique index to look up the caller's membership directly —
     // this avoids the previous fragile pattern of filtering members and accessing
     // members[0], which is undefined when the caller is not a member at all.
@@ -137,20 +234,13 @@ export class TeamsService {
     // MED-06: Enforce plan-based team member limit.
     // FREE and PRO plans have teamMembers === 0 (no team feature).
     // BUSINESS allows up to 10 members, ENTERPRISE is unlimited.
-    const owner = await this.prisma.user.findUnique({ where: { id: team.ownerUserId } })
-    const ownerPlan = owner?.plan ?? 'FREE'
-    const TEAM_MEMBER_LIMITS: Record<string, number> = {
-      FREE: 0, PRO: 0, BUSINESS: 10, ENTERPRISE: Infinity,
-    }
-    const memberLimit = TEAM_MEMBER_LIMITS[ownerPlan] ?? 0
-    if (memberLimit !== Infinity) {
-      const currentCount = await this.prisma.teamMember.count({ where: { teamId } })
-      if (currentCount >= memberLimit) {
-        throw new ForbiddenException(
-          `Your plan allows a maximum of ${memberLimit} team member(s). Upgrade to add more.`,
-        )
-      }
-    }
+    await this.assertTeamHasSeatCapacity(
+      this.prisma as unknown as Prisma.TransactionClient,
+      teamId,
+      {
+        includePendingInvites: true,
+      },
+    )
 
     const inviter = await this.prisma.user.findUnique({ where: { id: userId } })
     const token = randomUUID()
@@ -176,10 +266,12 @@ export class TeamsService {
       // LOW-03: Log delivery failures so they are visible in monitoring/alerting.
       // Previously this was .catch(() => void 0) — a completely silent swallow —
       // meaning the admin had no indication the invited user never received an email.
-      .catch((err: unknown) => this.logger.error(
-        `Team invite email failed for team ${teamId}`,
-        err instanceof Error ? err.message : err,
-      ))
+      .catch((err: unknown) =>
+        this.logger.error(
+          `Team invite email failed for team ${teamId}`,
+          err instanceof Error ? err.message : err,
+        ),
+      )
 
     return { message: 'Invitation sent' }
   }
@@ -203,42 +295,46 @@ export class TeamsService {
       throw new ForbiddenException('This invite was sent to a different email address')
     }
 
-    await this.prisma.teamMember.create({
-      data: {
-        teamId: invite.teamId,
-        userId,
-        role: invite.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertTeamHasSeatCapacity(tx, invite.teamId)
+
+      await tx.teamMember.create({
+        data: {
+          teamId: invite.teamId,
+          userId,
+          role: invite.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
+        },
+      })
+      await tx.teamInvite.update({ where: { token }, data: { accepted: true } })
     })
-    await this.prisma.teamInvite.update({ where: { token }, data: { accepted: true } })
 
     return { teamId: invite.teamId }
   }
 
   async removeMember(teamId: string, adminUserId: string, targetUserId: string) {
-    const admin = await this.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId: adminUserId } },
-    })
-    if (!admin || admin.role !== 'ADMIN') throw new ForbiddenException('Not an admin')
-
-    // F-12: Prevent the team from becoming admin-less (unmanageable orphan).
-    // Check if the target is the last admin before deleting.
-    const targetMember = await this.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId: targetUserId } },
-    })
-    if (targetMember?.role === 'ADMIN') {
-      const adminCount = await this.prisma.teamMember.count({
-        where: { teamId, role: 'ADMIN' },
+    return this.prisma.$transaction(async (tx) => {
+      const admin = await tx.teamMember.findUnique({
+        where: { teamId_userId: { teamId, userId: adminUserId } },
       })
-      if (adminCount <= 1) {
-        throw new BadRequestException(
-          'Cannot remove the last admin. Promote another member to admin first.',
-        )
-      }
-    }
+      if (!admin || admin.role !== 'ADMIN') throw new ForbiddenException('Not an admin')
 
-    return this.prisma.teamMember.delete({
-      where: { teamId_userId: { teamId, userId: targetUserId } },
+      const targetMember = await tx.teamMember.findUnique({
+        where: { teamId_userId: { teamId, userId: targetUserId } },
+      })
+      if (targetMember?.role === 'ADMIN') {
+        const adminCount = await tx.teamMember.count({
+          where: { teamId, role: 'ADMIN' },
+        })
+        if (adminCount <= 1) {
+          throw new BadRequestException(
+            'Cannot remove the last admin. Promote another member to admin first.',
+          )
+        }
+      }
+
+      return tx.teamMember.delete({
+        where: { teamId_userId: { teamId, userId: targetUserId } },
+      })
     })
   }
 
@@ -248,31 +344,32 @@ export class TeamsService {
     targetUserId: string,
     role: 'ADMIN' | 'MEMBER',
   ) {
-    const admin = await this.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId: adminUserId } },
-    })
-    if (!admin || admin.role !== 'ADMIN') throw new ForbiddenException('Not an admin')
-
-    // F-12: Also block demoting the last admin to MEMBER via role update.
-    if (role === 'MEMBER') {
-      const targetMember = await this.prisma.teamMember.findUnique({
-        where: { teamId_userId: { teamId, userId: targetUserId } },
+    return this.prisma.$transaction(async (tx) => {
+      const admin = await tx.teamMember.findUnique({
+        where: { teamId_userId: { teamId, userId: adminUserId } },
       })
-      if (targetMember?.role === 'ADMIN') {
-        const adminCount = await this.prisma.teamMember.count({
-          where: { teamId, role: 'ADMIN' },
+      if (!admin || admin.role !== 'ADMIN') throw new ForbiddenException('Not an admin')
+
+      if (role === 'MEMBER') {
+        const targetMember = await tx.teamMember.findUnique({
+          where: { teamId_userId: { teamId, userId: targetUserId } },
         })
-        if (adminCount <= 1) {
-          throw new BadRequestException(
-            'Cannot demote the last admin. Promote another member to admin first.',
-          )
+        if (targetMember?.role === 'ADMIN') {
+          const adminCount = await tx.teamMember.count({
+            where: { teamId, role: 'ADMIN' },
+          })
+          if (adminCount <= 1) {
+            throw new BadRequestException(
+              'Cannot demote the last admin. Promote another member to admin first.',
+            )
+          }
         }
       }
-    }
 
-    return this.prisma.teamMember.update({
-      where: { teamId_userId: { teamId, userId: targetUserId } },
-      data: { role },
+      return tx.teamMember.update({
+        where: { teamId_userId: { teamId, userId: targetUserId } },
+        data: { role },
+      })
     })
   }
 
@@ -298,7 +395,7 @@ export class TeamsService {
       orderBy: { joinedAt: 'asc' },
     })
     if (!membership) return null
-    return membership.team
+    return this.sanitizeTeamUsers(membership.team)
   }
 
   async updateBrandConfig(
@@ -322,7 +419,12 @@ export class TeamsService {
     // Exhaustive list of every field in brandConfig that may contain a URL.
     // All of them must pass the SSRF guard (HTTPS-only, no private/internal IPs).
     // Adding a new URL field to brandConfig REQUIRES adding it here first.
-    const URL_FIELDS_IN_BRAND_CONFIG = ['logoUrl', 'backgroundUrl', 'faviconUrl', 'coverUrl'] as const
+    const URL_FIELDS_IN_BRAND_CONFIG = [
+      'logoUrl',
+      'backgroundUrl',
+      'faviconUrl',
+      'coverUrl',
+    ] as const
 
     for (const field of URL_FIELDS_IN_BRAND_CONFIG) {
       const value = brandConfig[field]
@@ -340,7 +442,8 @@ export class TeamsService {
     // Reject any non-URL string value that contains a URL-like scheme to prevent
     // SSRF via undocumented/future fields being passed in the free-form blob.
     for (const [key, value] of Object.entries(brandConfig)) {
-      if (URL_FIELDS_IN_BRAND_CONFIG.includes(key as typeof URL_FIELDS_IN_BRAND_CONFIG[number])) continue
+      if (URL_FIELDS_IN_BRAND_CONFIG.includes(key as (typeof URL_FIELDS_IN_BRAND_CONFIG)[number]))
+        continue
       if (typeof value === 'string' && /^https?:\/\//i.test(value)) {
         throw new BadRequestException(
           `Field "${key}" contains a URL but is not a recognised URL field. Use logoUrl, backgroundUrl, faviconUrl, or coverUrl for image URLs.`,
@@ -350,7 +453,10 @@ export class TeamsService {
 
     return this.prisma.team.update({
       where: { id: teamId },
-      data: { brandConfig: brandConfig as Prisma.InputJsonValue, ...(brandLock !== undefined ? { brandLock } : {}) },
+      data: {
+        brandConfig: brandConfig as Prisma.InputJsonValue,
+        ...(brandLock !== undefined ? { brandLock } : {}),
+      },
     })
   }
 }

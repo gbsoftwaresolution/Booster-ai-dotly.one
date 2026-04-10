@@ -19,56 +19,9 @@ import { AnalyticsService } from '../analytics/analytics.service'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import * as path from 'path'
-import { randomBytes, createHmac, createVerify, createPublicKey } from 'crypto'
-
-// SEC-01: Verify a Supabase JWT signature and return the sub claim, or null if invalid.
-// Uses the same key-resolution logic as supabase.strategy.ts so verification is
-// consistent. Supports both ES256 (JWK) and HS256 (shared secret) key types.
-// This is used by getVcard() to authenticate MEMBERS_ONLY vCard downloads without
-// running the full Passport guard (which would reject unauthenticated requests before
-// the endpoint can decide whether the card requires auth).
-function verifySupabaseJwt(token: string, secret: string): string | null {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-    const [headerB64, payloadB64, sigB64] = parts as [string, string, string]
-    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString()) as { alg?: string }
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as {
-      sub?: string
-      exp?: number
-    }
-    // Reject expired tokens
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
-
-    const signingInput = `${headerB64}.${payloadB64}`
-    const sig = Buffer.from(sigB64, 'base64url')
-
-    let valid = false
-    try {
-      const jwk = JSON.parse(secret) as Record<string, unknown>
-      if (jwk['kty'] === 'EC') {
-        // ES256: verify with EC public key
-        const pubKey = createPublicKey({ key: jwk, format: 'jwk' })
-        const verify = createVerify('SHA256')
-        verify.update(signingInput)
-        // Convert raw R||S signature (64 bytes) to DER if needed
-        valid = verify.verify(pubKey, sig)
-      } else {
-        // Fallback: HS256
-        const mac = createHmac('sha256', secret).update(signingInput).digest()
-        valid = mac.length === sig.length && mac.equals(sig)
-      }
-    } catch {
-      // JWK parse failed — treat as HS256 shared secret
-      const mac = createHmac('sha256', secret).update(signingInput).digest()
-      valid = mac.length === sig.length && mac.equals(sig)
-    }
-
-    return valid ? (payload.sub ?? null) : null
-  } catch {
-    return null
-  }
-}
+import { randomBytes } from 'crypto'
+import { verifySupabaseJwt } from '../auth/utils/verify-supabase-jwt'
+import { assertSafeUrl } from '../common/utils/ssrf-guard'
 
 // F-26: Single source of truth for plan limits used in card creation.
 // BillingService.getPlanLimits() is the canonical source for all other plan
@@ -125,6 +78,7 @@ export class CardsService {
   private readonly r2Client: S3Client
   private readonly r2Bucket: string
   private readonly r2PublicUrl: string
+  private readonly allowedAssetHosts: Set<string>
 
   constructor(
     private readonly prisma: PrismaService,
@@ -138,6 +92,13 @@ export class CardsService {
     this.r2Bucket = this.config.getOrThrow<string>('R2_BUCKET')
     const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
     this.r2PublicUrl = r2Url.startsWith('http') ? r2Url : `https://${r2Url}`
+    const allowedAssetHosts = new Set<string>(['cdn.dotly.one'])
+    try {
+      allowedAssetHosts.add(new URL(this.r2PublicUrl).hostname)
+    } catch {
+      /* ignore invalid config */
+    }
+    this.allowedAssetHosts = allowedAssetHosts
 
     this.r2Client = new S3Client({
       region: 'auto',
@@ -160,6 +121,36 @@ export class CardsService {
     if (userBySupabaseId) return userBySupabaseId.id
 
     throw new UnauthorizedException('Authenticated user not found')
+  }
+
+  private isTrustedAssetUrl(value: string): boolean {
+    try {
+      const url = new URL(value)
+      return ['http:', 'https:'].includes(url.protocol) && this.allowedAssetHosts.has(url.hostname)
+    } catch {
+      return false
+    }
+  }
+
+  private sanitizeCardFields(
+    fields: Prisma.JsonValue | Prisma.InputJsonValue | null | undefined,
+  ): Prisma.InputJsonValue {
+    const record = { ...(((fields ?? {}) as Record<string, unknown>) || {}) }
+    const avatarUrl = record['avatarUrl']
+    if (typeof avatarUrl === 'string' && avatarUrl.trim() && !this.isTrustedAssetUrl(avatarUrl)) {
+      record['avatarUrl'] = ''
+    }
+    return record as Prisma.InputJsonValue
+  }
+
+  private async validateMediaBlockUrl(url: string | undefined, type: string): Promise<void> {
+    if (!url) throw new BadRequestException('Media block URL is required')
+
+    await assertSafeUrl(url)
+
+    if ((type === 'VIDEO' || type === 'AUDIO') && !this.isTrustedAssetUrl(url)) {
+      throw new BadRequestException('Audio and video blocks must use uploaded Dotly asset URLs')
+    }
   }
 
   async findAllByUser(userId: string) {
@@ -205,6 +196,7 @@ export class CardsService {
 
     return cards.map((card) => ({
       ...card,
+      fields: this.sanitizeCardFields(card.fields),
       viewCount: viewsByCardId.get(card.id) ?? 0,
     }))
   }
@@ -278,7 +270,7 @@ export class CardsService {
               userId: internalUserId,
               handle,
               templateId: dto.templateId ?? 'MINIMAL',
-              fields: (dto.fields ?? {}) as Prisma.InputJsonValue,
+              fields: this.sanitizeCardFields((dto.fields ?? {}) as Prisma.InputJsonValue),
               theme: {
                 create: {
                   primaryColor: '#000000',
@@ -343,7 +335,10 @@ export class CardsService {
     })
     if (!card) throw new NotFoundException('Card not found')
     if (card.userId !== internalUserId) throw new ForbiddenException('Access denied')
-    return card
+    return {
+      ...card,
+      fields: this.sanitizeCardFields(card.fields),
+    }
   }
 
   async update(id: string, userId: string, dto: UpdateCardDto) {
@@ -369,10 +364,10 @@ export class CardsService {
     let mergedFields: Prisma.InputJsonValue | undefined
     if (dto.fields !== undefined) {
       const existing = (card.fields ?? {}) as Record<string, unknown>
-      mergedFields = {
+      mergedFields = this.sanitizeCardFields({
         ...existing,
         ...(dto.fields as Record<string, unknown>),
-      } as Prisma.InputJsonValue
+      } as Prisma.InputJsonValue)
     }
 
     return this.prisma.card.update({
@@ -381,7 +376,6 @@ export class CardsService {
         ...(dto.handle !== undefined && { handle: dto.handle }),
         ...(dto.templateId !== undefined && { templateId: dto.templateId }),
         ...(mergedFields !== undefined && { fields: mergedFields }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.vcardPolicy !== undefined && { vcardPolicy: dto.vcardPolicy }),
       },
       include: { theme: true, socialLinks: true },
@@ -433,6 +427,9 @@ export class CardsService {
 
   async upsertMediaBlocks(id: string, userId: string, dto: UpsertMediaBlocksDto) {
     await this.findById(id, userId)
+    for (const block of dto.blocks) {
+      await this.validateMediaBlockUrl(block.url, block.type as unknown as PrismaMediaBlockType)
+    }
     // Same atomic guarantee as upsertSocialLinks.
     return this.prisma.$transaction(async (tx) => {
       await tx.mediaBlock.deleteMany({ where: { cardId: id } })
@@ -615,6 +612,7 @@ export class CardsService {
           include: {
             teamMemberships: {
               include: { team: true },
+              orderBy: { joinedAt: 'asc' },
               take: 1,
             },
           },
@@ -629,7 +627,7 @@ export class CardsService {
         isActive: true,
         deletedAt: null,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: {
         slug: true,
         name: true,
@@ -657,9 +655,14 @@ export class CardsService {
       }
     }
 
-    // Strip internal user data from public response
-    const { user: _user, ...publicCard } = card
-    return { ...publicCard, teamBrand, bookableAppointment }
+    // Strip owner-only identifiers from the public response.
+    const { user: _user, userId: _userId, ...publicCard } = card
+    return {
+      ...publicCard,
+      fields: this.sanitizeCardFields(publicCard.fields),
+      teamBrand,
+      bookableAppointment,
+    }
   }
 
   async uploadAvatar(id: string, userId: string, base64: string, mimeType: string) {
@@ -812,17 +815,19 @@ export class CardsService {
     if (safeField('bio')) lines.push(`NOTE:${escapeVcard(safeField('bio'))}`)
 
     // Photo — inline URL reference (vCard 3.0 PHOTO;VALUE=URI)
-    if (safeField('avatarUrl')) lines.push(`PHOTO;VALUE=URI:${safeField('avatarUrl')}`)
+    if (safeField('avatarUrl')) lines.push(`PHOTO;VALUE=URI:${escapeVcard(safeField('avatarUrl'))}`)
 
     // Social links — emit X- properties for major platforms
     const socialLinks = card.socialLinks ?? []
     for (const sl of socialLinks) {
       const platform = String(sl.platform).toUpperCase()
-      lines.push(`X-SOCIALPROFILE;TYPE=${platform}:${sl.url}`)
+      lines.push(`X-SOCIALPROFILE;TYPE=${platform}:${escapeVcard(sl.url)}`)
     }
 
     // Source — the public card URL
-    lines.push(`URL;TYPE=HOME:https://dotly.one/card/${dbHandle}`)
+    const webUrl = this.config.get<string>('WEB_URL') ?? 'https://dotly.one'
+    const normalizedWebUrl = webUrl.startsWith('http') ? webUrl : `https://${webUrl}`
+    lines.push(`URL;TYPE=HOME:${escapeVcard(`${normalizedWebUrl}/card/${dbHandle}`)}`)
 
     lines.push('END:VCARD')
 

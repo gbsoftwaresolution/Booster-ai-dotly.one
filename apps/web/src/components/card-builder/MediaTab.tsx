@@ -40,6 +40,31 @@ const MAX_DOCS = 10
 const DEFAULT_GROUP_ID = '__default__'
 const DEFAULT_GROUP_NAME = 'General'
 const DOCS_GROUP_ID = '__docs__'
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'audio/mp4',
+  'audio/m4a',
+  'audio/x-m4a',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/csv',
+  'text/plain',
+  'application/zip',
+  'application/x-zip-compressed',
+])
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -648,6 +673,11 @@ function AddSheet({
       const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
       const resolvedType = file.type || EXT_MIME[ext] || 'application/octet-stream'
 
+      if (!ALLOWED_UPLOAD_MIME_TYPES.has(resolvedType)) {
+        setUploadError('This file type is not supported.')
+        return
+      }
+
       const isImage = resolvedType.startsWith('image/')
       const isVideo = resolvedType.startsWith('video/')
       const isAudio = resolvedType.startsWith('audio/')
@@ -773,7 +803,7 @@ function AddSheet({
           if (!res.ok) throw new Error('Upload failed — please try again')
           publicUrl = pub
         } else {
-          publicUrl = URL.createObjectURL(file)
+          throw new Error('This file type is not supported.')
         }
 
         const block: MediaBlockData = {

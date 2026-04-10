@@ -3,11 +3,13 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common'
 import { promises as dns } from 'dns'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { assertSafeUrl } from '../common/utils/ssrf-guard'
+import { Prisma } from '@dotly/database'
 
 /**
  * L-08: dns.resolveTxt() has no built-in timeout. On slow or unresponsive
@@ -42,18 +44,25 @@ export class CustomDomainsService {
 
     const verificationToken = `dotly-verify=${randomUUID()}`
 
-    return this.prisma.customDomain.create({
-      data: {
-        userId,
-        cardId: cardId ?? null,
-        domain: domain.toLowerCase().trim(),
-        status: 'PENDING',
-        verificationToken,
-        isVerified: false,
-        sslStatus: 'pending',
-        txtRecord: verificationToken,
-      },
-    })
+    try {
+      return await this.prisma.customDomain.create({
+        data: {
+          userId,
+          cardId: cardId ?? null,
+          domain: domain.toLowerCase().trim(),
+          status: 'PENDING',
+          verificationToken,
+          isVerified: false,
+          sslStatus: 'pending',
+          txtRecord: verificationToken,
+        },
+      })
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('That domain is already registered')
+      }
+      throw err
+    }
   }
 
   async verifyDomain(userId: string, domainId: string) {
@@ -119,11 +128,7 @@ export class CustomDomainsService {
     return this.prisma.customDomain.delete({ where: { id: domainId } })
   }
 
-  async updateDomain(
-    userId: string,
-    domainId: string,
-    updates: { cardId?: string | null },
-  ) {
+  async updateDomain(userId: string, domainId: string, updates: { cardId?: string | null }) {
     const record = await this.prisma.customDomain.findUnique({ where: { id: domainId } })
     if (!record) throw new NotFoundException('Domain not found')
     if (record.userId !== userId) throw new ForbiddenException('Access denied')
@@ -160,13 +165,12 @@ export class CustomDomainsService {
       },
     })
 
-    if (!record || record.status !== 'ACTIVE' || !record.card) {
+    if (!record || record.status !== 'ACTIVE' || !record.card || !record.card.isActive) {
       throw new NotFoundException('No active card found for this domain')
     }
 
     return {
       handle: record.card.handle,
-      card: record.card,
     }
   }
 

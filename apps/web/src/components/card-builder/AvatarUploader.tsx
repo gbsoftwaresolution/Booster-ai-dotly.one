@@ -16,7 +16,7 @@ import type { JSX } from 'react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
-import { X, Link2, Upload, Camera, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react'
+import { X, Upload, Camera, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -28,7 +28,7 @@ const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'url' | 'upload' | 'camera'
+type Tab = 'upload' | 'camera'
 
 interface AvatarUploaderProps {
   cardId: string
@@ -146,24 +146,31 @@ async function getCroppedBlob(
   })
 }
 
-// ─── Upload helper: get signed URL then PUT blob directly to R2 ──────────────
+// ─── Upload helper: use validated avatar endpoint ────────────────────────────
 
-async function uploadBlobToR2(cardId: string, blob: Blob, mimeType: string): Promise<string> {
+async function uploadAvatar(cardId: string, blob: Blob, mimeType: string): Promise<string> {
   const token = await getAccessToken()
-  const ext = mimeType === 'image/webp' ? 'webp' : 'jpg'
-  const filename = `avatar-${Date.now()}.${ext}`
-  const { uploadUrl, publicUrl } = await apiPost<{ uploadUrl: string; publicUrl: string }>(
-    `/cards/${cardId}/upload-url`,
-    { filename, contentType: mimeType, fileSizeBytes: blob.size },
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string') {
+        reject(new Error('Failed to encode avatar image'))
+        return
+      }
+      const [, encoded = ''] = result.split(',', 2)
+      resolve(encoded)
+    }
+    reader.onerror = () => reject(new Error('Failed to read avatar image'))
+    reader.readAsDataURL(blob)
+  })
+
+  const response = await apiPost<{ avatarUrl: string }>(
+    `/cards/${cardId}/avatar`,
+    { base64, mimeType },
     token,
   )
-  const res = await fetch(uploadUrl, {
-    method: 'PUT',
-    body: blob,
-    headers: { 'Content-Type': mimeType },
-  })
-  if (!res.ok) throw new Error('Upload to storage failed — please try again')
-  return publicUrl
+  return response.avatarUrl
 }
 
 // ─── Tiny tab button ─────────────────────────────────────────────────────────
@@ -234,7 +241,9 @@ function CropPane({
 
       {/* Zoom slider */}
       <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-400 w-8 text-right" aria-hidden="true">–</span>
+        <span className="text-xs text-gray-400 w-8 text-right" aria-hidden="true">
+          –
+        </span>
         <input
           type="range"
           min={1}
@@ -245,7 +254,9 @@ function CropPane({
           onChange={(e) => setZoom(Number(e.target.value))}
           className="flex-1 accent-brand-500"
         />
-        <span className="text-xs text-gray-400 w-8" aria-hidden="true">+</span>
+        <span className="text-xs text-gray-400 w-8" aria-hidden="true">
+          +
+        </span>
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -280,73 +291,6 @@ function CropPane({
   )
 }
 
-// ─── Tab: URL ────────────────────────────────────────────────────────────────
-
-function UrlTab({ current, onConfirm }: { current: string; onConfirm: (url: string) => void }) {
-  const [value, setValue] = useState(current)
-  const [preview, setPreview] = useState(!!current)
-  const [imgError, setImgError] = useState(false)
-
-  function handleBlur() {
-    if (value.trim()) {
-      setPreview(true)
-      setImgError(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-xs text-gray-500">Paste a publicly accessible image URL.</p>
-
-      <div
-        className={cn(
-          'flex items-center gap-2.5 rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3',
-          'focus-within:border-brand-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/20',
-        )}
-      >
-        <Link2 className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-        <input
-          type="url"
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value)
-            setPreview(false)
-          }}
-          onBlur={handleBlur}
-          placeholder="https://example.com/photo.jpg"
-          aria-label="Image URL"
-          className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
-        />
-      </div>
-
-      {preview && value && (
-        <div className="flex justify-center">
-          {imgError ? (
-            <ErrorBanner message="Could not load image — check the URL" />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={value}
-              alt="URL preview"
-              onError={() => setImgError(true)}
-              className="h-28 w-28 rounded-full object-cover ring-4 ring-brand-100"
-            />
-          )}
-        </div>
-      )}
-
-      <button
-        type="button"
-        disabled={!value.trim() || imgError}
-        onClick={() => onConfirm(value.trim())}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
-      >
-        <Check className="h-4 w-4" aria-hidden="true" /> Use this URL
-      </button>
-    </div>
-  )
-}
-
 // ─── Tab: Upload + Crop ──────────────────────────────────────────────────────
 
 function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: string) => void }) {
@@ -357,7 +301,7 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = useCallback(async (file: File) => {
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type as typeof ALLOWED_IMAGE_TYPES[number])) {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
       setError('Only JPEG, PNG, and WebP images are supported.')
       return
     }
@@ -371,20 +315,23 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
     reader.readAsDataURL(file)
   }, [])
 
-  const handleCropConfirm = useCallback(async (pixels: Area) => {
-    if (!imageSrc) return
-    setUploading(true)
-    setError(null)
-    try {
-      const blob = await getCroppedBlob(imageSrc, pixels, 'image/webp')
-      const url = await uploadBlobToR2(cardId, blob, 'image/webp')
-      onConfirm(url)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }, [imageSrc, cardId, onConfirm])
+  const handleCropConfirm = useCallback(
+    async (pixels: Area) => {
+      if (!imageSrc) return
+      setUploading(true)
+      setError(null)
+      try {
+        const blob = await getCroppedBlob(imageSrc, pixels, 'image/webp')
+        const url = await uploadAvatar(cardId, blob, 'image/webp')
+        onConfirm(url)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Upload failed')
+      } finally {
+        setUploading(false)
+      }
+    },
+    [imageSrc, cardId, onConfirm],
+  )
 
   if (imageSrc) {
     return (
@@ -404,7 +351,10 @@ function UploadTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
         type="button"
         aria-label="Click or drag an image to upload"
         onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragActive(true)
+        }}
         onDragLeave={() => setDragActive(false)}
         onDrop={(e) => {
           e.preventDefault()
@@ -501,20 +451,23 @@ function CameraTab({ cardId, onConfirm }: { cardId: string; onConfirm: (url: str
     setCaptured(dataUrl)
   }
 
-  const handleCropConfirm = useCallback(async (pixels: Area) => {
-    if (!captured) return
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const blob = await getCroppedBlob(captured, pixels, 'image/webp')
-      const url = await uploadBlobToR2(cardId, blob, 'image/webp')
-      onConfirm(url)
-    } catch (e) {
-      setUploadError(e instanceof Error ? e.message : 'Upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }, [captured, cardId, onConfirm])
+  const handleCropConfirm = useCallback(
+    async (pixels: Area) => {
+      if (!captured) return
+      setUploading(true)
+      setUploadError(null)
+      try {
+        const blob = await getCroppedBlob(captured, pixels, 'image/webp')
+        const url = await uploadAvatar(cardId, blob, 'image/webp')
+        onConfirm(url)
+      } catch (e) {
+        setUploadError(e instanceof Error ? e.message : 'Upload failed')
+      } finally {
+        setUploading(false)
+      }
+    },
+    [captured, cardId, onConfirm],
+  )
 
   function retake() {
     setCaptured(null)
@@ -592,10 +545,13 @@ export function AvatarUploader({
   const [tab, setTab] = useState<Tab>('upload')
   const panelRef = useRef<HTMLDivElement>(null)
 
-  const handleConfirm = useCallback((url: string) => {
-    onAvatarChange(url)
-    onClose()
-  }, [onAvatarChange, onClose])
+  const handleConfirm = useCallback(
+    (url: string) => {
+      onAvatarChange(url)
+      onClose()
+    },
+    [onAvatarChange, onClose],
+  )
 
   // Focus trap + Escape key inside the panel
   useFocusTrap(panelRef, true, onClose)
@@ -661,14 +617,17 @@ export function AvatarUploader({
         )}
 
         {/* Tab switcher */}
-        <div role="tablist" aria-label="Photo source" className="flex gap-1 rounded-xl bg-gray-100 p-1 mb-4">
+        <div
+          role="tablist"
+          aria-label="Photo source"
+          className="flex gap-1 rounded-xl bg-gray-100 p-1 mb-4"
+        >
           <TabBtn
             active={tab === 'upload'}
             onClick={() => setTab('upload')}
             icon={Upload}
             label="Upload"
           />
-          <TabBtn active={tab === 'url'} onClick={() => setTab('url')} icon={Link2} label="URL" />
           <TabBtn
             active={tab === 'camera'}
             onClick={() => setTab('camera')}
@@ -678,7 +637,6 @@ export function AvatarUploader({
         </div>
 
         {/* Tab content */}
-        {tab === 'url' && <UrlTab current={currentAvatarUrl ?? ''} onConfirm={handleConfirm} />}
         {tab === 'upload' && <UploadTab cardId={cardId} onConfirm={handleConfirm} />}
         {tab === 'camera' && <CameraTab cardId={cardId} onConfirm={handleConfirm} />}
       </div>

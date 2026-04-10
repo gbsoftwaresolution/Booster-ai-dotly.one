@@ -6,6 +6,10 @@ import { WalletPassesService } from './wallet-passes.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Public } from '../auth/decorators/public.decorator'
 
+interface MaybeAuthUser {
+  id?: string
+}
+
 @ApiTags('wallet-passes')
 @Controller()
 export class WalletPassesController {
@@ -48,8 +52,12 @@ export class WalletPassesController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Get('public/cards/:handle/wallet/apple')
-  async publicApplePass(@Param('handle') handle: string, @Res() res: Response) {
-    const buf = await this.walletPassesService.getPublicPassForHandle(handle)
+  async publicApplePass(
+    @Param('handle') handle: string,
+    @CurrentUser() user: MaybeAuthUser | undefined,
+    @Res() res: Response,
+  ) {
+    const buf = await this.walletPassesService.getPublicPassForHandle(handle, user?.id ?? null)
     res.setHeader('Content-Type', 'application/vnd.apple.pkpass')
     res.setHeader('Content-Disposition', `attachment; filename="${handle}.pkpass"`)
     res.send(buf)
@@ -60,8 +68,14 @@ export class WalletPassesController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Get('public/cards/:handle/wallet/google')
-  async publicGooglePassUrl(@Param('handle') handle: string) {
-    const url = await this.walletPassesService.getPublicGooglePassUrlForHandle(handle)
+  async publicGooglePassUrl(
+    @Param('handle') handle: string,
+    @CurrentUser() user: MaybeAuthUser | undefined,
+  ) {
+    const url = await this.walletPassesService.getPublicGooglePassUrlForHandle(
+      handle,
+      user?.id ?? null,
+    )
     return { url }
   }
 }

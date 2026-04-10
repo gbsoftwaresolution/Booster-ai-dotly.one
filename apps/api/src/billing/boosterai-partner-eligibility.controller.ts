@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger'
 import { IsEmail, IsEthereumAddress, IsOptional, ValidateIf } from 'class-validator'
 import { PrismaService } from '../prisma/prisma.service'
 import { BoosterAiPartnerGuard } from './boosterai-partner.guard'
+import { Public } from '../auth/decorators/public.decorator'
 
 /**
  * Query params — at least one of email or walletAddress must be provided.
@@ -32,6 +33,7 @@ class PartnerEligibilityQuery {
  *   { eligible: false, reason: 'USER_NOT_FOUND' }
  */
 @ApiTags('internal')
+@Public()
 @Controller('v1/internal/boosterai')
 @UseGuards(BoosterAiPartnerGuard)
 export class BoosterAiPartnerEligibilityController {
@@ -45,16 +47,29 @@ export class BoosterAiPartnerEligibilityController {
       return { eligible: false, reason: 'MISSING_IDENTIFIER' }
     }
 
-    // Look up the Dotly user by email or wallet address.
-    const user = await this.prisma.user.findFirst({
-      where: {
-        OR: [
-          email          ? { email: email.toLowerCase() }  : undefined,
-          walletAddress  ? { walletAddress }               : undefined,
-        ].filter(Boolean) as any[],
-      },
-      select: { id: true, plan: true },
-    })
+    const normalizedEmail = email?.toLowerCase()
+    const normalizedWallet = walletAddress?.toLowerCase()
+
+    const [emailUser, walletUser] = await Promise.all([
+      normalizedEmail
+        ? this.prisma.user.findFirst({
+            where: { email: normalizedEmail },
+            select: { id: true, plan: true },
+          })
+        : Promise.resolve(null),
+      normalizedWallet
+        ? this.prisma.user.findFirst({
+            where: { walletAddress: normalizedWallet },
+            select: { id: true, plan: true },
+          })
+        : Promise.resolve(null),
+    ])
+
+    if (emailUser && walletUser && emailUser.id !== walletUser.id) {
+      return { eligible: false, reason: 'IDENTIFIER_MISMATCH' }
+    }
+
+    const user = emailUser ?? walletUser
 
     if (!user) {
       return { eligible: false, reason: 'USER_NOT_FOUND' }
@@ -67,15 +82,14 @@ export class BoosterAiPartnerEligibilityController {
     })
 
     const hasPaidPlan = user.plan !== 'FREE'
-    const isActive    = subscription?.status === 'ACTIVE'
-    const notExpired  = !subscription?.currentPeriodEnd
-                        || subscription.currentPeriodEnd > new Date()
+    const isActive = subscription?.status === 'ACTIVE'
+    const notExpired = !subscription?.currentPeriodEnd || subscription.currentPeriodEnd > new Date()
 
     if (hasPaidPlan && isActive && notExpired) {
       return {
         eligible: true,
-        plan:     subscription?.plan ?? user.plan,
-        status:   subscription?.status ?? 'ACTIVE',
+        plan: subscription?.plan ?? user.plan,
+        status: subscription?.status ?? 'ACTIVE',
       }
     }
 

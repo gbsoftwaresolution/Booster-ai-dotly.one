@@ -16,7 +16,15 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { AnalyticsService } from './analytics.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { BillingService } from '../billing/billing.service'
-import { IsString, IsIn, IsOptional, IsDateString, ValidateNested, IsObject } from 'class-validator'
+import {
+  IsString,
+  IsIn,
+  IsOptional,
+  IsDateString,
+  ValidateNested,
+  IsObject,
+  MaxLength,
+} from 'class-validator'
 import { Type } from 'class-transformer'
 import type { Request } from 'express'
 import { Plan } from '@dotly/types'
@@ -32,30 +40,37 @@ type EventType = (typeof VALID_EVENT_TYPES)[number]
 class EventMetadataDto {
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   contactId?: string
 
   @IsOptional()
   @IsString()
+  @MaxLength(2048)
   referrer?: string
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   linkPlatform?: string
 
   @IsOptional()
   @IsString()
+  @MaxLength(2048)
   linkUrl?: string
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   action?: string
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   surface?: string
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   status?: string
 }
 
@@ -100,6 +115,18 @@ export class AnalyticsController {
     private billingService: BillingService,
   ) {}
 
+  private extractClientIp(req: Request): string | undefined {
+    const trustedProxyHint = req.headers['x-vercel-ip-country'] || req.headers['x-real-ip']
+    if (trustedProxyHint) {
+      const forwarded = req.headers['x-forwarded-for']
+      const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded
+      const firstForwarded = forwardedValue?.split(',')[0]?.trim()
+      if (firstForwarded) return firstForwarded
+    }
+
+    return req.socket?.remoteAddress
+  }
+
   @Public()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60000 } })
@@ -116,8 +143,7 @@ export class AnalyticsController {
       throw new BadRequestException('Card not found or not published')
     }
 
-    const forwarded = req.headers['x-forwarded-for']
-    const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded) ?? req.socket?.remoteAddress
+    const ip = this.extractClientIp(req)
     const country = req.headers['x-vercel-ip-country'] as string | undefined
     const ua = req.headers['user-agent'] ?? ''
     // Order matters: check tablet before mobile — many tablet UAs also contain

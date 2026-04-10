@@ -20,6 +20,7 @@ const GLOBAL_STYLES = `
 interface ShareBarProps {
   handle: string
   ownerName: string
+  allowAnonymousExport?: boolean
   onAnalytics?: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
 }
 
@@ -45,7 +46,12 @@ function useWalletSupport() {
   return { appleSupported, googleSupported }
 }
 
-export function ShareBar({ handle, ownerName, onAnalytics }: ShareBarProps) {
+export function ShareBar({
+  handle,
+  ownerName,
+  allowAnonymousExport = true,
+  onAnalytics,
+}: ShareBarProps) {
   const [copied, setCopied] = useState(false)
   const { appleSupported, googleSupported } = useWalletSupport()
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -276,7 +282,7 @@ export function ShareBar({ handle, ownerName, onAnalytics }: ShareBarProps) {
       </div>
 
       {/* Wallet row — only rendered on supported devices */}
-      {(appleSupported || googleSupported) && (
+      {allowAnonymousExport && (appleSupported || googleSupported) && (
         <div style={{ display: 'flex', gap: 8 }}>
           {appleSupported && (
             <button

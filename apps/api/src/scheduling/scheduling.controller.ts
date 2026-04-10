@@ -144,9 +144,10 @@ export class SchedulingController {
   ) {
     const webUrl = process.env.WEB_URL ?? 'http://localhost:3000'
     try {
+      const userId = this.googleCalendar.verifyState(state)
       const tokens = await this.googleCalendar.exchangeCode(code)
       const googleEmail = await this.googleCalendar.getGoogleEmail(tokens.access_token)
-      await this.googleCalendar.saveConnection(state, tokens, googleEmail)
+      await this.googleCalendar.saveConnection(userId, tokens, googleEmail)
       res.redirect(`${webUrl}/scheduling?google=connected`)
     } catch {
       res.redirect(`${webUrl}/scheduling?google=error`)

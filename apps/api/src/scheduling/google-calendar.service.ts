@@ -1,6 +1,13 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
+
+interface GoogleOAuthStatePayload {
+  userId: string
+  nonce: string
+  exp: number
+}
 
 interface GoogleTokenResponse {
   access_token: string
@@ -26,11 +33,17 @@ interface GoogleFreeBusyResponse {
 @Injectable()
 export class GoogleCalendarService {
   private readonly logger = new Logger(GoogleCalendarService.name)
+  private readonly stateSecret: string
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-  ) {}
+  ) {
+    this.stateSecret =
+      this.config.get<string>('GOOGLE_OAUTH_STATE_SECRET') ??
+      this.config.get<string>('SUPABASE_JWT_SECRET') ??
+      this.config.getOrThrow<string>('GOOGLE_OAUTH_CLIENT_SECRET')
+  }
 
   private get clientId(): string {
     return this.config.getOrThrow<string>('GOOGLE_OAUTH_CLIENT_ID')
@@ -46,7 +59,13 @@ export class GoogleCalendarService {
   }
 
   /** Build the Google OAuth2 authorization URL */
-  getAuthUrl(state: string): string {
+  getAuthUrl(userId: string): string {
+    const payload: GoogleOAuthStatePayload = {
+      userId,
+      nonce: randomBytes(16).toString('hex'),
+      exp: Date.now() + 10 * 60 * 1000,
+    }
+    const state = this.signState(payload)
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
@@ -62,6 +81,29 @@ export class GoogleCalendarService {
       state,
     })
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+  }
+
+  private signState(payload: GoogleOAuthStatePayload): string {
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
+    const sig = createHmac('sha256', this.stateSecret).update(body).digest('base64url')
+    return `${body}.${sig}`
+  }
+
+  verifyState(state: string): string {
+    const [body, sig] = state.split('.')
+    if (!body || !sig) throw new BadRequestException('Invalid Google OAuth state')
+
+    const expectedSig = createHmac('sha256', this.stateSecret).update(body).digest('base64url')
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+      throw new BadRequestException('Invalid Google OAuth state')
+    }
+
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as GoogleOAuthStatePayload
+    if (!payload.userId || payload.exp < Date.now()) {
+      throw new BadRequestException('Google OAuth state has expired')
+    }
+
+    return payload.userId
   }
 
   /** Exchange authorization code for tokens */
@@ -190,10 +232,7 @@ export class GoogleCalendarService {
    * Create a Google Calendar event for a booking.
    * Returns the event ID to be stored with the booking.
    */
-  async createEvent(
-    userId: string,
-    event: GoogleCalendarEvent,
-  ): Promise<string | null> {
+  async createEvent(userId: string, event: GoogleCalendarEvent): Promise<string | null> {
     try {
       const conn = await this.prisma.googleCalendarConnection.findUnique({ where: { userId } })
       if (!conn) return null
@@ -223,7 +262,9 @@ export class GoogleCalendarService {
       const created = (await resp.json()) as { id: string }
       return created.id
     } catch (err) {
-      this.logger.error(`createEvent error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`)
+      this.logger.error(
+        `createEvent error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      )
       return null
     }
   }

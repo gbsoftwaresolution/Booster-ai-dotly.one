@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common'
 import { Prisma } from '@dotly/database'
 import { PrismaService } from '../prisma/prisma.service'
-import { createHmac, randomBytes } from 'crypto'
+import { ConfigService } from '@nestjs/config'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'crypto'
 import * as https from 'https'
 import * as http from 'http'
 import { URL } from 'url'
@@ -38,8 +39,93 @@ export interface WebhookPayload {
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name)
+  private static readonly MAX_RESPONSE_BYTES = 16 * 1024
+  private readonly encryptionKey: Buffer
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    const rawKey =
+      this.config.get<string>('WEBHOOK_SECRET_ENCRYPTION_KEY') ??
+      this.config.get<string>('SUPABASE_JWT_SECRET') ??
+      this.config.getOrThrow<string>('R2_SECRET_ACCESS_KEY')
+    this.encryptionKey = createHash('sha256').update(rawKey).digest()
+  }
+
+  private encryptSecret(secret: string): string {
+    const iv = randomBytes(12)
+    const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv)
+    const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
+    return `${iv.toString('base64url')}.${tag.toString('base64url')}.${encrypted.toString('base64url')}`
+  }
+
+  private decryptSecret(secret: string): string {
+    const parts = secret.split('.')
+    if (parts.length !== 3) return secret
+
+    try {
+      const [ivB64, tagB64, dataB64] = parts as [string, string, string]
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        this.encryptionKey,
+        Buffer.from(ivB64, 'base64url'),
+      )
+      decipher.setAuthTag(Buffer.from(tagB64, 'base64url'))
+      const decrypted = Buffer.concat([
+        decipher.update(Buffer.from(dataB64, 'base64url')),
+        decipher.final(),
+      ])
+      return decrypted.toString('utf8')
+    } catch {
+      return secret
+    }
+  }
+
+  private isEncryptedSecret(secret: string): boolean {
+    return secret.split('.').length === 3
+  }
+
+  private async resolveDeliverySecret(endpointId: string, storedSecret: string): Promise<string> {
+    if (this.isEncryptedSecret(storedSecret)) {
+      return this.decryptSecret(storedSecret)
+    }
+
+    const plaintextSecret = storedSecret
+    const encryptedSecret = this.encryptSecret(plaintextSecret)
+
+    void this.prisma.webhookEndpoint
+      .update({
+        where: { id: endpointId },
+        data: { secret: encryptedSecret },
+      })
+      .catch((err: unknown) =>
+        this.logger.warn(`Failed to migrate webhook secret for endpoint=${endpointId}`, err),
+      )
+
+    return plaintextSecret
+  }
+
+  async migrateLegacySecrets(): Promise<{ scanned: number; migrated: number }> {
+    const endpoints = await this.prisma.webhookEndpoint.findMany({
+      select: { id: true, secret: true },
+      take: 1000,
+    })
+
+    let migrated = 0
+    for (const endpoint of endpoints) {
+      if (this.isEncryptedSecret(endpoint.secret)) continue
+
+      await this.prisma.webhookEndpoint.update({
+        where: { id: endpoint.id },
+        data: { secret: this.encryptSecret(endpoint.secret) },
+      })
+      migrated += 1
+    }
+
+    return { scanned: endpoints.length, migrated }
+  }
 
   // ─── SSRF guard ──────────────────────────────────────────────────────────────
 
@@ -50,7 +136,9 @@ export class WebhooksService {
    * to defeat DNS-rebinding attacks (where a hostname resolves differently at
    * delivery time than it did at registration time).
    */
-  private async assertSafeWebhookUrl(url: string): Promise<void> {
+  private async assertSafeWebhookUrl(
+    url: string,
+  ): Promise<{ parsed: URL; resolvedAddress: string }> {
     let parsed: URL
     try {
       parsed = new URL(url)
@@ -63,13 +151,17 @@ export class WebhooksService {
     // net.isIP returns 4, 6, or 0.
     const isIpLiteral = net.isIP(hostname) !== 0
     const addrs: string[] = isIpLiteral
-      ? [hostname.replace(/^\[|\]$/g, '')] // strip IPv6 brackets
+      ? [hostname.replace(/^\[|\]$/g, '')]
       : await new Promise<string[]>((resolve, reject) =>
-          dns.resolve(hostname, (err, addresses) => {
+          dns.lookup(hostname, { all: true }, (err, addresses) => {
             if (err) reject(new BadRequestException(`Cannot resolve webhook hostname: ${hostname}`))
-            else resolve(addresses)
+            else resolve(addresses.map((entry) => entry.address))
           }),
         )
+
+    if (addrs.length === 0) {
+      throw new BadRequestException(`Cannot resolve webhook hostname: ${hostname}`)
+    }
 
     for (const addr of addrs) {
       if (this.isPrivateAddress(addr)) {
@@ -78,6 +170,13 @@ export class WebhooksService {
         )
       }
     }
+
+    return { parsed, resolvedAddress: addrs[0] as string }
+  }
+
+  private sanitizeEndpoint<T extends { secret?: string | null }>(endpoint: T): Omit<T, 'secret'> {
+    const { secret: _secret, ...rest } = endpoint
+    return rest
   }
 
   /** Returns true for loopback, RFC-1918, link-local, and other reserved ranges. */
@@ -164,27 +263,29 @@ export class WebhooksService {
     }
 
     const secret = randomBytes(24).toString('hex')
+    const encryptedSecret = this.encryptSecret(secret)
 
     const endpoint = await this.prisma.webhookEndpoint.create({
       data: {
         userId: internalId,
         url: dto.url,
         events: dto.events,
-        secret,
+        secret: encryptedSecret,
         enabled: true,
       },
     })
 
-    return { ...endpoint, secret } // return raw secret only on creation
+    return { ...this.sanitizeEndpoint(endpoint), secret } // return raw secret only on creation
   }
 
   async findAll(userId: string) {
     const internalId = await this.resolveUserId(userId)
-    return this.prisma.webhookEndpoint.findMany({
+    const endpoints = await this.prisma.webhookEndpoint.findMany({
       where: { userId: internalId },
       include: { _count: { select: { deliveries: true } } },
       orderBy: { createdAt: 'desc' },
     })
+    return endpoints.map((endpoint) => this.sanitizeEndpoint(endpoint))
   }
 
   async update(
@@ -226,7 +327,7 @@ export class WebhooksService {
       await this.assertSafeWebhookUrl(dto.url)
     }
 
-    return this.prisma.webhookEndpoint.update({
+    const updated = await this.prisma.webhookEndpoint.update({
       where: { id: endpointId },
       data: {
         ...(dto.url !== undefined && { url: dto.url }),
@@ -234,6 +335,7 @@ export class WebhooksService {
         ...(dto.enabled !== undefined && { enabled: dto.enabled }),
       },
     })
+    return this.sanitizeEndpoint(updated)
   }
 
   async regenerateSecret(userId: string, endpointId: string) {
@@ -241,11 +343,12 @@ export class WebhooksService {
     const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
     if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
     const secret = randomBytes(24).toString('hex')
+    const encryptedSecret = this.encryptSecret(secret)
     const updated = await this.prisma.webhookEndpoint.update({
       where: { id: endpointId },
-      data: { secret },
+      data: { secret: encryptedSecret },
     })
-    return { ...updated, secret }
+    return { ...this.sanitizeEndpoint(updated), secret }
   }
 
   async delete(userId: string, endpointId: string) {
@@ -285,7 +388,13 @@ export class WebhooksService {
       },
     }
 
-    const result = await this.deliver(ep.id, ep.url, ep.secret, payload, true)
+    const result = await this.deliver(
+      ep.id,
+      ep.url,
+      await this.resolveDeliverySecret(ep.id, ep.secret),
+      payload,
+      true,
+    )
     return result
   }
 
@@ -317,9 +426,9 @@ export class WebhooksService {
     }
 
     for (const ep of endpoints) {
-      void this.deliver(ep.id, ep.url, ep.secret, payload, false).catch((err: unknown) =>
-        this.logger.warn(`webhook delivery failed endpoint=${ep.id}`, err),
-      )
+      void this.resolveDeliverySecret(ep.id, ep.secret)
+        .then((secret) => this.deliver(ep.id, ep.url, secret, payload, false))
+        .catch((err: unknown) => this.logger.warn(`webhook delivery failed endpoint=${ep.id}`, err))
     }
   }
 
@@ -345,18 +454,18 @@ export class WebhooksService {
       // resolved to a public IP at registration time could later resolve to an
       // internal IP.  Re-checking here ensures we never send an actual HTTP
       // request to a private address regardless of when the URL was saved.
-      await this.assertSafeWebhookUrl(url)
-
-      const parsed = new URL(url)
+      const { parsed, resolvedAddress } = await this.assertSafeWebhookUrl(url)
       const lib = parsed.protocol === 'https:' ? https : http
       const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
         const req = lib.request(
           {
-            hostname: parsed.hostname,
+            host: resolvedAddress,
+            servername: net.isIP(parsed.hostname) === 0 ? parsed.hostname : undefined,
             port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
             path: parsed.pathname + parsed.search,
             method: 'POST',
             headers: {
+              Host: parsed.host,
               'Content-Type': 'application/json',
               'Content-Length': Buffer.byteLength(body),
               'X-Dotly-Event': payload.event,
@@ -368,7 +477,13 @@ export class WebhooksService {
           },
           (res) => {
             let data = ''
+            let totalBytes = 0
             res.on('data', (c: Buffer) => {
+              totalBytes += c.length
+              if (totalBytes > WebhooksService.MAX_RESPONSE_BYTES) {
+                req.destroy(new Error('Webhook response exceeded size limit'))
+                return
+              }
               data += c.toString()
             })
             res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data }))

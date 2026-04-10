@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { createSign, createHash } from 'crypto'
+import { Prisma } from '@dotly/database'
 
 /**
  * WalletPassesService
@@ -41,6 +42,31 @@ export class WalletPassesService {
   ) {
     const webUrlRaw = config.get<string>('WEB_URL') ?? 'https://dotly.one'
     this.webUrl = webUrlRaw.startsWith('http') ? webUrlRaw : `https://${webUrlRaw}`
+  }
+
+  private async getPublishedCardByHandle(handle: string) {
+    const card = await this.prisma.card.findUnique({
+      where: { handle, isActive: true },
+      include: { theme: true, socialLinks: true, user: { select: { id: true } } },
+    })
+    if (!card) throw new NotFoundException('Card not found')
+    return card
+  }
+
+  private async assertPublicExportAllowed(handle: string, requestUserId: string | null) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; vcardPolicy: string }>>`
+      SELECT id, "vcardPolicy"
+      FROM "Card"
+      WHERE handle = ${handle}
+        AND "isActive" = true
+      LIMIT 1
+    `
+    const card = rows[0]
+    if (!card) throw new NotFoundException('Card not found')
+    if (card.vcardPolicy === 'MEMBERS_ONLY' && !requestUserId) {
+      throw new ForbiddenException('Sign in to export this contact')
+    }
+    return card
   }
 
   // ─── Ownership guard ─────────────────────────────────────────────────────────
@@ -159,15 +185,6 @@ export class WalletPassesService {
       signature: sigBuf,
     })
 
-    // Cache pass metadata
-    await this.prisma.walletPass
-      .upsert({
-        where: { cardId },
-        create: { cardId },
-        update: {},
-      })
-      .catch(() => void 0)
-
     return pkpassBuf
   }
 
@@ -252,36 +269,24 @@ export class WalletPassesService {
     const jwt = `${signingInput}.${signature}`
     const saveUrl = `https://pay.google.com/gp/v/save/${jwt}`
 
-    // Cache
-    await this.prisma.walletPass
-      .upsert({
-        where: { cardId },
-        create: { cardId, googlePassId: objectId },
-        update: { googlePassId: objectId },
-      })
-      .catch(() => void 0)
-
     return saveUrl
   }
 
   // ─── Public pass endpoints (no auth — for Apple's web service callback) ──────
 
-  async getPublicPassForHandle(handle: string): Promise<Buffer> {
-    const card = await this.prisma.card.findUnique({
-      where: { handle, isActive: true },
-      include: { theme: true, socialLinks: true, user: { select: { id: true } } },
-    })
-    if (!card) throw new NotFoundException('Card not found')
+  async getPublicPassForHandle(handle: string, requestUserId: string | null): Promise<Buffer> {
+    await this.assertPublicExportAllowed(handle, requestUserId)
+    const card = await this.getPublishedCardByHandle(handle)
     // Generate a pass without ownership check (public endpoint, card must be active)
     return this.generateApplePassInternal(card)
   }
 
-  async getPublicGooglePassUrlForHandle(handle: string): Promise<string> {
-    const card = await this.prisma.card.findUnique({
-      where: { handle, isActive: true },
-      include: { theme: true, socialLinks: true, user: { select: { id: true } } },
-    })
-    if (!card) throw new NotFoundException('Card not found')
+  async getPublicGooglePassUrlForHandle(
+    handle: string,
+    requestUserId: string | null,
+  ): Promise<string> {
+    await this.assertPublicExportAllowed(handle, requestUserId)
+    const card = await this.getPublishedCardByHandle(handle)
     return this.generateGooglePassUrl(card.id, card.user.id)
   }
 
@@ -319,12 +324,8 @@ export class WalletPassesService {
       const sigHex = sign.sign({ key: certDer.toString(), passphrase }, 'hex')
       return Buffer.from(sigHex, 'hex')
     } catch {
-      // Return a zeroed signature — pkpass will be structurally valid but Apple
-      // devices will reject it until a real cert is in place
-      this.logger.warn(
-        'Apple pass signing skipped — no valid certificate. Set APPLE_PASS_CERT_P12.',
-      )
-      return Buffer.alloc(256, 0)
+      this.logger.warn('Apple pass signing failed — no valid certificate available.')
+      throw new BadRequestException('Apple Wallet passes are temporarily unavailable')
     }
   }
 

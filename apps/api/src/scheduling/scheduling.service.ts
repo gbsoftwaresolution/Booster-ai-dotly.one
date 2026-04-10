@@ -15,6 +15,7 @@ import { SetAvailabilityDto } from './dto/set-availability.dto'
 import { CreateBookingDto } from './dto/create-booking.dto'
 import { SetBookingQuestionsDto } from './dto/manage-booking-questions.dto'
 import { BookingStatus, Prisma } from '@dotly/database'
+import { ConfigService } from '@nestjs/config'
 
 // Day-of-week index: 0=Sunday, 1=Monday, ... 6=Saturday (JS Date.getDay())
 const DOW_MAP: Record<string, number> = {
@@ -177,12 +178,37 @@ function isWithinBufferWindow(startAt: Date, bufferDays: number): boolean {
 @Injectable()
 export class SchedulingService {
   private readonly logger = new Logger(SchedulingService.name)
+  private readonly allowedAssetHosts: Set<string>
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly googleCalendar: GoogleCalendarService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
+    const allowedAssetHosts = new Set<string>(['cdn.dotly.one'])
+    try {
+      const normalized = r2Url.startsWith('http') ? r2Url : `https://${r2Url}`
+      allowedAssetHosts.add(new URL(normalized).hostname)
+    } catch {
+      /* ignore invalid config */
+    }
+    this.allowedAssetHosts = allowedAssetHosts
+  }
+
+  private sanitizeAvatarUrl(value: string | null | undefined): string | null {
+    if (!value) return null
+    try {
+      const url = new URL(value)
+      if (['http:', 'https:'].includes(url.protocol) && this.allowedAssetHosts.has(url.hostname)) {
+        return url.toString()
+      }
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
 
   // ── Appointment Types ──────────────────────────────────────────────────────
 
@@ -445,7 +471,10 @@ export class SchedulingService {
 
     const freeSlots = allSlots.filter((slot) => {
       const slotEnd = new Date(slot.getTime() + slotDuration * 60_000)
-      const blockedByDb = existingBookings.some((b) => b.startAt < slotEnd && b.endAt > slot)
+      const blockedByDb = existingBookings.some((b) => {
+        const busyEnd = new Date(b.endAt.getTime() + apt.bufferAfterMins * 60_000)
+        return b.startAt < slotEnd && busyEnd > slot
+      })
       const blockedByGoogle = googleBusy.some((b) => b.start < slotEnd && b.end > slot)
       return !blockedByDb && !blockedByGoogle
     })
@@ -465,7 +494,7 @@ export class SchedulingService {
   async createBooking(ownerUserId: string, slug: string, dto: CreateBookingDto) {
     const apt = await this.prisma.appointmentType.findUnique({
       where: { ownerUserId_slug: { ownerUserId, slug } },
-      include: { availabilityRules: true },
+      include: { availabilityRules: true, questions: { orderBy: { position: 'asc' } } },
     })
     if (!apt || !apt.isActive) throw new NotFoundException()
 
@@ -503,6 +532,32 @@ export class SchedulingService {
     // correctly blocks slots that fall within the post-meeting buffer.
     const busyUntil = new Date(endAt.getTime() + apt.bufferAfterMins * 60_000)
 
+    const answers = dto.answers ?? []
+    const questionsById = new Map(apt.questions.map((question) => [question.id, question]))
+    const seenQuestionIds = new Set<string>()
+    for (const answer of answers) {
+      const question = questionsById.get(answer.questionId)
+      if (!question) {
+        throw new BadRequestException('Booking answers contain an invalid questionId')
+      }
+      if (seenQuestionIds.has(answer.questionId)) {
+        throw new BadRequestException('Duplicate booking answer for the same question')
+      }
+      seenQuestionIds.add(answer.questionId)
+    }
+
+    const missingRequiredQuestion = apt.questions.find(
+      (question) =>
+        question.required &&
+        (!seenQuestionIds.has(question.id) ||
+          !answers.find((answer) => answer.questionId === question.id)?.value.trim()),
+    )
+    if (missingRequiredQuestion) {
+      throw new BadRequestException(
+        `Answer required for question: ${missingRequiredQuestion.label}`,
+      )
+    }
+
     // CRITICAL-1: Wrap conflict check + create in a serializable transaction so
     // concurrent requests for the same slot cannot both pass the conflict check
     // before either has inserted the row (classic TOCTOU / phantom-read race).
@@ -522,7 +577,7 @@ export class SchedulingService {
           })
           if (conflict) throw new ConflictException('This time slot is no longer available')
 
-          return tx.booking.create({
+          const createdBooking = await tx.booking.create({
             data: {
               appointmentTypeId: apt.id,
               ownerUserId,
@@ -537,6 +592,19 @@ export class SchedulingService {
               tokenExpiresAt: new Date(startAt.getTime() + 24 * 60 * 60_000),
             },
           })
+
+          if (answers.length > 0) {
+            await tx.bookingAnswer.createMany({
+              data: answers.map((answer) => ({
+                bookingId: createdBooking.id,
+                questionId: answer.questionId,
+                value: answer.value.trim(),
+              })),
+              skipDuplicates: true,
+            })
+          }
+
+          return createdBooking
         },
         { isolationLevel: 'Serializable' },
       )
@@ -544,18 +612,6 @@ export class SchedulingService {
       // Re-throw NestJS HTTP exceptions (ConflictException etc.) unwrapped
       if (e instanceof ConflictException || e instanceof BadRequestException) throw e
       throw new ConflictException('This time slot is no longer available')
-    }
-
-    // Save custom question answers
-    if (dto.answers && dto.answers.length > 0) {
-      await this.prisma.bookingAnswer.createMany({
-        data: dto.answers.map((a) => ({
-          bookingId: booking.id,
-          questionId: a.questionId,
-          value: a.value,
-        })),
-        skipDuplicates: true,
-      })
     }
 
     // Create Google Calendar event (best-effort, don't block)
@@ -899,7 +955,9 @@ export class SchedulingService {
       isActive: apt.isActive,
       availabilityRules: apt.availabilityRules,
       questions: apt.questions,
-      owner: owner ?? { name: null, avatarUrl: null },
+      owner: owner
+        ? { name: owner.name, avatarUrl: this.sanitizeAvatarUrl(owner.avatarUrl) }
+        : { name: null, avatarUrl: null },
     }
   }
 

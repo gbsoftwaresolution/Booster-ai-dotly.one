@@ -1,4 +1,12 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, Matches, MaxLength, ValidateNested, IsObject } from 'class-validator'
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  ValidateNested,
+  IsObject,
+} from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { CardTemplate } from '@dotly/types'
@@ -26,12 +34,10 @@ export class UpdateCardDto {
   @Type(() => CardFieldsDto)
   fields?: CardFieldsDto
 
-  @ApiPropertyOptional({ description: 'Whether the card is published/active' })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean
-
-  @ApiPropertyOptional({ enum: VcardPolicy, description: 'Who can download the vCard: PUBLIC or MEMBERS_ONLY' })
+  @ApiPropertyOptional({
+    enum: VcardPolicy,
+    description: 'Who can download the vCard: PUBLIC or MEMBERS_ONLY',
+  })
   @IsOptional()
   @IsEnum(VcardPolicy)
   vcardPolicy?: VcardPolicy

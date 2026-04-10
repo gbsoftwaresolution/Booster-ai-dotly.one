@@ -29,6 +29,7 @@ export class UsersService {
   /** R2 client used only for account-deletion cleanup. */
   private readonly r2Client: S3Client | null
   private readonly r2Bucket: string
+  private readonly allowedAssetHosts: Set<string>
 
   constructor(
     private prisma: PrismaService,
@@ -71,6 +72,37 @@ export class UsersService {
       this.logger.warn(
         'R2 credentials not fully configured — uploaded media will NOT be deleted on account deletion',
       )
+    }
+
+    const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
+    const allowedAssetHosts = new Set<string>(['cdn.dotly.one'])
+    try {
+      const normalized = r2Url.startsWith('http') ? r2Url : `https://${r2Url}`
+      allowedAssetHosts.add(new URL(normalized).hostname)
+    } catch {
+      /* ignore invalid config */
+    }
+    this.allowedAssetHosts = allowedAssetHosts
+  }
+
+  private sanitizeAvatarUrl(value: string | null | undefined): string | null {
+    if (!value) return null
+    try {
+      const url = new URL(value)
+      if (['http:', 'https:'].includes(url.protocol) && this.allowedAssetHosts.has(url.hostname)) {
+        return url.toString()
+      }
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
+
+  private sanitizeUser<T extends { avatarUrl?: string | null }>(user: T | null): T | null {
+    if (!user) return null
+    return {
+      ...user,
+      avatarUrl: this.sanitizeAvatarUrl(user.avatarUrl ?? null),
     }
   }
 
@@ -145,11 +177,11 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<User | null> {
-    return this.findUniqueCompat({ id })
+    return this.sanitizeUser(await this.findUniqueCompat({ id })) as User | null
   }
 
   async findBySupabaseId(supabaseId: string): Promise<User | null> {
-    return this.findUniqueCompat({ supabaseId })
+    return this.sanitizeUser(await this.findUniqueCompat({ supabaseId })) as User | null
   }
 
   async savePushToken(userId: string, token: string): Promise<void> {
@@ -193,7 +225,12 @@ export class UsersService {
       this.prisma.analyticsEvent.count({ where: { card: { userId } } }),
     ])
 
-    return { user, cards, contacts, analyticsEventsSummary: { totalCount: analyticsEventCount } }
+    return {
+      user: this.sanitizeUser(user),
+      cards,
+      contacts,
+      analyticsEventsSummary: { totalCount: analyticsEventCount },
+    }
   }
 
   async updateProfile(

@@ -68,6 +68,7 @@ export function CardView({
   const [authChecked, setAuthChecked] = useState(false)
   const [vcardBlocked, setVcardBlocked] = useState(false) // shown when MEMBERS_ONLY + not auth
   const tokenRef = useRef<string | null>(null)
+  const allowAnonymousExport = vcardPolicy !== 'MEMBERS_ONLY'
 
   // Resolve auth token once on mount and cache it.
   // tokenRef is used as a fast-path cache; handleSaveContact always calls
@@ -170,7 +171,12 @@ export function CardView({
       )}
 
       {/* Share bar — shown below the card */}
-      <ShareBar handle={cardHandle} ownerName={ownerName} onAnalytics={trackInteraction} />
+      <ShareBar
+        handle={cardHandle}
+        ownerName={ownerName}
+        allowAnonymousExport={allowAnonymousExport}
+        onAnalytics={trackInteraction}
+      />
 
       {/* LeadCaptureModal — unauthenticated visitors get the contact form
           authenticated Dotly users get the direct "Connect" flow */}
@@ -286,13 +292,13 @@ function MembersOnlySheet({ ownerName, onClose }: { ownerName: string; onClose: 
             download their contact and exchange details.
           </p>
           <a
-            href={`${SITE_URL_LOCAL}/auth/signup`}
+            href={`${SITE_URL_LOCAL}/auth?mode=signup`}
             className="mt-2 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white text-center block"
           >
             Create free account
           </a>
           <a
-            href={`${SITE_URL_LOCAL}/auth/login`}
+            href={`${SITE_URL_LOCAL}/auth?mode=login`}
             className="w-full rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 text-center block"
           >
             Sign in
