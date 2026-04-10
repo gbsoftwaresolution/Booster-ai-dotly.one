@@ -68,10 +68,10 @@ export default function SchedulingDashboard(): JSX.Element {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Scheduling</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500">
             Manage appointments, availability and bookings
           </p>
         </div>
@@ -114,7 +114,7 @@ export default function SchedulingDashboard(): JSX.Element {
               color: 'bg-violet-500',
             },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div key={label} className="app-panel rounded-[24px] p-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-gray-500">{label}</p>
                 <span className={cn('flex h-8 w-8 items-center justify-center rounded-xl', color)}>
@@ -143,7 +143,7 @@ export default function SchedulingDashboard(): JSX.Element {
             ))}
           </div>
         ) : appointmentTypes.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-gray-200 py-12 text-center">
+          <div className="app-empty-state">
             <CalendarCheck className="h-10 w-10 text-gray-200 mb-3" />
             <p className="text-sm font-semibold text-gray-900">No appointment types</p>
             <p className="mt-1 text-xs text-gray-400">
@@ -161,10 +161,7 @@ export default function SchedulingDashboard(): JSX.Element {
         ) : (
           <div className="space-y-3">
             {appointmentTypes.map((apt) => (
-              <div
-                key={apt.id}
-                className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
-              >
+              <div key={apt.id} className="app-panel flex items-center gap-4 rounded-[24px] p-4">
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                   style={{ background: 'linear-gradient(135deg,#34d399,#059669)' }}
@@ -213,12 +210,12 @@ export default function SchedulingDashboard(): JSX.Element {
             ))}
           </div>
         ) : upcomingBookings.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border border-gray-100 bg-white py-10 text-center">
+          <div className="app-empty-state">
             <CalendarClock className="h-8 w-8 text-gray-200 mb-2" />
             <p className="text-sm text-gray-400">No upcoming bookings</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="app-table-shell divide-y divide-gray-50 overflow-hidden">
             {upcomingBookings.slice(0, 5).map((b) => {
               const start = new Date(b.startAt)
               return (
@@ -276,7 +273,7 @@ export default function SchedulingDashboard(): JSX.Element {
             <Link
               key={href}
               href={href}
-              className="group flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
+              className="app-panel group flex items-center gap-3 rounded-[24px] p-4 transition-all hover:shadow-md"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 shrink-0">
                 <Icon className="h-4 w-4 text-emerald-500" />
@@ -292,7 +289,7 @@ export default function SchedulingDashboard(): JSX.Element {
       </section>
 
       {/* Cross-app links */}
-      <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
+      <section className="app-panel-subtle rounded-[28px] border border-dashed border-gray-200 p-5">
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
           Connected Apps
         </p>

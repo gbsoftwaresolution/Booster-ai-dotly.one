@@ -40,10 +40,7 @@ export function Testimonials() {
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {TESTIMONIALS.map((t) => (
-            <div
-              key={t.name}
-              className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-            >
+            <div key={t.name} className="app-panel flex flex-col rounded-[28px] p-6">
               {/* Stars */}
               <div className="mb-4 flex gap-0.5">
                 {Array.from({ length: 5 }).map((_, i) => (

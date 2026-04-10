@@ -14,6 +14,7 @@ import {
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'
 import { useLayoutEffect } from 'react'
 import * as ImagePicker from 'expo-image-picker'
+import { Feather } from '@expo/vector-icons'
 import { api, updateCard, uploadAvatar } from '../../../lib/api'
 
 type Template = 'MINIMAL' | 'BOLD' | 'CREATIVE' | 'CORPORATE'
@@ -295,9 +296,16 @@ export default function EditCardScreen() {
                     borderStyle: 'dashed',
                   }}
                 >
-                  <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center' }}>
-                    {avatarBase64 ? '✓ Updated' : 'Change\nPhoto'}
-                  </Text>
+                  <View style={{ alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <Feather
+                      name={avatarBase64 ? 'check-circle' : 'camera'}
+                      size={18}
+                      color={avatarBase64 ? '#0ea5e9' : '#64748b'}
+                    />
+                    <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center' }}>
+                      {avatarBase64 ? 'Updated' : 'Change\nPhoto'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -406,9 +414,10 @@ export default function EditCardScreen() {
                         paddingHorizontal: 12,
                         paddingVertical: 10,
                         justifyContent: 'center',
+                        alignItems: 'center',
                       }}
                     >
-                      <Text style={{ color: '#ef4444', fontSize: 14 }}>✕</Text>
+                      <Feather name="x" size={14} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
                   <TextInput
@@ -479,7 +488,9 @@ export default function EditCardScreen() {
                       <Text style={{ fontWeight: '600', color: '#0f172a', fontSize: 14, flex: 1 }}>
                         {t.label}
                       </Text>
-                      {template === t.id && <Text style={{ color: t.color, fontSize: 16 }}>✓</Text>}
+                      {template === t.id && (
+                        <Feather name="check-circle" size={16} color={t.color} />
+                      )}
                     </TouchableOpacity>
                   ))}
                 </View>

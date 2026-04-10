@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Feather } from '@expo/vector-icons'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
 
@@ -1264,9 +1265,7 @@ export default function ContactDetailScreen() {
                       flexShrink: 0,
                     }}
                   >
-                    {task.completed && (
-                      <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>✓</Text>
-                    )}
+                    {task.completed && <Feather name="check" size={10} color="#ffffff" />}
                   </TouchableOpacity>
                   <View style={{ flex: 1 }}>
                     <Text
@@ -1406,9 +1405,10 @@ export default function ContactDetailScreen() {
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
                         <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
-                          Stage ›
+                          Stage
                         </Text>
                       </TouchableOpacity>
+                      <Feather name="chevron-right" size={14} color="#0ea5e9" />
                       <TouchableOpacity
                         onPress={() => handleDeleteDeal(deal.id)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

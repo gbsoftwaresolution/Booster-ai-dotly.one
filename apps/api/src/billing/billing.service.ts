@@ -453,7 +453,7 @@ export class BillingService {
         cards: 3,
         analyticsDays: 90,
         csvExport: true,
-        customDomain: false,
+        customDomain: true,
         teamMembers: 0,
       },
       [Plan.BUSINESS]: {

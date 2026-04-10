@@ -692,24 +692,29 @@ export default function SettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage your account preferences.</p>
+      <div className="app-panel rounded-[30px] px-6 py-6 sm:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+          Account
+        </p>
+        <h1 className="mt-2 text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="mt-2 text-sm text-gray-500">
+          Manage your profile, billing, and notification preferences.
+        </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex gap-6">
+      <div className="app-panel-subtle rounded-[24px] p-2">
+        <nav className="flex flex-wrap gap-2">
           {tabs.map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
               className={cn(
-                'whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors',
+                'whitespace-nowrap rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors',
                 activeTab === tab
-                  ? 'border-brand-500 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
+                  ? 'bg-white text-brand-600 shadow-sm ring-1 ring-white/80'
+                  : 'text-gray-500 hover:bg-white/70 hover:text-gray-700',
               )}
             >
               {tab}
@@ -719,7 +724,7 @@ export default function SettingsPage(): JSX.Element {
       </div>
 
       {/* Tab content */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="app-panel rounded-[28px] p-6 sm:p-7">
         {activeTab === 'Profile' && (
           <div className="space-y-4">
             <h2 className="text-base font-semibold text-gray-900">Profile Information</h2>
@@ -812,7 +817,7 @@ export default function SettingsPage(): JSX.Element {
               </div>
             ) : (
               <>
-                <div className="rounded-lg bg-gray-50 p-4 space-y-2">
+                <div className="app-panel-subtle rounded-[24px] p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-gray-700">Current plan</p>
                     <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 uppercase">

@@ -1,6 +1,7 @@
-import { TouchableOpacity, Text, Alert, ActivityIndicator, View } from 'react-native'
+import { TouchableOpacity, Alert, ActivityIndicator, View } from 'react-native'
 import { useState } from 'react'
 import { useRouter } from 'expo-router'
+import { Feather } from '@expo/vector-icons'
 import { pickBusinessCardImage } from '../lib/scanner'
 import { scanBusinessCard } from '../lib/api'
 
@@ -67,8 +68,7 @@ export function ScanCardButton({ style }: ScanCardButtonProps) {
         <ActivityIndicator color="#ffffff" />
       ) : (
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          {/* Camera icon via unicode */}
-          <Text style={{ fontSize: 22 }}>📷</Text>
+          <Feather name="camera" size={22} color="#ffffff" />
         </View>
       )}
     </TouchableOpacity>

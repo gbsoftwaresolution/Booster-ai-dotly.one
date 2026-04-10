@@ -9,7 +9,10 @@
     "lint": "next lint",
     "typecheck": "next typegen && tsc --noEmit",
     "analyze": "ANALYZE=true next build",
-    "test:e2e": "playwright test"
+    "verify": "npm run typecheck && npm run build",
+    "test:e2e": "playwright test",
+    "test:e2e:gates": "PLAYWRIGHT_FREE_STATE=.auth/free.json PLAYWRIGHT_STARTER_STATE=.auth/starter.json PLAYWRIGHT_PRO_STATE=.auth/pro.json playwright test e2e/plan-gates.spec.ts",
+    "test:e2e:auth-states": "tsx e2e/generate-auth-states.ts all"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

@@ -244,10 +244,13 @@ export default function TasksPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500/80">
+            Follow-ups
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">Tasks</h1>
+          <p className="mt-2 text-sm text-gray-500">
             Track follow-ups, due dates, and completed work in one place.
           </p>
         </div>
@@ -263,7 +266,7 @@ export default function TasksPage(): JSX.Element {
 
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="app-panel-subtle flex flex-wrap gap-2 rounded-[24px] p-2">
         {[
           { key: 'ALL', label: 'All' },
           { key: 'PENDING', label: 'Pending' },
@@ -298,7 +301,7 @@ export default function TasksPage(): JSX.Element {
         })}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="app-table-shell overflow-x-auto">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -306,7 +309,7 @@ export default function TasksPage(): JSX.Element {
             ))}
           </div>
         ) : filteredTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="app-empty-state rounded-none border-0 shadow-none">
             <CheckSquare className="mb-4 h-12 w-12 text-gray-300" />
             <p className="text-sm font-medium text-gray-700">No tasks in this view</p>
             <p className="mt-1 text-sm text-gray-400">
@@ -314,8 +317,8 @@ export default function TasksPage(): JSX.Element {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+          <table className="app-table">
+            <thead>
               <tr>
                 <th className="w-12 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Done
@@ -335,13 +338,13 @@ export default function TasksPage(): JSX.Element {
                 <th className="w-24 px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100/80">
               {filteredTasks.map((task) => {
                 const overdue = isOverdue(task)
                 const busy = busyTaskIds.has(task.id)
 
                 return (
-                  <tr key={task.id} className="hover:bg-gray-50">
+                  <tr key={task.id} className="transition hover:bg-white/65">
                     <td className="px-4 py-3 align-top">
                       <input
                         type="checkbox"
@@ -497,7 +500,9 @@ export default function TasksPage(): JSX.Element {
       {confirmDeleteId && (
         <ConfirmDialog
           message="Delete this task? This cannot be undone."
-          onConfirm={() => { void confirmDelete(confirmDeleteId) }}
+          onConfirm={() => {
+            void confirmDelete(confirmDeleteId)
+          }}
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
@@ -640,10 +645,18 @@ function ConfirmDialog({
         <h3 className="text-sm font-semibold text-gray-900">Confirm</h3>
         <p className="mt-1 text-sm text-gray-500">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
             Cancel
           </button>
-          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+          >
             Delete
           </button>
         </div>

@@ -182,8 +182,8 @@ function AvailabilityEditor({ initial, onSave, onClose }: AvailabilityEditorProp
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="app-panel flex max-h-[90vh] w-full max-w-lg flex-col rounded-[28px] shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 p-5 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">Edit Availability</h3>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
@@ -393,8 +393,8 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="app-panel flex max-h-[90vh] w-full max-w-lg flex-col rounded-[28px] shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 p-5 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">
             {initial?.id ? 'Edit Appointment Type' : 'New Appointment Type'}
@@ -659,8 +659,8 @@ function QuestionsBuilder({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="app-panel flex max-h-[90vh] w-full max-w-xl flex-col rounded-[28px] shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 p-5 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">Custom Booking Questions</h3>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
@@ -955,7 +955,7 @@ export default function SchedulingPage(): JSX.Element {
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL || ''
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen p-4 sm:p-6">
       {/* Toast */}
       {toast && (
         <div
@@ -1001,11 +1001,13 @@ export default function SchedulingPage(): JSX.Element {
         />
       )}
 
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="app-panel flex flex-col gap-5 rounded-[30px] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-3">
-            <Calendar className="h-7 w-7 text-sky-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600">
+              <Calendar className="h-6 w-6" />
+            </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Scheduling</h1>
               <p className="text-sm text-gray-500">Manage your booking pages and appointments</p>
@@ -1016,7 +1018,7 @@ export default function SchedulingPage(): JSX.Element {
               setEditingApt(null)
               setShowAptForm(true)
             }}
-            className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700"
           >
             <Plus className="h-4 w-4" /> New Appointment Type
           </button>
@@ -1024,7 +1026,7 @@ export default function SchedulingPage(): JSX.Element {
 
         {/* Google Calendar connect section */}
         {googleStatus !== null && (
-          <div className="mb-4 flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+          <div className="app-panel flex items-center gap-3 rounded-[24px] px-4 py-3">
             <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <span className="text-sm font-medium text-gray-700">Google Calendar</span>
@@ -1053,12 +1055,12 @@ export default function SchedulingPage(): JSX.Element {
         )}
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-1 rounded-xl bg-gray-100 p-1 w-fit">
+        <div className="app-panel-subtle flex w-fit gap-1 rounded-[20px] p-1.5">
           {(['types', 'bookings'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors ${tab === t ? 'bg-white text-gray-900 shadow-sm ring-1 ring-white/80' : 'text-gray-500 hover:text-gray-700'}`}
             >
               {t === 'types'
                 ? 'Appointment Types'
@@ -1072,16 +1074,20 @@ export default function SchedulingPage(): JSX.Element {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600" />
           </div>
         )}
-        {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+        {error && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* ── Card selector for booking links ───────────────────────────────── */}
         {allCards.length > 1 && (
-          <div className="mb-4 flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+          <div className="app-panel flex flex-col gap-3 rounded-[24px] px-4 py-3 sm:flex-row sm:items-center">
             <span className="text-sm font-medium text-gray-600">Booking links use card:</span>
             <select
               value={cardHandle ?? ''}
               onChange={(e) => setCardHandle(e.target.value)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
               {allCards.map((c) => (
                 <option key={c.id} value={c.handle}>
@@ -1096,15 +1102,19 @@ export default function SchedulingPage(): JSX.Element {
         {!loading && !error && tab === 'types' && (
           <div className="space-y-4">
             {aptTypes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16">
-                <Calendar className="mb-4 h-12 w-12 text-gray-300" />
-                <p className="text-gray-500">No appointment types yet.</p>
+              <div className="app-empty-state">
+                <Calendar className="mb-4 h-12 w-12 text-slate-300" />
+                <p className="text-gray-600">No appointment types yet.</p>
+                <p className="mt-2 max-w-md text-sm text-gray-400">
+                  Create your first appointment type to start sharing booking links and collecting
+                  meetings.
+                </p>
                 <button
                   onClick={() => {
                     setEditingApt(null)
                     setShowAptForm(true)
                   }}
-                  className="mt-4 flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                  className="mt-4 flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-sky-700"
                 >
                   <Plus className="h-4 w-4" /> Create your first
                 </button>
@@ -1113,10 +1123,7 @@ export default function SchedulingPage(): JSX.Element {
               aptTypes.map((apt) => {
                 const bookingUrl = cardHandle ? `${webUrl}/book/${cardHandle}/${apt.slug}` : null
                 return (
-                  <div
-                    key={apt.id}
-                    className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100"
-                  >
+                  <div key={apt.id} className="app-panel rounded-[28px] p-5 sm:p-6">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4">
                         <div
@@ -1218,7 +1225,7 @@ export default function SchedulingPage(): JSX.Element {
                       </div>
                     </div>
                     {bookingUrl && (
-                      <div className="mt-3 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="app-panel-subtle mt-3 flex items-center gap-2 rounded-[20px] px-3 py-2">
                         <span className="truncate font-mono text-xs text-gray-500">
                           {bookingUrl}
                         </span>
@@ -1256,31 +1263,31 @@ export default function SchedulingPage(): JSX.Element {
                 {showAllBookings ? 'Show upcoming only' : 'Show all bookings'}
               </button>
             </div>
-            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 overflow-hidden">
+            <div className="app-table-shell overflow-hidden">
               {bookings.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <Calendar className="mb-4 h-12 w-12 text-gray-300" />
-                  <p className="text-gray-500">No upcoming bookings.</p>
+                <div className="app-empty-state rounded-none border-0 shadow-none">
+                  <Calendar className="mb-4 h-12 w-12 text-slate-300" />
+                  <p className="text-gray-600">No upcoming bookings.</p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead className="border-b border-gray-100 bg-gray-50">
+                <table className="app-table">
+                  <thead className="border-b border-white/60">
                     <tr>
-                      <th className="px-5 py-3 text-left font-medium text-gray-500">Guest</th>
-                      <th className="px-5 py-3 text-left font-medium text-gray-500">Appointment</th>
-                      <th className="px-5 py-3 text-left font-medium text-gray-500">Time</th>
-                      <th className="px-5 py-3 text-left font-medium text-gray-500">Status</th>
-                      <th className="px-5 py-3" />
+                      <th>Guest</th>
+                      <th>Appointment</th>
+                      <th>Time</th>
+                      <th>Status</th>
+                      <th />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-slate-100/80">
                     {bookings.map((b) => (
-                      <tr key={b.id} className="hover:bg-gray-50">
-                        <td className="px-5 py-3.5">
+                      <tr key={b.id} className="transition hover:bg-white/65">
+                        <td>
                           <div className="font-medium text-gray-900">{b.guestName}</div>
                           <div className="text-gray-400">{b.guestEmail}</div>
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td>
                           <div className="flex items-center gap-2">
                             <div
                               className="h-2.5 w-2.5 rounded-full flex-shrink-0"
@@ -1289,17 +1296,15 @@ export default function SchedulingPage(): JSX.Element {
                             {b.appointmentType.name}
                           </div>
                         </td>
-                        <td className="px-5 py-3.5 text-gray-600">
-                          {formatDateTimeFull(b.startAt, userTz)}
-                        </td>
-                        <td className="px-5 py-3.5">
+                        <td className="text-gray-600">{formatDateTimeFull(b.startAt, userTz)}</td>
+                        <td>
                           <span
                             className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[b.status] ?? ''}`}
                           >
                             {b.status}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td>
                           {b.status !== 'CANCELLED' && (
                             <button
                               onClick={() => void handleCancelBooking(b.id)}

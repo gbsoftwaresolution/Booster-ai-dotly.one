@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Check, Handshake, X } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost } from '@/lib/api'
 
@@ -14,7 +15,9 @@ function AcceptInviteContent(): JSX.Element {
   const router = useRouter()
   const token = searchParams.get('token')
 
-  const [status, setStatus] = useState<'loading' | 'accepting' | 'success' | 'error' | 'unauthenticated'>('loading')
+  const [status, setStatus] = useState<
+    'loading' | 'accepting' | 'success' | 'error' | 'unauthenticated'
+  >('loading')
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -34,11 +37,7 @@ function AcceptInviteContent(): JSX.Element {
 
       setStatus('accepting')
       try {
-        await apiPost<{ teamId: string }>(
-          '/teams/accept-invite',
-          { token },
-          accessToken,
-        )
+        await apiPost<{ teamId: string }>('/teams/accept-invite', { token }, accessToken)
         setStatus('success')
         setMessage('You have joined the team!')
         setTimeout(() => router.push('/team'), 2000)
@@ -68,9 +67,9 @@ function AcceptInviteContent(): JSX.Element {
     const returnUrl = encodeURIComponent(`/team/accept?token=${token ?? ''}`)
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+        <div className="app-panel w-full max-w-md rounded-[28px] p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
-            <span className="text-2xl">🤝</span>
+            <Handshake className="h-6 w-6 text-brand-500" />
           </div>
           <h1 className="text-xl font-bold text-gray-900">Team Invitation</h1>
           <p className="mt-2 text-sm text-gray-500">
@@ -98,9 +97,9 @@ function AcceptInviteContent(): JSX.Element {
   if (status === 'success') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+        <div className="app-panel w-full max-w-md rounded-[28px] p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
-            <span className="text-2xl">✓</span>
+            <Check className="h-6 w-6 text-green-600" />
           </div>
           <h1 className="text-xl font-bold text-gray-900">Welcome to the team!</h1>
           <p className="mt-2 text-sm text-gray-500">{message}</p>
@@ -112,9 +111,9 @@ function AcceptInviteContent(): JSX.Element {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+      <div className="app-panel w-full max-w-md rounded-[28px] p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
-          <span className="text-2xl">✗</span>
+          <X className="h-6 w-6 text-red-600" />
         </div>
         <h1 className="text-xl font-bold text-gray-900">Invalid Invitation</h1>
         <p className="mt-2 text-sm text-gray-500">{message}</p>

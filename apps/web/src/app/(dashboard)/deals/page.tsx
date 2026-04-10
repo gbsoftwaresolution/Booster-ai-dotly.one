@@ -148,7 +148,7 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+      <div className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <h2 className="text-lg font-bold text-gray-900">New Deal</h2>
@@ -384,7 +384,7 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+      <div className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <h2 className="text-lg font-bold text-gray-900">Edit Deal</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -641,10 +641,13 @@ export default function DealsPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Deals</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500/80">
+            Revenue
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">Deals</h1>
+          <p className="mt-2 text-sm text-gray-500">
             Manage your sales pipeline across prospecting, proposals, and closed revenue.
           </p>
         </div>
@@ -660,7 +663,7 @@ export default function DealsPage(): JSX.Element {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <div className="app-panel rounded-[24px] px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Total pipeline
           </p>
@@ -668,7 +671,7 @@ export default function DealsPage(): JSX.Element {
             {formatCurrency(totalPipelineValue, pipelineCurrency)}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <div className="app-panel rounded-[24px] px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Weighted pipeline
           </p>
@@ -676,13 +679,13 @@ export default function DealsPage(): JSX.Element {
             {formatCurrency(weightedPipelineValue, pipelineCurrency)}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <div className="app-panel rounded-[24px] px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Win rate</p>
           <p className="mt-1 text-xl font-bold text-green-700">
             {winRate != null ? `${Math.round(winRate)}%` : '—'}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <div className="app-panel rounded-[24px] px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Avg won deal</p>
           <p className="mt-1 text-xl font-bold text-gray-900">
             {wonDeals.length > 0
@@ -725,11 +728,14 @@ export default function DealsPage(): JSX.Element {
       {loading ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {DEAL_STAGES.map((stage) => (
-            <div key={stage} className="h-72 w-72 shrink-0 animate-pulse rounded-xl bg-gray-100" />
+            <div
+              key={stage}
+              className="app-list-skeleton h-72 w-72 shrink-0 animate-pulse rounded-[24px]"
+            />
           ))}
         </div>
       ) : filteredDeals.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+        <div className="app-empty-state">
           <BriefcaseBusiness className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-sm font-medium text-gray-700">
             {deals.length === 0 ? 'No deals yet' : 'No deals match your filters'}
@@ -747,11 +753,10 @@ export default function DealsPage(): JSX.Element {
             const stageTotal = stageDeals.reduce((sum, deal) => sum + deal.value, 0)
 
             return (
-              <div
-                key={stage}
-                className="flex w-80 shrink-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm"
-              >
-                <div className={`rounded-t-xl border-b px-4 py-3 ${STAGE_HEADER_COLORS[stage]}`}>
+              <div key={stage} className="app-panel flex w-80 shrink-0 flex-col rounded-[24px]">
+                <div
+                  className={`rounded-t-[24px] border-b px-4 py-3 ${STAGE_HEADER_COLORS[stage]}`}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h2 className="text-sm font-semibold text-gray-800">{STAGE_LABELS[stage]}</h2>
@@ -773,10 +778,7 @@ export default function DealsPage(): JSX.Element {
                       const busy = busyDealIds.has(deal.id)
 
                       return (
-                        <div
-                          key={deal.id}
-                          className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-                        >
+                        <div key={deal.id} className="app-panel-subtle rounded-[22px] p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <h3 className="truncate text-sm font-semibold text-gray-900">
@@ -888,7 +890,9 @@ export default function DealsPage(): JSX.Element {
       {confirmDeleteId && (
         <ConfirmDialog
           message="Delete this deal? This cannot be undone."
-          onConfirm={() => { void confirmDelete(confirmDeleteId) }}
+          onConfirm={() => {
+            void confirmDelete(confirmDeleteId)
+          }}
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
@@ -914,10 +918,18 @@ function ConfirmDialog({
         <h3 className="text-sm font-semibold text-gray-900">Confirm</h3>
         <p className="mt-1 text-sm text-gray-500">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
             Cancel
           </button>
-          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+          >
             Delete
           </button>
         </div>

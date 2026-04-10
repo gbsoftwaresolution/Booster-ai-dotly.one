@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
+import { Feather } from '@expo/vector-icons'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
 
@@ -254,9 +255,7 @@ export default function TasksScreen() {
                   marginTop: 1,
                 }}
               >
-                {task.completed && (
-                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>✓</Text>
-                )}
+                {task.completed && <Feather name="check" size={12} color="#ffffff" />}
               </TouchableOpacity>
 
               {/* Content */}

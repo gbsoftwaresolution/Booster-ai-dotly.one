@@ -217,14 +217,18 @@ export function ComposeEmailModal({
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 z-60 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div
+        className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
       {/* Modal */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="compose-email-title"
-        className="fixed left-1/2 top-1/2 z-70 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white shadow-2xl"
+        className="app-panel fixed left-1/2 top-1/2 z-70 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[28px] shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">

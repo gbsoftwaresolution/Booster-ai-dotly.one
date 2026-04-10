@@ -23,6 +23,8 @@ const REQUIRED_ENV_VARS = [
   // M-5: NEXT_PUBLIC_API_URL falls back to localhost:3001 if absent — every API
   // call from the browser silently fails in production.  Validate here.
   'NEXT_PUBLIC_API_URL',
+  'NEXT_PUBLIC_APP_URL',
+  'NEXT_PUBLIC_WEB_URL',
 ]
 
 // Placeholder values that look valid but are definitely not real credentials
@@ -38,6 +40,21 @@ const missingOrPlaceholder = REQUIRED_ENV_VARS.filter((key) => {
   const val = process.env[key]
   return !val || KNOWN_PLACEHOLDERS.has(val)
 })
+
+function collectAllowedDevOrigins() {
+  const hosts = new Set(['dotly.one', '*.dotly.one'])
+
+  for (const value of [process.env.NEXT_PUBLIC_WEB_URL, process.env.NEXT_PUBLIC_APP_URL]) {
+    if (!value) continue
+    try {
+      hosts.add(new URL(value).hostname)
+    } catch {
+      // Ignore malformed local overrides and keep the static host allowlist.
+    }
+  }
+
+  return [...hosts]
+}
 
 if (missingOrPlaceholder.length > 0) {
   // Throw only in production to avoid blocking local dev with placeholder .env.local files.
@@ -66,6 +83,7 @@ if (!r2Hostname && process.env.NODE_ENV === 'production') {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: collectAllowedDevOrigins(),
   transpilePackages: ['@dotly/ui', '@dotly/types'],
   images: {
     remotePatterns: [
@@ -73,9 +91,7 @@ const nextConfig = {
       // In local dev this pattern is omitted when R2_PUBLIC_HOSTNAME is unset,
       // which causes next/image to throw a visible error rather than loading
       // from an unconstrained glob.
-      ...(r2Hostname
-        ? [{ protocol: /** @type {'https'} */ ('https'), hostname: r2Hostname }]
-        : []),
+      ...(r2Hostname ? [{ protocol: /** @type {'https'} */ ('https'), hostname: r2Hostname }] : []),
       // Production CDN
       { protocol: /** @type {'https'} */ ('https'), hostname: 'cdn.dotly.one' },
     ],

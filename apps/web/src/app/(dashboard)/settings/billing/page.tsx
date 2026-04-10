@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
+import { ExternalLink, ShieldCheck, Wallet } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/cn'
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -43,14 +45,14 @@ interface ActivateOrderResponse {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PAID_PLANS: PlanId[] = ['STARTER', 'PRO', 'BUSINESS', 'AGENCY', 'ENTERPRISE']
+const PAID_PLANS: PlanId[] = ['STARTER', 'PRO']
 
 const PLAN_PRICES: Record<PlanId, Record<Duration, number> | null> = {
   FREE: null,
-  STARTER:    { MONTHLY: 10,  SIX_MONTHS: 55,   ANNUAL: 100  },
-  PRO:        { MONTHLY: 20,  SIX_MONTHS: 110,  ANNUAL: 200  },
-  BUSINESS:   { MONTHLY: 50,  SIX_MONTHS: 275,  ANNUAL: 500  },
-  AGENCY:     { MONTHLY: 100, SIX_MONTHS: 550,  ANNUAL: 1000 },
+  STARTER: { MONTHLY: 10, SIX_MONTHS: 50, ANNUAL: 99 },
+  PRO: { MONTHLY: 20, SIX_MONTHS: 99, ANNUAL: 199 },
+  BUSINESS: { MONTHLY: 50, SIX_MONTHS: 275, ANNUAL: 500 },
+  AGENCY: { MONTHLY: 100, SIX_MONTHS: 550, ANNUAL: 1000 },
   ENTERPRISE: { MONTHLY: 199, SIX_MONTHS: 1095, ANNUAL: 1990 },
 }
 
@@ -125,10 +127,7 @@ function buildPayDeepLink(params: {
 }): string {
   const { paymentVaultAddress, paymentRef, chainId } = params
   const ref = paymentRef.startsWith('0x') ? paymentRef : `0x${paymentRef}`
-  return (
-    `ethereum:${paymentVaultAddress}@${chainId}/paySubscription` +
-    `?bytes32=${ref}`
-  )
+  return `ethereum:${paymentVaultAddress}@${chainId}/paySubscription` + `?bytes32=${ref}`
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -163,6 +162,7 @@ async function waitForReceipt(txHash: string, maxWaitMs = 90_000): Promise<void>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BillingSettingsPage(): JSX.Element {
+  const searchParams = useSearchParams()
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -192,6 +192,20 @@ export default function BillingSettingsPage(): JSX.Element {
     setHasWallet(Boolean(window.ethereum && typeof window.ethereum.request === 'function'))
   }, [])
 
+  useEffect(() => {
+    const planParam = searchParams.get('plan')
+    const durationParam = searchParams.get('duration')
+
+    if (planParam === 'STARTER' || planParam === 'PRO') setSelectedPlan(planParam)
+    if (
+      durationParam === 'MONTHLY' ||
+      durationParam === 'SIX_MONTHS' ||
+      durationParam === 'ANNUAL'
+    ) {
+      setSelectedDuration(durationParam)
+    }
+  }, [searchParams])
+
   // ─── Auth token ───────────────────────────────────────────────────────────
 
   const getToken = useCallback(async (): Promise<string | null> => {
@@ -209,7 +223,10 @@ export default function BillingSettingsPage(): JSX.Element {
     setError(null)
     try {
       const token = await getToken()
-      if (!token) { setError('Not authenticated'); return }
+      if (!token) {
+        setError('Not authenticated')
+        return
+      }
       const data = await apiGet<SubscriptionData>('/billing', token)
       setSubscription(data)
       setWalletAddress(data?.user?.walletAddress ?? null)
@@ -220,7 +237,9 @@ export default function BillingSettingsPage(): JSX.Element {
     }
   }, [getToken])
 
-  useEffect(() => { void fetchSubscription() }, [fetchSubscription])
+  useEffect(() => {
+    void fetchSubscription()
+  }, [fetchSubscription])
 
   // ─── Connect wallet ───────────────────────────────────────────────────────
 
@@ -232,7 +251,9 @@ export default function BillingSettingsPage(): JSX.Element {
     setConnectingWallet(true)
     setError(null)
     try {
-      const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) as string[]
+      const accounts = (await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      })) as string[]
       const address = accounts[0]
       if (!address) throw new Error('No account returned')
       setWalletAddress(address)
@@ -258,12 +279,16 @@ export default function BillingSettingsPage(): JSX.Element {
       const token = await getToken()
       if (!token) throw new Error('Not authenticated.')
       const ref = readRefCookie()
-      const order = await apiPost<CreateOrderResponse>('/billing/boosterai/order', {
-        plan: selectedPlan,
-        duration: selectedDuration,
-        walletAddress: walletAddr,
-        ...(ref ? { ref } : {}),
-      }, token)
+      const order = await apiPost<CreateOrderResponse>(
+        '/billing/boosterai/order',
+        {
+          plan: selectedPlan,
+          duration: selectedDuration,
+          walletAddress: walletAddr,
+          ...(ref ? { ref } : {}),
+        },
+        token,
+      )
       const amountRaw = parseUsdtAmount(order.amountUsdt)
       setNoWalletOrder({
         approveLink: buildApproveDeepLink({
@@ -306,8 +331,13 @@ export default function BillingSettingsPage(): JSX.Element {
             { orderId: noWalletOrder.orderId },
             token,
           )
-          if (result.status === 'ACTIVE') { activated = true; break }
-        } catch { /* keep polling */ }
+          if (result.status === 'ACTIVE') {
+            activated = true
+            break
+          }
+        } catch {
+          /* keep polling */
+        }
       }
       if (activated) {
         setSuccessMsg(`Successfully subscribed to ${selectedPlan}!`)
@@ -325,8 +355,14 @@ export default function BillingSettingsPage(): JSX.Element {
   }
 
   const handleSubscribe = async () => {
-    if (!walletAddress) { setError('Please connect your wallet first.'); return }
-    if (!window.ethereum) { setError('MetaMask is not installed.'); return }
+    if (!walletAddress) {
+      setError('Please connect your wallet first.')
+      return
+    }
+    if (!window.ethereum) {
+      setError('MetaMask is not installed.')
+      return
+    }
 
     setSubscribing(true)
     setError(null)
@@ -339,12 +375,16 @@ export default function BillingSettingsPage(): JSX.Element {
       const ref = readRefCookie()
 
       // ── Step 1: Create BoosterAI order ──────────────────────────────────
-      const order = await apiPost<CreateOrderResponse>('/billing/boosterai/order', {
-        plan: selectedPlan,
-        duration: selectedDuration,
-        walletAddress,
-        ...(ref ? { ref } : {}),
-      }, token)
+      const order = await apiPost<CreateOrderResponse>(
+        '/billing/boosterai/order',
+        {
+          plan: selectedPlan,
+          duration: selectedDuration,
+          walletAddress,
+          ...(ref ? { ref } : {}),
+        },
+        token,
+      )
 
       const {
         paymentVaultAddress,
@@ -359,7 +399,7 @@ export default function BillingSettingsPage(): JSX.Element {
       const chainId = parseInt(chainIdHex, 16)
       if (chainId !== requiredChainId) {
         throw new Error(
-          `Please switch your wallet to chain ${requiredChainId} (Arbitrum One). Currently on ${chainId}.`
+          `Please switch your wallet to chain ${requiredChainId} (Arbitrum One). Currently on ${chainId}.`,
         )
       }
 
@@ -411,7 +451,10 @@ export default function BillingSettingsPage(): JSX.Element {
             { orderId: order.orderId },
             token,
           )
-          if (result.status === 'ACTIVE') { activated = true; break }
+          if (result.status === 'ACTIVE') {
+            activated = true
+            break
+          }
         } catch {
           // Not ready yet — keep polling
         }
@@ -420,7 +463,7 @@ export default function BillingSettingsPage(): JSX.Element {
       if (!activated) {
         // Still set a partial success — backend will reconcile async
         setSuccessMsg(
-          `Payment sent! Your ${selectedPlan} plan will be activated shortly. Refresh in a moment.`
+          `Payment sent! Your ${selectedPlan} plan will be activated shortly. Refresh in a moment.`,
         )
       } else {
         setSuccessMsg(`Successfully subscribed to ${selectedPlan}!`)
@@ -446,7 +489,9 @@ export default function BillingSettingsPage(): JSX.Element {
   const currentStatus = subscription?.status ?? 'TRIALING'
   const expiryDate = subscription?.currentPeriodEnd
     ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long', day: 'numeric',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
       })
     : null
 
@@ -456,9 +501,21 @@ export default function BillingSettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage your subscription and payment method.</p>
+      <div className="app-panel rounded-[30px] px-6 py-6 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
+            <Wallet className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+              Subscription
+            </p>
+            <h1 className="mt-2 text-2xl font-bold text-gray-900">Billing</h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-500">
+              Manage your subscription, wallet connection, and on-chain payment history.
+            </p>
+          </div>
+        </div>
       </div>
 
       {successMsg && (
@@ -473,7 +530,7 @@ export default function BillingSettingsPage(): JSX.Element {
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="app-list-skeleton rounded-[28px]">
           <div className="animate-pulse space-y-3">
             <div className="h-4 w-32 rounded bg-gray-200" />
             <div className="h-4 w-48 rounded bg-gray-200" />
@@ -482,7 +539,7 @@ export default function BillingSettingsPage(): JSX.Element {
       ) : (
         <>
           {/* Current plan */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="app-panel rounded-[28px] p-6 sm:p-7">
             <h2 className="text-base font-semibold text-gray-900">Current Plan</h2>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span
@@ -509,8 +566,7 @@ export default function BillingSettingsPage(): JSX.Element {
             </div>
             {expiryDate && (
               <p className="mt-3 text-sm text-gray-500">
-                Current period ends:{' '}
-                <span className="font-medium text-gray-700">{expiryDate}</span>
+                Current period ends: <span className="font-medium text-gray-700">{expiryDate}</span>
               </p>
             )}
             {subscription?.amountUsdt && (
@@ -528,7 +584,7 @@ export default function BillingSettingsPage(): JSX.Element {
               <div className="mt-4">
                 <a
                   href="#upgrade"
-                  className="inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+                  className="inline-block rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
                 >
                   Upgrade your plan
                 </a>
@@ -537,7 +593,7 @@ export default function BillingSettingsPage(): JSX.Element {
           </div>
 
           {/* Web3 Wallet */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="app-panel rounded-[28px] p-6 sm:p-7">
             <h2 className="text-base font-semibold text-gray-900">Web3 Wallet</h2>
             <p className="mt-1 text-sm text-gray-500">
               Connect your wallet to pay with USDT on Arbitrum via the BoosterAI PaymentVault.
@@ -561,11 +617,15 @@ export default function BillingSettingsPage(): JSX.Element {
                 /* No wallet in this browser — show mobile deep-link path */
                 <div className="space-y-3">
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    No wallet detected in this browser. You can still subscribe using MetaMask Mobile — enter your wallet address below to generate payment links, then open them in your wallet app.
+                    No wallet detected in this browser. You can still subscribe using MetaMask
+                    Mobile — enter your wallet address below to generate payment links, then open
+                    them in your wallet app.
                   </div>
                   <div className="flex gap-2 items-end flex-wrap">
                     <div className="flex-1 min-w-0">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Your wallet address</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Your wallet address
+                      </label>
                       <input
                         type="text"
                         placeholder="0x…"
@@ -588,10 +648,14 @@ export default function BillingSettingsPage(): JSX.Element {
                   type="button"
                   onClick={() => void connectWallet()}
                   disabled={connectingWallet || hasWallet === null}
-                  className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-white disabled:opacity-50"
                 >
-                  <span>&#129422;</span>
-                  {connectingWallet ? 'Connecting…' : hasWallet === null ? 'Detecting wallet…' : 'Connect Wallet'}
+                  <Wallet className="h-4 w-4 text-brand-500" />
+                  {connectingWallet
+                    ? 'Connecting…'
+                    : hasWallet === null
+                      ? 'Detecting wallet…'
+                      : 'Connect Wallet'}
                 </button>
               )}
             </div>
@@ -599,7 +663,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
           {/* Upgrade section */}
           {currentPlan !== 'ENTERPRISE' && (
-            <div id="upgrade" className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div id="upgrade" className="app-panel rounded-[28px] p-6 sm:p-7">
               <h2 className="text-base font-semibold text-gray-900">Upgrade Plan</h2>
               <p className="mt-1 text-sm text-gray-500">
                 Pay with USDT. Your wallet signs the transaction — your private key stays private.
@@ -660,8 +724,11 @@ export default function BillingSettingsPage(): JSX.Element {
                 </div>
 
                 {/* Summary */}
-                <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-                  <p className="font-medium text-gray-800">Transaction summary</p>
+                <div className="app-panel-subtle rounded-[24px] p-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-gray-800">
+                    <ShieldCheck className="h-4 w-4 text-brand-500" />
+                    <p className="font-medium">Transaction summary</p>
+                  </div>
                   <p className="mt-1">
                     Plan:{' '}
                     <span className="font-semibold text-gray-900">
@@ -670,7 +737,9 @@ export default function BillingSettingsPage(): JSX.Element {
                   </p>
                   <p>
                     Duration:{' '}
-                    <span className="font-semibold text-gray-900">{DURATION_LABEL[selectedDuration]}</span>
+                    <span className="font-semibold text-gray-900">
+                      {DURATION_LABEL[selectedDuration]}
+                    </span>
                   </p>
                   <p>
                     Amount:{' '}
@@ -687,7 +756,14 @@ export default function BillingSettingsPage(): JSX.Element {
                 {subscribeStep && (
                   <div className="flex items-center gap-2 text-sm text-brand-600">
                     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
                     {subscribeStep}
@@ -696,17 +772,20 @@ export default function BillingSettingsPage(): JSX.Element {
 
                 {/* No-wallet deep-link result */}
                 {noWalletOrder && (
-                  <div className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="rounded-[24px] border border-blue-200/80 bg-blue-50/90 p-4 shadow-sm">
                     <p className="text-sm font-semibold text-blue-900">
                       Two-step payment via MetaMask Mobile
                     </p>
                     <p className="text-xs text-blue-700">
                       Open each link in your MetaMask Mobile or Trust Wallet browser in order.
-                      Amount: <strong>${noWalletOrder.amountUsdt} USDT</strong> on chain {noWalletOrder.chainId}.
+                      Amount: <strong>${noWalletOrder.amountUsdt} USDT</strong> on chain{' '}
+                      {noWalletOrder.chainId}.
                     </p>
-                    <div className="space-y-2">
+                    <div className="mt-4 space-y-2">
                       <div>
-                        <p className="text-xs font-medium text-blue-800 mb-1">Step 1 — Approve USDT spending</p>
+                        <p className="text-xs font-medium text-blue-800 mb-1">
+                          Step 1 — Approve USDT spending
+                        </p>
                         <a
                           href={noWalletOrder.approveLink}
                           className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
@@ -715,7 +794,9 @@ export default function BillingSettingsPage(): JSX.Element {
                         </a>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-blue-800 mb-1">Step 2 — Confirm payment</p>
+                        <p className="text-xs font-medium text-blue-800 mb-1">
+                          Step 2 — Confirm payment
+                        </p>
                         <a
                           href={noWalletOrder.payLink}
                           className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
@@ -731,9 +812,11 @@ export default function BillingSettingsPage(): JSX.Element {
                       type="button"
                       onClick={() => void handleNoWalletActivate()}
                       disabled={noWalletActivating}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                      className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {noWalletActivating ? 'Checking…' : "I've completed both transactions — activate my plan"}
+                      {noWalletActivating
+                        ? 'Checking…'
+                        : "I've completed both transactions — activate my plan"}
                     </button>
                   </div>
                 )}
@@ -747,7 +830,7 @@ export default function BillingSettingsPage(): JSX.Element {
                         onClick={() => void handleNoWalletSubscribe(walletAddress)}
                         disabled={subscribing}
                         className={cn(
-                          'rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors',
+                          'rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors',
                           'bg-brand-500 hover:bg-brand-600',
                           'disabled:cursor-not-allowed disabled:opacity-50',
                         )}
@@ -760,12 +843,12 @@ export default function BillingSettingsPage(): JSX.Element {
                         onClick={() => void handleSubscribe()}
                         disabled={subscribing || !walletAddress}
                         className={cn(
-                          'rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors',
+                          'rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors',
                           'bg-brand-500 hover:bg-brand-600',
                           'disabled:cursor-not-allowed disabled:opacity-50',
                         )}
                       >
-                        {subscribing ? subscribeStep ?? 'Processing…' : 'Subscribe with USDT'}
+                        {subscribing ? (subscribeStep ?? 'Processing…') : 'Subscribe with USDT'}
                       </button>
                     )}
                     {!walletAddress && (
@@ -782,10 +865,10 @@ export default function BillingSettingsPage(): JSX.Element {
           )}
 
           {/* Transaction history */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="app-panel rounded-[28px] p-6 sm:p-7">
             <h2 className="text-base font-semibold text-gray-900">Transaction History</h2>
             {subscription?.txHash ? (
-              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+              <div className="app-panel-subtle mt-3 rounded-[24px] p-4 text-sm text-gray-700">
                 <p className="font-medium text-gray-900">Latest subscription transaction</p>
                 <p className="mt-2">
                   Plan: <span className="font-semibold">{subscription.plan}</span>
@@ -798,13 +881,16 @@ export default function BillingSettingsPage(): JSX.Element {
                     Renews / expires: <span className="font-semibold">{expiryDate}</span>
                   </p>
                 )}
-                <p className="mt-2 break-all font-mono text-xs text-gray-500">{subscription.txHash}</p>
+                <p className="mt-2 break-all font-mono text-xs text-gray-500">
+                  {subscription.txHash}
+                </p>
                 <a
                   href={`https://arbiscan.io/tx/${subscription.txHash}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-3 inline-block text-brand-500 hover:underline"
+                  className="mt-3 inline-flex items-center gap-1 text-brand-500 hover:underline"
                 >
+                  <ExternalLink className="h-3.5 w-3.5" />
                   View on Arbiscan
                 </a>
               </div>

@@ -2,235 +2,84 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { Check, ShieldCheck, Sparkles, X as XIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Navbar } from '@/components/marketing/Navbar'
 import { Footer } from '@/components/marketing/Footer'
 
-// ─── Pricing data ─────────────────────────────────────────────────────────────
-
 type Duration = 'MONTHLY' | 'SIX_MONTHS' | 'ANNUAL'
 
 interface Plan {
-  id: 'STARTER' | 'PRO' | 'BUSINESS' | 'AGENCY' | 'ENTERPRISE'
+  id: 'STARTER' | 'PRO'
   name: string
   tagline: string
   prices: Record<Duration, number>
   highlight?: boolean
-  dark?: boolean
   features: string[]
   cta: string
-  ctaHref: string
+}
+
+interface FeatureRow {
+  label: string
+  free: string | boolean
+  starter: string | boolean
+  pro: string | boolean
 }
 
 const PLANS: Plan[] = [
   {
     id: 'STARTER',
     name: 'Starter',
-    tagline: 'Perfect for freelancers & solopreneurs.',
-    prices: { MONTHLY: 10, SIX_MONTHS: 55, ANNUAL: 100 },
-    features: ['1 digital card', '30-day analytics', '5 social links', 'Lead capture', 'Basic CRM'],
-    cta: 'Get Starter',
-    ctaHref: '/auth',
+    tagline: 'For individuals, freelancers, and solo professionals.',
+    prices: { MONTHLY: 10, SIX_MONTHS: 50, ANNUAL: 99 },
+    features: [
+      '1 premium card',
+      '30-day analytics',
+      'Lead capture',
+      'Basic CRM access',
+      'Email signature',
+      'Email templates',
+      'Basic scheduling',
+    ],
+    cta: 'Start with Starter',
   },
   {
     id: 'PRO',
     name: 'Pro',
-    tagline: 'For professionals building their brand.',
-    prices: { MONTHLY: 20, SIX_MONTHS: 110, ANNUAL: 200 },
+    tagline: 'For power users running their full follow-up workflow.',
+    prices: { MONTHLY: 20, SIX_MONTHS: 99, ANNUAL: 199 },
     highlight: true,
     features: [
-      '3 digital cards',
-      '90-day analytics',
-      'Unlimited social links',
-      'Full CRM access',
-      'Portfolio & media blocks',
+      'Up to 3 cards',
+      'Advanced analytics',
+      'Full CRM',
+      'Inbox + scheduling',
       'CSV export',
-    ],
-    cta: 'Get Pro',
-    ctaHref: '/auth',
-  },
-  {
-    id: 'BUSINESS',
-    name: 'Business',
-    tagline: 'For teams scaling their digital presence.',
-    prices: { MONTHLY: 50, SIX_MONTHS: 275, ANNUAL: 500 },
-    features: [
-      '10 digital cards',
-      '365-day analytics',
       'Custom domain',
-      'Team management (10 members)',
-      'Priority support',
+      'Webhooks',
     ],
-    cta: 'Get Business',
-    ctaHref: '/auth',
-  },
-  {
-    id: 'AGENCY',
-    name: 'Agency',
-    tagline: 'For agencies managing multiple clients.',
-    prices: { MONTHLY: 100, SIX_MONTHS: 550, ANNUAL: 1000 },
-    features: [
-      '50 digital cards',
-      'Unlimited analytics',
-      'Unlimited team members',
-      'Multi-workspace management',
-      'White label (partner branding)',
-      'Priority support + SLA',
-    ],
-    cta: 'Get Agency',
-    ctaHref: '/auth',
-  },
-  {
-    id: 'ENTERPRISE',
-    name: 'Enterprise',
-    tagline: 'White-glove service for large organizations.',
-    prices: { MONTHLY: 199, SIX_MONTHS: 1095, ANNUAL: 1990 },
-    dark: true,
-    features: [
-      'Unlimited cards',
-      'Unlimited analytics',
-      'White label / SSO / SCIM',
-      'Dedicated onboarding',
-      'SLA guarantee',
-      'Custom integrations',
-    ],
-    cta: 'Get Enterprise',
-    ctaHref: '/auth',
+    cta: 'Upgrade to Pro',
   },
 ]
-
-// Feature comparison table (6 tiers: Free + 5 paid)
-interface FeatureRow {
-  label: string
-  free: string | boolean
-  starter: string | boolean
-  pro: string | boolean
-  business: string | boolean
-  agency: string | boolean
-  enterprise: string | boolean
-}
 
 const FEATURES: FeatureRow[] = [
-  {
-    label: 'Digital cards',
-    free: '1',
-    starter: '1',
-    pro: '3',
-    business: '10',
-    agency: '50',
-    enterprise: 'Unlimited',
-  },
-  {
-    label: 'Analytics history',
-    free: '7 days',
-    starter: '30 days',
-    pro: '90 days',
-    business: '365 days',
-    agency: 'Unlimited',
-    enterprise: 'Unlimited',
-  },
+  { label: 'Digital cards', free: '1', starter: '1 premium card', pro: '3 cards' },
+  { label: 'Analytics history', free: '7 days', starter: '30 days', pro: 'Advanced analytics' },
   {
     label: 'Social links',
-    free: '3',
-    starter: '5',
-    pro: 'Unlimited',
-    business: 'Unlimited',
-    agency: 'Unlimited',
-    enterprise: 'Unlimited',
+    free: 'Up to 3',
+    starter: 'More social links',
+    pro: 'More social links',
   },
-  {
-    label: 'Lead capture',
-    free: false,
-    starter: true,
-    pro: true,
-    business: true,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'Full CRM access',
-    free: false,
-    starter: false,
-    pro: true,
-    business: true,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'Portfolio / media blocks',
-    free: false,
-    starter: false,
-    pro: true,
-    business: true,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'CSV export',
-    free: false,
-    starter: false,
-    pro: true,
-    business: true,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'Custom domain',
-    free: false,
-    starter: false,
-    pro: false,
-    business: true,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'Team management',
-    free: false,
-    starter: false,
-    pro: false,
-    business: '10 members',
-    agency: 'Unlimited',
-    enterprise: 'Unlimited',
-  },
-  {
-    label: 'White label / SSO',
-    free: false,
-    starter: false,
-    pro: false,
-    business: false,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'Priority support',
-    free: false,
-    starter: false,
-    pro: false,
-    business: true,
-    agency: true,
-    enterprise: true,
-  },
-  {
-    label: 'Dedicated onboarding',
-    free: false,
-    starter: false,
-    pro: false,
-    business: false,
-    agency: false,
-    enterprise: true,
-  },
-  {
-    label: 'SLA guarantee',
-    free: false,
-    starter: false,
-    pro: false,
-    business: false,
-    agency: true,
-    enterprise: true,
-  },
+  { label: 'Lead capture', free: 'Basic', starter: true, pro: true },
+  { label: 'CRM', free: false, starter: 'Basic CRM', pro: 'Full CRM' },
+  { label: 'Email signature', free: false, starter: true, pro: true },
+  { label: 'Email templates', free: false, starter: true, pro: true },
+  { label: 'Scheduling', free: false, starter: 'Basic', pro: 'Full' },
+  { label: 'CSV export', free: false, starter: false, pro: true },
+  { label: 'Custom domain', free: false, starter: false, pro: true },
+  { label: 'Webhooks', free: false, starter: false, pro: true },
 ]
-
-// ─── Duration config ───────────────────────────────────────────────────────────
 
 const DURATION_LABELS: Record<Duration, string> = {
   MONTHLY: 'Monthly',
@@ -240,17 +89,15 @@ const DURATION_LABELS: Record<Duration, string> = {
 
 const DURATION_SAVINGS: Record<Duration, string | null> = {
   MONTHLY: null,
-  SIX_MONTHS: 'Save 8%',
-  ANNUAL: 'Save 17%',
+  SIX_MONTHS: 'Best value',
+  ANNUAL: 'Lowest monthly rate',
 }
 
 const DURATION_NOTE: Record<Duration, string | null> = {
   MONTHLY: null,
-  SIX_MONTHS: 'Billed every 6 months',
-  ANNUAL: 'Billed annually — 2 months free',
+  SIX_MONTHS: 'Billed every 6 months in USDT',
+  ANNUAL: 'Billed annually in USDT',
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function FeatureValue({ value }: { value: string | boolean }) {
   if (value === true) {
@@ -264,185 +111,178 @@ function FeatureValue({ value }: { value: string | boolean }) {
       </svg>
     )
   }
+
   if (value === false) {
-    return <span className="block text-center text-gray-300">—</span>
+    return (
+      <span className="block text-center text-gray-300">
+        <XIcon className="mx-auto h-4 w-4" />
+      </span>
+    )
   }
+
   return <span className="block text-center text-sm text-gray-700">{value}</span>
 }
 
 function formatPrice(plan: Plan, duration: Duration): { display: string; sub: string } {
   const total = plan.prices[duration]
-  if (duration === 'MONTHLY') {
-    return { display: `$${total}`, sub: '/mo' }
-  }
-  if (duration === 'SIX_MONTHS') {
-    const monthly = (total / 6).toFixed(2).replace(/\.00$/, '')
-    return { display: `$${monthly}`, sub: `/mo · $${total} total` }
-  }
-  // ANNUAL
-  const monthly = (total / 12).toFixed(2).replace(/\.00$/, '')
-  return { display: `$${monthly}`, sub: `/mo · $${total}/yr` }
+  if (duration === 'MONTHLY') return { display: `$${total}`, sub: 'USDT / month' }
+  if (duration === 'SIX_MONTHS') return { display: `$${total}`, sub: 'USDT / 6 months' }
+  return { display: `$${total}`, sub: 'USDT / year' }
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function getCheckoutHref(plan: 'STARTER' | 'PRO', duration: Duration): string {
+  const next = encodeURIComponent(`/settings/billing?plan=${plan}&duration=${duration}`)
+  return `/auth?next=${next}`
+}
 
 export default function PricingPage() {
   const [duration, setDuration] = useState<Duration>('MONTHLY')
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="marketing-shell min-h-screen bg-transparent">
       <Navbar />
 
-      {/* Hero */}
-      <section className="px-6 py-14 text-center">
-        <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
-          Simple, transparent pricing
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-gray-500">
-          Pay with USDT via any Web3 wallet. No credit card, no middleman.
-        </p>
-        <p className="mt-2 text-sm font-medium text-brand-600">
-          Powered by BoosterAI PaymentVault — fully on-chain
-        </p>
+      <section className="px-6 py-16 text-center sm:py-20">
+        <div className="mx-auto max-w-3xl">
+          <div className="app-shell-surface inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-sky-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+            Paid in USDT
+          </div>
+          <h1 className="mt-6 text-4xl font-extrabold tracking-[-0.04em] text-gray-950 sm:text-5xl lg:text-6xl">
+            Simple pricing for how Dotly works today.
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-gray-600">
+            Start free, then upgrade when you need richer sharing, stronger analytics, and a more
+            complete CRM workflow.
+          </p>
+          <p className="mt-3 text-sm font-medium text-brand-600">
+            Business, Agency, and Enterprise plans will be published later.
+          </p>
 
-        {/* Duration toggle */}
-        <div className="mt-8 inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1">
-          {(['MONTHLY', 'SIX_MONTHS', 'ANNUAL'] as Duration[]).map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDuration(d)}
-              className={cn(
-                'flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                duration === d
-                  ? 'bg-white shadow text-gray-900'
-                  : 'text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {DURATION_LABELS[d]}
-              {DURATION_SAVINGS[d] && (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
-                  {DURATION_SAVINGS[d]}
-                </span>
-              )}
-            </button>
-          ))}
+          <div className="app-shell-surface mt-10 inline-flex items-center gap-1 rounded-full p-1">
+            {(['MONTHLY', 'SIX_MONTHS', 'ANNUAL'] as Duration[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDuration(d)}
+                className={cn(
+                  'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                  duration === d
+                    ? 'bg-gray-950 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800',
+                )}
+              >
+                {DURATION_LABELS[d]}
+                {DURATION_SAVINGS[d] && (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                    {DURATION_SAVINGS[d]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {DURATION_NOTE[duration] && (
+            <p className="mt-3 text-xs text-gray-500">{DURATION_NOTE[duration]}</p>
+          )}
         </div>
-        {DURATION_NOTE[duration] && (
-          <p className="mt-2 text-xs text-gray-500">{DURATION_NOTE[duration]}</p>
-        )}
       </section>
 
-      {/* Free + 5 Plan cards */}
-      <section className="px-6 pb-16">
-        <div className="mx-auto max-w-7xl">
-          {/* Free card — full-width intro row */}
-          <div className="mb-6 flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-8 py-5">
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Free</h2>
-              <p className="mt-0.5 text-sm text-gray-500">
-                Get started with the basics — no wallet needed.
-              </p>
-              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-                <li>1 digital card</li>
-                <li>7-day analytics</li>
-                <li>3 social links</li>
-              </ul>
-            </div>
-            <div className="flex shrink-0 items-center gap-6">
+      <section className="px-6 pb-16 sm:pb-20">
+        <div className="mx-auto max-w-6xl space-y-6">
+          <div className="app-panel rounded-[32px] px-6 py-6 sm:px-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <span className="text-3xl font-bold text-gray-900">$0</span>
-                <span className="ml-1 text-sm text-gray-500">/forever</span>
+                <h2 className="text-lg font-semibold text-gray-950">Free</h2>
+                <p className="mt-1 text-sm text-gray-500">Try Dotly with the essentials.</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-600">
+                  <span className="app-panel-subtle rounded-full px-3 py-1.5">1 digital card</span>
+                  <span className="app-panel-subtle rounded-full px-3 py-1.5">3 social links</span>
+                  <span className="app-panel-subtle rounded-full px-3 py-1.5">7-day analytics</span>
+                  <span className="app-panel-subtle rounded-full px-3 py-1.5">
+                    Basic lead capture
+                  </span>
+                </div>
               </div>
-              <Link
-                href="/auth"
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
-              >
-                Get started
-              </Link>
+
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div>
+                  <span className="text-4xl font-bold tracking-tight text-gray-950">$0</span>
+                  <span className="ml-1 text-sm text-gray-500">USDT forever</span>
+                </div>
+                <Link
+                  href="/auth?next=%2Fdashboard"
+                  className="app-panel-subtle inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-white"
+                >
+                  Get started free
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* 5 paid tier cards */}
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-6 lg:grid-cols-2">
             {PLANS.map((plan) => {
               const { display, sub } = formatPrice(plan, duration)
+
               return (
                 <div
                   key={plan.id}
                   className={cn(
-                    'relative flex flex-col rounded-2xl p-6 shadow-sm',
+                    'relative overflow-hidden rounded-[34px] p-7 shadow-[0_32px_90px_-44px_rgba(15,23,42,0.38)] backdrop-blur-xl',
                     plan.highlight
-                      ? 'border-2 border-brand-500 bg-white shadow-md'
-                      : plan.dark
-                        ? 'border border-gray-700 bg-gray-900'
-                        : 'border border-gray-200 bg-white',
+                      ? 'border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-cyan-50'
+                      : 'border border-white/75 bg-white/84',
                   )}
                 >
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-32"
+                    style={{
+                      background: plan.highlight
+                        ? 'radial-gradient(circle at top, rgba(56,189,248,0.22), transparent 60%)'
+                        : 'radial-gradient(circle at top, rgba(148,163,184,0.12), transparent 60%)',
+                    }}
+                  />
+
                   {plan.highlight && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="rounded-full bg-brand-500 px-3 py-1 text-xs font-semibold text-white">
-                        Most popular
-                      </span>
+                    <div className="absolute right-6 top-6 inline-flex items-center gap-1.5 rounded-full bg-gray-950 px-3 py-1 text-xs font-semibold text-white">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Most complete
                     </div>
                   )}
-                  <div className="mb-4">
-                    <h2
-                      className={cn(
-                        'text-base font-semibold',
-                        plan.dark ? 'text-white' : 'text-gray-900',
-                      )}
-                    >
-                      {plan.name}
-                    </h2>
-                    <div className="mt-2 flex flex-wrap items-end gap-1">
-                      <span
-                        className={cn(
-                          'text-3xl font-bold',
-                          plan.dark ? 'text-white' : 'text-gray-900',
-                        )}
-                      >
+
+                  <div className="relative">
+                    <h2 className="text-xl font-semibold text-gray-950">{plan.name}</h2>
+                    <p className="mt-2 text-sm leading-6 text-gray-500">{plan.tagline}</p>
+                  </div>
+
+                  <div className="relative mt-6">
+                    <div className="flex items-end gap-2">
+                      <span className="text-5xl font-bold tracking-tight text-gray-950">
                         {display}
                       </span>
                     </div>
-                    <p
-                      className={cn(
-                        'mt-0.5 text-xs',
-                        plan.dark ? 'text-gray-400' : 'text-gray-400',
-                      )}
-                    >
-                      {sub}
-                    </p>
-                    <p
-                      className={cn('mt-2 text-xs', plan.dark ? 'text-gray-400' : 'text-gray-500')}
-                    >
-                      {plan.tagline}
-                    </p>
+                    <p className="mt-2 text-sm font-medium text-gray-500">{sub}</p>
                   </div>
 
-                  <ul
-                    className={cn(
-                      'mb-6 flex-1 space-y-1.5 text-sm',
-                      plan.dark ? 'text-gray-300' : 'text-gray-600',
-                    )}
-                  >
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2">
-                        <span className={plan.dark ? 'text-brand-400' : 'text-brand-500'}>✓</span>
-                        {f}
+                  <ul className="relative mt-6 space-y-3 text-sm text-gray-700">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand-50 text-brand-500">
+                          <Check className="h-3.5 w-3.5" />
+                        </span>
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
 
                   <Link
-                    href={plan.ctaHref}
+                    href={getCheckoutHref(plan.id, duration)}
                     className={cn(
-                      'block rounded-lg px-4 py-2.5 text-center text-sm font-semibold transition-colors',
+                      'mt-8 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold',
                       plan.highlight
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
-                        : plan.dark
-                          ? 'border border-gray-600 text-white hover:bg-gray-800'
-                          : 'border border-brand-500 text-brand-600 hover:bg-brand-50',
+                        ? 'bg-gradient-to-b from-sky-500 to-sky-600 text-white shadow-[0_22px_45px_-24px_rgba(14,165,233,0.72)] hover:brightness-[1.03]'
+                        : 'border border-brand-200 bg-white text-brand-700 hover:bg-brand-50',
                     )}
                   >
                     {plan.cta}
@@ -454,52 +294,40 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Full feature comparison table */}
       <section className="border-t border-gray-100 px-6 py-16">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="mb-8 text-center text-2xl font-bold text-gray-900">
-            Full feature comparison
-          </h2>
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="w-full text-left text-sm">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="text-center text-2xl font-bold text-gray-950">Feature comparison</h2>
+          <p className="mt-3 text-center text-sm text-gray-500">
+            Published plans today: Free, Starter, and Pro.
+          </p>
+
+          <div className="app-panel mt-8 overflow-x-auto rounded-[32px]">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-5 py-3 font-semibold text-gray-700">Feature</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-500">Free</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700">Starter</th>
-                  <th className="px-3 py-3 text-center font-semibold text-brand-600">Pro</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700">Business</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700">Agency</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700">Enterprise</th>
+                <tr className="border-b border-gray-100 bg-gray-50/80">
+                  <th className="px-5 py-4 font-semibold text-gray-700">Feature</th>
+                  <th className="px-4 py-4 text-center font-semibold text-gray-500">Free</th>
+                  <th className="px-4 py-4 text-center font-semibold text-gray-700">Starter</th>
+                  <th className="bg-brand-50/40 px-4 py-4 text-center font-semibold text-brand-700">
+                    Pro
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {FEATURES.map((row, i) => (
+                {FEATURES.map((row, index) => (
                   <tr
                     key={row.label}
-                    className={cn(
-                      'border-b border-gray-100',
-                      i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50',
-                    )}
+                    className={cn(index % 2 === 0 ? 'bg-white' : 'bg-gray-50/35')}
                   >
-                    <td className="px-5 py-3 font-medium text-gray-700">{row.label}</td>
-                    <td className="px-3 py-3">
+                    <td className="px-5 py-4 font-medium text-gray-700">{row.label}</td>
+                    <td className="px-4 py-4">
                       <FeatureValue value={row.free} />
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-4">
                       <FeatureValue value={row.starter} />
                     </td>
-                    <td className="px-3 py-3 bg-brand-50/30">
+                    <td className="bg-brand-50/20 px-4 py-4">
                       <FeatureValue value={row.pro} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <FeatureValue value={row.business} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <FeatureValue value={row.agency} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <FeatureValue value={row.enterprise} />
                     </td>
                   </tr>
                 ))}
@@ -509,18 +337,15 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Web3 payment note */}
-      <section className="border-t border-gray-100 bg-gray-50 px-6 py-12 text-center">
-        <div className="mx-auto max-w-lg">
-          <div className="mb-3 text-3xl">&#128274;</div>
-          <h3 className="text-lg font-bold text-gray-900">Pay with USDT — no credit card needed</h3>
-          <p className="mt-2 text-sm text-gray-500">
-            Connect MetaMask, WalletConnect, or any EVM-compatible wallet. Payments are settled on
-            Arbitrum via the BoosterAI PaymentVault smart contract. Your private key never leaves
-            your wallet.
-          </p>
-          <p className="mt-3 text-xs font-medium text-brand-600">
-            Powered by BoosterAI PaymentVault — no middleman, no subscription lock-in
+      <section className="border-t border-gray-100 bg-gray-50/75 px-6 py-12 text-center">
+        <div className="app-panel mx-auto flex max-w-2xl flex-col items-center rounded-[30px] px-6 py-8">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+            <ShieldCheck className="h-6 w-6" />
+          </span>
+          <h3 className="text-lg font-bold text-gray-950">Pay with USDT</h3>
+          <p className="mt-3 text-sm leading-7 text-gray-500">
+            Connect MetaMask, WalletConnect, or any EVM-compatible wallet. Payments settle via the
+            BoosterAI PaymentVault on Arbitrum. Your private key never leaves your wallet.
           </p>
         </div>
       </section>

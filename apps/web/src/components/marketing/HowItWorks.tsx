@@ -34,12 +34,12 @@ export function HowItWorks() {
 
         <div className="mt-14 grid gap-8 md:grid-cols-3">
           {STEPS.map((step, i) => (
-            <div key={step.number} className="relative">
+            <div key={step.number} className="app-panel relative rounded-[28px] p-6">
               {/* Connector line */}
               {i < STEPS.length - 1 && (
                 <div
                   aria-hidden="true"
-                  className="absolute left-full top-6 hidden h-px w-full -translate-x-4 bg-gradient-to-r from-brand-200 to-transparent md:block"
+                  className="absolute left-full top-1/2 hidden h-px w-full -translate-x-4 bg-gradient-to-r from-brand-200 to-transparent md:block"
                 />
               )}
 

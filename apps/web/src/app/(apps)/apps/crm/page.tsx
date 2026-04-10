@@ -50,7 +50,7 @@ function StatPill({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+      className="app-panel group flex items-center gap-4 rounded-[24px] p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
       <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl shrink-0', color)}>
         <Icon className="h-5 w-5 text-white" />
@@ -93,10 +93,10 @@ export default function CRMDashboard(): JSX.Element {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">CRM</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500">
             Contacts, pipeline, deals and tasks in one place
           </p>
         </div>
@@ -145,7 +145,7 @@ export default function CRMDashboard(): JSX.Element {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent contacts */}
-        <section className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <section className="app-panel overflow-hidden rounded-[28px]">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <h2 className="text-sm font-semibold text-gray-900">Recent Contacts</h2>
             <Link
@@ -162,7 +162,7 @@ export default function CRMDashboard(): JSX.Element {
               ))}
             </div>
           ) : data.contacts.length === 0 ? (
-            <div className="flex flex-col items-center py-10 text-center">
+            <div className="app-empty-state rounded-none border-0 shadow-none">
               <Users className="h-8 w-8 text-gray-200 mb-2" />
               <p className="text-sm text-gray-400">No contacts yet</p>
               <Link
@@ -200,18 +200,42 @@ export default function CRMDashboard(): JSX.Element {
         </section>
 
         {/* CRM links */}
-        <section className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <section className="app-panel overflow-hidden rounded-[28px]">
           <div className="border-b border-gray-100 px-5 py-4">
             <h2 className="text-sm font-semibold text-gray-900">CRM Tools</h2>
           </div>
           <div className="divide-y divide-gray-50">
             {[
-              { href: '/apps/crm/deals', label: 'Deals', desc: 'Track and manage opportunities', icon: DollarSign },
-              { href: '/apps/crm/tasks', label: 'Tasks', desc: 'Manage follow-ups and to-dos', icon: CheckSquare },
-              { href: '/apps/crm/leads', label: 'Lead Submissions', desc: 'Contacts from your cards', icon: Inbox },
-              { href: '/apps/crm/pipeline', label: 'Pipeline', desc: 'Visual Kanban pipeline', icon: Kanban },
+              {
+                href: '/apps/crm/deals',
+                label: 'Deals',
+                desc: 'Track and manage opportunities',
+                icon: DollarSign,
+              },
+              {
+                href: '/apps/crm/tasks',
+                label: 'Tasks',
+                desc: 'Manage follow-ups and to-dos',
+                icon: CheckSquare,
+              },
+              {
+                href: '/apps/crm/leads',
+                label: 'Lead Submissions',
+                desc: 'Contacts from your cards',
+                icon: Inbox,
+              },
+              {
+                href: '/apps/crm/pipeline',
+                label: 'Pipeline',
+                desc: 'Visual Kanban pipeline',
+                icon: Kanban,
+              },
             ].map(({ href, label, desc, icon: Icon }) => (
-              <Link key={href} href={href} className="group flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+              <Link
+                key={href}
+                href={href}
+                className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/70"
+              >
                 <Icon className="h-4 w-4 shrink-0 text-violet-400" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900">{label}</p>
@@ -261,7 +285,7 @@ export default function CRMDashboard(): JSX.Element {
             <Link
               key={href}
               href={href}
-              className="group flex flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm text-center transition-all hover:shadow-md"
+              className="app-panel group flex flex-col items-center gap-2 rounded-[24px] p-4 text-center transition-all hover:shadow-md"
             >
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', color)}>
                 <Icon className={cn('h-5 w-5', iconColor)} />
@@ -273,7 +297,7 @@ export default function CRMDashboard(): JSX.Element {
       </section>
 
       {/* Cross-app links */}
-      <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
+      <section className="app-panel-subtle rounded-[28px] border border-dashed border-gray-200 p-5">
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
           Connected Apps
         </p>

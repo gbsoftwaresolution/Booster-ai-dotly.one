@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { BillingPlan, hasPlanAccess } from '@/lib/billing-plans'
 import {
   BarChart3,
   Calendar,
@@ -24,6 +25,7 @@ export interface DashboardNavItem {
   label: string
   icon: LucideIcon
   section: string
+  minPlan?: BillingPlan
 }
 
 export interface DashboardNavSection {
@@ -55,8 +57,20 @@ export const dashboardNavItems: DashboardNavItem[] = [
   { href: '/crm/analytics', label: 'CRM Analytics', icon: TrendingUp, section: 'CRM' },
 
   // Administration
-  { href: '/team', label: 'Team', icon: UsersRound, section: 'Administration' },
-  { href: '/settings/webhooks', label: 'Webhooks', icon: Webhook, section: 'Administration' },
+  {
+    href: '/team',
+    label: 'Team',
+    icon: UsersRound,
+    section: 'Administration',
+    minPlan: 'BUSINESS',
+  },
+  {
+    href: '/settings/webhooks',
+    label: 'Webhooks',
+    icon: Webhook,
+    section: 'Administration',
+    minPlan: 'PRO',
+  },
   { href: '/settings', label: 'Settings', icon: Settings, section: 'Administration' },
 ]
 
@@ -82,6 +96,13 @@ export const dashboardMoreItems = dashboardNavItems.filter(
   (item) => !dashboardBottomTabs.some((tab) => tab.href === item.href),
 )
 
+function filterDashboardItemsByPlan(
+  items: DashboardNavItem[],
+  plan: BillingPlan,
+): DashboardNavItem[] {
+  return items.filter((item) => !item.minPlan || hasPlanAccess(plan, item.minPlan))
+}
+
 function groupDashboardNavItems(items: DashboardNavItem[]): DashboardNavSection[] {
   return items.reduce<DashboardNavSection[]>((sections, item) => {
     const existingSection = sections.find((section) => section.title === item.section)
@@ -98,3 +119,15 @@ function groupDashboardNavItems(items: DashboardNavItem[]): DashboardNavSection[
 
 export const dashboardNavSections = groupDashboardNavItems(dashboardNavItems)
 export const dashboardMoreSections = groupDashboardNavItems(dashboardMoreItems)
+
+export function getVisibleDashboardNavSections(plan: BillingPlan): DashboardNavSection[] {
+  return groupDashboardNavItems(filterDashboardItemsByPlan(dashboardNavItems, plan))
+}
+
+export function getVisibleDashboardBottomTabs(plan: BillingPlan): DashboardNavItem[] {
+  return filterDashboardItemsByPlan(dashboardBottomTabs, plan)
+}
+
+export function getVisibleDashboardMoreSections(plan: BillingPlan): DashboardNavSection[] {
+  return groupDashboardNavItems(filterDashboardItemsByPlan(dashboardMoreItems, plan))
+}

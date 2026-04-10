@@ -18,6 +18,9 @@ import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { ContactsService } from './contacts.service'
+import { BillingService } from '../billing/billing.service'
+import { PrismaService } from '../prisma/prisma.service'
+import { Plan } from '@dotly/types'
 import {
   IsString,
   IsOptional,
@@ -661,7 +664,25 @@ class AssignPipelineDto {
 @ApiTags('contacts')
 @Controller()
 export class ContactsController {
-  constructor(private contactsService: ContactsService) {}
+  constructor(
+    private contactsService: ContactsService,
+    private billingService: BillingService,
+    private prisma: PrismaService,
+  ) {}
+
+  private async assertCsvExportAccess(rawUserId: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: { OR: [{ id: rawUserId }, { supabaseId: rawUserId }] },
+      select: { plan: true },
+    })
+
+    const plan = (user?.plan as Plan | undefined) ?? Plan.FREE
+    const limits = this.billingService.getPlanLimits(plan)
+
+    if (!limits.csvExport) {
+      throw new BadRequestException('CSV export is available on Pro.')
+    }
+  }
 
   @Public()
   @UseGuards(ThrottlerGuard)
@@ -985,6 +1006,7 @@ export class ContactsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    await this.assertCsvExportAccess(user.id)
     const result = await this.contactsService.exportContacts(user.id, { cardId, from, to })
     const filename = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')

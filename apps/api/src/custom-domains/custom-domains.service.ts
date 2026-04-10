@@ -10,6 +10,8 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { assertSafeUrl } from '../common/utils/ssrf-guard'
 import { Prisma } from '@dotly/database'
+import { Plan } from '@dotly/types'
+import { BillingService } from '../billing/billing.service'
 
 /**
  * L-08: dns.resolveTxt() has no built-in timeout. On slow or unresponsive
@@ -29,9 +31,28 @@ function resolveTxtWithTimeout(hostname: string, timeoutMs = 5000): Promise<stri
 
 @Injectable()
 export class CustomDomainsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billingService: BillingService,
+  ) {}
+
+  private async assertCustomDomainAccess(userId: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: { OR: [{ id: userId }, { supabaseId: userId }] },
+      select: { plan: true },
+    })
+
+    const plan = (user?.plan as Plan | undefined) ?? Plan.FREE
+    const limits = this.billingService.getPlanLimits(plan)
+
+    if (!limits.customDomain) {
+      throw new ForbiddenException('Custom domains require Pro or higher')
+    }
+  }
 
   async addDomain(userId: string, cardId: string | null, domain: string) {
+    await this.assertCustomDomainAccess(userId)
+
     // Guard against SSRF via domain input — validate it is a safe external URL
     await assertSafeUrl(`https://${domain.toLowerCase().trim()}`)
 
@@ -66,6 +87,8 @@ export class CustomDomainsService {
   }
 
   async verifyDomain(userId: string, domainId: string) {
+    await this.assertCustomDomainAccess(userId)
+
     const record = await this.prisma.customDomain.findUnique({
       where: { id: domainId },
     })
@@ -107,6 +130,8 @@ export class CustomDomainsService {
   }
 
   async getDomains(userId: string) {
+    await this.assertCustomDomainAccess(userId)
+
     return this.prisma.customDomain.findMany({
       where: { userId },
       include: {
@@ -119,6 +144,8 @@ export class CustomDomainsService {
   }
 
   async deleteDomain(userId: string, domainId: string) {
+    await this.assertCustomDomainAccess(userId)
+
     const record = await this.prisma.customDomain.findUnique({
       where: { id: domainId },
     })
@@ -129,6 +156,8 @@ export class CustomDomainsService {
   }
 
   async updateDomain(userId: string, domainId: string, updates: { cardId?: string | null }) {
+    await this.assertCustomDomainAccess(userId)
+
     const record = await this.prisma.customDomain.findUnique({ where: { id: domainId } })
     if (!record) throw new NotFoundException('Domain not found')
     if (record.userId !== userId) throw new ForbiddenException('Access denied')

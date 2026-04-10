@@ -195,14 +195,19 @@ export default function PipelinesPage(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
         <div className="flex items-center gap-3">
-          <GitBranch className="h-6 w-6 text-sky-500" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600">
+            <GitBranch className="h-6 w-6" />
+          </div>
           <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-500/80">
+              CRM Setup
+            </p>
             <h1 className="text-2xl font-bold text-gray-900">Pipelines</h1>
-            <p className="mt-0.5 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-gray-500">
               Manage CRM pipelines with custom stage sequences and colours
             </p>
           </div>
@@ -227,7 +232,7 @@ export default function PipelinesPage(): JSX.Element {
       {loading ? (
         <div className="flex items-center justify-center py-20 text-gray-400">Loading...</div>
       ) : pipelines.length === 0 ? (
-        <div className="py-20 text-center text-gray-400">
+        <div className="app-empty-state">
           <GitBranch className="mx-auto mb-3 h-10 w-10 opacity-40" />
           <p className="text-base font-medium text-gray-500">No pipelines yet</p>
           <p className="mt-1 text-sm">Create your first pipeline to start organising contacts.</p>
@@ -235,10 +240,7 @@ export default function PipelinesPage(): JSX.Element {
       ) : (
         <div className="space-y-4">
           {pipelines.map((pipeline) => (
-            <div
-              key={pipeline.id}
-              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-            >
+            <div key={pipeline.id} className="app-panel rounded-[24px] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -304,7 +306,7 @@ export default function PipelinesPage(): JSX.Element {
       {/* Create / Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+          <div className="app-panel mx-4 w-full max-w-lg rounded-[28px] shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h2 className="text-lg font-bold text-gray-900">
                 {editingPipeline ? 'Edit Pipeline' : 'New Pipeline'}

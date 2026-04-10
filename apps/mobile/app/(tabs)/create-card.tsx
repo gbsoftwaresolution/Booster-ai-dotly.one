@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import { Feather } from '@expo/vector-icons'
 import { createCard, checkHandleAvailable, uploadAvatar } from '../../lib/api'
 
 type Template = 'MINIMAL' | 'BOLD' | 'CREATIVE' | 'CORPORATE'
@@ -156,9 +157,13 @@ export default function CreateCardScreen() {
         >
           <TouchableOpacity
             onPress={() => (step > 0 ? setStep(step - 1) : router.back())}
-            style={{ marginRight: 12 }}
+            style={{ marginRight: 12, width: 28, alignItems: 'center' }}
           >
-            <Text style={{ color: '#0ea5e9', fontSize: 16 }}>{step > 0 ? '← Back' : '✕'}</Text>
+            {step > 0 ? (
+              <Feather name="chevron-left" size={20} color="#0ea5e9" />
+            ) : (
+              <Feather name="x" size={20} color="#0ea5e9" />
+            )}
           </TouchableOpacity>
           <Text style={{ fontSize: 17, fontWeight: '700', color: '#0f172a', flex: 1 }}>
             New Card — {STEP_TITLES[step]}
@@ -246,9 +251,11 @@ export default function CreateCardScreen() {
                     {checkingHandle ? (
                       <ActivityIndicator size="small" color="#0ea5e9" />
                     ) : handle.length > 0 ? (
-                      <Text style={{ fontSize: 18 }}>
-                        {handleAvailable === true ? '✓' : handleAvailable === false ? '✗' : ''}
-                      </Text>
+                      handleAvailable === true ? (
+                        <Feather name="check-circle" size={18} color="#22c55e" />
+                      ) : handleAvailable === false ? (
+                        <Feather name="x-circle" size={18} color="#ef4444" />
+                      ) : null
                     ) : null}
                   </View>
                 </View>
@@ -342,7 +349,7 @@ export default function CreateCardScreen() {
                         justifyContent: 'center',
                       }}
                     >
-                      <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }}>✓</Text>
+                      <Feather name="check" size={12} color="#ffffff" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -370,9 +377,24 @@ export default function CreateCardScreen() {
                     overflow: 'hidden',
                   }}
                 >
-                  <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center', padding: 8 }}>
-                    {avatarBase64 ? '✓ Photo\nselected' : 'Tap to\nupload'}
-                  </Text>
+                  <View
+                    style={{ alignItems: 'center', justifyContent: 'center', padding: 8, gap: 4 }}
+                  >
+                    <Feather
+                      name={avatarBase64 ? 'check-circle' : 'upload-cloud'}
+                      size={18}
+                      color={avatarBase64 ? '#ffffff' : '#64748b'}
+                    />
+                    <Text
+                      style={{
+                        color: avatarBase64 ? '#ffffff' : '#64748b',
+                        fontSize: 12,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {avatarBase64 ? 'Photo\nselected' : 'Tap to\nupload'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
                 <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 6 }}>
                   Profile photo (optional)

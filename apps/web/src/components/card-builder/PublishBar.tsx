@@ -47,7 +47,7 @@ export function PublishBar({
   return (
     <>
       {/* ── Publish bar ── */}
-      <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3.5">
+      <div className="app-sticky-action-bar shrink-0 px-4 py-3.5">
         {/* Status + URL row */}
         <div className="mb-3 flex items-center gap-2">
           {/* Live / Draft pill */}
@@ -67,7 +67,7 @@ export function PublishBar({
           </span>
 
           {/* URL */}
-          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-xl bg-gray-50 px-3 py-1.5">
+          <div className="app-panel-subtle flex min-w-0 flex-1 items-center gap-1 rounded-xl px-3 py-1.5">
             <Globe className="h-3 w-3 shrink-0 text-gray-400" />
             <span className="flex-1 truncate text-xs text-gray-500">
               <span className="text-gray-400">dotly.one/</span>
@@ -80,7 +80,7 @@ export function PublishBar({
             type="button"
             onClick={() => void handleCopy()}
             className={cn(
-              'flex shrink-0 items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition-all',
+              'app-interactive app-touch-target flex shrink-0 items-center gap-1 rounded-xl border px-3 py-2 text-xs font-semibold',
               copied
                 ? 'border-green-200 bg-green-50 text-green-700'
                 : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
@@ -135,7 +135,7 @@ export function PublishBar({
       {/* ── Publish success modal ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="app-shell-surface w-full max-w-sm rounded-3xl p-6">
             {/* Success icon */}
             <div className="mb-4 flex justify-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">

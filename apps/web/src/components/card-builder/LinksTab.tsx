@@ -203,7 +203,7 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
             return (
               <div
                 key={link.id}
-                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 transition-all hover:border-gray-200 hover:bg-white hover:shadow-sm"
+                className="app-panel-subtle flex items-center gap-3 rounded-[24px] px-4 py-3 transition-all hover:bg-white hover:shadow-[0_18px_40px_-30px_rgba(15,23,42,0.2)]"
               >
                 {/* Platform icon */}
                 <PlatformIcon platform={link.platform} size={14} />
@@ -240,7 +240,7 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
 
       {/* ── Empty state ── */}
       {links.length === 0 && !showAddForm && (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-8 text-center">
+        <div className="app-panel-subtle flex flex-col items-center gap-2 rounded-[24px] border border-dashed border-gray-200 py-8 text-center">
           <Link2 className="h-8 w-8 text-gray-300" />
           <p className="text-sm font-medium text-gray-500">No links yet</p>
           <p className="text-xs text-gray-400">Add your social profiles and custom links</p>
@@ -249,7 +249,7 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
 
       {/* ── Add link form ── */}
       {showAddForm ? (
-        <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-4 space-y-4">
+        <div className="rounded-[28px] border border-brand-100 bg-brand-50/55 p-4 shadow-[0_24px_60px_-42px_rgba(14,165,233,0.28)] space-y-4">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
             Add Social Link
           </p>

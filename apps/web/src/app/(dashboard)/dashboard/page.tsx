@@ -17,6 +17,8 @@ import {
   AlertCircle,
   Calendar,
   TrendingUp,
+  Hand,
+  X,
 } from 'lucide-react'
 import { getAccessToken, createClient } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
@@ -156,7 +158,7 @@ function StatCard({
   return (
     <Link
       href={href}
-      className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md active:shadow-none"
+      className="app-panel flex flex-col gap-3 rounded-[26px] p-4 transition-shadow hover:shadow-[0_28px_60px_-36px_rgba(15,23,42,0.25)] active:shadow-none"
     >
       <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', bg)}>
         <Icon className={cn('h-4 w-4', color)} aria-hidden="true" />
@@ -237,7 +239,7 @@ function CardAnalyticsRow({
   return (
     <Link
       href={`/cards/${card.id}/edit`}
-      className="group flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md active:shadow-none"
+      className="app-panel group flex items-center gap-3 rounded-[24px] p-4 transition-shadow hover:shadow-[0_24px_52px_-34px_rgba(15,23,42,0.24)] active:shadow-none"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-bold text-white">
         {initials || '?'}
@@ -377,27 +379,28 @@ export default function DashboardPage(): JSX.Element {
     <div className="space-y-5">
       {/* Error banner */}
       {loadError && (
-        <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-700 shadow-[0_16px_32px_-24px_rgba(239,68,68,0.35)]">
           <span>{loadError}</span>
           <button
             type="button"
             onClick={() => setLoadError(null)}
-            className="ml-4 font-bold text-red-400 hover:text-red-600"
+            className="ml-4 rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
       {/* ── Greeting ── */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">
-          {greeting}
-        </p>
-        <h1 className="mt-0.5 text-2xl font-bold text-gray-900">{userName} 👋</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Here&apos;s your business overview for today.
-        </p>
+      <div className="app-panel rounded-[30px] px-5 py-5 sm:px-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">{greeting}</p>
+        <div className="mt-1 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-950">{userName}</h1>
+          <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
+            <Hand className="h-4 w-4" />
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-gray-500">Here&apos;s your business overview for today.</p>
       </div>
 
       {/* ── App Launcher ── */}
@@ -449,7 +452,7 @@ export default function DashboardPage(): JSX.Element {
             {loading ? (
               <SkeletonList rows={3} />
             ) : leads.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+              <div className="app-panel-subtle rounded-[26px] border-2 border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
                 No leads captured yet.
               </div>
             ) : (
@@ -465,13 +468,11 @@ export default function DashboardPage(): JSX.Element {
                     <Link
                       key={lead.id}
                       href="/leads"
-                      className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                      className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-gray-900">{name}</p>
-                        {email && (
-                          <p className="truncate text-xs text-gray-400">{email}</p>
-                        )}
+                        {email && <p className="truncate text-xs text-gray-400">{email}</p>}
                       </div>
                       <span className="ml-3 shrink-0 text-xs text-gray-400">
                         {timeAgo(lead.createdAt)}
@@ -489,7 +490,7 @@ export default function DashboardPage(): JSX.Element {
             {loading ? (
               <SkeletonList rows={3} />
             ) : contacts.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+              <div className="app-panel-subtle rounded-[26px] border-2 border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
                 No contacts yet.{' '}
                 <Link href="/contacts" className="text-brand-500 underline">
                   Add one
@@ -501,15 +502,13 @@ export default function DashboardPage(): JSX.Element {
                   <Link
                     key={c.id}
                     href={`/contacts/${c.id}`}
-                    className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                    className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-gray-900">
                         {c.firstName} {c.lastName}
                       </p>
-                      {c.email && (
-                        <p className="truncate text-xs text-gray-400">{c.email}</p>
-                      )}
+                      {c.email && <p className="truncate text-xs text-gray-400">{c.email}</p>}
                     </div>
                     {c.crmStage && (
                       <span
@@ -549,7 +548,7 @@ export default function DashboardPage(): JSX.Element {
             {loading ? (
               <SkeletonList rows={3} />
             ) : tasks.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+              <div className="app-panel-subtle rounded-[26px] border-2 border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
                 All caught up — no pending tasks.
               </div>
             ) : (
@@ -560,12 +559,10 @@ export default function DashboardPage(): JSX.Element {
                     <Link
                       key={task.id}
                       href="/tasks"
-                      className="flex items-start justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                      className="app-panel-subtle flex items-start justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">
-                          {task.title}
-                        </p>
+                        <p className="truncate text-sm font-semibold text-gray-900">{task.title}</p>
                         {task.contact && (
                           <p className="text-xs text-gray-400">
                             {task.contact.firstName} {task.contact.lastName}
@@ -598,7 +595,7 @@ export default function DashboardPage(): JSX.Element {
             {loading ? (
               <SkeletonList rows={3} />
             ) : openDeals.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white py-8 text-center text-sm text-gray-400">
+              <div className="app-panel-subtle rounded-[26px] border-2 border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
                 No open deals.{' '}
                 <Link href="/deals" className="text-brand-500 underline">
                   Add one
@@ -616,7 +613,7 @@ export default function DashboardPage(): JSX.Element {
                   <Link
                     key={deal.id}
                     href="/deals"
-                    className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                    className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-gray-900">{deal.title}</p>
@@ -660,7 +657,7 @@ export default function DashboardPage(): JSX.Element {
               {loading ? (
                 <SkeletonList rows={4} />
               ) : funnel && funnel.stages.length > 0 ? (
-                <div className="space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="app-panel rounded-[26px] p-4 space-y-2.5">
                   {funnel.stages.map((s) => (
                     <div key={s.stage}>
                       <div className="mb-1 flex items-center justify-between text-xs">
@@ -689,7 +686,7 @@ export default function DashboardPage(): JSX.Element {
             {loading ? (
               <SkeletonList rows={2} />
             ) : cards.length === 0 ? (
-              <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-gray-200 bg-white py-10 text-center">
+              <div className="app-panel-subtle flex flex-col items-center rounded-[28px] border-2 border-dashed border-gray-200 py-10 text-center">
                 <CreditCard className="mb-3 h-10 w-10 text-gray-200" />
                 <p className="text-sm font-medium text-gray-500">No cards yet</p>
                 <p className="mt-1 text-xs text-gray-400">
@@ -711,7 +708,7 @@ export default function DashboardPage(): JSX.Element {
                 {cards.length > 3 && (
                   <Link
                     href="/cards"
-                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    className="app-panel-subtle flex w-full items-center justify-center gap-1.5 rounded-[24px] py-3 text-sm font-medium text-gray-500 hover:bg-white"
                   >
                     View all {cards.length} cards
                     <ChevronRight className="h-4 w-4" />
@@ -730,7 +727,7 @@ export default function DashboardPage(): JSX.Element {
                   <Link
                     key={at.id}
                     href="/scheduling"
-                    className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
+                    className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 shrink-0 text-brand-400" />
@@ -747,7 +744,7 @@ export default function DashboardPage(): JSX.Element {
 
       {/* ── Card performance summary bar ── */}
       {!loading && cards.length > 0 && (
-        <div className="grid grid-cols-3 divide-x divide-gray-100 rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="app-panel grid grid-cols-3 divide-x divide-gray-100 rounded-[28px]">
           {[
             { label: 'Total Views', value: totalStats.views, icon: Eye, color: 'text-blue-600' },
             {
@@ -809,7 +806,7 @@ export default function DashboardPage(): JSX.Element {
             <Link
               key={label}
               href={href}
-              className="flex flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md active:scale-95"
+              className="app-panel flex flex-col items-center gap-2 rounded-[24px] p-4 transition-shadow hover:shadow-[0_24px_52px_-34px_rgba(15,23,42,0.24)] active:scale-95"
             >
               <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', bg)}>
                 <Icon className={cn('h-5 w-5', color)} />

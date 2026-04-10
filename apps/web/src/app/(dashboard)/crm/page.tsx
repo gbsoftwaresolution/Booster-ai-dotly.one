@@ -2,6 +2,7 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { CircleDot } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -116,7 +117,7 @@ function KanbanCard({
       {...attributes}
       style={{ opacity: isDragging ? 0.4 : 1 }}
       aria-label={`Drag to reorder ${contact.name}`}
-      className="cursor-grab rounded-lg border border-gray-200 bg-white p-3 shadow-sm active:cursor-grabbing select-none"
+      className="app-panel cursor-grab rounded-[22px] p-3 active:cursor-grabbing select-none"
     >
       <div className="flex items-start gap-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
@@ -167,9 +168,9 @@ function DroppableColumn({
   const { setNodeRef, isOver } = useDroppable({ id: stage })
 
   return (
-    <div className="flex w-64 shrink-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="app-panel flex w-64 shrink-0 flex-col rounded-[24px]">
       {/* Column header */}
-      <div className={`rounded-t-xl border-b px-4 py-3 ${colorClass}`}>
+      <div className={`rounded-t-[24px] border-b px-4 py-3 ${colorClass}`}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">{stageLabel}</h3>
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-gray-600 shadow-sm">
@@ -368,12 +369,20 @@ export default function CrmPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">CRM Pipeline</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Drag contacts between stages to update their pipeline status.
-          </p>
+      <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600">
+            <CircleDot className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500/80">
+              Pipeline
+            </p>
+            <h1 className="mt-2 text-2xl font-bold text-gray-900">CRM Pipeline</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Drag contacts between stages to update their pipeline status.
+            </p>
+          </div>
         </div>
 
         {/* Pipeline selector */}
@@ -429,7 +438,10 @@ export default function CrmPage(): JSX.Element {
       {loading ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {activeStages.map((s) => (
-            <div key={s} className="h-64 w-64 shrink-0 animate-pulse rounded-xl bg-gray-100" />
+            <div
+              key={s}
+              className="app-list-skeleton h-64 w-64 shrink-0 animate-pulse rounded-[24px]"
+            />
           ))}
         </div>
       ) : (
@@ -455,7 +467,7 @@ export default function CrmPage(): JSX.Element {
           {/* Drag overlay */}
           <DragOverlay>
             {activeContact ? (
-              <div className="cursor-grabbing rounded-lg border border-indigo-300 bg-white p-3 shadow-xl opacity-95 w-56">
+              <div className="app-panel w-56 cursor-grabbing rounded-[22px] p-3 opacity-95 shadow-xl">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
                     {getInitials(activeContact.name)}

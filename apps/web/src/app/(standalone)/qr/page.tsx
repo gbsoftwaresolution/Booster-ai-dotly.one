@@ -168,6 +168,14 @@ const GLOBAL_STYLES = `
     from { opacity: 0; }
     to   { opacity: 1; }
   }
+  @keyframes scanner-breathe {
+    0%, 100% { transform: scale(1); opacity: .72; }
+    50% { transform: scale(1.015); opacity: 1; }
+  }
+  @keyframes scanner-corner-glow {
+    0%, 100% { box-shadow: 0 0 0 rgba(85,167,255,.0); }
+    50% { box-shadow: 0 0 22px rgba(85,167,255,.45); }
+  }
   @keyframes shimmer {
     0%   { background-position: -400px 0; }
     100% { background-position:  400px 0; }
@@ -179,6 +187,7 @@ const GLOBAL_STYLES = `
   }
   .slide-up  { animation: slide-up 0.3s cubic-bezier(.32,.72,0,1) both; }
   .fade-in   { animation: fade-in  0.25s ease both; }
+  .scanner-breathe { animation: scanner-breathe 2.8s ease-in-out infinite; }
 `
 
 // ─── ScannedCardSheet ─────────────────────────────────────────────────────────
@@ -973,7 +982,7 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
         {/* Viewfinder box */}
         {!detected && !error && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="relative" style={{ width: 260, height: 260 }}>
+            <div className="scanner-breathe relative" style={{ width: 260, height: 260 }}>
               {/* Corners */}
               {[
                 'top-0 left-0',
@@ -988,6 +997,7 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
                     borderTop: '3px solid #55a7ff',
                     borderLeft: '3px solid #55a7ff',
                     borderRadius: '4px 0 0 0',
+                    animation: 'scanner-corner-glow 2.8s ease-in-out infinite',
                   }}
                 />
               ))}
@@ -1468,7 +1478,10 @@ export default function QrPage(): JSX.Element {
   return (
     <div
       className="min-h-screen w-full"
-      style={{ background: 'linear-gradient(160deg,#050810,#0b1120)' }}
+      style={{
+        background:
+          'radial-gradient(circle at top, rgba(85,167,255,0.16), transparent 24%), linear-gradient(160deg,#050810,#0b1120)',
+      }}
     >
       {/* Global keyframes — defined once here so all sub-components can use them */}
       <style>{GLOBAL_STYLES}</style>
@@ -1483,7 +1496,7 @@ export default function QrPage(): JSX.Element {
         }}
       >
         {/* Top bar */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between rounded-[28px] border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-xl">
           <div>
             <p
               className="text-[10px] font-bold uppercase tracking-[0.12em]"

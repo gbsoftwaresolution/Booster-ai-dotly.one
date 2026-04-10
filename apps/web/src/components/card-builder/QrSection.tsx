@@ -254,7 +254,7 @@ export function QrSection({ cardId, apiUrl = '' }: QrSectionProps) {
 
       {/* QR Preview */}
       {qrResult && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-5 shadow-sm">
+        <div className="app-panel-subtle flex flex-col items-center gap-3 rounded-[28px] p-5">
           {/* QR image */}
           <div
             className="rounded-2xl shadow-lg"

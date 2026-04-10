@@ -241,7 +241,13 @@ export default function ContactsPage(): JSX.Element {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export`, {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       })
-      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      if (!res.ok) {
+        const message = await res.text().catch(() => '')
+        if (message.includes('CSV export is available on Pro.')) {
+          throw new Error('CSV export is available on Pro. Upgrade in billing to export contacts.')
+        }
+        throw new Error(`Export failed: ${res.status}`)
+      }
       const csv = await res.text()
       const blob = new Blob([csv], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
@@ -309,17 +315,14 @@ export default function ContactsPage(): JSX.Element {
       onConfirm: async () => {
         try {
           const token = await getAccessToken()
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/bulk`,
-            {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ ids: [...selectedIds] }),
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/bulk`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
             },
-          )
+            body: JSON.stringify({ ids: [...selectedIds] }),
+          })
           if (!res.ok) throw new Error(`API error ${res.status}`)
           setSelectedIds(new Set())
           void loadContacts(page)
@@ -346,7 +349,10 @@ export default function ContactsPage(): JSX.Element {
       if (bulkEditMode === 'company') {
         payload.company = trimmedValue
       } else {
-        const parsedTags = trimmedValue.split(',').map((t) => t.trim()).filter(Boolean)
+        const parsedTags = trimmedValue
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)
         if (parsedTags.length === 0) return
         if (bulkEditMode === 'tagsAdd') payload.tagsAdd = parsedTags
         if (bulkEditMode === 'tagsRemove') payload.tagsRemove = parsedTags
@@ -459,7 +465,9 @@ export default function ContactsPage(): JSX.Element {
             >
               <option value="">All tags</option>
               {allTags.map((tag) => (
-                <option key={tag} value={tag}>{tag}</option>
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
               ))}
             </select>
           </div>
@@ -509,9 +517,7 @@ export default function ContactsPage(): JSX.Element {
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-          <span className="text-sm font-semibold text-blue-700">
-            {selectedIds.size} selected
-          </span>
+          <span className="text-sm font-semibold text-blue-700">{selectedIds.size} selected</span>
 
           {/* Stage change */}
           <select
@@ -521,7 +527,9 @@ export default function ContactsPage(): JSX.Element {
           >
             <option value="">Change stage…</option>
             {STAGES.map((s) => (
-              <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+              <option key={s} value={s}>
+                {s.charAt(0) + s.slice(1).toLowerCase()}
+              </option>
             ))}
           </select>
           {bulkStage && (
@@ -554,7 +562,9 @@ export default function ContactsPage(): JSX.Element {
                 type="text"
                 value={bulkEditValue}
                 onChange={(e) => setBulkEditValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') void handleBulkEdit() }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleBulkEdit()
+                }}
                 placeholder={bulkEditMode === 'company' ? 'Company name' : 'Tags (comma-separated)'}
                 className="rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
               />
@@ -599,11 +609,11 @@ export default function ContactsPage(): JSX.Element {
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="app-table-shell overflow-x-auto">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100" />
+              <div key={i} className="app-list-skeleton h-12 animate-pulse" />
             ))}
           </div>
         ) : displayedContacts.length === 0 ? (
@@ -612,25 +622,41 @@ export default function ContactsPage(): JSX.Element {
             onAdd={() => setShowAddModal(true)}
           />
         ) : (
-          <table className="w-full text-sm">
+          <table className="app-table">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
                 <th className="px-4 py-3">
                   <input
                     type="checkbox"
                     aria-label="Select all"
-                    checked={selectedIds.size === displayedContacts.length && displayedContacts.length > 0}
+                    checked={
+                      selectedIds.size === displayedContacts.length && displayedContacts.length > 0
+                    }
                     onChange={selectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Email</th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 md:table-cell">Company</th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">Source Card</th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">Added</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Stage</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Score</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Email
+                </th>
+                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 md:table-cell">
+                  Company
+                </th>
+                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">
+                  Source Card
+                </th>
+                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 lg:table-cell">
+                  Added
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Stage
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Score
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -640,7 +666,7 @@ export default function ContactsPage(): JSX.Element {
                 return (
                   <tr
                     key={contact.id}
-                    className="cursor-pointer hover:bg-blue-50/40 transition-colors"
+                    className="cursor-pointer transition-colors hover:bg-blue-50/40"
                   >
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -669,13 +695,22 @@ export default function ContactsPage(): JSX.Element {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-500" onClick={() => setDrawerContactId(contact.id)}>
+                    <td
+                      className="px-4 py-3 text-gray-500"
+                      onClick={() => setDrawerContactId(contact.id)}
+                    >
                       {contact.email ?? '—'}
                     </td>
-                    <td className="hidden px-4 py-3 text-gray-500 md:table-cell" onClick={() => setDrawerContactId(contact.id)}>
+                    <td
+                      className="hidden px-4 py-3 text-gray-500 md:table-cell"
+                      onClick={() => setDrawerContactId(contact.id)}
+                    >
                       {contact.company ?? '—'}
                     </td>
-                    <td className="hidden px-4 py-3 lg:table-cell" onClick={() => setDrawerContactId(contact.id)}>
+                    <td
+                      className="hidden px-4 py-3 lg:table-cell"
+                      onClick={() => setDrawerContactId(contact.id)}
+                    >
                       {contact.sourceCard ? (
                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                           /{contact.sourceCard.handle}
@@ -684,17 +719,24 @@ export default function ContactsPage(): JSX.Element {
                         '—'
                       )}
                     </td>
-                    <td className="hidden px-4 py-3 text-gray-500 lg:table-cell" onClick={() => setDrawerContactId(contact.id)}>
+                    <td
+                      className="hidden px-4 py-3 text-gray-500 lg:table-cell"
+                      onClick={() => setDrawerContactId(contact.id)}
+                    >
                       {formatDate(contact.createdAt, userTz)}
                     </td>
                     <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_BADGE[stage]}`}>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_BADGE[stage]}`}
+                      >
                         <span className={`h-1.5 w-1.5 rounded-full ${STAGE_DOT[stage]}`} />
                         {stage.charAt(0) + stage.slice(1).toLowerCase()}
                       </span>
                     </td>
                     <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getScoreBadgeClass(contact.enrichmentScore)}`}
+                      >
                         {contact.enrichmentScore ?? '—'}
                       </span>
                     </td>
@@ -796,7 +838,7 @@ function EmptyState({
   onAdd: () => void
 }): JSX.Element {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
+    <div className="app-empty-state py-20">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
         <Users className="h-8 w-8 text-gray-400" />
       </div>
@@ -809,7 +851,8 @@ function EmptyState({
         <>
           <p className="text-sm font-semibold text-gray-800">No contacts yet</p>
           <p className="mt-1 max-w-xs text-sm text-gray-400">
-            Add your first contact manually, import a CSV, or share your card to start capturing leads.
+            Add your first contact manually, import a CSV, or share your card to start capturing
+            leads.
           </p>
           <button
             type="button"
@@ -840,7 +883,9 @@ function ConfirmDialog({
 }): JSX.Element {
   // Close on Escape
   useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
     document.addEventListener('keydown', handle)
     return () => document.removeEventListener('keydown', handle)
   }, [onCancel])
@@ -941,7 +986,9 @@ function AddContactModal({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', handle)
     return () => document.removeEventListener('keydown', handle)
   }, [onClose])
@@ -957,7 +1004,10 @@ function AddContactModal({
     setError(null)
     try {
       const token = await getAccessToken()
-      const parsedTags = tags.split(',').map((t) => t.trim()).filter(Boolean)
+      const parsedTags = tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
       await apiPost<ContactDetail>(
         '/contacts',
         {
@@ -1001,14 +1051,12 @@ function AddContactModal({
         <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
-      <form
-        noValidate
-        onSubmit={(e) => void handleSubmit(e)}
-        className="mt-4 space-y-3"
-      >
+      <form noValidate onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label htmlFor="ac-name" className={labelCls}>Full name <span className="text-red-500">*</span></label>
+            <label htmlFor="ac-name" className={labelCls}>
+              Full name <span className="text-red-500">*</span>
+            </label>
             <input
               id="ac-name"
               required
@@ -1020,7 +1068,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-email" className={labelCls}>Email</label>
+            <label htmlFor="ac-email" className={labelCls}>
+              Email
+            </label>
             <input
               id="ac-email"
               type="email"
@@ -1033,7 +1083,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-phone" className={labelCls}>Phone</label>
+            <label htmlFor="ac-phone" className={labelCls}>
+              Phone
+            </label>
             <input
               id="ac-phone"
               type="tel"
@@ -1046,7 +1098,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-company" className={labelCls}>Company</label>
+            <label htmlFor="ac-company" className={labelCls}>
+              Company
+            </label>
             <input
               id="ac-company"
               autoComplete="organization"
@@ -1057,7 +1111,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-title" className={labelCls}>Job title</label>
+            <label htmlFor="ac-title" className={labelCls}>
+              Job title
+            </label>
             <input
               id="ac-title"
               autoComplete="organization-title"
@@ -1068,7 +1124,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-website" className={labelCls}>Website</label>
+            <label htmlFor="ac-website" className={labelCls}>
+              Website
+            </label>
             <input
               id="ac-website"
               type="url"
@@ -1080,7 +1138,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-address" className={labelCls}>Address</label>
+            <label htmlFor="ac-address" className={labelCls}>
+              Address
+            </label>
             <input
               id="ac-address"
               autoComplete="street-address"
@@ -1091,7 +1151,9 @@ function AddContactModal({
             />
           </div>
           <div>
-            <label htmlFor="ac-stage" className={labelCls}>Stage</label>
+            <label htmlFor="ac-stage" className={labelCls}>
+              Stage
+            </label>
             <select
               id="ac-stage"
               value={stage}
@@ -1099,12 +1161,16 @@ function AddContactModal({
               className={inputCls}
             >
               {STAGES.map((s) => (
-                <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+                <option key={s} value={s}>
+                  {s.charAt(0) + s.slice(1).toLowerCase()}
+                </option>
               ))}
             </select>
           </div>
           <div>
-            <label htmlFor="ac-source" className={labelCls}>Source card</label>
+            <label htmlFor="ac-source" className={labelCls}>
+              Source card
+            </label>
             <select
               id="ac-source"
               value={sourceCardId}
@@ -1113,12 +1179,16 @@ function AddContactModal({
             >
               <option value="">None</option>
               {cards.map((c) => (
-                <option key={c.id} value={c.id}>/{c.handle}</option>
+                <option key={c.id} value={c.id}>
+                  /{c.handle}
+                </option>
               ))}
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="ac-tags" className={labelCls}>Tags <span className="text-gray-400">(comma-separated)</span></label>
+            <label htmlFor="ac-tags" className={labelCls}>
+              Tags <span className="text-gray-400">(comma-separated)</span>
+            </label>
             <input
               id="ac-tags"
               placeholder="prospect, warm-lead"
@@ -1128,7 +1198,9 @@ function AddContactModal({
             />
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="ac-notes" className={labelCls}>Notes</label>
+            <label htmlFor="ac-notes" className={labelCls}>
+              Notes
+            </label>
             <textarea
               id="ac-notes"
               rows={3}
@@ -1200,7 +1272,9 @@ function ImportCsvModal({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', handle)
     return () => document.removeEventListener('keydown', handle)
   }, [onClose])
@@ -1275,7 +1349,10 @@ function ImportCsvModal({
           <div
             role="button"
             tabIndex={0}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragging(true)
+            }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
@@ -1307,7 +1384,10 @@ function ImportCsvModal({
 
           {/* Paste fallback */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="import-csv-paste">
+            <label
+              className="block text-xs font-medium text-gray-600 mb-1"
+              htmlFor="import-csv-paste"
+            >
               Or paste CSV content
             </label>
             <textarea
@@ -1332,7 +1412,8 @@ function ImportCsvModal({
           {result && (
             <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
               <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
-              Created {result.created} contact{result.created !== 1 ? 's' : ''}, skipped {result.skipped} duplicate{result.skipped !== 1 ? 's' : ''}
+              Created {result.created} contact{result.created !== 1 ? 's' : ''}, skipped{' '}
+              {result.skipped} duplicate{result.skipped !== 1 ? 's' : ''}
             </div>
           )}
 

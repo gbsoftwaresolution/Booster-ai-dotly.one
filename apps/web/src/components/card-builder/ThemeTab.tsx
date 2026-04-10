@@ -205,8 +205,8 @@ export function ThemeTab({
                 className={cn(
                   'relative flex flex-col items-start overflow-hidden rounded-2xl border-2 transition-all duration-150 active:scale-95',
                   active
-                    ? 'border-brand-500 shadow-md shadow-brand-500/20'
-                    : 'border-gray-100 hover:border-gray-300',
+                    ? 'border-brand-500 shadow-[0_24px_54px_-34px_rgba(14,165,233,0.42)]'
+                    : 'border-gray-100 hover:border-gray-300 hover:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.2)]',
                 )}
               >
                 {/* Mini card swatch */}
@@ -339,7 +339,7 @@ export function ThemeTab({
                   'flex items-center justify-between rounded-2xl border-2 px-4 py-3 transition-all duration-150 active:scale-[0.98]',
                   active
                     ? 'border-brand-500 bg-brand-50'
-                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white',
+                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-[0_16px_34px_-28px_rgba(15,23,42,0.18)]',
                 )}
               >
                 <span
@@ -374,7 +374,7 @@ export function ThemeTab({
                   'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150 active:scale-[0.98]',
                   active
                     ? 'border-brand-500 bg-brand-50'
-                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white',
+                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-[0_16px_34px_-28px_rgba(15,23,42,0.18)]',
                 )}
               >
                 {/* Mini preview */}
@@ -415,7 +415,7 @@ export function ThemeTab({
                   'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150 active:scale-[0.98]',
                   active
                     ? 'border-brand-500 bg-brand-50'
-                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white',
+                    : 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-[0_16px_34px_-28px_rgba(15,23,42,0.18)]',
                 )}
               >
                 <SocialButtonStylePreview styleId={style.id} />

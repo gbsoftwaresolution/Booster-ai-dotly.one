@@ -70,10 +70,7 @@ export async function GET(): Promise<NextResponse> {
     const billing = (await billingRes.json()) as BillingResponse
     const plan = billing?.user?.plan ?? 'FREE'
     if (!CSV_EXPORT_PLANS.has(plan)) {
-      return NextResponse.json(
-        { error: 'CSV export is not available on the FREE plan. Upgrade to PRO or higher.' },
-        { status: 403 },
-      )
+      return NextResponse.json({ error: 'CSV export is available on Pro.' }, { status: 403 })
     }
 
     // Paginate through all contacts using the API's max page size (200).

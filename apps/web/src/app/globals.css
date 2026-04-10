@@ -24,6 +24,26 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 199 89% 48%;
     --radius: 0.5rem;
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    min-height: 100%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -31,13 +51,50 @@
   * {
     @apply border-gray-200;
   }
+  *::selection {
+    background: rgba(14, 165, 233, 0.18);
+    color: inherit;
+  }
   body {
-    @apply bg-white text-gray-900;
+    @apply text-gray-900;
     font-family: var(--font-inter), sans-serif;
-    /* Respect iPhone notch / Dynamic Island */
+    background:
+      radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 26%),
+      radial-gradient(circle at 82% 18%, rgba(99, 102, 241, 0.1), transparent 18%),
+      radial-gradient(circle at 18% 78%, rgba(14, 165, 233, 0.08), transparent 22%),
+      linear-gradient(180deg, #f6faff 0%, #f4f7fb 38%, #eef4fb 100%);
+    min-height: 100vh;
     padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before,
+  body::after {
+    content: '';
+    position: fixed;
+    z-index: -1;
+    border-radius: 9999px;
+    filter: blur(90px);
+    pointer-events: none;
+    opacity: 0.65;
+  }
+  body::before {
+    top: -10rem;
+    left: -6rem;
+    width: 22rem;
+    height: 22rem;
+    background: rgba(56, 189, 248, 0.22);
+  }
+  body::after {
+    right: -8rem;
+    bottom: -8rem;
+    width: 24rem;
+    height: 24rem;
+    background: rgba(99, 102, 241, 0.12);
   }
   h1,
   h2,
@@ -46,5 +103,128 @@
   h5,
   h6 {
     font-family: var(--font-heading), sans-serif;
+  }
+  a,
+  button,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+    font: inherit;
+  }
+  a,
+  button {
+    transition:
+      transform 180ms ease,
+      opacity 180ms ease,
+      box-shadow 220ms ease,
+      background-color 220ms ease,
+      border-color 220ms ease,
+      color 220ms ease;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid rgba(14, 165, 233, 0.55);
+    outline-offset: 2px;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.45);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.56);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+}
+
+@layer components {
+  .app-shell-surface {
+    @apply border border-white/70 backdrop-blur-2xl;
+    background-color: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 28px 80px -42px rgba(15, 23, 42, 0.38);
+  }
+
+  .app-panel {
+    @apply border border-white/75 backdrop-blur-xl;
+    background-color: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 24px 70px -38px rgba(15, 23, 42, 0.24);
+  }
+
+  .app-panel-subtle {
+    @apply border border-slate-200/70 backdrop-blur-xl;
+    background-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 18px 48px -34px rgba(15, 23, 42, 0.18);
+  }
+
+  .marketing-shell {
+    @apply relative overflow-hidden;
+  }
+
+  .marketing-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 28%),
+      radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1), transparent 20%);
+    opacity: 0.9;
+  }
+
+  .app-interactive {
+    @apply transition-all duration-200 active:scale-[0.98];
+  }
+
+  .app-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .app-sticky-action-bar {
+    @apply sticky bottom-0 z-10 border-t border-white/70 backdrop-blur-2xl;
+    background-color: rgba(255, 255, 255, 0.88);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .app-empty-state {
+    @apply app-panel-subtle flex flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-slate-200 px-6 py-14 text-center;
+  }
+
+  .app-table-shell {
+    @apply app-panel overflow-hidden rounded-[28px];
+  }
+
+  .app-table {
+    @apply w-full text-sm;
+  }
+
+  .app-table thead {
+    @apply sticky top-0 z-[1] bg-white/90 backdrop-blur-xl;
+  }
+
+  .app-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-400;
+  }
+
+  .app-table td {
+    @apply px-4 py-3 text-sm text-gray-700;
+  }
+
+  .app-list-skeleton {
+    @apply rounded-[24px] border border-white/70 bg-white/80 p-4 backdrop-blur-xl;
+    box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.22);
   }
 }

@@ -128,10 +128,10 @@ export default function EmailTemplatesPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="app-panel flex flex-wrap items-center justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500">
             Create reusable templates for outreach, follow-ups, and updates.
           </p>
         </div>
@@ -154,11 +154,11 @@ export default function EmailTemplatesPage(): JSX.Element {
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-48 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="app-list-skeleton h-48 animate-pulse rounded-[24px]" />
           ))}
         </div>
       ) : templates.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+        <div className="app-empty-state">
           <FileText className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-sm font-medium text-gray-700">No templates yet</p>
           <p className="mt-1 text-sm text-gray-400">
@@ -168,10 +168,7 @@ export default function EmailTemplatesPage(): JSX.Element {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {templates.map((template) => (
-            <div
-              key={template.id}
-              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-            >
+            <div key={template.id} className="app-panel rounded-[24px] p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate text-base font-semibold text-gray-900">
@@ -201,7 +198,7 @@ export default function EmailTemplatesPage(): JSX.Element {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl bg-gray-50 p-4">
+              <div className="app-panel-subtle mt-4 rounded-[20px] p-4">
                 <p className="line-clamp-6 whitespace-pre-wrap text-sm text-gray-600">
                   {template.body}
                 </p>
@@ -358,14 +355,14 @@ function TemplateModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="fixed inset-x-4 top-1/2 z-50 w-full max-w-2xl -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+        className="app-panel fixed inset-x-4 top-1/2 z-50 w-full max-w-2xl -translate-y-1/2 rounded-[28px] p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
       >
         <h2 id={titleId} className="text-lg font-semibold text-gray-900">
           {title}
@@ -520,13 +517,13 @@ function ConfirmDeleteDialog({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} />
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+        className="app-panel fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-[28px] p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
       >
         <h2 id={titleId} className="text-base font-semibold text-gray-900">
           {title}

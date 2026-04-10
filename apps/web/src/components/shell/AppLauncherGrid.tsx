@@ -2,16 +2,23 @@
 
 import Link from 'next/link'
 import type { JSX } from 'react'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import {
+  ArrowRight,
+  MessagesSquare,
+  MonitorPlay,
+  ShoppingBag,
+  Sparkles,
+  ConciergeBell,
+} from 'lucide-react'
 import { APPS } from '@/components/navigation/apps-nav'
 
 // ─── Coming soon apps ─────────────────────────────────────────────────────────
 
 const COMING_SOON = [
-  { label: 'Services', description: 'Sell & book your services online', emoji: '🛎️' },
-  { label: 'Communication', description: 'Chat, calls & video meetings', emoji: '💬' },
-  { label: 'Ecommerce', description: 'Mini online store for your brand', emoji: '🛒' },
-  { label: 'Meetings', description: 'Structured meeting workflows', emoji: '🎥' },
+  { label: 'Services', description: 'Sell & book your services online', icon: ConciergeBell },
+  { label: 'Communication', description: 'Chat, calls & video meetings', icon: MessagesSquare },
+  { label: 'Ecommerce', description: 'Mini online store for your brand', icon: ShoppingBag },
+  { label: 'Meetings', description: 'Structured meeting workflows', icon: MonitorPlay },
 ]
 
 // ─── AppLauncherGrid ──────────────────────────────────────────────────────────
@@ -21,18 +28,20 @@ export function AppLauncherGrid(): JSX.Element {
     <section className="mb-8">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-gray-900">Your Workspace Apps</h2>
-          <p className="text-sm text-gray-500">Each app is a full workspace — all connected</p>
+          <h2 className="text-base font-bold text-gray-950">Your Workspace Apps</h2>
+          <p className="text-sm text-gray-500">
+            Each app is a focused workspace with shared data and a cleaner cross-app flow
+          </p>
         </div>
       </div>
 
       {/* Active apps grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {APPS.map((app) => (
           <Link
             key={app.id}
             href={app.href}
-            className="group relative flex flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden"
+            className="app-panel group relative flex flex-col overflow-hidden rounded-[28px] p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_30px_70px_-38px_rgba(15,23,42,0.35)]"
           >
             {/* Background gradient glow */}
             <div
@@ -48,8 +57,8 @@ export function AppLauncherGrid(): JSX.Element {
               <app.icon className="h-6 w-6 text-white" />
             </div>
 
-            <p className="text-[15px] font-bold text-gray-900">{app.label}</p>
-            <p className="mt-1 text-xs text-gray-500 leading-relaxed">{app.description}</p>
+            <p className="text-[15px] font-bold text-gray-950">{app.label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500">{app.description}</p>
 
             {/* Sub-pages preview */}
             <div className="mt-3 flex flex-wrap gap-1">
@@ -79,12 +88,14 @@ export function AppLauncherGrid(): JSX.Element {
 
       {/* Coming soon row */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {COMING_SOON.map(({ label, description, emoji }) => (
+        {COMING_SOON.map(({ label, description, icon: Icon }) => (
           <div
             key={label}
-            className="flex flex-col items-start rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-4"
+            className="app-panel-subtle flex flex-col items-start rounded-[24px] border border-dashed border-slate-200 p-4"
           >
-            <span className="mb-2 text-2xl">{emoji}</span>
+            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-sky-600 shadow-sm">
+              <Icon className="h-5 w-5" />
+            </span>
             <p className="text-xs font-bold text-gray-500">{label}</p>
             <p className="mt-0.5 text-[10px] text-gray-400 leading-relaxed">{description}</p>
             <span className="mt-2 flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-gray-400">

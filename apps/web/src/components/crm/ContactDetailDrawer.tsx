@@ -789,10 +789,10 @@ export function ContactDetailDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       <div
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl"
+        className="app-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col rounded-l-[32px] border-l border-white/80 shadow-2xl"
         role="dialog"
         aria-modal="true"
       >
@@ -855,7 +855,7 @@ export function ContactDetailDrawer({
             <button
               type="button"
               onClick={() => void openMergeModal()}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              className="app-touch-target inline-flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
             >
               <Search className="h-3.5 w-3.5" />
               Find Duplicates
@@ -864,7 +864,7 @@ export function ContactDetailDrawer({
               type="button"
               onClick={onClose}
               aria-label="Close contact details"
-              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="app-touch-target rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             >
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -878,11 +878,11 @@ export function ContactDetailDrawer({
               <span>{drawerError}</span>
               <button
                 type="button"
-                className="ml-auto shrink-0 text-red-400 hover:text-red-600"
+                className="ml-auto shrink-0 rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
                 onClick={() => setDrawerError(null)}
                 aria-label="Dismiss error"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -994,7 +994,7 @@ export function ContactDetailDrawer({
                   </h3>
                   <span className="text-xs text-gray-400">{tasks.length}</span>
                 </div>
-                <div className="space-y-3 rounded-xl border border-gray-200 p-3">
+                <div className="app-panel-subtle space-y-3 rounded-[24px] p-3">
                   {tasks.length > 0 ? (
                     <div className="space-y-2">
                       {tasks.map((task) => {
@@ -1036,7 +1036,7 @@ export function ContactDetailDrawer({
                               type="button"
                               onClick={() => void deleteTask(task.id)}
                               disabled={deletingTaskId === task.id}
-                              className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                              className="app-touch-target text-gray-400 hover:text-red-500 disabled:opacity-50"
                               aria-label="Delete task"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1071,7 +1071,7 @@ export function ContactDetailDrawer({
                         type="button"
                         onClick={() => void addTask()}
                         disabled={addingTask || !taskTitle.trim()}
-                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                        className="app-touch-target inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" />
                         Add
@@ -1100,7 +1100,7 @@ export function ContactDetailDrawer({
                   </button>
                 </div>
 
-                <div className="space-y-3 rounded-xl border border-gray-200 p-3">
+                <div className="app-panel-subtle space-y-3 rounded-[24px] p-3">
                   {deals.length > 0 ? (
                     <div className="space-y-2">
                       {deals.map((deal) => (
@@ -1130,7 +1130,7 @@ export function ContactDetailDrawer({
                               type="button"
                               onClick={() => void deleteDeal(deal.id)}
                               disabled={deletingDealId === deal.id}
-                              className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                              className="app-touch-target text-gray-400 hover:text-red-500 disabled:opacity-50"
                               aria-label="Delete deal"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1142,7 +1142,7 @@ export function ContactDetailDrawer({
                               value={deal.stage}
                               onChange={(e) => void updateDealStage(deal.id, e.target.value)}
                               disabled={updatingDealId === deal.id}
-                              className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                              className="app-touch-target rounded-xl border border-gray-200 px-3 py-2 text-xs text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                             >
                               {DEAL_STAGES.map((stage) => (
                                 <option key={stage} value={stage}>
@@ -1252,7 +1252,7 @@ export function ContactDetailDrawer({
                     </a>
                   </div>
                 ) : (
-                  <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                  <div className="app-panel-subtle space-y-2 rounded-[24px] p-3">
                     {customFields.map((field) => {
                       const existingValue = (contact.customFieldValues ?? []).find(
                         (value) => value.fieldId === field.id,
@@ -1279,7 +1279,7 @@ export function ContactDetailDrawer({
                   <span className="text-xs text-gray-400">{notes.length}</span>
                 </div>
 
-                <div className="space-y-3 rounded-xl border border-gray-200 p-3">
+                <div className="app-panel-subtle space-y-3 rounded-[24px] p-3">
                   {notes.length > 0 ? (
                     <div className="space-y-2">
                       {notes.map((note) => (
@@ -1297,7 +1297,7 @@ export function ContactDetailDrawer({
                                   type="button"
                                   onClick={() => void saveEditNote(note.id)}
                                   disabled={savingEditNoteId === note.id || !editNoteContent.trim()}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                                  className="app-touch-target inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                                 >
                                   <Check className="h-3 w-3" />
                                   Save
@@ -1305,7 +1305,7 @@ export function ContactDetailDrawer({
                                 <button
                                   type="button"
                                   onClick={cancelEditNote}
-                                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                                  className="app-touch-target rounded-xl border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
                                 >
                                   Cancel
                                 </button>
@@ -1321,7 +1321,7 @@ export function ContactDetailDrawer({
                                   <button
                                     type="button"
                                     onClick={() => startEditNote(note)}
-                                    className="text-gray-400 hover:text-indigo-500"
+                                    className="app-touch-target text-gray-400 hover:text-indigo-500"
                                     aria-label="Edit note"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
@@ -1330,7 +1330,7 @@ export function ContactDetailDrawer({
                                     type="button"
                                     onClick={() => void deleteNote(note.id)}
                                     disabled={deletingNoteId === note.id}
-                                    className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                                    className="app-touch-target text-gray-400 hover:text-red-500 disabled:opacity-50"
                                     aria-label="Delete note"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1362,7 +1362,7 @@ export function ContactDetailDrawer({
                         type="button"
                         onClick={() => void addNote()}
                         disabled={addingNote || !newNote.trim()}
-                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                        className="app-touch-target inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" />
                         Add Note
@@ -1429,7 +1429,7 @@ export function ContactDetailDrawer({
                     type="button"
                     onClick={() => void handleReenrich()}
                     disabled={reenriching}
-                    className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-100 disabled:opacity-50"
+                    className="app-touch-target rounded-xl bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-100 disabled:opacity-50"
                   >
                     {reenriching
                       ? 'Queuing...'
@@ -1527,7 +1527,7 @@ export function ContactDetailDrawer({
             <button
               type="button"
               onClick={() => setComposeOpen(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="app-touch-target flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
             >
               <Mail className="h-4 w-4" />
               Send Email
@@ -1538,7 +1538,7 @@ export function ContactDetailDrawer({
 
       {mergeModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+          <div className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Duplicate Contacts</h3>

@@ -2,9 +2,23 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, Play, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react'
+import {
+  RadioTower,
+  Plus,
+  Trash2,
+  RefreshCw,
+  Play,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Check,
+  X,
+} from 'lucide-react'
+import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
+import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { cn } from '@/lib/cn'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
+import { hasPlanAccess } from '@/lib/billing-plans'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDateTime } from '@/lib/tz'
 import { useUserTimezone } from '@/hooks/useUserLocale'
@@ -193,7 +207,7 @@ function EndpointCard({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="app-panel overflow-hidden rounded-[24px]">
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Enabled toggle */}
@@ -324,7 +338,7 @@ function EndpointCard({
 
           {/* Delivery log */}
           {showLog && (
-            <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
+            <div className="app-panel-subtle rounded-[20px] px-3 py-2">
               <DeliveryLog endpointId={endpoint.id} />
             </div>
           )}
@@ -465,6 +479,7 @@ function CreateModal({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function WebhooksPage(): JSX.Element {
+  const { plan, loading: planLoading } = useBillingPlan()
   const [endpoints, setEndpoints] = useState<WebhookEndpoint[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -483,8 +498,25 @@ export default function WebhooksPage(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    if (planLoading || !hasPlanAccess(plan, 'PRO')) return
     void load()
-  }, [load])
+  }, [load, plan, planLoading])
+
+  if (planLoading) {
+    return <div className="h-40 animate-pulse rounded-3xl bg-white/70" />
+  }
+
+  if (!hasPlanAccess(plan, 'PRO')) {
+    return (
+      <FeatureGateCard
+        eyebrow="Pro feature"
+        title="Webhooks require Pro"
+        description="Real-time webhook delivery is available on Pro. Upgrade when you need server-to-server event automation."
+        ctaLabel="Upgrade to Pro"
+        ctaHref="/settings/billing"
+      />
+    )
+  }
 
   async function handleToggle(id: string, enabled: boolean) {
     try {
@@ -519,21 +551,35 @@ export default function WebhooksPage(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 sm:py-8">
       {/* Error banner */}
       {pageError && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <span>{pageError}</span>
-          <button type="button" onClick={() => setPageError(null)} className="ml-4 text-red-400 hover:text-red-600 font-bold">✕</button>
+          <button
+            type="button"
+            onClick={() => setPageError(null)}
+            className="ml-4 rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Webhooks</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Receive real-time HTTP POST requests when events happen in Dotly.
-          </p>
+      <div className="app-panel flex items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
+            <RadioTower className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+              Developer Tools
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Webhooks</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Receive real-time HTTP POST requests when events happen in Dotly.
+            </p>
+          </div>
         </div>
         <button
           type="button"
@@ -563,7 +609,7 @@ export default function WebhooksPage(): JSX.Element {
           <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
         </div>
       ) : endpoints.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center">
+        <div className="app-empty-state">
           <svg
             width="40"
             height="40"

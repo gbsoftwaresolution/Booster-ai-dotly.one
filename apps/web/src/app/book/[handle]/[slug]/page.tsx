@@ -10,6 +10,7 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
+  Check,
   CheckCircle,
   AlertCircle,
   User,
@@ -129,7 +130,7 @@ function StepIndicator({ step }: { step: 'date' | 'form' | 'confirmed' }): JSX.E
   ]
   const idx = steps.findIndex((s) => s.key === step)
   return (
-    <div className="flex items-center gap-0 mb-6">
+    <div className="app-panel mb-6 flex items-center justify-center gap-0 rounded-[28px] px-4 py-4">
       {steps.map((s, i) => (
         <div key={s.key} className="flex items-center">
           <div className="flex flex-col items-center">
@@ -142,7 +143,7 @@ function StepIndicator({ step }: { step: 'date' | 'form' | 'confirmed' }): JSX.E
                     : 'bg-gray-100 text-gray-400'
               }`}
             >
-              {i < idx ? '✓' : i + 1}
+              {i < idx ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </div>
             <span
               className={`mt-1 text-[10px] font-medium whitespace-nowrap ${i === idx ? 'text-sky-700' : 'text-gray-400'}`}
@@ -185,7 +186,7 @@ function CalendarPicker({ selected, onSelect }: CalendarPickerProps): JSX.Elemen
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d))
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="app-panel rounded-[28px] p-4">
       <div className="mb-3 flex items-center justify-between">
         <button
           onClick={() => setView((v) => addMonths(v, -1))}
@@ -409,7 +410,7 @@ export default function BookingPage(): JSX.Element {
   if (step === 'confirmed' && confirmedBooking) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-100 text-center">
+        <div className="app-panel w-full max-w-md rounded-[30px] p-8 text-center">
           <div className="mb-4 flex justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
               <CheckCircle className="h-10 w-10 text-green-500" />
@@ -468,7 +469,7 @@ export default function BookingPage(): JSX.Element {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl px-4 py-10">
         {/* Header card */}
-        <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+        <div className="app-panel mb-6 rounded-[30px] p-6">
           <div className="flex items-start gap-4">
             <div
               className="h-14 w-14 flex-shrink-0 rounded-2xl"
@@ -535,7 +536,7 @@ export default function BookingPage(): JSX.Element {
                   : 'Select a date to see times'}
               </h2>
               {!selectedDate && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
+                <div className="app-panel-subtle flex flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-gray-200 py-16 text-center">
                   <Calendar className="mb-2 h-8 w-8 text-gray-300" />
                   <p className="text-sm text-gray-400">Pick a date on the left</p>
                 </div>
@@ -546,7 +547,7 @@ export default function BookingPage(): JSX.Element {
                 </div>
               )}
               {!loadingSlots && selectedDate && slotError && (
-                <div className="rounded-2xl border-2 border-dashed border-red-100 bg-red-50 py-10 text-center">
+                <div className="rounded-[28px] border-2 border-dashed border-red-100 bg-red-50 py-10 text-center shadow-[0_20px_48px_-34px_rgba(239,68,68,0.3)]">
                   <AlertCircle className="mx-auto mb-2 h-7 w-7 text-red-400" />
                   <p className="text-sm text-red-600">Failed to load available times.</p>
                   <button
@@ -558,7 +559,7 @@ export default function BookingPage(): JSX.Element {
                 </div>
               )}
               {!loadingSlots && selectedDate && !slotError && slots.length === 0 && (
-                <div className="rounded-2xl border-2 border-dashed border-gray-200 py-10 text-center">
+                <div className="app-panel-subtle rounded-[28px] border-2 border-dashed border-gray-200 py-10 text-center">
                   <Calendar className="mx-auto mb-2 h-7 w-7 text-gray-300" />
                   <p className="text-sm text-gray-400">No available times on this day.</p>
                   <p className="mt-1 text-xs text-gray-400">Try a different date.</p>
@@ -577,10 +578,10 @@ export default function BookingPage(): JSX.Element {
                       <button
                         key={slot}
                         onClick={() => setSelectedSlot(slot)}
-                        className={`rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
+                        className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
                           selectedSlot === slot
-                            ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-sky-400 hover:text-sky-700 hover:shadow-sm'
+                            ? 'border-sky-600 bg-sky-600 text-white shadow-[0_18px_38px_-24px_rgba(2,132,199,0.75)]'
+                            : 'border-white/70 bg-white/88 text-gray-700 hover:border-sky-400 hover:text-sky-700 hover:shadow-[0_18px_38px_-28px_rgba(15,23,42,0.22)]'
                         }`}
                       >
                         {formatSlotTime(slot, guestTz)}
@@ -590,9 +591,9 @@ export default function BookingPage(): JSX.Element {
                   {selectedSlot && (
                     <button
                       onClick={() => setStep('form')}
-                      className="mt-4 w-full rounded-xl bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-700 transition-colors shadow-sm"
+                      className="mt-4 w-full rounded-2xl bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-700 transition-colors shadow-[0_20px_44px_-26px_rgba(2,132,199,0.72)]"
                     >
-                      Next: Your details →
+                      Next: Your details
                     </button>
                   )}
                 </>
@@ -602,7 +603,7 @@ export default function BookingPage(): JSX.Element {
         )}
 
         {step === 'form' && (
-          <div className="mx-auto max-w-lg rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <div className="app-panel mx-auto max-w-lg rounded-[30px] p-6">
             <div className="mb-5 flex items-center gap-3">
               <button
                 onClick={() => setStep('date')}

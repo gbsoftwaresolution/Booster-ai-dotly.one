@@ -1189,7 +1189,7 @@ function GroupCard({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+    <div className="app-panel rounded-[26px] overflow-hidden">
       {/* Group header */}
       <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50/80 border-b border-gray-100">
         <FolderOpen className="h-4 w-4 text-brand-400 shrink-0" />
@@ -1225,7 +1225,7 @@ function GroupCard({
                   setEditingName(true)
                   setNameValue(group.name)
                 }}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                className="app-touch-target rounded-xl p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
                 title="Rename group"
               >
                 <Pencil className="h-3 w-3" />
@@ -1233,7 +1233,7 @@ function GroupCard({
               <button
                 type="button"
                 onClick={() => onDeleteGroup(group.id)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                className="app-touch-target rounded-xl p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
                 title="Delete group"
               >
                 <Trash2 className="h-3 w-3" />
@@ -1243,7 +1243,7 @@ function GroupCard({
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+            className="app-touch-target rounded-xl p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
             title={collapsed ? 'Expand' : 'Collapse'}
           >
             <ChevronDown
@@ -1300,7 +1300,7 @@ function GroupCard({
               onClick={onToggleAddSheet}
               disabled={atLimit}
               className={cn(
-                'group flex w-full items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 transition-all',
+                'group app-touch-target flex w-full items-center gap-2.5 rounded-xl border border-dashed px-3 py-3 transition-all',
                 atLimit
                   ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
                   : 'border-gray-200 bg-white hover:border-brand-300 hover:bg-brand-50/40 active:scale-[0.99]',
@@ -1371,7 +1371,7 @@ function DocSection({
   const atLimit = docBlocks.length >= MAX_DOCS
 
   return (
-    <div className="rounded-2xl border border-amber-100 bg-white overflow-hidden shadow-sm">
+    <div className="app-panel rounded-[26px] overflow-hidden">
       {/* Section header */}
       <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50/60 border-b border-amber-100">
         <Download className="h-4 w-4 text-amber-500 shrink-0" />
@@ -1427,7 +1427,7 @@ function DocSection({
             onClick={onToggleAddSheet}
             disabled={atLimit}
             className={cn(
-              'group flex w-full items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 transition-all',
+              'group app-touch-target flex w-full items-center gap-2.5 rounded-xl border border-dashed px-3 py-3 transition-all',
               atLimit
                 ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
                 : 'border-amber-200 bg-white hover:border-amber-400 hover:bg-amber-50/40 active:scale-[0.99]',
@@ -1610,7 +1610,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
 
       {/* ── New group prompt ── */}
       {showNewGroupPrompt && (
-        <div className="rounded-2xl border border-brand-100 bg-white shadow-sm p-4 space-y-3">
+        <div className="app-panel rounded-[28px] p-4 space-y-3">
           <p className="text-xs font-bold text-gray-700 uppercase tracking-widest">Create Group</p>
           <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3 focus-within:bg-white focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
             <FolderOpen className="h-4 w-4 shrink-0 text-gray-400" />
@@ -1631,7 +1631,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
             <button
               type="button"
               onClick={handleCreateGroup}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-500 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-[0.98] transition-all"
+              className="app-touch-target flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-500 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-[0.98] transition-all"
             >
               <Plus className="h-4 w-4" />
               Create
@@ -1639,7 +1639,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
             <button
               type="button"
               onClick={() => setShowNewGroupPrompt(false)}
-              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all"
+              className="app-touch-target flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all"
             >
               Cancel
             </button>
@@ -1649,7 +1649,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
 
       {/* ── Empty state ── */}
       {!hasAnything && (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-gradient-to-b from-gray-50 to-white p-8 text-center space-y-3">
+        <div className="app-panel-subtle rounded-[28px] border border-dashed border-gray-200 bg-gradient-to-b from-gray-50 to-white p-8 text-center space-y-3">
           <div className="flex justify-center -space-x-2">
             {([ImageIcon, PlayCircle, Music2, FileText] as React.FC<{ className?: string }>[]).map(
               (Icon, i) => (
@@ -1678,7 +1678,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
                 setShowNewGroupPrompt(true)
                 setNewGroupName('')
               }}
-              className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-95 transition-all"
+              className="app-touch-target flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 active:scale-95 transition-all"
             >
               <Plus className="h-4 w-4" />
               New Group
@@ -1686,7 +1686,7 @@ export function MediaTab({ cardId, mediaBlocks, onChange }: MediaTabProps): JSX.
             <button
               type="button"
               onClick={() => setShowDocSheet(true)}
-              className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 active:scale-95 transition-all"
+              className="app-touch-target flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-100 active:scale-95 transition-all"
             >
               <Download className="h-4 w-4" />
               Add Document

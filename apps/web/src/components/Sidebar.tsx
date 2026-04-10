@@ -6,10 +6,11 @@ import type { JSX } from 'react'
 import { cn } from '@/lib/cn'
 import { LogOut } from 'lucide-react'
 import { useState } from 'react'
+import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import {
-  dashboardBottomTabs,
-  dashboardMoreSections,
-  dashboardNavSections,
+  getVisibleDashboardBottomTabs,
+  getVisibleDashboardMoreSections,
+  getVisibleDashboardNavSections,
 } from '@/components/navigation/dashboard-nav'
 import { useSignOut } from '@/hooks/useSignOut'
 
@@ -18,12 +19,14 @@ import { useSignOut } from '@/hooks/useSignOut'
 function DesktopSidebar(): JSX.Element {
   const pathname = usePathname()
   const { signingOut, handleSignOut } = useSignOut()
+  const { plan } = useBillingPlan()
+  const visibleSections = getVisibleDashboardNavSections(plan)
 
   return (
-    <aside className="hidden w-60 shrink-0 border-r border-gray-100 bg-white lg:flex lg:flex-col">
+    <aside className="app-shell-surface hidden w-64 shrink-0 lg:flex lg:flex-col">
       <nav className="flex h-full flex-col px-3 py-5" aria-label="Main navigation">
         {/* Wordmark */}
-        <div className="mb-7 flex items-center gap-2.5 px-2">
+        <div className="app-panel-subtle mb-7 flex items-center gap-3 rounded-[24px] px-3 py-3.5">
           {/* Dot icon mark */}
           <div
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
@@ -47,9 +50,9 @@ function DesktopSidebar(): JSX.Element {
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1">
-          {dashboardNavSections.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.title} className="mb-5 last:mb-0">
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
                 {section.title}
               </p>
               <ul className="space-y-0.5">
@@ -61,7 +64,7 @@ function DesktopSidebar(): JSX.Element {
                         href={href}
                         aria-current={isActive ? 'page' : undefined}
                         className={cn(
-                          'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                          'group relative flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-medium transition-all duration-150',
                           isActive
                             ? 'bg-brand-50 text-brand-600'
                             : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
@@ -93,7 +96,7 @@ function DesktopSidebar(): JSX.Element {
             type="button"
             onClick={() => void handleSignOut()}
             disabled={signingOut}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            className="app-touch-target flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-medium text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
           >
             <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
             {signingOut ? 'Signing out…' : 'Sign out'}
@@ -110,6 +113,9 @@ function MobileBottomNav(): JSX.Element {
   const pathname = usePathname()
   const { signingOut, handleSignOut } = useSignOut()
   const [moreOpen, setMoreOpen] = useState(false)
+  const { plan } = useBillingPlan()
+  const visibleBottomTabs = getVisibleDashboardBottomTabs(plan)
+  const visibleMoreSections = getVisibleDashboardMoreSections(plan)
 
   return (
     <>
@@ -123,18 +129,18 @@ function MobileBottomNav(): JSX.Element {
           className="flex items-stretch border-t border-gray-200/70 bg-white/85"
           style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
         >
-          {dashboardBottomTabs.map(({ href, label, icon: Icon }) => {
+          {visibleBottomTabs.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/')
             return (
               <Link
                 key={href}
                 href={href}
                 aria-current={isActive ? 'page' : undefined}
-                className="flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
+                className="app-touch-target flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
               >
                 <span
                   className={cn(
-                    'flex h-7 w-12 items-center justify-center rounded-full transition-all duration-200',
+                    'flex h-9 w-14 items-center justify-center rounded-full transition-all duration-200',
                     isActive ? 'bg-brand-500' : 'bg-transparent',
                   )}
                 >
@@ -162,10 +168,10 @@ function MobileBottomNav(): JSX.Element {
           <button
             type="button"
             onClick={() => setMoreOpen(true)}
-            className="flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
+            className="app-touch-target flex flex-1 flex-col items-center justify-center gap-[3px] py-2 transition-opacity active:opacity-60"
             aria-label="More navigation options"
           >
-            <span className="flex h-7 w-12 items-center justify-center rounded-full">
+            <span className="flex h-9 w-14 items-center justify-center rounded-full">
               <svg
                 className="h-[18px] w-[18px] text-gray-400"
                 fill="none"
@@ -195,7 +201,7 @@ function MobileBottomNav(): JSX.Element {
             onClick={() => setMoreOpen(false)}
           />
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white pb-safe lg:hidden"
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[30px] bg-white pb-safe lg:hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
@@ -206,13 +212,19 @@ function MobileBottomNav(): JSX.Element {
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
                 aria-label="Close"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             <nav className="max-h-[60vh] overflow-y-auto px-3 py-3">
-              {dashboardMoreSections.map((section) => (
+              {visibleMoreSections.map((section) => (
                 <div key={section.title} className="mb-4 last:mb-0">
                   <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
                     {section.title}
@@ -227,14 +239,17 @@ function MobileBottomNav(): JSX.Element {
                             onClick={() => setMoreOpen(false)}
                             aria-current={isActive ? 'page' : undefined}
                             className={cn(
-                              'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
+                              'app-touch-target flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-all',
                               isActive
                                 ? 'bg-brand-50 text-brand-600'
                                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                             )}
                           >
                             <Icon
-                              className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-500' : 'text-gray-400')}
+                              className={cn(
+                                'h-4 w-4 shrink-0',
+                                isActive ? 'text-brand-500' : 'text-gray-400',
+                              )}
                               aria-hidden="true"
                             />
                             {label}
@@ -248,9 +263,12 @@ function MobileBottomNav(): JSX.Element {
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <button
                   type="button"
-                  onClick={() => { setMoreOpen(false); void handleSignOut() }}
+                  onClick={() => {
+                    setMoreOpen(false)
+                    void handleSignOut()
+                  }}
                   disabled={signingOut}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  className="app-touch-target flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                 >
                   <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {signingOut ? 'Signing out…' : 'Sign out'}

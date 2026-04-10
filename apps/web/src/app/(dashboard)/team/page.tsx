@@ -2,9 +2,12 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
+import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
-import { AlertTriangle } from 'lucide-react'
+import { hasPlanAccess } from '@/lib/billing-plans'
+import { AlertTriangle, Users } from 'lucide-react'
 import { formatDate } from '@/lib/tz'
 import { useUserTimezone } from '@/hooks/useUserLocale'
 
@@ -52,7 +55,7 @@ function ConfirmDialog({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+      <div className="app-panel fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-[28px] p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
             <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -85,6 +88,7 @@ function ConfirmDialog({
 
 export default function TeamPage(): JSX.Element {
   const userTz = useUserTimezone()
+  const { plan, loading: planLoading } = useBillingPlan()
   const [team, setTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +130,11 @@ export default function TeamPage(): JSX.Element {
 
   // On mount, fetch the current user's team from the API
   useEffect(() => {
+    if (planLoading || !hasPlanAccess(plan, 'BUSINESS')) {
+      setLoading(false)
+      return
+    }
+
     const init = async () => {
       try {
         const token = await getAccessToken()
@@ -147,7 +156,7 @@ export default function TeamPage(): JSX.Element {
       }
     }
     void init()
-  }, [])
+  }, [plan, planLoading])
 
   useEffect(() => {
     if (teamId && !team) void loadTeam()
@@ -237,6 +246,26 @@ export default function TeamPage(): JSX.Element {
     [teamId, resendState],
   )
 
+  if (planLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (!hasPlanAccess(plan, 'BUSINESS')) {
+    return (
+      <FeatureGateCard
+        eyebrow="Coming later"
+        title="Team management is not published yet"
+        description="Team members and shared team controls are reserved for future Business plans. Free, Starter, and Pro currently focus on individual workflows."
+        ctaLabel="View current pricing"
+        ctaHref="/pricing"
+      />
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -247,10 +276,20 @@ export default function TeamPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your team members and brand settings.</p>
+      <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
+            <Users className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+              Collaboration
+            </p>
+            <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Manage your team members and brand settings.
+            </p>
+          </div>
         </div>
         {team && (
           <button
@@ -283,7 +322,7 @@ export default function TeamPage(): JSX.Element {
       )}
 
       {!team ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
+        <div className="app-empty-state">
           <h2 className="text-lg font-semibold text-gray-900">No team yet</h2>
           <p className="mt-2 text-sm text-gray-500">
             Create a team to collaborate with others on Dotly.one (Business plan required).
@@ -299,7 +338,7 @@ export default function TeamPage(): JSX.Element {
       ) : (
         <div className="space-y-6">
           {/* Team header */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="app-panel rounded-[24px] p-6">
             <h2 className="text-xl font-bold text-gray-900">{team.name}</h2>
             <p className="text-sm text-gray-500">
               {team.members.length} member{team.members.length !== 1 ? 's' : ''}
@@ -307,7 +346,7 @@ export default function TeamPage(): JSX.Element {
           </div>
 
           {/* Members table */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="app-panel rounded-[24px] shadow-sm">
             <div className="border-b border-gray-100 px-6 py-4">
               <h3 className="font-semibold text-gray-900">Members</h3>
             </div>
@@ -364,7 +403,7 @@ export default function TeamPage(): JSX.Element {
 
           {/* Pending invites */}
           {team.invites.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="app-panel rounded-[24px] shadow-sm">
               <div className="border-b border-gray-100 px-6 py-4">
                 <h3 className="font-semibold text-gray-900">Pending Invites</h3>
               </div>
@@ -403,7 +442,7 @@ export default function TeamPage(): JSX.Element {
       {/* Create team modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="app-panel w-full max-w-md rounded-[28px] p-6 shadow-xl">
             <h2 className="text-lg font-bold text-gray-900">Create Team</h2>
             <input
               type="text"
@@ -435,7 +474,7 @@ export default function TeamPage(): JSX.Element {
       {/* Invite modal */}
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="app-panel w-full max-w-md rounded-[28px] p-6 shadow-xl">
             <h2 className="text-lg font-bold text-gray-900">Invite Member</h2>
             <input
               type="email"

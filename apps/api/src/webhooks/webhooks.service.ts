@@ -8,6 +8,8 @@ import * as http from 'http'
 import { URL } from 'url'
 import * as dns from 'dns'
 import * as net from 'net'
+import { Plan } from '@dotly/types'
+import { BillingService } from '../billing/billing.service'
 
 export const WEBHOOK_EVENTS = [
   'lead.created',
@@ -39,6 +41,7 @@ export class WebhooksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly billingService: BillingService,
   ) {
     const rawKey =
       this.config.get<string>('WEBHOOK_SECRET_ENCRYPTION_KEY') ??
@@ -218,10 +221,27 @@ export class WebhooksService {
     return u.id
   }
 
+  private async assertWebhookAccess(rawUserId: string): Promise<string> {
+    const internalId = await this.resolveUserId(rawUserId)
+    const user = await this.prisma.user.findUnique({
+      where: { id: internalId },
+      select: { plan: true },
+    })
+
+    const plan = (user?.plan as Plan | undefined) ?? Plan.FREE
+    const limits = this.billingService.getPlanLimits(plan)
+
+    if (!limits.csvExport) {
+      throw new ForbiddenException('Webhooks require Pro or higher')
+    }
+
+    return internalId
+  }
+
   // ─── CRUD ────────────────────────────────────────────────────────────────────
 
   async create(userId: string, dto: { url: string; events: string[] }) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
 
     // Validate URL scheme — only HTTPS in production, allow HTTP in dev
     let parsed: URL
@@ -274,7 +294,7 @@ export class WebhooksService {
   }
 
   async findAll(userId: string) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
     const endpoints = await this.prisma.webhookEndpoint.findMany({
       where: { userId: internalId },
       include: { _count: { select: { deliveries: true } } },
@@ -288,7 +308,7 @@ export class WebhooksService {
     endpointId: string,
     dto: { url?: string; events?: string[]; enabled?: boolean },
   ) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
     const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
     if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
 
@@ -334,7 +354,7 @@ export class WebhooksService {
   }
 
   async regenerateSecret(userId: string, endpointId: string) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
     const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
     if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
     const secret = randomBytes(24).toString('hex')
@@ -347,7 +367,7 @@ export class WebhooksService {
   }
 
   async delete(userId: string, endpointId: string) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
     const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
     if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
     await this.prisma.webhookEndpoint.delete({ where: { id: endpointId } })
@@ -355,7 +375,7 @@ export class WebhooksService {
   }
 
   async getDeliveries(userId: string, endpointId: string) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
     const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
     if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
     return this.prisma.webhookDelivery.findMany({
@@ -368,7 +388,7 @@ export class WebhooksService {
   // ─── Test fire ───────────────────────────────────────────────────────────────
 
   async testEndpoint(userId: string, endpointId: string) {
-    const internalId = await this.resolveUserId(userId)
+    const internalId = await this.assertWebhookAccess(userId)
     const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
     if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
 

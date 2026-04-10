@@ -40,10 +40,10 @@ function RailItem({
 
       <span
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200',
+          'flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 transition-all duration-200',
           isActive
-            ? 'scale-105 shadow-lg ring-2 ring-white/20'
-            : 'opacity-60 hover:opacity-100 hover:scale-105',
+            ? 'scale-105 shadow-[0_18px_28px_-16px_rgba(255,255,255,0.7)] ring-2 ring-white/20'
+            : 'opacity-70 hover:opacity-100 hover:scale-105 hover:border-white/20',
         )}
         style={
           isActive
@@ -78,14 +78,22 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
 
   return (
     <div
-      className={cn('hidden lg:flex flex-col items-center w-[64px] shrink-0 py-4 gap-1 sticky top-0 h-screen', className)}
-      style={{ background: 'linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%)' }}
+      className={cn(
+        'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-2 border-r border-white/10 px-3 py-6 lg:flex',
+        className,
+      )}
+      style={{
+        background:
+          'radial-gradient(circle at top, rgba(56,189,248,0.18), transparent 28%), linear-gradient(180deg, #07101d 0%, #0f172a 38%, #172554 100%)',
+      }}
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/8 to-transparent" />
+
       {/* Wordmark dot */}
       <Link
         href="/dashboard"
         aria-label="Dotly home"
-        className="mb-4 flex h-9 w-9 items-center justify-center rounded-2xl transition-transform hover:scale-105"
+        className="mb-5 flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/15 transition-transform hover:scale-[1.03]"
         style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
       >
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -95,7 +103,7 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
       </Link>
 
       {/* Divider */}
-      <div className="mb-2 h-px w-8 bg-white/10" />
+      <div className="mb-2 h-px w-10 bg-white/10" />
 
       {/* Home */}
       <RailItem href="/dashboard" label="Home" icon={Home} isActive={isHomeActive} isHome />
@@ -119,7 +127,7 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
       <div className="flex-1" />
 
       {/* Divider */}
-      <div className="mb-1 h-px w-8 bg-white/10" />
+      <div className="mb-1 h-px w-10 bg-white/10" />
 
       {/* Settings */}
       <RailItem

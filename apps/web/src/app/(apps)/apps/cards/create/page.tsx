@@ -132,13 +132,13 @@ const TEMPLATES: {
     preview: (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#FDFAF6] p-3 border border-[#E8E4DF]">
         <div className="h-10 w-10 rounded-full border border-gray-300 bg-[#FFFFFF] shadow-sm flex items-center justify-center">
-            <div className="h-8 w-8 rounded-full bg-[#9A7B4F] opacity-70" />
+          <div className="h-8 w-8 rounded-full bg-[#9A7B4F] opacity-70" />
         </div>
         <div className="h-1.5 w-20 rounded-none bg-[#1A1817]" />
         <div className="h-1 w-16 rounded-none bg-[#6E6B68]" />
         <div className="mt-2 w-full border-t border-[#E8E4DF] pt-2 flex flex-col gap-1 items-center">
-            <div className="h-1 w-24 rounded-none bg-[#2C2B29] opacity-80" />
-            <div className="h-1 w-16 rounded-none bg-[#2C2B29] opacity-60" />
+          <div className="h-1 w-24 rounded-none bg-[#2C2B29] opacity-80" />
+          <div className="h-1 w-16 rounded-none bg-[#2C2B29] opacity-60" />
         </div>
       </div>
     ),
@@ -173,15 +173,18 @@ const TEMPLATES: {
         {/* Extreme glowing backgrounds */}
         <div className="absolute top-0 right-0 w-16 h-16 bg-[#FF00FF] rounded-full blur-[30px] opacity-30"></div>
         <div className="absolute bottom-0 left-0 w-16 h-16 bg-[#00FFFF] rounded-full blur-[30px] opacity-20"></div>
-        
+
         {/* Avatar area */}
         <div className="h-9 w-9 rounded-full border-2 border-[#FF00FF] bg-[#141414] z-10 shadow-[0_0_12px_rgba(255,0,255,0.6)]" />
         <div className="h-2 w-16 bg-[#FFFFFF] z-10 shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
         <div className="h-1.5 w-12 bg-[#00FFFF] z-10 opacity-90 shadow-[0_0_4px_rgba(0,255,255,0.5)]" />
-        
+
         <div className="mt-2 flex w-full flex-col gap-1.5 z-10">
           {[0, 1].map((i) => (
-            <div key={i} className="h-4 w-full rounded-md border border-[#FF00FF] bg-black/40 shadow-[0_0_8px_rgba(255,0,255,0.2)]" />
+            <div
+              key={i}
+              className="h-4 w-full rounded-md border border-[#FF00FF] bg-black/40 shadow-[0_0_8px_rgba(255,0,255,0.2)]"
+            />
           ))}
         </div>
       </div>
@@ -195,15 +198,18 @@ const TEMPLATES: {
     preview: (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#F1F5F9] p-3 relative overflow-hidden border-4 border-[#FF90E8]">
         <div className="absolute top-0 left-0 right-0 h-4 bg-[#FF90E8] border-b-2 border-black flex items-center px-1">
-           <div className="h-1.5 w-1.5 bg-white border border-black"></div>
+          <div className="h-1.5 w-1.5 bg-white border border-black"></div>
         </div>
         <div className="h-9 w-9 rounded-none border-2 border-black bg-white z-10 shadow-[2px_2px_0_black] mt-3" />
         <div className="h-2 w-16 bg-black z-10" />
         <div className="h-1.5 w-12 bg-black z-10 opacity-70" />
-        
+
         <div className="mt-2 flex w-full flex-col gap-1.5 z-10">
           {[0, 1].map((i) => (
-            <div key={i} className="h-4 w-full border-2 border-black bg-white shadow-[2px_2px_0_black]" />
+            <div
+              key={i}
+              className="h-4 w-full border-2 border-black bg-white shadow-[2px_2px_0_black]"
+            />
           ))}
         </div>
       </div>
@@ -218,14 +224,17 @@ const TEMPLATES: {
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 p-3 relative overflow-hidden">
         <div className="absolute -top-4 -left-4 w-16 h-16 bg-[#6366F1] rounded-full blur-[20px] opacity-60"></div>
         <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-[#EC4899] rounded-full blur-[20px] opacity-60"></div>
-        
+
         <div className="h-9 w-9 rounded-full border border-white/40 bg-white/20 backdrop-blur-md z-10 shadow-lg" />
         <div className="h-2 w-16 bg-white z-10 rounded-full opacity-90 shadow-sm" />
         <div className="h-1.5 w-12 bg-white/70 z-10 rounded-full" />
-        
+
         <div className="mt-2 flex w-full flex-col gap-1.5 z-10">
           {[0, 1].map((i) => (
-            <div key={i} className="h-4 w-full rounded-md border border-white/20 bg-white/10 backdrop-blur-md shadow-sm" />
+            <div
+              key={i}
+              className="h-4 w-full rounded-md border border-white/20 bg-white/10 backdrop-blur-md shadow-sm"
+            />
           ))}
         </div>
       </div>
@@ -249,7 +258,12 @@ export default function CreateCardPage() {
       const card = await apiPost<{ id: string }>('/cards', { templateId: selected }, token)
       router.push(`/apps/cards/${card.id}/edit`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create card')
+      const message = err instanceof Error ? err.message : 'Failed to create card'
+      if (message.includes('PLAN_LIMIT_REACHED') || message.includes('maximum of 1 card')) {
+        setError('Your current plan allows 1 card. Upgrade to Pro to create up to 3 cards.')
+      } else {
+        setError(message)
+      }
       setLoading(false)
     }
   }
@@ -354,7 +368,17 @@ export default function CreateCardPage() {
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <p className="text-sm text-red-700">{error}</p>
+          <div>
+            <p className="text-sm text-red-700">{error}</p>
+            {error.includes('Upgrade to Pro') && (
+              <a
+                href="/settings/billing?plan=PRO&duration=MONTHLY"
+                className="mt-1 inline-block text-sm font-semibold text-brand-600 hover:underline"
+              >
+                Upgrade in billing
+              </a>
+            )}
+          </div>
         </div>
       )}
 

@@ -79,7 +79,7 @@ function StatCard({
   color: string
 }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="app-panel rounded-[26px] p-5">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-gray-500">{label}</p>
         <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl', color)}>
@@ -87,9 +87,7 @@ function StatCard({
         </span>
       </div>
       <p className="mt-3 text-3xl font-bold text-gray-900 tabular-nums">{value}</p>
-      {subValue && (
-        <p className="mt-1 text-xs font-medium text-gray-400">{subValue}</p>
-      )}
+      {subValue && <p className="mt-1 text-xs font-medium text-gray-400">{subValue}</p>}
     </div>
   )
 }
@@ -156,7 +154,9 @@ function ConfirmDialog({
       role="presentation"
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onCancel()
+      }}
     >
       <div
         ref={dialogRef}
@@ -164,7 +164,7 @@ function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby="dialog-desc"
-        className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
+        className="app-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl"
         style={{ animation: 'dialog-up 0.22s cubic-bezier(.32,1.2,.56,1) both' }}
       >
         <style>{`
@@ -177,9 +177,13 @@ function ConfirmDialog({
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50">
             <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
           </span>
-          <h2 id="dialog-title" className="text-base font-bold text-gray-900">{title}</h2>
+          <h2 id="dialog-title" className="text-base font-bold text-gray-900">
+            {title}
+          </h2>
         </div>
-        <p id="dialog-desc" className="text-sm text-gray-500 leading-relaxed">{message}</p>
+        <p id="dialog-desc" className="text-sm text-gray-500 leading-relaxed">
+          {message}
+        </p>
         <div className="mt-5 flex gap-2.5">
           <button
             ref={cancelRef}
@@ -267,7 +271,7 @@ function ActionBtn({
       aria-label={label}
       title={label}
       className={cn(
-        'relative flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-40',
+        'app-panel-subtle relative flex h-8 w-8 items-center justify-center rounded-xl transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-40',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
         danger
           ? 'text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-500 focus-visible:ring-red-400'
@@ -298,10 +302,7 @@ function CardTile({
   duplicating: boolean
 }) {
   // Fix #11/#17: use safeStr() so malformed/non-string fields can't crash the tile
-  const name =
-    safeStr(card.fields['name']) ||
-    safeStr(card.fields['fullName']) ||
-    card.handle
+  const name = safeStr(card.fields['name']) || safeStr(card.fields['fullName']) || card.handle
   const title = safeStr(card.fields['title'])
   const company = safeStr(card.fields['company'])
   const avatarUrl = safeStr(card.fields['avatarUrl'])
@@ -316,7 +317,7 @@ function CardTile({
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200',
+        'app-panel group relative flex items-center gap-4 rounded-[26px] p-4 transition-all duration-200',
         'hover:-translate-y-px hover:shadow-md hover:shadow-gray-200/80 hover:border-gray-200',
         duplicating && 'pointer-events-none opacity-60',
       )}
@@ -366,7 +367,9 @@ function CardTile({
             {[title, company].filter(Boolean).join(' \u00b7 ')}
           </p>
         )}
-        <p className="truncate text-[11px] text-gray-300 mt-0.5">{DISPLAY_HOST}/{card.handle}</p>
+        <p className="truncate text-[11px] text-gray-300 mt-0.5">
+          {DISPLAY_HOST}/{card.handle}
+        </p>
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -422,7 +425,11 @@ function CardTile({
             href={`${APP_URL}/card/${card.handle}`}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={card.isActive ? `Preview ${name} (opens in new tab)` : `Preview ${name} — draft, not visible to visitors`}
+            aria-label={
+              card.isActive
+                ? `Preview ${name} (opens in new tab)`
+                : `Preview ${name} — draft, not visible to visitors`
+            }
             title={card.isActive ? `Preview ${name}` : `Draft — not visible to visitors`}
             className={cn(
               'flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white transition-all active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-1',
@@ -435,11 +442,7 @@ function CardTile({
           </a>
 
           {/* Delete */}
-          <ActionBtn
-            onClick={() => onDelete(card)}
-            label={`Delete ${name}`}
-            danger
-          >
+          <ActionBtn onClick={() => onDelete(card)} label={`Delete ${name}`} danger>
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </ActionBtn>
         </div>
@@ -471,7 +474,6 @@ export default function CardsDashboard(): JSX.Element {
     return tokenRef.current
   }, [])
 
-
   // Fix #4: AbortController so in-flight fetches are cancelled on unmount/re-fetch
   const abortRef = useRef<AbortController | null>(null)
 
@@ -483,7 +485,7 @@ export default function CardsDashboard(): JSX.Element {
     setLoading(true)
     setFetchFailed(false)
     setError(null)
-    setSummary(null)   // clear stale stats so skeleton shows during refresh
+    setSummary(null) // clear stale stats so skeleton shows during refresh
     // Reset token cache so a fresh token is fetched on each explicit reload
     tokenRef.current = undefined
 
@@ -501,7 +503,9 @@ export default function CardsDashboard(): JSX.Element {
         setCards(cardsResult.value)
       } else {
         setFetchFailed(true)
-        setError(cardsResult.reason instanceof Error ? cardsResult.reason.message : 'Failed to load cards')
+        setError(
+          cardsResult.reason instanceof Error ? cardsResult.reason.message : 'Failed to load cards',
+        )
       }
 
       if (summaryResult.status === 'fulfilled') {
@@ -519,7 +523,9 @@ export default function CardsDashboard(): JSX.Element {
 
   useEffect(() => {
     void fetchData()
-    return () => { abortRef.current?.abort() }
+    return () => {
+      abortRef.current?.abort()
+    }
   }, [fetchData])
 
   // Fix #3: return focus to the trigger element when dialog closes
@@ -547,12 +553,16 @@ export default function CardsDashboard(): JSX.Element {
       setCards((prev) => prev.filter((c) => c.id !== deleteTarget.id))
       // Optimistically update summary counts so the stat cards reflect
       // the deletion immediately without waiting for the next full reload.
-      setSummary((prev) => prev ? {
-        ...prev,
-        totalCards: Math.max(0, prev.totalCards - 1),
-        activeCards: wasActive ? Math.max(0, prev.activeCards - 1) : prev.activeCards,
-        totalViews: Math.max(0, prev.totalViews - (deleteTarget.viewCount ?? 0)),
-      } : prev)
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              totalCards: Math.max(0, prev.totalCards - 1),
+              activeCards: wasActive ? Math.max(0, prev.activeCards - 1) : prev.activeCards,
+              totalViews: Math.max(0, prev.totalViews - (deleteTarget.viewCount ?? 0)),
+            }
+          : prev,
+      )
       closeDeleteDialog()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete card')
@@ -569,11 +579,15 @@ export default function CardsDashboard(): JSX.Element {
       const newCard = await apiPost<CardSummary>(`/cards/${card.id}/duplicate`, {}, token)
       setCards((prev) => [newCard, ...prev])
       // Optimistically bump totalCards — the duplicate is always created as a draft.
-      setSummary((prev) => prev ? {
-        ...prev,
-        totalCards: prev.totalCards + 1,
-        // activeCards unchanged — duplicates start as draft (isActive: false)
-      } : prev)
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              totalCards: prev.totalCards + 1,
+              // activeCards unchanged — duplicates start as draft (isActive: false)
+            }
+          : prev,
+      )
       router.push(`/apps/cards/${newCard.id}/edit`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to duplicate card')
@@ -585,21 +599,21 @@ export default function CardsDashboard(): JSX.Element {
   // All aggregate stats come from the dashboard-summary endpoint so they are
   // always consistent and accurate regardless of the 100-card display cap.
   // Falls back to null (shown as "--") if the summary hasn't loaded yet.
-  const totalCards   = summary?.totalCards   ?? null
-  const activeCards  = summary?.activeCards  ?? null
-  const totalViews   = summary?.totalViews   ?? null
-  const totalClicks  = summary?.totalClicks  ?? null
-  const totalLeads   = summary?.totalLeads   ?? null
-  const isTruncated  = summary?.truncated    ?? false
+  const totalCards = summary?.totalCards ?? null
+  const activeCards = summary?.activeCards ?? null
+  const totalViews = summary?.totalViews ?? null
+  const totalClicks = summary?.totalClicks ?? null
+  const totalLeads = summary?.totalLeads ?? null
+  const isTruncated = summary?.truncated ?? false
 
   return (
     <>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="app-panel flex flex-wrap items-center justify-between gap-3 rounded-[30px] px-6 py-6 sm:px-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Cards</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-gray-500">
               Manage your digital business cards and track engagement
             </p>
           </div>
@@ -639,38 +653,40 @@ export default function CardsDashboard(): JSX.Element {
         {loading ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+              <div key={i} className="app-list-skeleton h-24 animate-pulse" />
             ))}
           </div>
-        ) : !fetchFailed && (
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {/* totalCards from backend — accurate even when user has >100 cards */}
-            <StatCard
-              label="Total Cards"
-              value={fmt(totalCards)}
-              subValue={activeCards != null ? `${fmt(activeCards)} live` : undefined}
-              icon={CreditCard}
-              color="bg-sky-500"
-            />
-            <StatCard
-              label="Total Views"
-              value={fmt(totalViews)}
-              icon={Eye}
-              color="bg-violet-500"
-            />
-            <StatCard
-              label="Total Clicks"
-              value={fmt(totalClicks)}
-              icon={MousePointerClick}
-              color="bg-emerald-500"
-            />
-            <StatCard
-              label="Total Leads"
-              value={fmt(totalLeads)}
-              icon={Users}
-              color="bg-orange-400"
-            />
-          </div>
+        ) : (
+          !fetchFailed && (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {/* totalCards from backend — accurate even when user has >100 cards */}
+              <StatCard
+                label="Total Cards"
+                value={fmt(totalCards)}
+                subValue={activeCards != null ? `${fmt(activeCards)} live` : undefined}
+                icon={CreditCard}
+                color="bg-sky-500"
+              />
+              <StatCard
+                label="Total Views"
+                value={fmt(totalViews)}
+                icon={Eye}
+                color="bg-violet-500"
+              />
+              <StatCard
+                label="Total Clicks"
+                value={fmt(totalClicks)}
+                icon={MousePointerClick}
+                color="bg-emerald-500"
+              />
+              <StatCard
+                label="Total Leads"
+                value={fmt(totalLeads)}
+                icon={Users}
+                color="bg-orange-400"
+              />
+            </div>
+          )
         )}
 
         {/* Cards list */}
@@ -687,11 +703,11 @@ export default function CardsDashboard(): JSX.Element {
           {loading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-[80px] animate-pulse rounded-2xl bg-gray-100" />
+                <div key={i} className="app-list-skeleton h-[88px] animate-pulse" />
               ))}
             </div>
           ) : fetchFailed ? null : cards.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
+            <div className="app-empty-state">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50">
                 <CreditCard className="h-7 w-7 text-sky-500" aria-hidden="true" />
               </div>
@@ -731,7 +747,7 @@ export default function CardsDashboard(): JSX.Element {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Link
               href="/apps/cards/email-templates"
-              className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
+              className="app-panel group flex items-center gap-4 rounded-[26px] p-4 transition-all hover:shadow-[0_24px_54px_-34px_rgba(15,23,42,0.22)]"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50">
                 <Mail className="h-5 w-5 text-violet-500" aria-hidden="true" />
@@ -740,12 +756,15 @@ export default function CardsDashboard(): JSX.Element {
                 <p className="font-semibold text-gray-900">Email Templates</p>
                 <p className="text-xs text-gray-500">Branded follow-up email templates</p>
               </div>
-              <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              <ArrowRight
+                className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-1"
+                aria-hidden="true"
+              />
             </Link>
 
             <Link
               href="/apps/cards/email-signature"
-              className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
+              className="app-panel group flex items-center gap-4 rounded-[26px] p-4 transition-all hover:shadow-[0_24px_54px_-34px_rgba(15,23,42,0.22)]"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
                 <FileSignature className="h-5 w-5 text-emerald-500" aria-hidden="true" />
@@ -754,12 +773,15 @@ export default function CardsDashboard(): JSX.Element {
                 <p className="font-semibold text-gray-900">Email Signature</p>
                 <p className="text-xs text-gray-500">Generate your HTML email signature</p>
               </div>
-              <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              <ArrowRight
+                className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-1"
+                aria-hidden="true"
+              />
             </Link>
 
             <Link
               href="/apps/cards/analytics"
-              className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
+              className="app-panel group flex items-center gap-4 rounded-[26px] p-4 transition-all hover:shadow-[0_24px_54px_-34px_rgba(15,23,42,0.22)]"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50">
                 <BarChart3 className="h-5 w-5 text-sky-500" aria-hidden="true" />
@@ -768,12 +790,15 @@ export default function CardsDashboard(): JSX.Element {
                 <p className="font-semibold text-gray-900">Analytics</p>
                 <p className="text-xs text-gray-500">Views, clicks and lead captures</p>
               </div>
-              <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              <ArrowRight
+                className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-1"
+                aria-hidden="true"
+              />
             </Link>
 
             <Link
               href="/apps/crm/leads"
-              className="group flex items-center gap-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50"
+              className="app-panel-subtle group flex items-center gap-4 rounded-[26px] border border-dashed border-gray-200 p-4 transition-all hover:border-violet-200 hover:bg-violet-50"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
                 <Inbox className="h-5 w-5 text-violet-500" aria-hidden="true" />
@@ -782,7 +807,10 @@ export default function CardsDashboard(): JSX.Element {
                 <p className="font-semibold text-gray-700">View CRM Leads</p>
                 <p className="text-xs text-gray-400">See contacts captured from your cards</p>
               </div>
-              <Zap className="h-4 w-4 text-violet-300 transition-colors group-hover:text-violet-500" aria-hidden="true" />
+              <Zap
+                className="h-4 w-4 text-violet-300 transition-colors group-hover:text-violet-500"
+                aria-hidden="true"
+              />
             </Link>
           </div>
         </section>

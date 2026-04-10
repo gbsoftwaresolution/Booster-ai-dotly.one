@@ -188,12 +188,15 @@ export default function CustomFieldsPage(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="app-panel flex items-center justify-between rounded-[30px] px-6 py-6 sm:px-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Custom Fields</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-500/80">
+            CRM Setup
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">Custom Fields</h1>
+          <p className="mt-2 text-sm text-gray-500">
             Define extra fields that appear on every contact record in your CRM.
           </p>
         </div>
@@ -222,7 +225,7 @@ export default function CustomFieldsPage(): JSX.Element {
 
       {/* Empty state */}
       {!loading && fields.length === 0 && (
-        <div className="text-center py-20 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+        <div className="app-empty-state">
           <GripVertical size={40} className="mx-auto text-gray-300 mb-3" />
           <h3 className="text-gray-700 font-semibold mb-1">No custom fields yet</h3>
           <p className="text-sm text-gray-400 mb-4">
@@ -252,7 +255,7 @@ export default function CustomFieldsPage(): JSX.Element {
       {/* Create / Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="app-panel w-full max-w-md rounded-[28px] p-6 shadow-2xl">
             <h2 className="text-lg font-bold text-gray-900 mb-5">
               {editingField ? 'Edit Custom Field' : 'New Custom Field'}
             </h2>

@@ -94,11 +94,20 @@ function ConfirmDialog({
         return
       }
       if (e.key !== 'Tab') return
-      if (focusable.length === 0) { e.preventDefault(); return }
+      if (focusable.length === 0) {
+        e.preventDefault()
+        return
+      }
       if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last?.focus() }
+        if (document.activeElement === first) {
+          e.preventDefault()
+          last?.focus()
+        }
       } else {
-        if (document.activeElement === last) { e.preventDefault(); first?.focus() }
+        if (document.activeElement === last) {
+          e.preventDefault()
+          first?.focus()
+        }
       }
     }
     el.addEventListener('keydown', onKeyDown)
@@ -110,7 +119,9 @@ function ConfirmDialog({
       role="presentation"
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onCancel()
+      }}
     >
       <div
         ref={panelRef}
@@ -118,15 +129,19 @@ function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-desc"
-        className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
+        className="app-shell-surface w-full max-w-sm rounded-3xl p-6"
       >
         <div className="mb-3 flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50">
             <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
           </span>
-          <h2 id="confirm-title" className="text-base font-bold text-gray-900">{title}</h2>
+          <h2 id="confirm-title" className="text-base font-bold text-gray-900">
+            {title}
+          </h2>
         </div>
-        <p id="confirm-desc" className="text-sm text-gray-500 leading-relaxed">{message}</p>
+        <p id="confirm-desc" className="text-sm text-gray-500 leading-relaxed">
+          {message}
+        </p>
         <div className="mt-5 flex gap-2.5">
           <button
             type="button"
@@ -292,250 +307,253 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
 
   return (
     <>
-    <div className="flex h-full flex-col bg-gray-50">
-      {/* ── Header ── */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 py-3 lg:px-6">
-        {/* Back */}
-        <Link
-          href="/apps/cards"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-
-        {/* Card identity */}
-        <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-semibold text-gray-900 truncate leading-tight">
-            {(card.fields as unknown as Record<string, string>).name || 'Untitled Card'}
-          </h1>
-          <p className="text-xs text-gray-400 truncate">dotly.one/{card.handle}</p>
-        </div>
-
-        {/* Analytics — desktop only */}
-        {analytics && (
+      <div className="flex h-full flex-col bg-[linear-gradient(180deg,#f7faff_0%,#f1f5fb_100%)]">
+        {/* ── Header ── */}
+        <header className="app-shell-surface mx-3 mt-3 flex shrink-0 items-center gap-3 rounded-[28px] px-4 py-3 lg:px-6">
+          {/* Back */}
           <Link
-            href={`/apps/cards/${id}/analytics`}
-            className="hidden items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-1.5 transition-colors hover:border-sky-200 hover:bg-sky-50 lg:flex"
+            href="/apps/cards"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
           >
-            <BarChart2 className="h-3.5 w-3.5 text-gray-400" />
-            <span className="text-xs text-gray-500">
-              <span className="font-semibold text-sky-600">{analytics.totalViews}</span> views
-            </span>
-            <span className="text-[10px] text-gray-300">·</span>
-            <span className="text-xs text-gray-500">
-              <span className="font-semibold text-purple-600">{analytics.totalClicks}</span> clicks
-            </span>
-            <span className="text-[10px] text-gray-300">·</span>
-            <span className="text-xs text-gray-500">
-              <span className="font-semibold text-green-600">{analytics.totalLeads}</span> leads
-            </span>
+            <ArrowLeft className="h-4 w-4" />
           </Link>
-        )}
 
-        {/* Save indicator + button */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden sm:block">{saveIndicator()}</div>
-
-          {/* Duplicate button */}
-          <button
-            type="button"
-            onClick={() => void handleDuplicate()}
-            disabled={duplicating}
-            title="Duplicate card"
-            aria-label="Duplicate card"
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {duplicating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-          </button>
-
-          {/* Delete button */}
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            title="Delete card"
-            aria-label="Delete card"
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-all active:scale-95"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void saveNow()}
-            disabled={saveStatus === 'saving'}
-            className={cn(
-              'rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed',
-              saveStatus === 'error'
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-brand-500 text-white hover:bg-brand-600 shadow-sm shadow-brand-500/25',
-            )}
-          >
-            {saveStatus === 'saving' ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </header>
-
-      {/* ── Main layout ── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left / full-width editor panel */}
-        <div className="flex w-full flex-col bg-white lg:w-[440px] lg:shrink-0 lg:border-r lg:border-gray-200">
-          {/* Tab bar — iOS pill style */}
-          <div className="shrink-0 border-b border-gray-100 bg-white px-3 pt-2 pb-0">
-            <div className="flex gap-0.5">
-              {TABS.map((tab) => {
-                const Icon = tab.icon
-                const active = activeTab === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      'flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5 transition-all duration-150',
-                      active ? 'bg-brand-50 text-brand-600' : 'text-gray-400 hover:text-gray-600',
-                    )}
-                  >
-                    <Icon className={cn('h-4 w-4 transition-transform', active && 'scale-110')} />
-                    <span
-                      className={cn(
-                        'text-[10px] font-semibold leading-none',
-                        active ? 'text-brand-600' : 'text-gray-400',
-                      )}
-                    >
-                      {tab.label}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            {/* Active underline */}
-            <div className="mt-2 h-0.5 rounded-full bg-gray-100 relative overflow-hidden">
-              <div
-                className="absolute inset-y-0 rounded-full bg-brand-500 transition-all duration-200"
-                style={{
-                  left: `${TABS.findIndex((t) => t.id === activeTab) * (100 / TABS.length)}%`,
-                  width: `${100 / TABS.length}%`,
-                }}
-              />
-            </div>
+          {/* Card identity */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-semibold text-gray-900 truncate leading-tight">
+              {(card.fields as unknown as Record<string, string>).name || 'Untitled Card'}
+            </h1>
+            <p className="text-xs text-gray-400 truncate">dotly.one/{card.handle}</p>
           </div>
 
-          {/* Tab content — mobile Preview tab shows the phone mockup inline */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'preview' ? (
-              /* ── Mobile inline preview ── */
-              <div className="flex items-start justify-center bg-gray-100 p-6 min-h-full">
-                <div className="relative w-full max-w-[340px]">
-                  <div className="mx-auto overflow-hidden rounded-[36px] border-[8px] border-gray-800 shadow-2xl bg-white">
-                    <div className="h-6 bg-gray-800 flex items-center justify-center">
-                      <div className="h-1.5 w-16 rounded-full bg-gray-700" />
-                    </div>
-                    <div className="max-h-[580px] overflow-y-auto">
-                      <CardRenderer {...rendererProps} />
+          {/* Analytics — desktop only */}
+          {analytics && (
+            <Link
+              href={`/apps/cards/${id}/analytics`}
+              className="hidden items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-1.5 transition-colors hover:border-sky-200 hover:bg-sky-50 lg:flex"
+            >
+              <BarChart2 className="h-3.5 w-3.5 text-gray-400" />
+              <span className="text-xs text-gray-500">
+                <span className="font-semibold text-sky-600">{analytics.totalViews}</span> views
+              </span>
+              <span className="text-[10px] text-gray-300">·</span>
+              <span className="text-xs text-gray-500">
+                <span className="font-semibold text-purple-600">{analytics.totalClicks}</span>{' '}
+                clicks
+              </span>
+              <span className="text-[10px] text-gray-300">·</span>
+              <span className="text-xs text-gray-500">
+                <span className="font-semibold text-green-600">{analytics.totalLeads}</span> leads
+              </span>
+            </Link>
+          )}
+
+          {/* Save indicator + button */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:block">{saveIndicator()}</div>
+
+            {/* Duplicate button */}
+            <button
+              type="button"
+              onClick={() => void handleDuplicate()}
+              disabled={duplicating}
+              title="Duplicate card"
+              aria-label="Duplicate card"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {duplicating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            {/* Delete button */}
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              title="Delete card"
+              aria-label="Delete card"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-all active:scale-95"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void saveNow()}
+              disabled={saveStatus === 'saving'}
+              className={cn(
+                'rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed',
+                saveStatus === 'error'
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-brand-500 text-white hover:bg-brand-600 shadow-sm shadow-brand-500/25',
+              )}
+            >
+              {saveStatus === 'saving' ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </header>
+
+        {/* ── Main layout ── */}
+        <div className="flex flex-1 overflow-hidden px-3 pb-3 pt-3">
+          {/* Left / full-width editor panel */}
+          <div className="app-shell-surface flex w-full flex-col rounded-[30px] lg:w-[440px] lg:shrink-0">
+            {/* Tab bar — iOS pill style */}
+            <div className="shrink-0 border-b border-slate-100 px-3 pt-3 pb-2">
+              <div className="flex gap-0.5">
+                {TABS.map((tab) => {
+                  const Icon = tab.icon
+                  const active = activeTab === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        'flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5 transition-all duration-150',
+                        active
+                          ? 'bg-brand-50 text-brand-600 shadow-sm'
+                          : 'text-gray-400 hover:bg-white/80 hover:text-gray-600',
+                      )}
+                    >
+                      <Icon className={cn('h-4 w-4 transition-transform', active && 'scale-110')} />
+                      <span
+                        className={cn(
+                          'text-[10px] font-semibold leading-none',
+                          active ? 'text-brand-600' : 'text-gray-400',
+                        )}
+                      >
+                        {tab.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {/* Active underline */}
+              <div className="mt-2 h-0.5 rounded-full bg-gray-100 relative overflow-hidden">
+                <div
+                  className="absolute inset-y-0 rounded-full bg-brand-500 transition-all duration-200"
+                  style={{
+                    left: `${TABS.findIndex((t) => t.id === activeTab) * (100 / TABS.length)}%`,
+                    width: `${100 / TABS.length}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Tab content — mobile Preview tab shows the phone mockup inline */}
+            <div className="flex-1 overflow-y-auto">
+              {activeTab === 'preview' ? (
+                /* ── Mobile inline preview ── */
+                <div className="flex min-h-full items-start justify-center bg-[linear-gradient(180deg,#eef5ff_0%,#e8eef8_100%)] p-6">
+                  <div className="relative w-full max-w-[340px]">
+                    <div className="mx-auto overflow-hidden rounded-[36px] border-[8px] border-gray-800 shadow-2xl bg-white">
+                      <div className="h-6 bg-gray-800 flex items-center justify-center">
+                        <div className="h-1.5 w-16 rounded-full bg-gray-700" />
+                      </div>
+                      <div className="max-h-[580px] overflow-y-auto">
+                        <CardRenderer {...rendererProps} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div
-                className={cn(
-                  'px-4 py-4',
-                  // On mobile add extra bottom padding so content isn't hidden behind the bottom nav bar
-                  'pb-28 lg:pb-6',
-                )}
-              >
-                {activeTab === 'profile' && (
-                  <ProfileTab
-                    cardId={id}
-                    fields={card.fields as unknown as Record<string, string>}
-                    handle={card.handle}
-                    vcardPolicy={vcardPolicy}
-                    onFieldChange={updateField}
-                    onHandleChange={updateHandle}
-                    onVcardPolicyChange={updateVcardPolicy}
-                  />
-                )}
-                {activeTab === 'links' && (
-                  <LinksTab
-                    links={socialLinks}
-                    onChange={updateSocialLinks as (links: SocialLinkData[]) => void}
-                  />
-                )}
-                {activeTab === 'media' && (
-                  <MediaTab
-                    cardId={id}
-                    mediaBlocks={mediaBlocks}
-                    onChange={updateMediaBlocks as (blocks: MediaBlockData[]) => void}
-                  />
-                )}
-                {activeTab === 'theme' && (
-                  <ThemeTab
-                    templateId={card.templateId}
-                    theme={theme}
-                    onTemplateChange={updateTemplate as (t: CardTemplate) => void}
-                    onThemeChange={updateTheme}
-                  />
-                )}
-                {activeTab === 'qr' && <QrSection cardId={id} />}
-                {activeTab === 'form' && <LeadFormTab cardId={id} />}
-              </div>
+              ) : (
+                <div
+                  className={cn(
+                    'px-4 py-4',
+                    // On mobile add extra bottom padding so content isn't hidden behind the bottom nav bar
+                    'pb-28 lg:pb-6',
+                  )}
+                >
+                  {activeTab === 'profile' && (
+                    <ProfileTab
+                      cardId={id}
+                      fields={card.fields as unknown as Record<string, string>}
+                      handle={card.handle}
+                      vcardPolicy={vcardPolicy}
+                      onFieldChange={updateField}
+                      onHandleChange={updateHandle}
+                      onVcardPolicyChange={updateVcardPolicy}
+                    />
+                  )}
+                  {activeTab === 'links' && (
+                    <LinksTab
+                      links={socialLinks}
+                      onChange={updateSocialLinks as (links: SocialLinkData[]) => void}
+                    />
+                  )}
+                  {activeTab === 'media' && (
+                    <MediaTab
+                      cardId={id}
+                      mediaBlocks={mediaBlocks}
+                      onChange={updateMediaBlocks as (blocks: MediaBlockData[]) => void}
+                    />
+                  )}
+                  {activeTab === 'theme' && (
+                    <ThemeTab
+                      templateId={card.templateId}
+                      theme={theme}
+                      onTemplateChange={updateTemplate as (t: CardTemplate) => void}
+                      onThemeChange={updateTheme}
+                    />
+                  )}
+                  {activeTab === 'qr' && <QrSection cardId={id} />}
+                  {activeTab === 'form' && <LeadFormTab cardId={id} />}
+                </div>
+              )}
+            </div>
+
+            {/* Publish bar — hidden on preview, qr, and form tabs */}
+            {activeTab !== 'preview' && activeTab !== 'qr' && activeTab !== 'form' && (
+              <PublishBar
+                handle={card.handle}
+                isActive={card.isActive}
+                onPublish={publishCard}
+                onUnpublish={unpublishCard}
+              />
             )}
           </div>
 
-          {/* Publish bar — hidden on preview, qr, and form tabs */}
-          {activeTab !== 'preview' && activeTab !== 'qr' && activeTab !== 'form' && (
-            <PublishBar
-              handle={card.handle}
-              isActive={card.isActive}
-              onPublish={publishCard}
-              onUnpublish={unpublishCard}
-            />
-          )}
-        </div>
-
-        {/* ── Right preview panel — desktop only ── */}
-        <div className="hidden flex-1 items-start justify-center overflow-y-auto bg-gray-100 p-10 lg:flex">
-          <div className="sticky top-10">
-            {/* Phone frame */}
-            <div className="relative w-[375px]">
-              <div className="mx-auto overflow-hidden rounded-[44px] border-[10px] border-gray-800 shadow-[0_40px_80px_rgba(0,0,0,0.3)] bg-white">
-                {/* Notch */}
-                <div className="h-7 bg-gray-800 flex items-center justify-center gap-2 px-4">
-                  <div className="h-1.5 w-20 rounded-full bg-gray-700" />
+          {/* ── Right preview panel — desktop only ── */}
+          <div className="hidden flex-1 items-start justify-center overflow-y-auto rounded-[30px] bg-[linear-gradient(180deg,#eaf2ff_0%,#eef1f7_100%)] p-10 lg:ml-3 lg:flex">
+            <div className="sticky top-10">
+              {/* Phone frame */}
+              <div className="relative w-[375px]">
+                <div className="mx-auto overflow-hidden rounded-[44px] border-[10px] border-gray-800 shadow-[0_40px_80px_rgba(0,0,0,0.3)] bg-white">
+                  {/* Notch */}
+                  <div className="h-7 bg-gray-800 flex items-center justify-center gap-2 px-4">
+                    <div className="h-1.5 w-20 rounded-full bg-gray-700" />
+                  </div>
+                  <div className="max-h-[660px] overflow-y-auto">
+                    <CardRenderer {...rendererProps} />
+                  </div>
                 </div>
-                <div className="max-h-[660px] overflow-y-auto">
-                  <CardRenderer {...rendererProps} />
-                </div>
+                {/* Reflection under phone */}
+                <div className="mt-4 mx-8 h-6 rounded-[50%] bg-black/10 blur-xl" />
               </div>
-              {/* Reflection under phone */}
-              <div className="mt-4 mx-8 h-6 rounded-[50%] bg-black/10 blur-xl" />
-            </div>
 
-            {/* Live / Draft label under phone */}
-            <div className="mt-5 flex justify-center">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
-                  card.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500',
-                )}
-              >
+              {/* Live / Draft label under phone */}
+              <div className="mt-5 flex justify-center">
                 <span
                   className={cn(
-                    'h-1.5 w-1.5 rounded-full',
-                    card.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400',
+                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
+                    card.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500',
                   )}
-                />
-                {card.isActive ? 'Live preview' : 'Draft preview'}
-              </span>
+                >
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full',
+                      card.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400',
+                    )}
+                  />
+                  {card.isActive ? 'Live preview' : 'Draft preview'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
       {/* Action error banner */}
       {actionError && (

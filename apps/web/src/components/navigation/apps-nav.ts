@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import type { BillingPlan } from '@/lib/billing-plans'
 import {
   BarChart3,
   Calendar,
@@ -31,6 +32,7 @@ export interface AppNavItem {
   label: string
   icon: LucideIcon
   badge?: string
+  minPlan?: BillingPlan
 }
 
 export interface AppNavSection {
@@ -184,15 +186,15 @@ export const ADMIN_APPS: AppDefinition[] = [
         items: [
           { href: '/settings', label: 'General', icon: Settings },
           { href: '/settings/billing', label: 'Billing', icon: DollarSign },
-          { href: '/settings/domains', label: 'Custom Domains', icon: GitBranch },
-          { href: '/settings/webhooks', label: 'Webhooks', icon: Webhook },
+          { href: '/settings/domains', label: 'Custom Domains', icon: GitBranch, minPlan: 'PRO' },
+          { href: '/settings/webhooks', label: 'Webhooks', icon: Webhook, minPlan: 'PRO' },
         ],
       },
       {
         title: 'Team',
         items: [
-          { href: '/team', label: 'Members', icon: UsersRound },
-          { href: '/team/brand', label: 'Brand', icon: FileSignature },
+          { href: '/team', label: 'Members', icon: UsersRound, minPlan: 'BUSINESS' },
+          { href: '/team/brand', label: 'Brand', icon: FileSignature, minPlan: 'BUSINESS' },
         ],
       },
     ],

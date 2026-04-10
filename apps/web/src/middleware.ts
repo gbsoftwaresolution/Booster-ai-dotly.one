@@ -26,19 +26,19 @@ const LEGACY_REDIRECTS: RedirectEntry[] = [
   // also matches all sub-paths (/cards/create, /cards/:id/edit, /cards/:id/analytics)
   // because of the prefix-match logic below. All those sub-paths are now implemented
   // under /apps/cards/* so the redirect is safe — no loops.
-  ['/cards/new',                            '/apps/cards/create'],
-  ['/cards',                                '/apps/cards'],
+  ['/cards/new', '/apps/cards/create'],
+  ['/cards', '/apps/cards'],
   // CRM — specific sub-paths before the bare /crm catch-all
-  ['/crm/custom-fields',                    '/apps/crm/custom-fields'],
-  ['/crm/analytics',                        '/apps/crm/analytics'],
-  ['/crm',                                  '/apps/crm/pipeline'],
-  ['/contacts',                             '/apps/crm/contacts'],
-  ['/leads',                                '/apps/crm/leads'],
-  ['/deals',                                '/apps/crm/deals'],
-  ['/tasks',                                '/apps/crm/tasks'],
-  ['/pipelines',                            '/apps/crm/pipelines'],
+  ['/crm/custom-fields', '/apps/crm/custom-fields'],
+  ['/crm/analytics', '/apps/crm/analytics'],
+  ['/crm', '/apps/crm/pipeline'],
+  ['/contacts', '/apps/crm/contacts'],
+  ['/leads', '/apps/crm/leads'],
+  ['/deals', '/apps/crm/deals'],
+  ['/tasks', '/apps/crm/tasks'],
+  ['/pipelines', '/apps/crm/pipelines'],
   // Scheduling
-  ['/scheduling',                           '/apps/scheduling'],
+  ['/scheduling', '/apps/scheduling'],
 ]
 
 export async function middleware(request: NextRequest) {
@@ -112,6 +112,8 @@ export async function middleware(request: NextRequest) {
   if (!user && isDashboardRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth'
+    url.search = ''
+    url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`)
     return NextResponse.redirect(url)
   }
 

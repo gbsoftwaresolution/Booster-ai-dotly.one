@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Put, Param, Body, Query, Res } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { Response } from 'express'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
@@ -20,6 +21,7 @@ export class SchedulingController {
   constructor(
     private readonly schedulingService: SchedulingService,
     private readonly googleCalendar: GoogleCalendarService,
+    private readonly config: ConfigService,
   ) {}
 
   // ── Appointment Types (authenticated) ─────────────────────────────────────
@@ -142,7 +144,7 @@ export class SchedulingController {
     @Query('state') state: string,
     @Res() res: Response,
   ) {
-    const webUrl = process.env.WEB_URL ?? 'http://localhost:3000'
+    const webUrl = this.config.getOrThrow<string>('WEB_URL')
     try {
       const userId = this.googleCalendar.verifyState(state)
       const tokens = await this.googleCalendar.exchangeCode(code)

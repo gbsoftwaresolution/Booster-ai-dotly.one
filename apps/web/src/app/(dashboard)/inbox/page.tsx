@@ -20,6 +20,12 @@ import {
   ChevronDown,
   Search,
   X,
+  File,
+  FileArchive,
+  FileImage,
+  FileSpreadsheet,
+  FileStack,
+  FileText,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,6 +75,7 @@ type InboxListKey = 'messages' | 'voiceNotes' | 'dropboxFiles'
 type InboxListItem = Message | VoiceNote | DropboxFile
 
 type Tab = 'all' | 'messages' | 'voice' | 'files'
+type InboxCollection = Message[] | VoiceNote[] | DropboxFile[]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,14 +105,14 @@ function formatDuration(sec?: number | null): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
-function mimeIcon(mime: string): string {
-  if (mime.startsWith('image/')) return '🖼️'
-  if (mime === 'application/pdf') return '📄'
-  if (mime.includes('word')) return '📝'
-  if (mime.includes('excel') || mime.includes('spreadsheet')) return '📊'
-  if (mime.includes('powerpoint') || mime.includes('presentation')) return '📑'
-  if (mime.includes('zip')) return '🗜️'
-  return '📎'
+function mimeIcon(mime: string): React.ElementType {
+  if (mime.startsWith('image/')) return FileImage
+  if (mime === 'application/pdf') return FileText
+  if (mime.includes('word')) return FileText
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return FileSpreadsheet
+  if (mime.includes('powerpoint') || mime.includes('presentation')) return FileStack
+  if (mime.includes('zip')) return FileArchive
+  return File
 }
 
 function getInboxListKey(type: 'messages' | 'voice-notes' | 'dropbox'): InboxListKey {
@@ -344,6 +351,8 @@ function DropboxFileCard({
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
 }) {
+  const MimeIcon = mimeIcon(item.mimeType)
+
   return (
     <div
       className={cn(
@@ -373,7 +382,9 @@ function DropboxFileCard({
           )}
           {/* File pill */}
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-            <span className="text-xl leading-none">{mimeIcon(item.mimeType)}</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-emerald-500 shadow-sm">
+              <MimeIcon className="h-5 w-5" />
+            </span>
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-semibold text-gray-800">{item.fileName}</p>
               <p className="text-[11px] text-gray-400">{fileSize(item.fileSize)}</p>
@@ -437,7 +448,7 @@ function EmptyState({ tab }: { tab: Tab }) {
   }
   const { icon, title, sub } = map[tab]
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+    <div className="app-empty-state gap-4">
       {icon}
       <div>
         <p className="text-base font-semibold text-gray-600">{title}</p>
@@ -511,6 +522,7 @@ export default function InboxPage(): JSX.Element {
           [key]: updated,
           unreadCount: {
             ...prev.unreadCount,
+            [key]: wasUnread ? Math.max(0, prev.unreadCount[key] - 1) : prev.unreadCount[key],
             [key]: wasUnread ? Math.max(0, prev.unreadCount[key] - 1) : prev.unreadCount[key],
           },
         }
@@ -683,8 +695,19 @@ export default function InboxPage(): JSX.Element {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         {loading && !data ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-sky-500 border-t-transparent" />
+          <div className="space-y-3 py-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="app-list-skeleton">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-36 animate-pulse rounded bg-slate-200" />
+                    <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+                    <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
@@ -700,7 +723,7 @@ export default function InboxPage(): JSX.Element {
         ) : isEmpty ? (
           <EmptyState tab={activeTab} />
         ) : (
-          <div className="space-y-3 pb-24 lg:pb-6">
+          <div className="space-y-2.5 pb-24 lg:pb-6">
             {/* All tab — chronological mix */}
             {activeTab === 'all' &&
               allItems.map(({ type, item }) => {

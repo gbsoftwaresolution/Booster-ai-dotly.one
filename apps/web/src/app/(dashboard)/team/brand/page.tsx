@@ -3,8 +3,12 @@
 import type { JSX } from 'react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { Palette } from 'lucide-react'
+import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
+import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut } from '@/lib/api'
+import { hasPlanAccess } from '@/lib/billing-plans'
 
 const FONT_OPTIONS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Playfair Display', 'Lato']
 
@@ -18,6 +22,7 @@ interface BrandConfig {
 }
 
 export default function TeamBrandPage(): JSX.Element {
+  const { plan, loading: planLoading } = useBillingPlan()
   // teamId is fetched on mount from the user's first team
   const [teamId, setTeamId] = useState<string>('')
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -34,6 +39,8 @@ export default function TeamBrandPage(): JSX.Element {
 
   // Fetch the user's team on mount so we have a teamId to save against
   useEffect(() => {
+    if (planLoading || !hasPlanAccess(plan, 'BUSINESS')) return
+
     async function loadTeam() {
       try {
         const token = await getAccessToken()
@@ -63,9 +70,25 @@ export default function TeamBrandPage(): JSX.Element {
       }
     }
     void loadTeam()
-  }, [])
+  }, [plan, planLoading])
 
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  if (planLoading) {
+    return <div className="h-40 animate-pulse rounded-3xl bg-white/70" />
+  }
+
+  if (!hasPlanAccess(plan, 'BUSINESS')) {
+    return (
+      <FeatureGateCard
+        eyebrow="Coming later"
+        title="Shared team branding is coming later"
+        description="Centralized team brand controls will launch with future Business plans. Current published plans focus on individual cards and personal workflows."
+        ctaLabel="View current pricing"
+        ctaHref="/pricing"
+      />
+    )
+  }
 
   const handleSave = async () => {
     if (!teamId) return
@@ -98,11 +121,21 @@ export default function TeamBrandPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Brand Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Configure shared brand settings for all team member cards.
-        </p>
+      <div className="app-panel rounded-[30px] px-6 py-6 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
+            <Palette className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+              Team Identity
+            </p>
+            <h1 className="mt-2 text-2xl font-bold text-gray-900">Brand Settings</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Configure shared brand settings for all team member cards.
+            </p>
+          </div>
+        </div>
       </div>
 
       {loadError && (
@@ -119,7 +152,7 @@ export default function TeamBrandPage(): JSX.Element {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Brand config form */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+        <div className="app-panel rounded-[28px] p-6 space-y-5">
           {/* Logo URL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
@@ -258,7 +291,7 @@ export default function TeamBrandPage(): JSX.Element {
         </div>
 
         {/* Live preview */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="app-panel rounded-[28px] p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Live Preview</h3>
           <div
             className="rounded-xl p-6 shadow-md"

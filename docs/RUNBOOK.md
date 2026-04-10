@@ -2,29 +2,36 @@
 
 ## On-call Contacts
 
-| Role | Name | Contact |
-|------|------|---------|
-| Primary On-call | TBD | TBD |
-| Secondary On-call | TBD | TBD |
-| Engineering Lead | TBD | TBD |
-| Database Admin | TBD | TBD |
+| Role              | Name | Contact |
+| ----------------- | ---- | ------- |
+| Primary On-call   | TBD  | TBD     |
+| Secondary On-call | TBD  | TBD     |
+| Engineering Lead  | TBD  | TBD     |
+| Database Admin    | TBD  | TBD     |
 
 ---
 
 ## Service URLs
 
-| Service | URL |
-|---------|-----|
-| Web (Production) | https://dotly.one |
-| API Health | https://api.dotly.one/health |
-| Swagger Docs | https://api.dotly.one/api/docs |
-| Sentry (API errors) | https://sentry.io/organizations/dotly |
-| PostHog (Analytics) | https://app.posthog.com |
-| Railway (API hosting) | https://railway.app/project/dotly-api |
-| Vercel (Web hosting) | https://vercel.com/dotly/web |
-| Supabase (Auth/DB) | https://app.supabase.com/project/dotly |
-| Redis Cloud | https://app.redislabs.com |
-| Mailgun | https://app.mailgun.com |
+| Service               | URL                                    |
+| --------------------- | -------------------------------------- |
+| Web (Production)      | https://dotly.one                      |
+| API Health            | https://api.dotly.one/health           |
+| Swagger Docs          | https://api.dotly.one/api/docs         |
+| Sentry (API errors)   | https://sentry.io/organizations/dotly  |
+| PostHog (Analytics)   | https://app.posthog.com                |
+| Railway (API hosting) | https://railway.app/project/dotly-api  |
+| Vercel (Web hosting)  | https://vercel.com/dotly/web           |
+| Supabase (Auth/DB)    | https://app.supabase.com/project/dotly |
+| Redis Cloud           | https://app.redislabs.com              |
+| Mailgun               | https://app.mailgun.com                |
+
+---
+
+## Related Docs
+
+- `PRICING_SPEC.md` — current enforced pricing and limits
+- `PRICING_GATE_CHECKLIST.md` — required checks when pricing or feature gates change
 
 ---
 
@@ -35,6 +42,7 @@
 **Symptoms:** `/health` returns non-200 or times out, users cannot log in.
 
 **Steps:**
+
 1. Check Railway logs: `railway logs --service api`
 2. Confirm the health endpoint: `curl https://api.dotly.one/health`
 3. Check DB connectivity from Railway console
@@ -49,6 +57,7 @@
 **Symptoms:** Sentry error volume spikes > 10× baseline, user reports of 500 errors.
 
 **Steps:**
+
 1. Open Sentry dashboard, filter by `environment:production`, sort by volume
 2. Identify the top error — check stack trace and affected release
 3. If the error is from a recent deploy: initiate rollback (see Rollback Procedure below)
@@ -62,6 +71,7 @@
 **Symptoms:** `P2024 Connection pool timeout` errors in Sentry, API returning 500s.
 
 **Steps:**
+
 1. Restart the API service to flush idle connections
 2. Check PgBouncer / Supabase connection pooler status
 3. Identify slow queries via Supabase Query Performance dashboard
@@ -82,6 +92,7 @@
 **Symptoms:** Health endpoint shows `"redis": "error"`, Bull queues not processing.
 
 **Steps:**
+
 1. Check Redis Cloud dashboard for downtime or eviction
 2. The API is designed to fall back to direct DB writes — queue jobs may be delayed
 3. Verify fallback is active: check API logs for `Redis unavailable — fallback mode active`
@@ -95,6 +106,7 @@
 **Symptoms:** Users not receiving welcome/notification emails, Mailgun error logs.
 
 **Steps:**
+
 1. Check Mailgun dashboard → Logs → filter by domain `mg.dotly.one`
 2. If Mailgun is down: SES fallback should activate automatically (check `EMAIL_PROVIDER` env var)
 3. Verify SES sending limits have not been exceeded in AWS console
@@ -109,6 +121,12 @@
 
 Deployments are triggered automatically on push to `main`.
 
+Preflight:
+
+```bash
+pnpm --filter @dotly/web run verify
+```
+
 ```bash
 # Manual deploy via Vercel CLI
 vercel --prod
@@ -119,6 +137,12 @@ Vercel preview URLs are generated for every PR automatically.
 ### API (Railway)
 
 Deployments are triggered automatically when `apps/api` changes are merged to `main`.
+
+Preflight:
+
+```bash
+pnpm --filter @dotly/api run verify
+```
 
 ```bash
 # Manual deploy via Railway CLI

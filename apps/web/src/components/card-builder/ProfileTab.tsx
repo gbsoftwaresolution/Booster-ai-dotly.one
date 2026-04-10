@@ -146,7 +146,7 @@ function AvatarPicker({
 
   return (
     <>
-      <div className="flex flex-col items-center gap-3 py-2">
+      <div className="app-panel-subtle flex flex-col items-center gap-3 rounded-[28px] px-4 py-5">
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide self-start">
           Profile Photo
         </label>
@@ -160,7 +160,15 @@ function AvatarPicker({
         >
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:') ? avatarUrl : `https://${avatarUrl}`} alt={name || 'Avatar'} className="h-full w-full object-cover" />
+            <img
+              src={
+                avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:')
+                  ? avatarUrl
+                  : `https://${avatarUrl}`
+              }
+              alt={name || 'Avatar'}
+              className="h-full w-full object-cover"
+            />
           ) : (
             // Initials placeholder
             <div
@@ -336,7 +344,7 @@ export function ProfileTab({
       {/* ── Contact Sharing ── */}
       <SectionHeader label="Contact Sharing" />
 
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+      <div className="app-panel-subtle rounded-[28px] p-4 space-y-3">
         <p className="text-xs text-gray-500 leading-relaxed">
           Control who can download your vCard (contact file) from your public card page.
         </p>
@@ -359,15 +367,20 @@ export function ProfileTab({
                 vcardPolicy === 'PUBLIC' ? 'border-brand-500 bg-brand-500' : 'border-gray-300',
               )}
             >
-              {vcardPolicy === 'PUBLIC' && (
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-              )}
+              {vcardPolicy === 'PUBLIC' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
             </span>
             <div>
-              <p className={cn('text-sm font-semibold', vcardPolicy === 'PUBLIC' ? 'text-brand-700' : 'text-gray-800')}>
+              <p
+                className={cn(
+                  'text-sm font-semibold',
+                  vcardPolicy === 'PUBLIC' ? 'text-brand-700' : 'text-gray-800',
+                )}
+              >
                 Public
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">Anyone can download your contact — no sign-in required.</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Anyone can download your contact — no sign-in required.
+              </p>
             </div>
           </button>
 
@@ -385,7 +398,9 @@ export function ProfileTab({
             <span
               className={cn(
                 'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                vcardPolicy === 'MEMBERS_ONLY' ? 'border-brand-500 bg-brand-500' : 'border-gray-300',
+                vcardPolicy === 'MEMBERS_ONLY'
+                  ? 'border-brand-500 bg-brand-500'
+                  : 'border-gray-300',
               )}
             >
               {vcardPolicy === 'MEMBERS_ONLY' && (
@@ -393,10 +408,17 @@ export function ProfileTab({
               )}
             </span>
             <div>
-              <p className={cn('text-sm font-semibold', vcardPolicy === 'MEMBERS_ONLY' ? 'text-brand-700' : 'text-gray-800')}>
+              <p
+                className={cn(
+                  'text-sm font-semibold',
+                  vcardPolicy === 'MEMBERS_ONLY' ? 'text-brand-700' : 'text-gray-800',
+                )}
+              >
                 Members only
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">Only signed-in Dotly users can download your contact.</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Only signed-in Dotly users can download your contact.
+              </p>
             </div>
           </button>
         </div>

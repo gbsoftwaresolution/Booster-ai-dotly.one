@@ -123,7 +123,7 @@ const FEATURES = [
 
 export function Features() {
   return (
-    <section id="features" className="border-t border-gray-100 bg-gray-50 px-6 py-20">
+    <section id="features" className="border-t border-gray-100 bg-gray-50/45 px-6 py-20">
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-brand-500">
@@ -142,7 +142,7 @@ export function Features() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+              className="app-panel rounded-[28px] p-6 transition-shadow hover:shadow-[0_30px_70px_-38px_rgba(15,23,42,0.28)]"
             >
               <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                 {feature.icon}

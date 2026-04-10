@@ -163,9 +163,9 @@ export default function EmailSignaturePage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
+      <div className="app-panel rounded-[30px] px-6 py-6 sm:px-8">
         <h1 className="text-2xl font-bold text-gray-900">Email Signature Generator</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-gray-500">
           Generate a Gmail-compatible email signature from your Dotly card.
         </p>
       </div>
@@ -187,7 +187,7 @@ export default function EmailSignaturePage(): JSX.Element {
       </div>
 
       {cards.length === 0 && !error ? (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
+        <div className="app-empty-state">
           <Mail className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-sm text-gray-500">
             Create a card first to generate an email signature.
@@ -198,7 +198,7 @@ export default function EmailSignaturePage(): JSX.Element {
           {/* ── Controls panel ── */}
           <div className="space-y-6">
             {/* Card selector */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="app-panel rounded-[24px] p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Card</h2>
               <select
                 aria-label="Select a card for this signature"
@@ -216,7 +216,7 @@ export default function EmailSignaturePage(): JSX.Element {
             </div>
 
             {/* Style selector */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="app-panel rounded-[24px] p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Style</h2>
               <div className="space-y-2">
                 {STYLES.map((s) => (
@@ -240,7 +240,7 @@ export default function EmailSignaturePage(): JSX.Element {
             </div>
 
             {/* Options */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="app-panel rounded-[24px] p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Options</h2>
               <div className="space-y-3">
                 {(
@@ -319,7 +319,7 @@ export default function EmailSignaturePage(): JSX.Element {
           </div>
 
           {/* ── Live preview ── */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="app-panel rounded-[28px] p-6">
             <h2 className="mb-4 text-sm font-semibold text-gray-700">Preview</h2>
 
             {selectedCard ? (

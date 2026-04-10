@@ -122,7 +122,7 @@ function StatCard({
   color: string
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+    <div className="app-panel flex flex-col gap-3 rounded-[24px] p-4">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</p>
         <span className={cn('flex h-8 w-8 items-center justify-center rounded-xl', color)}>
@@ -327,7 +327,7 @@ export default function CardAnalyticsPage(): JSX.Element {
     return (
       <div className="space-y-4">
         <PageHeader id={id} />
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 py-12 text-center">
+        <div className="app-empty-state">
           <BarChart2 className="h-8 w-8 text-gray-300" aria-hidden="true" />
           <p className="text-sm text-gray-400">No analytics data yet</p>
         </div>
@@ -354,7 +354,7 @@ export default function CardAnalyticsPage(): JSX.Element {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="app-panel flex items-center justify-between rounded-[28px] px-5 py-4">
         <PageHeader id={id} />
         <button
           type="button"
@@ -375,7 +375,7 @@ export default function CardAnalyticsPage(): JSX.Element {
       <div
         role="group"
         aria-label="Date range"
-        className="flex items-center gap-1 rounded-2xl border border-gray-100 bg-white p-1 shadow-sm w-fit"
+        className="app-panel-subtle flex w-fit items-center gap-1 rounded-[20px] p-1.5"
       >
         {RANGES.map((r) => (
           <button
@@ -426,7 +426,7 @@ export default function CardAnalyticsPage(): JSX.Element {
       </div>
 
       {/* Views over time */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="app-panel rounded-[28px] p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-gray-900">Views over time</h3>
@@ -441,7 +441,7 @@ export default function CardAnalyticsPage(): JSX.Element {
 
       {/* Clicks over time */}
       {charts.clicksByDay.some((d) => d.count > 0) && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="app-panel rounded-[28px] p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Link clicks over time</h3>
@@ -458,7 +458,7 @@ export default function CardAnalyticsPage(): JSX.Element {
       {/* 2-column breakdowns */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* Device breakdown */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="app-panel rounded-[28px] p-5">
           <h3 className="mb-4 text-sm font-bold text-gray-900">Devices</h3>
           {sortedDevices.length === 0 ? (
             <p className="text-xs text-gray-300">No data yet</p>
@@ -487,7 +487,7 @@ export default function CardAnalyticsPage(): JSX.Element {
         </div>
 
         {/* Top countries */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="app-panel rounded-[28px] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Globe2 className="h-4 w-4 text-gray-300" aria-hidden="true" />
             <h3 className="text-sm font-bold text-gray-900">Countries</h3>
@@ -511,7 +511,7 @@ export default function CardAnalyticsPage(): JSX.Element {
 
         {/* Top links clicked */}
         {sortedLinks.length > 0 && (
-          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="app-panel rounded-[28px] p-5">
             <h3 className="mb-4 text-sm font-bold text-gray-900">Links clicked</h3>
             <div className="space-y-3">
               {sortedLinks.slice(0, 8).map((item) => (
@@ -529,7 +529,7 @@ export default function CardAnalyticsPage(): JSX.Element {
 
         {/* Interaction actions */}
         {sortedActions.length > 0 && (
-          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="app-panel rounded-[28px] p-5">
             <h3 className="mb-4 text-sm font-bold text-gray-900">Interaction actions</h3>
             <div className="space-y-3">
               {sortedActions.slice(0, 10).map((item) => (
@@ -547,7 +547,7 @@ export default function CardAnalyticsPage(): JSX.Element {
 
         {/* Referrers */}
         {charts.referrers.length > 0 && (
-          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="app-panel rounded-[28px] p-5">
             <h3 className="mb-4 text-sm font-bold text-gray-900">Referrers</h3>
             <div className="space-y-3">
               {charts.referrers.slice(0, 8).map((item) => (
@@ -570,7 +570,7 @@ export default function CardAnalyticsPage(): JSX.Element {
 
       {/* Empty state — no views at all */}
       {summary.totalViews === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
+        <div className="app-empty-state">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50">
             <BarChart2 className="h-6 w-6 text-gray-300" aria-hidden="true" />
           </span>
@@ -597,7 +597,7 @@ function PageHeader({ id }: { id: string }) {
     <div className="flex items-center gap-3">
       <Link
         href={`/apps/cards/${id}/edit`}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+        className="app-panel-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-white"
         aria-label="Back to editor"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />

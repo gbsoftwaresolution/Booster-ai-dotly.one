@@ -234,7 +234,7 @@ function FieldCard({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="app-panel rounded-[24px] overflow-hidden">
       {/* Header row */}
       <div className="flex items-center gap-2 px-3 py-2.5">
         {/* Drag handle (visual only) */}
@@ -265,7 +265,7 @@ function FieldCard({
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             aria-label="Move up"
           >
             <svg
@@ -284,7 +284,7 @@ function FieldCard({
             type="button"
             onClick={onMoveDown}
             disabled={index === total - 1}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             aria-label="Move down"
           >
             <svg
@@ -305,7 +305,7 @@ function FieldCard({
         <button
           type="button"
           onClick={() => setExpanded((x) => !x)}
-          className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors shrink-0"
+          className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition-colors shrink-0"
           aria-label={expanded ? 'Collapse' : 'Expand'}
         >
           <ChevronDown
@@ -320,7 +320,7 @@ function FieldCard({
         <button
           type="button"
           onClick={onDelete}
-          className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
+          className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
           aria-label="Remove field"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -495,7 +495,7 @@ export function LeadFormTab({ cardId }: LeadFormTabProps): JSX.Element {
       {/* Form settings */}
       <section>
         <SectionLabel>Form Settings</SectionLabel>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 flex flex-col gap-3 shadow-sm">
+        <div className="app-panel rounded-[28px] p-4 flex flex-col gap-3">
           <TextInput
             label="Title"
             value={form.title}
@@ -524,7 +524,7 @@ export function LeadFormTab({ cardId }: LeadFormTabProps): JSX.Element {
         </div>
 
         {form.fields.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-8 text-center">
+          <div className="app-panel-subtle rounded-[24px] border border-dashed border-gray-200 py-8 text-center">
             <p className="text-sm text-gray-400">No custom fields yet.</p>
             <p className="text-xs text-gray-300 mt-1">
               Default fields (name, email, phone) will be shown.
@@ -561,7 +561,7 @@ export function LeadFormTab({ cardId }: LeadFormTabProps): JSX.Element {
       </section>
 
       {/* Save */}
-      <div className="flex items-center gap-3">
+      <div className="app-sticky-action-bar -mx-4 mt-2 flex items-center gap-3 px-4 pt-4">
         <button
           type="button"
           onClick={() => void handleSave()}

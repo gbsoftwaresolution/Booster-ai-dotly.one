@@ -339,19 +339,15 @@ function VoiceTab({
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const blobUrlRef = useRef<string | null>(null)
   const MAX_SECONDS = 120
-
-  useEffect(() => {
-    blobUrlRef.current = blobUrl
-  }, [blobUrl])
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
-    }
-  }, [])
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    },
+    [blobUrl],
+  )
 
   async function startRecording() {
     setError('')

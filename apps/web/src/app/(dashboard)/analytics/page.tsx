@@ -87,7 +87,7 @@ function StatCard({
   color: string
 }): JSX.Element {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="app-panel flex items-center gap-4 rounded-[24px] p-4">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
         <Icon className="h-5 w-5 text-white" />
       </div>
@@ -188,7 +188,13 @@ export default function AnalyticsPage(): JSX.Element {
       const res = await fetch(`${apiBase}/contacts/export?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       })
-      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      if (!res.ok) {
+        const message = await res.text().catch(() => '')
+        if (message.includes('CSV export is available on Pro.')) {
+          throw new Error('CSV export is available on Pro. Upgrade in billing to export leads.')
+        }
+        throw new Error(`Export failed: ${res.status}`)
+      }
       // Surface truncation notice if the server capped the export
       if (res.headers.get('x-export-truncated') === 'true') {
         const count = res.headers.get('x-export-row-count') ?? '10000'
@@ -228,19 +234,19 @@ export default function AnalyticsPage(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="app-panel flex flex-wrap items-center justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="mt-1 text-sm text-gray-500">Insights into how your cards are performing.</p>
+          <p className="mt-2 text-sm text-gray-500">Insights into how your cards are performing.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="app-panel-subtle flex flex-wrap items-center gap-3 rounded-[24px] p-2">
           {/* Card selector */}
           {cards.length > 0 && (
             <select
               value={selectedCardId ?? ''}
               onChange={(e) => setSelectedCardId(e.target.value)}
               aria-label="Select card"
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="rounded-xl border border-gray-300 bg-white/85 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
               {cards.map((card) => (
                 <option key={card.id} value={card.id}>
@@ -251,7 +257,7 @@ export default function AnalyticsPage(): JSX.Element {
           )}
 
           {/* Date range picker */}
-          <div className="flex rounded-lg border border-gray-300 bg-white shadow-sm">
+          <div className="flex rounded-xl border border-gray-300 bg-white/85">
             {DATE_RANGE_OPTIONS.map((opt) => (
               <button
                 key={opt.days}
@@ -259,7 +265,7 @@ export default function AnalyticsPage(): JSX.Element {
                 onClick={() => setDateRangeDays(opt.days)}
                 aria-pressed={dateRangeDays === opt.days}
                 className={[
-                  'px-3 py-2 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg',
+                  'px-3 py-2 text-sm font-medium transition-colors first:rounded-l-xl last:rounded-r-xl',
                   dateRangeDays === opt.days
                     ? 'bg-indigo-600 text-white'
                     : 'text-gray-600 hover:bg-gray-50',
@@ -275,7 +281,7 @@ export default function AnalyticsPage(): JSX.Element {
             type="button"
             onClick={() => void loadAnalytics()}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white/85 px-3 py-2 text-sm text-gray-700 hover:bg-white disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -319,7 +325,7 @@ export default function AnalyticsPage(): JSX.Element {
 
       {/* Empty card state */}
       {cards.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
+        <div className="app-empty-state">
           <TrendingUp className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-sm text-gray-500">Create a card and share it to see analytics here.</p>
         </div>
@@ -336,7 +342,7 @@ export default function AnalyticsPage(): JSX.Element {
         analyticsData.summary.totalViews === 0 &&
         analyticsData.summary.totalClicks === 0 &&
         analyticsData.summary.totalLeads === 0 ? (
-          <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
+          <div className="app-empty-state">
             <TrendingUp className="mx-auto mb-4 h-12 w-12 text-gray-300" />
             <p className="text-sm font-medium text-gray-700">No data yet for this period</p>
             <p className="mt-1 text-sm text-gray-400">
@@ -380,7 +386,7 @@ export default function AnalyticsPage(): JSX.Element {
       ) : null}
 
       {dashboardSummary && dashboardSummary.interactionsByAction.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="app-panel rounded-[28px] p-6">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Interaction actions</h2>
           <div className="space-y-3">
             {dashboardSummary.interactionsByAction.slice(0, 10).map((item) => {
@@ -442,7 +448,7 @@ export default function AnalyticsPage(): JSX.Element {
 
             {/* Clicks over time line chart */}
             {analyticsData.charts.clicksByDay.some((d) => d.count > 0) && (
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="app-panel rounded-[28px] p-6">
                 <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks over time</h2>
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart
@@ -477,7 +483,7 @@ export default function AnalyticsPage(): JSX.Element {
             {/* Clicks by platform + Device donut */}
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Clicks by platform */}
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="app-panel rounded-[28px] p-6">
                 <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks by platform</h2>
                 {analyticsData.charts.clicksByLink.length === 0 ? (
                   <p className="py-8 text-center text-sm text-gray-400">No click data yet.</p>
@@ -514,7 +520,7 @@ export default function AnalyticsPage(): JSX.Element {
               </div>
 
               {/* Device breakdown donut */}
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="app-panel rounded-[28px] p-6">
                 <h2 className="mb-4 text-base font-semibold text-gray-900">Device breakdown</h2>
                 {analyticsData.charts.deviceBreakdown.length === 0 ? (
                   <p className="py-8 text-center text-sm text-gray-400">No device data yet.</p>
@@ -549,12 +555,14 @@ export default function AnalyticsPage(): JSX.Element {
             {/* Countries + Referrers */}
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Top countries */}
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="app-panel rounded-[26px] p-6">
                 <h2 className="mb-4 text-base font-semibold text-gray-900">Top countries</h2>
                 {analyticsData.charts.countryBreakdown.length === 0 ? (
-                  <p className="text-sm text-gray-400">No country data yet.</p>
+                  <div className="app-empty-state py-10">
+                    <p className="text-sm text-gray-400">No country data yet.</p>
+                  </div>
                 ) : (
-                  <table className="w-full text-sm">
+                  <table className="app-table">
                     <thead>
                       <tr className="text-left text-xs text-gray-500">
                         <th className="pb-2 font-medium">Country</th>
@@ -576,12 +584,14 @@ export default function AnalyticsPage(): JSX.Element {
               </div>
 
               {/* Top referrers */}
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="app-panel rounded-[26px] p-6">
                 <h2 className="mb-4 text-base font-semibold text-gray-900">Top referrers</h2>
                 {analyticsData.charts.referrers.length === 0 ? (
-                  <p className="text-sm text-gray-400">No referrer data yet.</p>
+                  <div className="app-empty-state py-10">
+                    <p className="text-sm text-gray-400">No referrer data yet.</p>
+                  </div>
                 ) : (
-                  <table className="w-full text-sm">
+                  <table className="app-table">
                     <thead>
                       <tr className="text-left text-xs text-gray-500">
                         <th className="pb-2 font-medium">Referrer</th>
@@ -616,13 +626,13 @@ export default function AnalyticsPage(): JSX.Element {
             </div>
 
             {/* Leads section */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="app-panel rounded-[26px] p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-base font-semibold text-gray-900">Leads</h2>
                 <button
                   type="button"
                   onClick={() => void exportLeadsCSV()}
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white/85 px-3 py-1.5 text-sm text-gray-700 hover:bg-white"
                 >
                   <Download className="h-4 w-4" />
                   Export CSV

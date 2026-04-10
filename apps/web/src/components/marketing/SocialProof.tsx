@@ -16,12 +16,12 @@ const LOGOS = [
 
 export function SocialProof() {
   return (
-    <section className="border-t border-gray-100 bg-gray-50 px-6 py-16">
+    <section className="border-t border-gray-100 bg-gray-50/45 px-6 py-16">
       <div className="mx-auto max-w-7xl">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {STATS.map((stat) => (
-            <div key={stat.label} className="text-center">
+            <div key={stat.label} className="app-panel rounded-[26px] px-4 py-5 text-center">
               <p className="text-4xl font-extrabold text-brand-500">{stat.value}</p>
               <p className="mt-1 text-sm text-gray-500">{stat.label}</p>
             </div>
@@ -37,7 +37,7 @@ export function SocialProof() {
             {LOGOS.map((name) => (
               <span
                 key={name}
-                className="rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-gray-400 shadow-sm"
+                className="app-panel-subtle rounded-2xl px-5 py-2.5 text-sm font-semibold text-gray-400"
               >
                 {name}
               </span>

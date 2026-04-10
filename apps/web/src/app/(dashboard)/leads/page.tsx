@@ -144,7 +144,13 @@ export default function LeadsPage(): JSX.Element {
         `${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token ?? ''}` } },
       )
-      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      if (!res.ok) {
+        const message = await res.text().catch(() => '')
+        if (message.includes('CSV export is available on Pro.')) {
+          throw new Error('CSV export is available on Pro. Upgrade in billing to export leads.')
+        }
+        throw new Error(`Export failed: ${res.status}`)
+      }
       const csv = await res.text()
       const blob = new Blob([csv], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
@@ -269,15 +275,15 @@ export default function LeadsPage(): JSX.Element {
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="app-table-shell overflow-x-auto">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-gray-100" />
+              <div key={i} className="app-list-skeleton h-14 animate-pulse" />
             ))}
           </div>
         ) : submissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="app-empty-state py-16">
             <Inbox className="mb-4 h-12 w-12 text-gray-300" />
             <p className="text-sm font-medium text-gray-700">No lead submissions yet</p>
             <p className="mt-1 text-sm text-gray-400">
@@ -285,7 +291,7 @@ export default function LeadsPage(): JSX.Element {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="app-table">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3">

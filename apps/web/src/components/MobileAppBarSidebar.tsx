@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { dashboardNavSections } from '@/components/navigation/dashboard-nav'
+import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
+import { getVisibleDashboardNavSections } from '@/components/navigation/dashboard-nav'
 import { cn } from '@/lib/cn'
 import { useSignOut } from '@/hooks/useSignOut'
 
@@ -12,6 +13,8 @@ export function MobileAppBarSidebar(): React.JSX.Element {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const { signingOut, handleSignOut } = useSignOut()
+  const { plan } = useBillingPlan()
+  const visibleSections = getVisibleDashboardNavSections(plan)
 
   useEffect(() => {
     if (!open) {
@@ -65,7 +68,11 @@ export function MobileAppBarSidebar(): React.JSX.Element {
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4">
-              <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setOpen(false)}>
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-3"
+                onClick={() => setOpen(false)}
+              >
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl"
                   style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
@@ -98,7 +105,7 @@ export function MobileAppBarSidebar(): React.JSX.Element {
             </div>
 
             <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Mobile main navigation">
-              {dashboardNavSections.map((section) => (
+              {visibleSections.map((section) => (
                 <div key={section.title} className="mb-5 last:mb-0">
                   <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
                     {section.title}

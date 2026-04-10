@@ -49,7 +49,7 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ring-2 ring-white transition-transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+        className="flex h-10 w-10 items-center justify-center rounded-[18px] text-xs font-bold text-white shadow-[0_18px_34px_-22px_rgba(14,165,233,0.75)] ring-2 ring-white/90 transition-transform hover:scale-[1.03] active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
         style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
       >
         {initial}
@@ -57,13 +57,13 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
 
       {open && (
         <div
-          className="absolute right-0 mt-2.5 w-56 origin-top-right rounded-2xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60 z-50 overflow-hidden"
+          className="app-shell-surface absolute right-0 z-50 mt-3 w-60 origin-top-right overflow-hidden rounded-[24px]"
           style={{ animation: 'avatar-menu 0.18s cubic-bezier(.32,1.2,.56,1) both' }}
         >
           {/* User info header */}
-          <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white shadow-sm"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-sm"
               style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
             >
               {initial}
@@ -75,11 +75,11 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
           </div>
 
           {/* Actions */}
-          <div className="p-1.5">
+          <div className="p-2">
             <Link
               href="/settings"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-white"
             >
               <Settings className="h-4 w-4 text-gray-400" />
               Settings
@@ -88,7 +88,7 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
               type="button"
               onClick={() => void handleSignOut()}
               disabled={signingOut}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
             >
               <LogOut className="h-4 w-4" />
               {signingOut ? 'Signing out…' : 'Sign out'}

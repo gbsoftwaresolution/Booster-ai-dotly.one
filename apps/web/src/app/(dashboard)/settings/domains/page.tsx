@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Globe, Plus } from 'lucide-react'
+import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
+import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
+import { hasPlanAccess } from '@/lib/billing-plans'
 import { getAccessToken } from '@/lib/supabase/client'
 
 interface CustomDomain {
@@ -33,6 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function DomainsPage(): JSX.Element {
+  const { plan, loading: planLoading } = useBillingPlan()
   const [domains, setDomains] = useState<CustomDomain[]>([])
   const [cards, setCards] = useState<CardOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,6 +64,7 @@ export default function DomainsPage(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    if (planLoading || !hasPlanAccess(plan, 'PRO')) return
     void fetchDomains()
     // Load user cards for the assign-to-card selector
     void (async () => {
@@ -71,7 +76,23 @@ export default function DomainsPage(): JSX.Element {
         // non-fatal — card selector will just be empty
       }
     })()
-  }, [fetchDomains])
+  }, [fetchDomains, plan, planLoading])
+
+  if (planLoading) {
+    return <div className="h-40 animate-pulse rounded-3xl bg-white/70" />
+  }
+
+  if (!hasPlanAccess(plan, 'PRO')) {
+    return (
+      <FeatureGateCard
+        eyebrow="Pro feature"
+        title="Custom domains require Pro"
+        description="Connect your own domain to a card on the Pro plan. Free and Starter keep the standard Dotly card link."
+        ctaLabel="Upgrade to Pro"
+        ctaHref="/settings/billing"
+      />
+    )
+  }
 
   async function handleAddDomain(e: React.FormEvent) {
     e.preventDefault()
@@ -140,18 +161,37 @@ export default function DomainsPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Custom Domains</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Point your own domain to your Dotly card. Add a TXT record to verify ownership, then
-          configure a CNAME to <code className="font-mono text-xs bg-gray-100 px-1 rounded">cname.dotly.one</code>.
-        </p>
+      <div className="app-panel rounded-[30px] px-6 py-6 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600">
+            <Globe className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-500/80">
+              Pro Feature
+            </p>
+            <h1 className="mt-2 text-2xl font-bold text-gray-900">Custom Domains</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Point your own domain to your Dotly card. Add a TXT record to verify ownership, then
+              configure a CNAME to{' '}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
+                cname.dotly.one
+              </code>
+              .
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Add domain form */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="app-panel rounded-[28px] p-6 sm:p-7">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Add a Domain</h2>
-        <form onSubmit={(e) => { void handleAddDomain(e) }} className="flex gap-3">
+        <form
+          onSubmit={(e) => {
+            void handleAddDomain(e)
+          }}
+          className="flex flex-col gap-3 sm:flex-row"
+        >
           <input
             type="text"
             value={domainInput}
@@ -162,8 +202,9 @@ export default function DomainsPage(): JSX.Element {
           <button
             type="submit"
             disabled={adding || !domainInput.trim()}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
           >
+            <Plus className="h-4 w-4" />
             {adding ? 'Adding...' : 'Add Domain'}
           </button>
         </form>
@@ -178,18 +219,21 @@ export default function DomainsPage(): JSX.Element {
 
       {/* Domain list */}
       {loading ? (
-        <div className="text-sm text-gray-500">Loading domains...</div>
+        <div className="app-list-skeleton rounded-[28px] text-sm text-gray-500">
+          Loading domains...
+        </div>
       ) : domains.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-400">
-          No custom domains yet. Add one above.
+        <div className="app-empty-state">
+          <Globe className="mb-4 h-10 w-10 text-slate-300" />
+          <p className="text-sm font-medium text-gray-600">No custom domains yet.</p>
+          <p className="mt-2 max-w-md text-sm text-gray-400">
+            Add a domain above to start verification and connect it to one of your cards.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
           {domains.map((domain) => (
-            <div
-              key={domain.id}
-              className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
-            >
+            <div key={domain.id} className="app-panel rounded-[28px] p-6 sm:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   {/* Domain + status */}
@@ -204,24 +248,29 @@ export default function DomainsPage(): JSX.Element {
                     </span>
                     {domain.card && (
                       <span className="text-xs text-gray-400">
-                        → /{domain.card.handle}
+                        Assigned to /{domain.card.handle}
                       </span>
                     )}
                   </div>
 
                   {/* Assign to card */}
                   <div className="mt-3 flex items-center gap-2">
-                    <label className="text-xs font-medium text-gray-500 shrink-0">Assign to card:</label>
+                    <label className="text-xs font-medium text-gray-500 shrink-0">
+                      Assign to card:
+                    </label>
                     <select
                       value={domain.card?.id ?? ''}
                       disabled={assigningId === domain.id}
-                      onChange={(e) => { void handleAssignCard(domain.id, e.target.value || null) }}
-                      className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                      onChange={(e) => {
+                        void handleAssignCard(domain.id, e.target.value || null)
+                      }}
+                      className="flex-1 rounded-xl border border-gray-300/80 bg-white/85 px-3 py-2 text-xs text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                     >
                       <option value="">— None —</option>
                       {cards.map((c) => (
                         <option key={c.id} value={c.id}>
-                          /{c.handle}{c.fields?.name ? ` (${c.fields.name})` : ''}
+                          /{c.handle}
+                          {c.fields?.name ? ` (${c.fields.name})` : ''}
                         </option>
                       ))}
                     </select>
@@ -232,7 +281,7 @@ export default function DomainsPage(): JSX.Element {
 
                   {/* TXT verification record */}
                   {domain.status !== 'ACTIVE' && (
-                    <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                    <div className="app-panel-subtle mt-4 rounded-[22px] p-4">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                         DNS Verification Record
                       </p>
@@ -257,22 +306,26 @@ export default function DomainsPage(): JSX.Element {
                 </div>
 
                 {/* Actions */}
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
                   {domain.status !== 'ACTIVE' && (
                     <button
                       type="button"
-                      onClick={() => { void handleVerify(domain.id) }}
+                      onClick={() => {
+                        void handleVerify(domain.id)
+                      }}
                       disabled={verifyingId === domain.id}
-                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
                     >
                       {verifyingId === domain.id ? 'Checking...' : 'Verify'}
                     </button>
                   )}
                   <button
                     type="button"
-                    onClick={() => { void confirmDelete(domain.id) }}
+                    onClick={() => {
+                      void confirmDelete(domain.id)
+                    }}
                     disabled={deletingId === domain.id}
-                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                   >
                     {deletingId === domain.id ? 'Removing...' : 'Remove'}
                   </button>
@@ -311,7 +364,7 @@ function ConfirmDialog({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} aria-hidden="true" />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+      <div className="app-panel fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-[28px] p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
             <AlertTriangle className="h-5 w-5 text-red-600" />

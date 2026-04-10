@@ -14,10 +14,29 @@ export function Navbar() {
   const [open, setOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <header className="sticky top-0 z-40 px-3 pt-3 sm:px-4">
+      <div className="app-shell-surface mx-auto flex max-w-7xl items-center justify-between rounded-[28px] px-5 py-4 sm:px-6">
         {/* Logo */}
-        <Link href="/" className="text-xl font-extrabold tracking-tight text-gray-900">
+        <Link
+          href="/"
+          className="flex items-center gap-3 text-xl font-extrabold tracking-tight text-gray-900"
+        >
+          <span
+            className="flex h-10 w-10 items-center justify-center rounded-[18px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.7)]"
+            style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="3.5" fill="white" />
+              <circle
+                cx="8"
+                cy="8"
+                r="6.5"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeDasharray="3 2"
+              />
+            </svg>
+          </span>
           Dotly<span className="text-brand-500">.one</span>
         </Link>
 
@@ -41,7 +60,7 @@ export function Navbar() {
           </Link>
           <Link
             href="/auth"
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+            className="rounded-2xl bg-gradient-to-b from-sky-500 to-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_22px_45px_-24px_rgba(14,165,233,0.72)] transition-all hover:-translate-y-0.5 hover:brightness-[1.03]"
           >
             Get started free
           </Link>
@@ -50,7 +69,7 @@ export function Navbar() {
         {/* Mobile hamburger */}
         <button
           type="button"
-          className="flex flex-col gap-1.5 p-1 md:hidden"
+          className="flex h-11 w-11 flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/70 bg-white/80 md:hidden"
           aria-label="Toggle menu"
           onClick={() => setOpen((o) => !o)}
         >
@@ -74,7 +93,7 @@ export function Navbar() {
 
       {/* Mobile drawer */}
       {open && (
-        <div className="border-t border-gray-100 bg-white px-6 pb-6 pt-4 md:hidden">
+        <div className="app-shell-surface mx-auto mt-2 max-w-7xl rounded-[28px] px-6 pb-6 pt-5 md:hidden">
           <nav className="mb-4 flex flex-col gap-3">
             {NAV_LINKS.map((link) => (
               <Link

@@ -221,9 +221,46 @@ export class AnalyticsService {
     throw new ForbiddenException('Authenticated user not found')
   }
 
+  private isMissingContactSourceCardColumnError(error: unknown): boolean {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2022') {
+      return false
+    }
+
+    const column =
+      error.meta && typeof error.meta === 'object' && 'column' in error.meta
+        ? String(error.meta.column)
+        : ''
+
+    return column === 'contacts.sourceCardId'
+  }
+
+  private async countLeadsForCard(
+    cardId: string,
+    createdAt?: { gte: Date; lte: Date },
+  ): Promise<number> {
+    try {
+      return await this.prisma.contact.count({
+        where: {
+          sourceCardId: cardId,
+          ...(createdAt ? { createdAt } : {}),
+        },
+      })
+    } catch (error) {
+      if (!this.isMissingContactSourceCardColumnError(error)) throw error
+
+      this.logger.warn(
+        'contacts.sourceCardId column missing; returning 0 leads for analytics until migrations are applied',
+      )
+      return 0
+    }
+  }
+
   async getSummary(cardId: string, userId: string) {
     const internalUserId = await this.resolveInternalUserId(userId)
-    const card = await this.prisma.card.findUnique({ where: { id: cardId } })
+    const card = await this.prisma.card.findUnique({
+      where: { id: cardId },
+      select: { id: true, userId: true },
+    })
     if (!card || card.userId !== internalUserId) throw new NotFoundException('Card not found')
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -267,7 +304,7 @@ export class AnalyticsService {
         GROUP BY DATE("createdAt" AT TIME ZONE 'UTC')
         ORDER BY DATE("createdAt" AT TIME ZONE 'UTC')
       `,
-      this.prisma.contact.count({ where: { sourceCardId: cardId } }),
+      this.countLeadsForCard(cardId),
     ])
 
     const countByType = new Map(eventTotals.map((r) => [r.type, r._count._all]))
@@ -298,7 +335,10 @@ export class AnalyticsService {
     },
   ) {
     const internalUserId = await this.resolveInternalUserId(userId)
-    const card = await this.prisma.card.findUnique({ where: { id: cardId } })
+    const card = await this.prisma.card.findUnique({
+      where: { id: cardId },
+      select: { id: true, userId: true },
+    })
     if (!card || card.userId !== internalUserId) throw new ForbiddenException()
 
     const where = { cardId, createdAt: { gte: params.from, lte: params.to } }
@@ -331,9 +371,7 @@ export class AnalyticsService {
         orderBy: { createdAt: 'desc' },
         take: 5000, // Cap for in-memory breakdown aggregation — totals use exactCounts below
       }),
-      this.prisma.contact.count({
-        where: { sourceCardId: cardId, createdAt: { gte: params.from, lte: params.to } },
-      }),
+      this.countLeadsForCard(cardId, { gte: params.from, lte: params.to }),
       // COUNT DISTINCT ipHash in SQL — avoids pulling thousands of hash rows
       // into application memory just to count them. Prisma doesn't have a native
       // countDistinct API, so we use $queryRaw with a parameterised query.

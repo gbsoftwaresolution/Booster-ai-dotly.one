@@ -7,3 +7,5 @@ export async function register(): Promise<void> {
     enabled: process.env.NODE_ENV === 'production',
   })
 }
+
+export const onRequestError = Sentry.captureRequestError
