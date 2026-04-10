@@ -2,8 +2,43 @@ import { getPublicApiUrl } from './public-env'
 
 const API_URL = getPublicApiUrl()
 
+export class ApiError extends Error {
+  statusCode: number
+  code?: string
+  details?: unknown
+  path?: string
+
+  constructor({
+    message,
+    statusCode,
+    code,
+    details,
+    path,
+  }: {
+    message: string
+    statusCode: number
+    code?: string
+    details?: unknown
+    path?: string
+  }) {
+    super(message)
+    this.name = 'ApiError'
+    this.statusCode = statusCode
+    this.code = code
+    this.details = details
+    this.path = path
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError
+}
+
 async function throwApiError(res: Response): Promise<never> {
   let message = `API ${res.status}`
+  let code: string | undefined
+  let details: unknown
+  let path: string | undefined
   try {
     const body = (await res.json()) as Record<string, unknown>
     const msg = body['message']
@@ -15,10 +50,20 @@ async function throwApiError(res: Response): Promise<never> {
     } else if (typeof body['error'] === 'string') {
       message = body['error']
     }
+
+    if (typeof body['code'] === 'string') code = body['code']
+    if ('details' in body) details = body['details']
+    if (typeof body['path'] === 'string') path = body['path']
   } catch {
     // ignore JSON parse failure — keep default message
   }
-  throw new Error(message)
+  throw new ApiError({
+    message,
+    statusCode: res.status,
+    code,
+    details,
+    path,
+  })
 }
 
 export async function apiGet<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {

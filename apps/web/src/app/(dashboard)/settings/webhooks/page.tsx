@@ -18,7 +18,7 @@ import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { cn } from '@/lib/cn'
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
+import { apiGet, apiPost, apiPut, apiDelete, isApiError } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDateTime } from '@/lib/tz'
@@ -520,7 +520,7 @@ export default function WebhooksPage(): JSX.Element {
       const data = await apiGet<WebhookEndpoint[]>('/webhooks', token)
       setEndpoints(data)
     } catch (e) {
-      if (e instanceof Error && (e.message.includes('403') || e.message.includes('401'))) {
+      if (isApiError(e) && (e.statusCode === 403 || e.statusCode === 401)) {
         setPermissionDenied(true)
         setPageError('You do not have permission to manage webhooks.')
       } else {

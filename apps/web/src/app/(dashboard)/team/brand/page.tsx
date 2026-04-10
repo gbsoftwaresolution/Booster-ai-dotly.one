@@ -7,8 +7,9 @@ import { Palette } from 'lucide-react'
 import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiPut } from '@/lib/api'
+import { apiGet, apiPut, isApiError } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Playfair Display', 'Lato', 'Montserrat', 'Space Grotesk']
@@ -66,7 +67,7 @@ export default function TeamBrandPage(): JSX.Element {
             (cfg['hideDotlyBranding'] as boolean | undefined) ?? prev.hideDotlyBranding,
         }))
       } catch (err) {
-        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
           setPermissionDenied(true)
           setLoadError('You do not have permission to manage team branding.')
           return
@@ -118,7 +119,7 @@ export default function TeamBrandPage(): JSX.Element {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+      if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
         setPermissionDenied(true)
         setSaveError('Only team admins can change team branding.')
         return
@@ -150,22 +151,15 @@ export default function TeamBrandPage(): JSX.Element {
       </div>
 
       {permissionDenied && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Team branding is admin-only. Ask a team admin to make these changes.
-        </div>
+        <StatusNotice
+          tone="warning"
+          message="Team branding is admin-only. Ask a team admin to make these changes."
+        />
       )}
 
-      {loadError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {loadError}
-        </div>
-      )}
+      {loadError && <StatusNotice message={loadError} />}
 
-      {saveError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {saveError}
-        </div>
-      )}
+      {saveError && <StatusNotice message={saveError} />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Brand config form */}

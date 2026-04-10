@@ -2,6 +2,25 @@ import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from
 import * as Sentry from '@sentry/node'
 import { Request, Response } from 'express'
 
+function getErrorCode(status: number): string {
+  switch (status) {
+    case HttpStatus.BAD_REQUEST:
+      return 'bad_request'
+    case HttpStatus.UNAUTHORIZED:
+      return 'unauthorized'
+    case HttpStatus.FORBIDDEN:
+      return 'forbidden'
+    case HttpStatus.NOT_FOUND:
+      return 'not_found'
+    case HttpStatus.CONFLICT:
+      return 'conflict'
+    case HttpStatus.UNPROCESSABLE_ENTITY:
+      return 'validation_error'
+    default:
+      return status >= 500 ? 'internal_error' : 'request_error'
+  }
+}
+
 @Catch()
 export class SentryExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
@@ -23,6 +42,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getResponse() : undefined
 
     let message = 'Internal server error'
+    let details: unknown = undefined
     if (exception instanceof HttpException) {
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse
@@ -34,10 +54,15 @@ export class SentryExceptionFilter implements ExceptionFilter {
         const responseMessage = (exceptionResponse as { message?: unknown }).message
         if (Array.isArray(responseMessage)) {
           message = responseMessage.join(', ')
+          details = responseMessage
         } else if (typeof responseMessage === 'string') {
           message = responseMessage
         } else {
           message = exception.message
+        }
+
+        if ('details' in exceptionResponse) {
+          details = (exceptionResponse as { details?: unknown }).details
         }
       } else {
         message = exception.message
@@ -46,6 +71,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       statusCode: status,
+      code: getErrorCode(status),
       timestamp: new Date().toISOString(),
       // F-22: Use request.path instead of request.url so query string
       // parameters (which may contain sensitive tokens or PII) are not
@@ -53,6 +79,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
       // pathname portion (e.g. "/cards/123") without query string.
       path: request.path,
       message,
+      ...(details !== undefined ? { details } : {}),
     })
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { JSX } from 'react'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { cn } from '@/lib/cn'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch } from '@/lib/api'
@@ -925,12 +926,18 @@ export default function SettingsPage(): JSX.Element {
               <p className="text-sm text-green-600">Profile saved successfully.</p>
             )}
             {profileLoadError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {profileLoadError}
-                <button type="button" onClick={() => void loadProfile()} className="ml-3 underline">
-                  Retry
-                </button>
-              </div>
+              <StatusNotice
+                message={profileLoadError}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => void loadProfile()}
+                    className="ml-3 underline"
+                  >
+                    Retry
+                  </button>
+                }
+              />
             )}
             {profileStatus === 'error' && !profileLoadError && (
               <p className="text-sm text-red-600">Failed to save profile. Please try again.</p>
@@ -956,9 +963,7 @@ export default function SettingsPage(): JSX.Element {
                 <div className="h-20 animate-pulse rounded-lg bg-gray-100" />
               </div>
             ) : billingError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {billingError}
-              </div>
+              <StatusNotice message={billingError} />
             ) : (
               <>
                 <div className="app-panel-subtle rounded-[24px] p-4 space-y-2">

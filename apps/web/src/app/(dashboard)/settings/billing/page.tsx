@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
 import { ExternalLink, ShieldCheck, Wallet } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { cn } from '@/lib/cn'
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -631,11 +632,7 @@ export default function BillingSettingsPage(): JSX.Element {
           {successMsg}
         </div>
       )}
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <StatusNotice message={error} />}
 
       {loading ? (
         <div className="app-list-skeleton rounded-[28px]">

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
+import { apiGet, apiPost, apiPatch, apiDelete, isApiError } from '@/lib/api'
 import { SelectField } from '@/components/ui/SelectField'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { ContactDetailDrawer, type ContactDetail } from '@/components/crm/ContactDetailDrawer'
@@ -214,7 +214,7 @@ export default function ContactsPage(): JSX.Element {
         setTotal(data.total)
         setPage(p)
       } catch (err) {
-        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
           setPermissionDenied(true)
           setError('You do not have permission to view contacts.')
         } else {
@@ -647,12 +647,14 @@ export default function ContactsPage(): JSX.Element {
 
       {/* Export error */}
       {exportError && (
-        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{exportError}</span>
-          <button type="button" onClick={() => setExportError(null)}>
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <StatusNotice
+          message={exportError}
+          action={
+            <button type="button" onClick={() => setExportError(null)}>
+              <X className="h-4 w-4" />
+            </button>
+          }
+        />
       )}
 
       {/* Filters row */}

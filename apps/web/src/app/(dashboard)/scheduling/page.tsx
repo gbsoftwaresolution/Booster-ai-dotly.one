@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { getPublicApiUrl } from '@/lib/public-env'
 import {
   Calendar,
@@ -521,11 +522,7 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="overflow-y-auto flex-1 space-y-4 p-5">
-            {error && (
-              <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
+            {error && <StatusNotice message={error} />}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
               <input

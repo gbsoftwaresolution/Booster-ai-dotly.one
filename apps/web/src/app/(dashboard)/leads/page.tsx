@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiDelete } from '@/lib/api'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import {
   Inbox,
   ChevronLeft,
@@ -273,7 +274,7 @@ export default function LeadsPage(): JSX.Element {
       )}
 
       {/* Error */}
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && <StatusNotice message={error} />}
 
       {/* Table */}
       <div className="app-table-shell overflow-x-auto">

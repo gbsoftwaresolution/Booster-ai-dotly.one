@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, GitBranch, Pencil, Plus, Star, Trash2, X } from 'lucide-react'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/tz'
@@ -345,11 +346,7 @@ export default function PipelinesPage(): JSX.Element {
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <StatusNotice message={error} />}
 
       {/* Loading */}
       {loading ? (

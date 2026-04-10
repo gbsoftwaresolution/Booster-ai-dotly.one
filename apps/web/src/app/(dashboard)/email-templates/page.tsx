@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/tz'
@@ -158,11 +159,7 @@ export default function EmailTemplatesPage(): JSX.Element {
         </button>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <StatusNotice message={error} />}
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -436,12 +433,8 @@ function TemplateModal({
           Save a reusable draft for future email sends.
         </p>
         {error && (
-          <div
-            id={errorId}
-            role="alert"
-            className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
-          >
-            {error}
+          <div id={errorId} className="mt-4">
+            <StatusNotice message={error} />
           </div>
         )}
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -634,8 +627,8 @@ function ConfirmDeleteDialog({
         </h2>
         <p className="mt-2 text-sm text-gray-500">{message}</p>
         {error && (
-          <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+          <div className="mt-4">
+            <StatusNotice message={error} />
           </div>
         )}
         <div className="mt-5 flex justify-end gap-2">

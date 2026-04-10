@@ -16,7 +16,7 @@ import {
   useDraggable,
 } from '@dnd-kit/core'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiPatch } from '@/lib/api'
+import { apiGet, apiPatch, isApiError } from '@/lib/api'
 import { SelectField } from '@/components/ui/SelectField'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
@@ -278,7 +278,7 @@ export default function CrmPage(): JSX.Element {
         setTruncated(data.truncated)
       }
     } catch (err) {
-      if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+      if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
         setPermissionDenied(true)
         setError('You do not have permission to view the CRM pipeline.')
       } else {
@@ -447,7 +447,7 @@ export default function CrmPage(): JSX.Element {
       )}
 
       {/* Toast */}
-      {toast && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{toast}</div>}
+      {toast && <StatusNotice message={toast} />}
 
       {/* Loading skeleton */}
       {loading ? (

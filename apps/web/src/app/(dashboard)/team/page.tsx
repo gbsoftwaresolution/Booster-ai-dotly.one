@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
+import { apiGet, apiPost, apiDelete, apiPatch, isApiError } from '@/lib/api'
 import { SelectField } from '@/components/ui/SelectField'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { hasPlanAccess } from '@/lib/billing-plans'
@@ -141,7 +141,7 @@ export default function TeamPage(): JSX.Element {
         const data = await apiGet<Team>(`/teams/${resolvedId}`, token)
         setTeam(data)
       } catch (err) {
-        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
           setPermissionDenied(true)
           setError('You do not have permission to view this team.')
         } else {
@@ -173,12 +173,9 @@ export default function TeamPage(): JSX.Element {
         }
       } catch (err) {
         // Distinguish "no team" (404) from real errors
-        if (err instanceof Error && err.message.includes('404')) {
+        if (isApiError(err) && err.statusCode === 404) {
           // No team yet — show the "Create Team" empty state (not an error)
-        } else if (
-          err instanceof Error &&
-          (err.message.includes('403') || err.message.includes('401'))
-        ) {
+        } else if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
           setPermissionDenied(true)
           setError('You do not have permission to access team management.')
         } else {

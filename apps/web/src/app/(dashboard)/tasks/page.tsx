@@ -13,6 +13,7 @@ import {
   Clock3,
 } from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { useUserTimezone } from '@/hooks/useUserLocale'
@@ -423,7 +424,7 @@ export default function TasksPage(): JSX.Element {
         </div>
       </div>
 
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && <StatusNotice message={error} />}
 
       <div className="app-panel-subtle flex flex-wrap gap-2 rounded-[24px] p-2">
         {[

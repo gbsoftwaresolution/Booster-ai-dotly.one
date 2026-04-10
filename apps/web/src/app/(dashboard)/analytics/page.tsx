@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import {
   LineChart,
   Line,
@@ -418,19 +419,18 @@ export default function AnalyticsPage(): JSX.Element {
 
       {/* Error banner */}
       {error && (
-        <div
-          role="alert"
-          className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => void loadAnalytics()}
-            className="ml-4 font-semibold underline"
-          >
-            Retry
-          </button>
-        </div>
+        <StatusNotice
+          message={error}
+          action={
+            <button
+              type="button"
+              onClick={() => void loadAnalytics()}
+              className="ml-4 font-semibold underline"
+            >
+              Retry
+            </button>
+          }
+        />
       )}
 
       {/* Empty card state */}

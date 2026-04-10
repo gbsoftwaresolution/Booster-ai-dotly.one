@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BarChart3, TrendingUp, DollarSign, Target } from 'lucide-react'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiGet } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 
@@ -236,12 +237,18 @@ export default function CrmAnalyticsPage(): JSX.Element {
       </div>
 
       {error && (
-        <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{error}</span>
-          <button type="button" onClick={() => void loadData()} className="font-semibold underline">
-            Retry
-          </button>
-        </div>
+        <StatusNotice
+          message={error}
+          action={
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="font-semibold underline"
+            >
+              Retry
+            </button>
+          }
+        />
       )}
 
       {/* ── Deal Revenue KPIs ── */}

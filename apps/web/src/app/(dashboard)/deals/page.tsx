@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { ContactDetailDrawer } from '@/components/crm/ContactDetailDrawer'
 import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/tz'
@@ -875,7 +876,7 @@ export default function DealsPage(): JSX.Element {
         </SelectField>
       </div>
 
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && <StatusNotice message={error} />}
 
       {loading ? (
         <div className="flex gap-4 overflow-x-auto pb-4">

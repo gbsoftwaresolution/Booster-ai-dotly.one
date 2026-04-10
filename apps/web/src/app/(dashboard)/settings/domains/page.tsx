@@ -6,7 +6,8 @@ import { AlertTriangle, Globe, Plus } from 'lucide-react'
 import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { SelectField } from '@/components/ui/SelectField'
-import { apiGet, apiPost, apiDelete, apiPatch } from '@/lib/api'
+import { StatusNotice } from '@/components/ui/StatusNotice'
+import { apiGet, apiPost, apiDelete, apiPatch, isApiError } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
 import { getAccessToken } from '@/lib/supabase/client'
 
@@ -62,7 +63,7 @@ export default function DomainsPage(): JSX.Element {
       const data = await apiGet<CustomDomain[]>('/custom-domains', token ?? undefined)
       setDomains(data)
     } catch (err) {
-      if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+      if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
         setPermissionDenied(true)
         setError('You do not have permission to manage custom domains.')
       } else {
@@ -83,7 +84,7 @@ export default function DomainsPage(): JSX.Element {
         const data = await apiGet<CardOption[]>('/cards', token ?? undefined)
         setCards(data)
       } catch (err) {
-        if (err instanceof Error && (err.message.includes('403') || err.message.includes('401'))) {
+        if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
           setPermissionDenied(true)
         }
         // non-fatal — card selector will just be empty
@@ -367,15 +368,12 @@ export default function DomainsPage(): JSX.Element {
 
       {/* Error */}
       {permissionDenied && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Custom domain management is not available for your current account access.
-        </div>
+        <StatusNotice
+          tone="warning"
+          message="Custom domain management is not available for your current account access."
+        />
       )}
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <StatusNotice message={error} />}
 
       {/* Domain list */}
       {loading ? (

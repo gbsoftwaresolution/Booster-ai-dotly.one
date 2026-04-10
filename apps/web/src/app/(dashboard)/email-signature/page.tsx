@@ -6,6 +6,7 @@ import DOMPurify from 'dompurify'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import { SelectField } from '@/components/ui/SelectField'
+import { StatusNotice } from '@/components/ui/StatusNotice'
 import { Copy, Check, Mail } from 'lucide-react'
 import {
   generateSignatureHtml,
@@ -171,11 +172,7 @@ export default function EmailSignaturePage(): JSX.Element {
         </p>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <StatusNotice message={error} />}
 
       {copyError && (
         <div role="alert" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">
