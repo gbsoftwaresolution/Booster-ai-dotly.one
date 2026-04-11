@@ -70,6 +70,25 @@ function ConfirmDialog({
       if (event.key === 'Escape') {
         event.preventDefault()
         onCancel()
+        return
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return
+
+      const focusableElements = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'),
+      )
+      if (focusableElements.length === 0) return
+
+      const first = focusableElements[0]
+      const last = focusableElements[focusableElements.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
       }
     }
 

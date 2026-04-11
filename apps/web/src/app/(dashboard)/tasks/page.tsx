@@ -74,6 +74,7 @@ export default function TasksPage(): JSX.Element {
   const [createDueAt, setCreateDueAt] = useState('')
   const [createSaving, setCreateSaving] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [createContactLoadError, setCreateContactLoadError] = useState<string | null>(null)
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -229,6 +230,7 @@ export default function TasksPage(): JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
+        setCreateContactLoadError(null)
         const token = await getAccessToken()
         const params = new URLSearchParams({ limit: '50' })
         if (createContactSearch.trim()) params.set('search', createContactSearch.trim())
@@ -238,7 +240,7 @@ export default function TasksPage(): JSX.Element {
         )
         setCreateContacts(data.contacts)
       } catch {
-        // silently ignore
+        setCreateContactLoadError('Could not load matching contacts. Try again.')
       }
     })()
   }, [createContactSearch, showCreate])
@@ -737,6 +739,11 @@ export default function TasksPage(): JSX.Element {
                       onChange={(e) => setCreateContactSearch(e.target.value)}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     />
+                    {createContactLoadError && (
+                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        {createContactLoadError}
+                      </p>
+                    )}
                     {createContacts.length > 0 && (
                       <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
                         {createContacts.map((c) => (
@@ -836,6 +843,25 @@ function ConfirmDialog({
       if (event.key === 'Escape') {
         event.preventDefault()
         onCancel()
+        return
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return
+
+      const focusableElements = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'),
+      )
+      if (focusableElements.length === 0) return
+
+      const first = focusableElements[0]
+      const last = focusableElements[focusableElements.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
       }
     }
 

@@ -1128,6 +1128,9 @@ export default function ContactDetailScreen() {
                 <TouchableOpacity
                   key={stage}
                   onPress={() => void handleStageChange(stage)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Set stage to ${stage}`}
+                  accessibilityState={{ selected: isActive }}
                   style={{
                     paddingHorizontal: 12,
                     paddingVertical: 6,
@@ -1246,12 +1249,22 @@ export default function ContactDetailScreen() {
                           {relativeTime(note.createdAt)}
                         </Text>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <TouchableOpacity onPress={() => handleStartEditNote(note)}>
+                          <TouchableOpacity
+                            onPress={() => handleStartEditNote(note)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit note"
+                            accessibilityHint="Opens this note for editing"
+                          >
                             <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
                               Edit
                             </Text>
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => void handleDeleteNote(note.id)}>
+                          <TouchableOpacity
+                            onPress={() => void handleDeleteNote(note.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Delete note"
+                            accessibilityHint="Deletes this note"
+                          >
                             <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
                               Delete
                             </Text>
@@ -1491,6 +1504,9 @@ export default function ContactDetailScreen() {
                       <TouchableOpacity
                         onPress={() => void handleChangeDealStage(deal)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Change stage for deal ${deal.title}`}
+                        accessibilityHint="Cycles this deal to the next stage"
                       >
                         <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
                           Stage
@@ -1500,6 +1516,9 @@ export default function ContactDetailScreen() {
                       <TouchableOpacity
                         onPress={() => handleDeleteDeal(deal.id)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete deal ${deal.title}`}
+                        accessibilityHint="Deletes this deal after confirmation"
                       >
                         <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
                           Delete

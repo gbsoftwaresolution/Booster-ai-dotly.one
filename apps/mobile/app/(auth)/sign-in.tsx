@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native'
 import { Link } from 'expo-router'
 import { supabase } from '../../lib/supabase'
@@ -29,6 +30,10 @@ export default function SignInScreen() {
       setError(signInError.message)
     }
     setLoading(false)
+  }
+
+  function handleForgotPassword() {
+    void Linking.openURL('https://dotly.one/auth?mode=reset')
   }
 
   return (
@@ -137,6 +142,23 @@ export default function SignInScreen() {
               ) : (
                 <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700' }}>Sign In</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              accessibilityRole="link"
+              accessibilityLabel="Forgot password"
+              accessibilityHint="Opens the password reset page in your browser"
+              style={{
+                alignSelf: 'center',
+                marginTop: 2,
+                paddingVertical: 6,
+                paddingHorizontal: 6,
+              }}
+            >
+              <Text style={{ color: '#0ea5e9', fontSize: 14, fontWeight: '600' }}>
+                Forgot password?
+              </Text>
             </TouchableOpacity>
           </View>
 
