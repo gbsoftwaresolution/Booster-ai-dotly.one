@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BarChart3, TrendingUp, DollarSign, Target } from 'lucide-react'
@@ -176,13 +177,13 @@ export default function CrmAnalyticsPage(): JSX.Element {
       {/* Header */}
       <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
         <div>
-          <a
+          <Link
             href="/contacts"
             className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to contacts
-          </a>
+          </Link>
           <h1 className="text-2xl font-bold text-gray-900">CRM Analytics</h1>
           <p className="mt-2 text-sm text-gray-500">
             Contact funnel performance and deal revenue metrics.

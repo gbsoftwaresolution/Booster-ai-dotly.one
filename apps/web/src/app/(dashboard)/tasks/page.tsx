@@ -57,6 +57,7 @@ function parseTaskDueAt(value: string): string | null | undefined {
 
 export default function TasksPage(): JSX.Element {
   const userTz = useUserTimezone()
+  const createContactRequestIdRef = useRef(0)
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -258,6 +259,7 @@ export default function TasksPage(): JSX.Element {
 
   // Load contacts for task creation contact picker
   useEffect(() => {
+    const requestId = ++createContactRequestIdRef.current
     void (async () => {
       try {
         setCreateContactLoadError(null)
@@ -268,8 +270,10 @@ export default function TasksPage(): JSX.Element {
           `/contacts?${params.toString()}`,
           token,
         )
+        if (createContactRequestIdRef.current !== requestId) return
         setCreateContacts(data.contacts)
       } catch {
+        if (createContactRequestIdRef.current !== requestId) return
         setCreateContactLoadError('Could not load matching contacts. Try again.')
       }
     })()

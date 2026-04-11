@@ -21,6 +21,22 @@ const LEGACY_USER_SELECT = {
 
 type LegacyUserRecord = Prisma.UserGetPayload<{ select: typeof LEGACY_USER_SELECT }>
 
+export interface MeResponse {
+  id: string
+  email: string
+  name: string | null
+  avatarUrl: string | null
+  plan: string
+  walletAddress: string | null
+  country: string | null
+  timezone: string | null
+  notifLeadCaptured: boolean | null
+  notifWeeklyDigest: boolean | null
+  notifProductUpdates: boolean | null
+  createdAt: Date
+  updatedAt: Date
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name)
@@ -180,6 +196,26 @@ export class UsersService {
     return this.sanitizeUser(await this.findUniqueCompat({ id })) as User | null
   }
 
+  async getMe(id: string): Promise<MeResponse | null> {
+    const user = await this.findById(id)
+    if (!user) return null
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      plan: user.plan,
+      walletAddress: user.walletAddress,
+      country: user.country ?? null,
+      timezone: user.timezone ?? null,
+      notifLeadCaptured: user.notifLeadCaptured ?? null,
+      notifWeeklyDigest: user.notifWeeklyDigest ?? null,
+      notifProductUpdates: user.notifProductUpdates ?? null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }
+  }
+
   async findBySupabaseId(supabaseId: string): Promise<User | null> {
     return this.sanitizeUser(await this.findUniqueCompat({ supabaseId })) as User | null
   }
@@ -188,6 +224,13 @@ export class UsersService {
     await this.prisma.user.update({
       where: { id: userId },
       data: { pushToken: token },
+    })
+  }
+
+  async clearPushToken(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pushToken: null },
     })
   }
 
@@ -243,12 +286,13 @@ export class UsersService {
       notifWeeklyDigest?: boolean
       notifProductUpdates?: boolean
     },
-  ): Promise<User> {
+  ): Promise<MeResponse | null> {
     try {
-      return await this.prisma.user.update({
+      await this.prisma.user.update({
         where: { id: userId },
         data,
       })
+      return this.getMe(userId)
     } catch (error) {
       if (!this.isMissingUserProfileColumnError(error)) throw error
 
@@ -260,15 +304,15 @@ export class UsersService {
         if (!existing) {
           throw error
         }
-        return existing
+        return this.getMe(userId)
       }
 
-      const updated = await this.prisma.user.update({
+      await this.prisma.user.update({
         where: { id: userId },
         data: legacyData,
         select: LEGACY_USER_SELECT,
       })
-      return this.withMissingProfileColumns(updated) as User
+      return this.getMe(userId)
     }
   }
 

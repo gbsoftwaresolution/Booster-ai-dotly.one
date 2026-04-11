@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import type { JSX } from 'react'
+import { AuthBoundary } from '@/components/AuthBoundary'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import './globals.css'
 
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
     <html lang="en" className={`${inter.variable} ${plusJakartaSans.variable}`}>
       <body className="min-h-screen bg-background font-sans antialiased text-gray-950">
         <PostHogProvider>{children}</PostHogProvider>
+        <AuthBoundary />
       </body>
     </html>
   )

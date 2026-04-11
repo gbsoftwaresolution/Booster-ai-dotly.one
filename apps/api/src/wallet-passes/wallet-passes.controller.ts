@@ -5,6 +5,7 @@ import type { Response } from 'express'
 import { WalletPassesService } from './wallet-passes.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Public } from '../auth/decorators/public.decorator'
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard'
 
 interface MaybeAuthUser {
   id?: string
@@ -49,7 +50,7 @@ export class WalletPassesController {
 
   @Public()
   @ApiOperation({ summary: 'Download Apple Wallet .pkpass for a published card (no auth)' })
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(ThrottlerGuard, OptionalJwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Get('public/cards/:handle/wallet/apple')
   async publicApplePass(
@@ -65,7 +66,7 @@ export class WalletPassesController {
 
   @Public()
   @ApiOperation({ summary: 'Get Google Wallet save URL for a published card (no auth)' })
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(ThrottlerGuard, OptionalJwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Get('public/cards/:handle/wallet/google')
   async publicGooglePassUrl(

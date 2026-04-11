@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { Navbar } from '@/components/marketing/Navbar'
 import { Footer } from '@/components/marketing/Footer'
 
@@ -25,8 +26,8 @@ export default function TermsPage() {
             <p>
               By creating an account or using Dotly.one (the &quot;Service&quot;), you agree to be
               bound by these Terms of Service (&quot;Terms&quot;) and our{' '}
-              <a href="/privacy">Privacy Policy</a>. If you are using the Service on behalf of an
-              organisation, you represent that you have authority to bind that organisation.
+              <Link href="/privacy">Privacy Policy</Link>. If you are using the Service on behalf of
+              an organisation, you represent that you have authority to bind that organisation.
             </p>
 
             <h2>2. Eligibility</h2>

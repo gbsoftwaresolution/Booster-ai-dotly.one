@@ -4,7 +4,16 @@ import Link from 'next/link'
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiPost, apiPatch, apiDelete, isApiError } from '@/lib/api'
+import {
+  apiGet,
+  apiPost,
+  apiPatch,
+  apiDelete,
+  apiDeleteWithBody,
+  isApiError,
+  ApiError,
+} from '@/lib/api'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { SelectField } from '@/components/ui/SelectField'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { ContactDetailDrawer, type ContactDetail } from '@/components/crm/ContactDetailDrawer'
@@ -65,6 +74,7 @@ interface ImportContactsResponse {
 
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 type Stage = (typeof STAGES)[number]
+const API_URL = getPublicApiUrl()
 
 const STAGE_BADGE: Record<Stage, string> = {
   NEW: 'bg-gray-100 text-gray-600',
@@ -222,6 +232,10 @@ export default function ContactsPage(): JSX.Element {
         if (tag) params.set('tag', tag)
         const data = await apiGet<ContactsResponse>(`/contacts?${params.toString()}`, token)
         setContacts(data.contacts)
+        setSelectedIds((prev) => {
+          const visibleIds = new Set(data.contacts.map((contact) => contact.id))
+          return new Set([...prev].filter((id) => visibleIds.has(id)))
+        })
         setTotal(data.total)
         setPage(p)
       } catch (err) {
@@ -272,17 +286,7 @@ export default function ContactsPage(): JSX.Element {
     setExportError(null)
     try {
       const token = await getAccessToken()
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/export`, {
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-      })
-      if (!res.ok) {
-        const message = await res.text().catch(() => '')
-        if (message.includes('CSV export is available on Pro.')) {
-          throw new Error('CSV export is available on Pro. Upgrade in billing to export contacts.')
-        }
-        throw new Error(`Export failed: ${res.status}`)
-      }
-      const csv = await res.text()
+      const csv = await apiGet<string>('/contacts/export', token)
       const blob = new Blob([csv], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -293,6 +297,10 @@ export default function ContactsPage(): JSX.Element {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
+      if (err instanceof ApiError && err.message.includes('CSV export is available on Pro.')) {
+        setExportError('CSV export is available on Pro. Upgrade in billing to export contacts.')
+        return
+      }
       setExportError(err instanceof Error ? err.message : 'Export failed')
     }
   }, [])
@@ -349,15 +357,7 @@ export default function ContactsPage(): JSX.Element {
       onConfirm: async () => {
         try {
           const token = await getAccessToken()
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/contacts/bulk`, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ ids: [...selectedIds] }),
-          })
-          if (!res.ok) throw new Error(`API error ${res.status}`)
+          await apiDeleteWithBody('/contacts/bulk', { ids: [...selectedIds] }, token)
           setSelectedIds(new Set())
           void loadContacts(page)
         } catch {
@@ -407,14 +407,31 @@ export default function ContactsPage(): JSX.Element {
       setConfirmDialog({
         message: 'Delete this contact? This cannot be undone.',
         onConfirm: async () => {
-          const token = await getAccessToken()
-          await apiDelete(`/contacts/${id}`, token)
-          void loadContacts(page)
+          try {
+            const token = await getAccessToken()
+            await apiDelete(`/contacts/${id}`, token)
+            void loadContacts(page)
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : 'Failed to delete contact. Please try again.',
+            )
+          }
         },
       })
     },
     [loadContacts, page],
   )
+
+  const refreshDrawerContact = useCallback(async () => {
+    if (!drawerContactId) return
+    try {
+      const token = await getAccessToken()
+      const refreshed = await apiGet<ContactRow>(`/contacts/${drawerContactId}`, token)
+      setContacts((prev) => prev.map((c) => (c.id === refreshed.id ? { ...c, ...refreshed } : c)))
+    } catch {
+      void loadContacts(page)
+    }
+  }, [drawerContactId, loadContacts, page])
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
   const visibleWithEmail = displayedContacts.filter((contact) => Boolean(contact.email)).length
@@ -1175,6 +1192,9 @@ export default function ContactsPage(): JSX.Element {
         onClose={() => setDrawerContactId(null)}
         onUpdate={(updated) => {
           setContacts((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)))
+        }}
+        onMutate={() => {
+          void refreshDrawerContact()
         }}
       />
 

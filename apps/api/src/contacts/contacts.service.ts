@@ -66,6 +66,7 @@ interface CreateContactDto {
   title?: string
   website?: string
   sourceCardId?: string
+  sourceHandle?: string
   stage?: string
   notes?: string
   tags?: string[]
@@ -327,9 +328,12 @@ export class ContactsService {
         if (dto.sourceCardId) {
           const sourceCard = await tx.card.findUnique({
             where: { id: dto.sourceCardId },
-            select: { userId: true },
+            select: { userId: true, handle: true },
           })
-          if (!sourceCard || sourceCard.userId !== userId) {
+          if (!sourceCard) {
+            throw new ForbiddenException('Invalid source card')
+          }
+          if (sourceCard.userId !== userId && sourceCard.handle !== dto.sourceHandle) {
             throw new ForbiddenException('Invalid source card')
           }
         }

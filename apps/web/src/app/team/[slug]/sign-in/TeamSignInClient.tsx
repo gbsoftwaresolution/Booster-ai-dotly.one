@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import Image from 'next/image'
 import { getAuthCallbackUrl } from '@/lib/app-url'
@@ -34,6 +34,31 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
   const brandColor = team.brandColor ?? '#0ea5e9'
   const displayName = team.brandName ?? team.name
   const teamNext = '/team'
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function verifyExistingSession() {
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      if (!token) return
+      try {
+        await apiGet(`/teams/${team.id}`, token)
+        if (!cancelled) {
+          router.push(teamNext)
+          router.refresh()
+        }
+      } catch {
+        // Leave the branded sign-in screen visible for non-members.
+      }
+    }
+
+    void verifyExistingSession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router, supabase, team.id])
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()

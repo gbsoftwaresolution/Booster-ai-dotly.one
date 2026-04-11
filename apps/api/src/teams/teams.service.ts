@@ -55,12 +55,19 @@ export class TeamsService {
   }
 
   private sanitizeTeamUsers<
-    T extends { members?: Array<{ user?: { avatarUrl?: string | null } | null }> },
+    T extends {
+      ownerUserId?: string
+      members?: Array<{ userId?: string; user?: { avatarUrl?: string | null } | null }>
+    },
   >(team: T): T {
     return {
       ...team,
       members: team.members?.map((member) => ({
         ...member,
+        isOwner:
+          'ownerUserId' in team
+            ? member.userId === (team as { ownerUserId?: string }).ownerUserId
+            : false,
         user: member.user
           ? {
               ...member.user,
@@ -161,6 +168,9 @@ export class TeamsService {
     if (!team) throw new NotFoundException('Team not found')
     const member = team.members.find((m) => m.userId === userId)
     if (!member) throw new ForbiddenException('Not a team member')
+    if (member.role !== 'ADMIN') {
+      return this.sanitizeTeamUsers({ ...team, invites: [] })
+    }
     return this.sanitizeTeamUsers(team)
   }
 
@@ -338,10 +348,19 @@ export class TeamsService {
 
   async removeMember(teamId: string, adminUserId: string, targetUserId: string) {
     return this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.findUnique({
+        where: { id: teamId },
+        select: { ownerUserId: true },
+      })
+      if (!team) throw new NotFoundException('Team not found')
+
       const admin = await tx.teamMember.findUnique({
         where: { teamId_userId: { teamId, userId: adminUserId } },
       })
       if (!admin || admin.role !== 'ADMIN') throw new ForbiddenException('Not an admin')
+      if (targetUserId === team.ownerUserId) {
+        throw new BadRequestException('The team owner cannot be removed.')
+      }
 
       const targetMember = await tx.teamMember.findUnique({
         where: { teamId_userId: { teamId, userId: targetUserId } },
@@ -370,10 +389,19 @@ export class TeamsService {
     role: 'ADMIN' | 'MEMBER',
   ) {
     return this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.findUnique({
+        where: { id: teamId },
+        select: { ownerUserId: true },
+      })
+      if (!team) throw new NotFoundException('Team not found')
+
       const admin = await tx.teamMember.findUnique({
         where: { teamId_userId: { teamId, userId: adminUserId } },
       })
       if (!admin || admin.role !== 'ADMIN') throw new ForbiddenException('Not an admin')
+      if (targetUserId === team.ownerUserId && role !== 'ADMIN') {
+        throw new BadRequestException('The team owner cannot be demoted.')
+      }
 
       if (role === 'MEMBER') {
         const targetMember = await tx.teamMember.findUnique({
@@ -420,6 +448,9 @@ export class TeamsService {
       orderBy: { joinedAt: 'asc' },
     })
     if (!membership) return null
+    if (membership.role !== 'ADMIN') {
+      return this.sanitizeTeamUsers({ ...membership.team, invites: [] })
+    }
     return this.sanitizeTeamUsers(membership.team)
   }
 

@@ -165,12 +165,12 @@ async function uploadAvatar(cardId: string, blob: Blob, mimeType: string): Promi
     reader.readAsDataURL(blob)
   })
 
-  const response = await apiPost<{ avatarUrl: string }>(
+  const response = await apiPost<{ url: string }>(
     `/cards/${cardId}/avatar`,
     { base64, mimeType },
     token,
   )
-  return response.avatarUrl
+  return response.url
 }
 
 // ─── Tiny tab button ─────────────────────────────────────────────────────────

@@ -41,6 +41,7 @@ const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?
 
 export default function DomainsPage(): JSX.Element {
   const { plan, loading: planLoading } = useBillingPlan()
+  const fetchDomainsRequestIdRef = useRef(0)
   const [domains, setDomains] = useState<CustomDomain[]>([])
   const [cards, setCards] = useState<CardOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,11 +59,14 @@ export default function DomainsPage(): JSX.Element {
   } | null>(null)
 
   const fetchDomains = useCallback(async () => {
+    const requestId = ++fetchDomainsRequestIdRef.current
     try {
       const token = await getAccessToken()
       const data = await apiGet<CustomDomain[]>('/custom-domains', token ?? undefined)
+      if (fetchDomainsRequestIdRef.current !== requestId) return
       setDomains(data)
     } catch (err) {
+      if (fetchDomainsRequestIdRef.current !== requestId) return
       if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
         setPermissionDenied(true)
         setError('You do not have permission to manage custom domains.')
@@ -140,6 +144,7 @@ export default function DomainsPage(): JSX.Element {
   }
 
   async function handleVerify(domainId: string) {
+    if (verifyingId || assigningId || deletingId) return
     setVerifyingId(domainId)
     setError('')
     try {
@@ -155,7 +160,9 @@ export default function DomainsPage(): JSX.Element {
   }
 
   async function handleAssignCard(domainId: string, cardId: string | null) {
+    if (verifyingId || assigningId || deletingId) return
     setAssigningId(domainId)
+    setError('')
     try {
       const token = await getAccessToken()
       await apiPatch(`/custom-domains/${domainId}`, { cardId }, token ?? undefined)
@@ -168,6 +175,7 @@ export default function DomainsPage(): JSX.Element {
   }
 
   async function handleDelete(domainId: string) {
+    if (verifyingId || assigningId || deletingId) return
     setDeletingId(domainId)
     setError('')
     try {
@@ -392,103 +400,113 @@ export default function DomainsPage(): JSX.Element {
         <div className="space-y-4">
           {domains.map((domain) => (
             <div key={domain.id} className="app-panel rounded-[28px] p-6 sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  {/* Domain + status */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-mono text-sm font-semibold text-gray-900">
-                      {domain.domain}
-                    </span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[domain.status] ?? ''}`}
-                    >
-                      {domain.status}
-                    </span>
-                    {domain.card && (
-                      <span className="text-xs text-gray-400">
-                        Assigned to /{domain.card.handle}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Assign to card */}
-                  <div className="mt-3 flex items-center gap-2">
-                    <label className="text-xs font-medium text-gray-500 shrink-0">
-                      Assign to card:
-                    </label>
-                    <SelectField
-                      value={domain.card?.id ?? ''}
-                      disabled={assigningId === domain.id}
-                      onChange={(e) => {
-                        void handleAssignCard(domain.id, e.target.value || null)
-                      }}
-                      className="flex-1 rounded-xl border-gray-300/80 bg-white/85 px-3 py-2.5 pr-9 text-xs focus:border-brand-500 focus:ring-brand-100"
-                    >
-                      <option value="">— None —</option>
-                      {cards.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          /{c.handle}
-                          {c.fields?.name ? ` (${c.fields.name})` : ''}
-                        </option>
-                      ))}
-                    </SelectField>
-                    {assigningId === domain.id && (
-                      <span className="text-xs text-gray-400">Saving…</span>
-                    )}
-                  </div>
-
-                  {/* TXT verification record */}
-                  {domain.status !== 'ACTIVE' && (
-                    <div className="app-panel-subtle mt-4 rounded-[22px] p-4">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        DNS Verification Record
-                      </p>
-                      <div className="space-y-1 font-mono text-xs text-gray-700">
-                        <div>
-                          <span className="text-gray-400">Type:</span> TXT
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Name:</span>{' '}
-                          <span className="select-all">_dotly-verify.{domain.domain}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Value:</span>{' '}
-                          <span className="select-all break-all">{domain.verificationToken}</span>
-                        </div>
+              {(() => {
+                const rowBusy =
+                  verifyingId === domain.id || assigningId === domain.id || deletingId === domain.id
+                const anyRowBusy =
+                  verifyingId !== null || assigningId !== null || deletingId !== null
+                return (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      {/* Domain + status */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-mono text-sm font-semibold text-gray-900">
+                          {domain.domain}
+                        </span>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[domain.status] ?? ''}`}
+                        >
+                          {domain.status}
+                        </span>
+                        {domain.card && (
+                          <span className="text-xs text-gray-400">
+                            Assigned to /{domain.card.handle}
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-2 text-xs text-gray-400">
-                        After adding the record, DNS propagation may take up to 24 hours.
-                      </p>
-                    </div>
-                  )}
-                </div>
 
-                {/* Actions */}
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {domain.status !== 'ACTIVE' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleVerify(domain.id)
-                      }}
-                      disabled={verifyingId === domain.id}
-                      className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      {verifyingId === domain.id ? 'Checking...' : 'Verify'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void confirmDelete(domain.id)
-                    }}
-                    disabled={deletingId === domain.id}
-                    className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                  >
-                    {deletingId === domain.id ? 'Removing...' : 'Remove'}
-                  </button>
-                </div>
-              </div>
+                      {/* Assign to card */}
+                      <div className="mt-3 flex items-center gap-2">
+                        <label className="text-xs font-medium text-gray-500 shrink-0">
+                          Assign to card:
+                        </label>
+                        <SelectField
+                          value={domain.card?.id ?? ''}
+                          disabled={rowBusy || anyRowBusy}
+                          onChange={(e) => {
+                            void handleAssignCard(domain.id, e.target.value || null)
+                          }}
+                          className="flex-1 rounded-xl border-gray-300/80 bg-white/85 px-3 py-2.5 pr-9 text-xs focus:border-brand-500 focus:ring-brand-100"
+                        >
+                          <option value="">— None —</option>
+                          {cards.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              /{c.handle}
+                              {c.fields?.name ? ` (${c.fields.name})` : ''}
+                            </option>
+                          ))}
+                        </SelectField>
+                        {assigningId === domain.id && (
+                          <span className="text-xs text-gray-400">Saving…</span>
+                        )}
+                      </div>
+
+                      {/* TXT verification record */}
+                      {domain.status !== 'ACTIVE' && (
+                        <div className="app-panel-subtle mt-4 rounded-[22px] p-4">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            DNS Verification Record
+                          </p>
+                          <div className="space-y-1 font-mono text-xs text-gray-700">
+                            <div>
+                              <span className="text-gray-400">Type:</span> TXT
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Name:</span>{' '}
+                              <span className="select-all">_dotly-verify.{domain.domain}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Value:</span>{' '}
+                              <span className="select-all break-all">
+                                {domain.verificationToken}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-xs text-gray-400">
+                            After adding the record, DNS propagation may take up to 24 hours.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {domain.status !== 'ACTIVE' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleVerify(domain.id)
+                          }}
+                          disabled={rowBusy || anyRowBusy}
+                          className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {verifyingId === domain.id ? 'Checking...' : 'Verify'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void confirmDelete(domain.id)
+                        }}
+                        disabled={rowBusy || anyRowBusy}
+                        className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletingId === domain.id ? 'Removing...' : 'Remove'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>

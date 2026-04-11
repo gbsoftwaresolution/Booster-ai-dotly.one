@@ -155,6 +155,9 @@ export default function TeamPage(): JSX.Element {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'ADMIN' | 'MEMBER'>('MEMBER')
   const [actionMsg, setActionMsg] = useState<string | null>(null)
+  const [creatingTeam, setCreatingTeam] = useState(false)
+  const [inviting, setInviting] = useState(false)
+  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null)
 
   const [teamId, setTeamId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -242,8 +245,14 @@ export default function TeamPage(): JSX.Element {
     if (teamId && !team) void loadTeam()
   }, [teamId, team, loadTeam])
 
+  const currentMember = currentUserId
+    ? team?.members.find((member) => member.userId === currentUserId)
+    : null
+  const canManageTeam = currentMember?.role === 'ADMIN'
+
   const handleCreate = async () => {
-    if (!newTeamName.trim()) return
+    if (!newTeamName.trim() || creatingTeam) return
+    setCreatingTeam(true)
     try {
       const token = await getAccessToken()
       const created = await apiPost<Team>('/teams', { name: newTeamName }, token)
@@ -253,11 +262,17 @@ export default function TeamPage(): JSX.Element {
       setNewTeamName('')
     } catch (err) {
       setActionMsg(err instanceof Error ? err.message : 'Failed to create team')
+    } finally {
+      setCreatingTeam(false)
     }
   }
 
   const handleInvite = async () => {
-    if (!inviteEmail.trim() || !teamId) return
+    if (!inviteEmail.trim() || !teamId || !canManageTeam || inviting) {
+      if (teamId && !canManageTeam) setActionMsg('Only admins can invite members.')
+      return
+    }
+    setInviting(true)
     try {
       const token = await getAccessToken()
       await apiPost(`/teams/${teamId}/invite`, { email: inviteEmail, role: inviteRole }, token)
@@ -267,12 +282,17 @@ export default function TeamPage(): JSX.Element {
       void loadTeam()
     } catch {
       setActionMsg('Failed to send invite')
+    } finally {
+      setInviting(false)
     }
   }
 
   const handleRemove = useCallback(
     (userId: string) => {
-      if (!teamId) return
+      if (!teamId || !canManageTeam) {
+        if (teamId && !canManageTeam) setActionMsg('Only admins can remove members.')
+        return
+      }
       setConfirmDialog({
         message: 'Remove this member from the team? This cannot be undone.',
         onConfirm: async () => {
@@ -291,23 +311,32 @@ export default function TeamPage(): JSX.Element {
         },
       })
     },
-    [teamId, loadTeam],
+    [teamId, canManageTeam, loadTeam],
   )
 
   const handleRoleChange = async (userId: string, role: 'ADMIN' | 'MEMBER') => {
-    if (!teamId) return
+    if (!teamId || !canManageTeam || roleUpdatingId !== null) {
+      if (teamId && !canManageTeam) setActionMsg('Only admins can update roles.')
+      return
+    }
+    setRoleUpdatingId(userId)
     try {
       const token = await getAccessToken()
       await apiPatch(`/teams/${teamId}/members/${userId}/role`, { role }, token)
       void loadTeam()
     } catch {
       setActionMsg('Failed to update role')
+    } finally {
+      setRoleUpdatingId(null)
     }
   }
 
   const handleResend = useCallback(
     async (invite: TeamInvite) => {
-      if (!teamId || resendState[invite.id] === 'loading') return
+      if (!teamId || !canManageTeam || resendState[invite.id] === 'loading') {
+        if (teamId && !canManageTeam) setActionMsg('Only admins can resend invites.')
+        return
+      }
       setResendState((prev) => ({ ...prev, [invite.id]: 'loading' }))
       try {
         const token = await getAccessToken()
@@ -323,13 +352,8 @@ export default function TeamPage(): JSX.Element {
         })
       }
     },
-    [teamId, resendState],
+    [teamId, canManageTeam, resendState],
   )
-
-  const currentMember = currentUserId
-    ? team?.members.find((member) => member.userId === currentUserId)
-    : null
-  const canManageTeam = currentMember?.role === 'ADMIN'
 
   if (planLoading) {
     return (
@@ -591,6 +615,7 @@ export default function TeamPage(): JSX.Element {
                       onChange={(e) =>
                         void handleRoleChange(member.userId, e.target.value as 'ADMIN' | 'MEMBER')
                       }
+                      disabled={roleUpdatingId !== null}
                       className="w-[132px] rounded-lg px-2.5 py-2 pr-8 text-sm focus:ring-brand-100"
                     >
                       <option value="MEMBER">Member</option>
@@ -692,9 +717,10 @@ export default function TeamPage(): JSX.Element {
               <button
                 type="button"
                 onClick={() => void handleCreate()}
-                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+                disabled={!newTeamName.trim() || creatingTeam}
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                Create
+                {creatingTeam ? 'Creating…' : 'Create'}
               </button>
             </div>
           </div>
@@ -742,9 +768,10 @@ export default function TeamPage(): JSX.Element {
               <button
                 type="button"
                 onClick={() => void handleInvite()}
-                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+                disabled={!inviteEmail.trim() || inviting}
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                Send Invite
+                {inviting ? 'Sending…' : 'Send Invite'}
               </button>
             </div>
           </div>

@@ -30,6 +30,28 @@ const TEMPLATES: { id: Template; label: string; description: string; color: stri
   },
 ]
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validateCardProfile(input: { email: string; website: string }): string | null {
+  if (input.email.trim() && !EMAIL_RE.test(input.email.trim())) {
+    return 'Enter a valid email address.'
+  }
+
+  if (input.website.trim()) {
+    try {
+      const normalized = /^https?:\/\//i.test(input.website.trim())
+        ? input.website.trim()
+        : `https://${input.website.trim()}`
+      const url = new URL(normalized)
+      if (!['http:', 'https:'].includes(url.protocol)) return 'Enter a valid website URL.'
+    } catch {
+      return 'Enter a valid website URL.'
+    }
+  }
+
+  return null
+}
+
 export default function CreateCardScreen() {
   const router = useRouter()
 
@@ -64,6 +86,7 @@ export default function CreateCardScreen() {
       setHandleAvailable(null)
       return
     }
+    setHandleAvailable('unknown')
     setCheckingHandle(true)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
@@ -102,6 +125,12 @@ export default function CreateCardScreen() {
   }
 
   async function handleCreate() {
+    const profileError = validateCardProfile({ email, website })
+    if (profileError) {
+      Alert.alert('Validation', profileError)
+      return
+    }
+
     setCreating(true)
     try {
       const created = (await createCard({
@@ -120,7 +149,10 @@ export default function CreateCardScreen() {
         try {
           await uploadAvatar(created.id, avatarBase64, avatarMime)
         } catch {
-          // Avatar upload failed — non-fatal
+          Alert.alert(
+            'Avatar upload failed',
+            'Your card was created, but the profile photo did not upload. You can retry from Edit Card.',
+          )
         }
       }
 
@@ -133,7 +165,10 @@ export default function CreateCardScreen() {
   }
 
   const canProceedStep0 =
-    name.trim().length > 0 && handle.trim().length > 0 && handleAvailable === true
+    name.trim().length > 0 &&
+    handle.trim().length > 0 &&
+    !checkingHandle &&
+    handleAvailable === true
 
   const STEP_TITLES = ['Basic Info', 'Template', 'Profile', 'Review & Create']
 
@@ -156,7 +191,7 @@ export default function CreateCardScreen() {
           }}
         >
           <TouchableOpacity
-            onPress={() => (step > 0 ? setStep(step - 1) : router.back())}
+            onPress={() => (step > 0 ? setStep(step - 1) : router.replace('/(tabs)'))}
             style={{ marginRight: 12, width: 28, alignItems: 'center' }}
           >
             {step > 0 ? (

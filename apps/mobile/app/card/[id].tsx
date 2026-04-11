@@ -106,7 +106,7 @@ export default function CardDetailScreen() {
           borderBottomColor: '#e2e8f0',
         }}
       >
-        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={{ marginRight: 12 }}>
           <Text style={{ color: '#0ea5e9', fontSize: 16 }}>← Back</Text>
         </TouchableOpacity>
         <Text style={{ fontSize: 17, fontWeight: '700', color: '#0f172a', flex: 1 }}>

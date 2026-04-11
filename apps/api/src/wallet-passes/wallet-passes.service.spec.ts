@@ -50,4 +50,22 @@ describe('WalletPassesService', () => {
     )
     expect(generateApplePassSpy).not.toHaveBeenCalled()
   })
+
+  it('public export allows members-only cards when request user id is present', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'card-1', vcardPolicy: 'MEMBERS_ONLY' }]),
+    } as never
+    const config = {
+      get: jest.fn().mockReturnValue('https://dotly.one'),
+    } as unknown as ConfigService
+    const service = new WalletPassesService(prisma, config)
+
+    await expect(
+      (
+        service as unknown as {
+          assertPublicExportAllowed: (handle: string, userId: string | null) => Promise<unknown>
+        }
+      ).assertPublicExportAllowed('alice', 'user_1'),
+    ).resolves.toEqual({ id: 'card-1', vcardPolicy: 'MEMBERS_ONLY' })
+  })
 })

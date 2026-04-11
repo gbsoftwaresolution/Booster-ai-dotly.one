@@ -173,6 +173,7 @@ interface CreateDealModalProps {
 function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Element {
   const modalRef = useRef<HTMLDivElement>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
+  const contactRequestIdRef = useRef(0)
   const [contacts, setContacts] = useState<ContactOption[]>([])
   const [contactSearch, setContactSearch] = useState('')
   const [selectedContactId, setSelectedContactId] = useState('')
@@ -192,6 +193,7 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
   useEffect(() => {
     previousActiveElementRef.current = document.activeElement as HTMLElement | null
 
+    const requestId = ++contactRequestIdRef.current
     void (async () => {
       try {
         const token = await getAccessToken()
@@ -201,8 +203,10 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
           `/contacts?${params.toString()}`,
           token,
         )
+        if (contactRequestIdRef.current !== requestId) return
         setContacts(data.contacts)
       } catch {
+        if (contactRequestIdRef.current !== requestId) return
         setError('Could not load matching contacts. Try again.')
       }
     })()

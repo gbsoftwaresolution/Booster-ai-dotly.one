@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native'
 import { supabase } from '../../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
+import { clearPushToken } from '../../lib/api'
 
 export default function SettingsTab() {
   const [session, setSession] = useState<Session | null>(null)
@@ -22,6 +23,7 @@ export default function SettingsTab() {
   async function handleSignOut() {
     setSigningOut(true)
     try {
+      await clearPushToken().catch(() => void 0)
       const { error } = await supabase.auth.signOut()
       if (error) throw error
     } catch (error) {

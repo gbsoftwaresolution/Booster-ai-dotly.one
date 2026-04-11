@@ -66,6 +66,7 @@ export default function CustomFieldsPage(): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [reordering, setReordering] = useState(false)
 
   const fetchFields = useCallback(async () => {
     setLoading(true)
@@ -168,6 +169,7 @@ export default function CustomFieldsPage(): JSX.Element {
   }
 
   async function handleReorder(activeId: string, overId: string) {
+    if (reordering) return
     const oldIndex = fields.findIndex((f) => f.id === activeId)
     const newIndex = fields.findIndex((f) => f.id === overId)
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
@@ -175,6 +177,7 @@ export default function CustomFieldsPage(): JSX.Element {
     const reordered = arrayMove(fields, oldIndex, newIndex)
     // Optimistic update
     setFields(reordered)
+    setReordering(true)
     try {
       const token = await getAccessToken()
       await Promise.all(
@@ -185,6 +188,8 @@ export default function CustomFieldsPage(): JSX.Element {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to reorder fields')
       await fetchFields() // revert on error
+    } finally {
+      setReordering(false)
     }
   }
 
@@ -247,6 +252,7 @@ export default function CustomFieldsPage(): JSX.Element {
         <SortableFieldList
           fields={fields}
           deletingId={deletingId}
+          reordering={reordering}
           onEdit={openEdit}
           onDelete={handleDelete}
           onReorder={handleReorder}
@@ -358,11 +364,13 @@ export default function CustomFieldsPage(): JSX.Element {
 function SortableFieldRow({
   field,
   deletingId,
+  reordering,
   onEdit,
   onDelete,
 }: {
   field: CustomField
   deletingId: string | null
+  reordering: boolean
   onEdit: (f: CustomField) => void
   onDelete: (id: string) => void
 }): JSX.Element {
@@ -386,7 +394,8 @@ function SortableFieldRow({
         type="button"
         {...listeners}
         {...attributes}
-        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 flex-shrink-0 focus:outline-none"
+        disabled={reordering || deletingId !== null}
+        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 flex-shrink-0 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         aria-label="Drag to reorder"
       >
         <GripVertical size={16} />
@@ -413,14 +422,15 @@ function SortableFieldRow({
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
           onClick={() => onEdit(field)}
-          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+          disabled={reordering || deletingId !== null}
+          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
           title="Edit"
         >
           <Pencil size={14} />
         </button>
         <button
           onClick={() => onDelete(field.id)}
-          disabled={deletingId === field.id}
+          disabled={reordering || deletingId !== null}
           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
           title="Delete"
         >
@@ -438,12 +448,14 @@ function SortableFieldRow({
 function SortableFieldList({
   fields,
   deletingId,
+  reordering,
   onEdit,
   onDelete,
   onReorder,
 }: {
   fields: CustomField[]
   deletingId: string | null
+  reordering: boolean
   onEdit: (f: CustomField) => void
   onDelete: (id: string) => void
   onReorder: (activeId: string, overId: string) => void
@@ -466,6 +478,7 @@ function SortableFieldList({
               key={field.id}
               field={field}
               deletingId={deletingId}
+              reordering={reordering}
               onEdit={onEdit}
               onDelete={onDelete}
             />

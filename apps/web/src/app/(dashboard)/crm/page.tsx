@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import type { JSX } from 'react'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { CircleDot } from 'lucide-react'
 import {
   DndContext,
@@ -206,6 +207,7 @@ function DroppableColumn({
 }
 
 export default function CrmPage(): JSX.Element {
+  const stageMoveRequestIdsRef = useRef<Record<string, number>>({})
   const [pipeline, setPipeline] = useState<PipelineData>({})
   const [truncated, setTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -333,6 +335,8 @@ export default function CrmPage(): JSX.Element {
       // Optimistic UI
       const contact = (pipeline[sourceStage] ?? []).find((c) => c.id === contactId)
       if (!contact) return
+      const requestId = (stageMoveRequestIdsRef.current[contactId] ?? 0) + 1
+      stageMoveRequestIdsRef.current[contactId] = requestId
 
       setPipeline((prev) => {
         const next = { ...prev }
@@ -348,6 +352,7 @@ export default function CrmPage(): JSX.Element {
         const token = await getToken()
         await apiPatch(`/contacts/${contactId}/stage`, { stage: targetStage }, token)
       } catch {
+        if (stageMoveRequestIdsRef.current[contactId] !== requestId) return
         // Revert
         setPipeline((prev) => {
           const next = { ...prev }
@@ -439,9 +444,9 @@ export default function CrmPage(): JSX.Element {
       {truncated && !loading && (
         <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
           Showing the first 200 contacts. Use the{' '}
-          <a href="/contacts" className="font-semibold underline">
+          <Link href="/contacts" className="font-semibold underline">
             Contacts page
-          </a>{' '}
+          </Link>{' '}
           to view and filter all contacts.
         </div>
       )}

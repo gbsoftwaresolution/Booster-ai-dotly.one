@@ -126,12 +126,59 @@ pnpm exec playwright test e2e/auth.spec.ts e2e/pricing.spec.ts e2e/scheduling-pu
 - New critical findings: NONE / LIST
 - Final verdict: GREEN / NOT GREEN
 
+## Engineering Hardening Status
+
+These items were confirmed during the repo audit and hardening pass through code tracing, implementation, and type/test verification. They reduce known launch risk, but they do not replace recorded end-to-end signoff evidence.
+
+### Confirmed Hardened
+
+- web authenticated routing and auth-boundary redirects
+- web team sign-in team-slug validation and existing-session handling
+- web contacts list/detail mutation refresh behavior
+- web contacts delete confirmations and error surfacing
+- web contacts and leads bulk-selection consistency across reload/filter changes
+- web leads bulk delete partial-failure handling
+- web team create/invite/role-change duplicate-submit protection
+- web settings notification preference cache ordering
+- web card-builder immediate-save rollback and stale late-response protection
+- web deals and tasks contact-picker stale-response protection
+- web contact drawer stale detail-load protection when switching contacts quickly
+- web contact drawer task/deal cross-action in-flight protection
+- web contact drawer enrichment polling stale-update protection
+- web contact drawer duplicate-lookup stale-response protection
+- web contact drawer custom-field same-field save protection
+- mobile contacts search/pagination stale-response protection
+- mobile deals/tasks row-level in-flight mutation protection
+- mobile contact-detail task/deal row-level in-flight mutation protection
+- mobile card create/edit validation hardening
+- api `/users/me` PATCH response alignment with GET response contract
+
+### Verified By Command
+
+- `pnpm -C apps/web exec tsc --noEmit`
+- `pnpm -C apps/mobile exec tsc --noEmit`
+- `pnpm -C apps/api exec tsc --noEmit`
+- `pnpm -C apps/api exec jest src/teams/teams.service.spec.ts src/users/users.service.spec.ts src/wallet-passes/wallet-passes.service.spec.ts`
+
+### Still Unverified For Final Signoff
+
+- recorded web runtime evidence for the critical authenticated flows listed above
+- recorded mobile runtime evidence for the critical device flows listed above
+- final manual or automated evidence for public runtime flows after the latest hardening patches
+- slow-network runtime behavior for some remaining non-audited CRUD surfaces
+
+### Residual Risks
+
+- some untouched CRUD areas outside CRM/team/settings/card-builder have not yet had the same strict runtime audit
+- some flows still prefer local optimistic state over canonical refetch after every mutation
+- release should remain `NOT GREEN` until required runtime evidence is captured
+
 ## Completed Signoff
 
-- Authenticated web runtime: PASS
-- Mobile runtime: PASS
-- Public web runtime: PASS
+- Authenticated web runtime: FAIL
+- Mobile runtime: FAIL
+- Public web runtime: FAIL
 - Backend tests: PASS
 - Typecheck: PASS
-- New critical findings: NONE
-- Final verdict: GREEN
+- New critical findings: NONE currently open from the completed audit pass
+- Final verdict: NOT GREEN

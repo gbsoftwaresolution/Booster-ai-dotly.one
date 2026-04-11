@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { api, type AnalyticsSummary } from '../../lib/api'
+import { useAuthz } from '../../components/AuthzProvider'
 
 interface CardItem {
   id: string
@@ -45,6 +46,7 @@ function StatTile({ label, value, color }: { label: string; value: number; color
 
 export default function AnalyticsTab() {
   const router = useRouter()
+  const { analyticsAllowed, loading: authzLoading } = useAuthz()
   const [cards, setCards] = useState<CardItem[]>([])
   const [analytics, setAnalytics] = useState<CardAnalytics[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,6 +94,21 @@ export default function AnalyticsTab() {
       { views: 0, clicks: 0, leads: 0 },
     )
   }, [analytics])
+
+  if (!authzLoading && !analyticsAllowed) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
+            Analytics are available on paid plans
+          </Text>
+          <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 8 }}>
+            Upgrade your plan to see engagement analytics across your cards.
+          </Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   if (loading) {
     return (

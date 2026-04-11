@@ -1050,6 +1050,7 @@ export default function SchedulingPage(): JSX.Element {
   const userTz = useUserTimezone()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const loadRequestIdRef = useRef(0)
   const [aptTypes, setAptTypes] = useState<AppointmentType[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -1068,6 +1069,8 @@ export default function SchedulingPage(): JSX.Element {
     googleEmail?: string
   } | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [deletingAppointmentTypeId, setDeletingAppointmentTypeId] = useState<string | null>(null)
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
 
   // Tab: 'types' | 'bookings'
   const [tab, setTab] = useState<'types' | 'bookings'>('types')
@@ -1083,6 +1086,7 @@ export default function SchedulingPage(): JSX.Element {
   }
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current
     setLoading(true)
     setError(null)
     try {
@@ -1099,6 +1103,7 @@ export default function SchedulingPage(): JSX.Element {
           token ?? undefined,
         ).catch(() => ({ connected: false })),
       ])
+      if (loadRequestIdRef.current !== requestId) return
       setAptTypes(types)
       setBookings(bkgs)
       setAllCards(cardsResp)
@@ -1106,8 +1111,10 @@ export default function SchedulingPage(): JSX.Element {
       if (cardsResp.length > 0 && cardsResp[0])
         setCardHandle((prev) => prev ?? cardsResp[0]?.handle ?? null)
     } catch (e) {
+      if (loadRequestIdRef.current !== requestId) return
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
+      if (loadRequestIdRef.current !== requestId) return
       setLoading(false)
     }
   }, [showAllBookings])
@@ -1140,11 +1147,23 @@ export default function SchedulingPage(): JSX.Element {
     const g = params.get('google')
     if (g === 'connected') {
       showToast('Google Calendar connected!')
-      window.history.replaceState({}, '', window.location.pathname)
+      params.delete('google')
+      const next = params.toString()
+      window.history.replaceState(
+        {},
+        '',
+        next ? `${window.location.pathname}?${next}` : window.location.pathname,
+      )
       void load()
     } else if (g === 'error') {
       showToast('Failed to connect Google Calendar', false)
-      window.history.replaceState({}, '', window.location.pathname)
+      params.delete('google')
+      const next = params.toString()
+      window.history.replaceState(
+        {},
+        '',
+        next ? `${window.location.pathname}?${next}` : window.location.pathname,
+      )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -1181,12 +1200,14 @@ export default function SchedulingPage(): JSX.Element {
   }
 
   async function handleDelete(id: string) {
+    if (deletingAppointmentTypeId) return
     if (
       !confirm(
         'Deactivate this appointment type? It will be hidden and no longer bookable. Existing bookings are preserved.',
       )
     )
       return
+    setDeletingAppointmentTypeId(id)
     try {
       const token = await getAccessToken()
       await apiDelete(`/scheduling/appointment-types/${id}`, token ?? undefined)
@@ -1194,6 +1215,8 @@ export default function SchedulingPage(): JSX.Element {
       await load()
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Error', false)
+    } finally {
+      setDeletingAppointmentTypeId(null)
     }
   }
 
@@ -1217,7 +1240,9 @@ export default function SchedulingPage(): JSX.Element {
   }
 
   async function handleCancelBooking(bookingId: string) {
+    if (cancellingBookingId) return
     if (!confirm('Cancel this booking?')) return
+    setCancellingBookingId(bookingId)
     try {
       const token = await getAccessToken()
       await apiPatch(`/scheduling/bookings/${bookingId}/cancel`, {}, token ?? undefined)
@@ -1225,6 +1250,8 @@ export default function SchedulingPage(): JSX.Element {
       await load()
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Error', false)
+    } finally {
+      setCancellingBookingId(null)
     }
   }
 
@@ -1413,6 +1440,7 @@ export default function SchedulingPage(): JSX.Element {
             ) : (
               aptTypes.map((apt) => {
                 const bookingUrl = cardHandle ? `${webUrl}/book/${cardHandle}/${apt.slug}` : null
+                const busy = deletingAppointmentTypeId === apt.id
                 return (
                   <div key={apt.id} className="app-panel rounded-[28px] p-5 sm:p-6">
                     <div className="flex items-start justify-between gap-4">
@@ -1485,14 +1513,16 @@ export default function SchedulingPage(): JSX.Element {
                         <button
                           title="Edit questions"
                           onClick={() => setQuestionsEditorFor(apt)}
-                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50"
+                          disabled={busy || deletingAppointmentTypeId !== null}
+                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 disabled:opacity-50"
                         >
                           Questions{apt.questions.length > 0 ? ` (${apt.questions.length})` : ''}
                         </button>
                         <button
                           title="Edit availability"
                           onClick={() => setAvailEditorFor(apt)}
-                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50"
+                          disabled={busy || deletingAppointmentTypeId !== null}
+                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50 disabled:opacity-50"
                         >
                           Availability
                         </button>
@@ -1502,14 +1532,16 @@ export default function SchedulingPage(): JSX.Element {
                             setEditingApt(apt)
                             setShowAptForm(true)
                           }}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-sky-600"
+                          disabled={busy || deletingAppointmentTypeId !== null}
+                          className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-sky-600 disabled:opacity-50"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           title="Delete"
                           onClick={() => void handleDelete(apt.id)}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                          disabled={busy || deletingAppointmentTypeId !== null}
+                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1572,41 +1604,45 @@ export default function SchedulingPage(): JSX.Element {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100/80">
-                    {bookings.map((b) => (
-                      <tr key={b.id} className="transition hover:bg-white/65">
-                        <td>
-                          <div className="font-medium text-gray-900">{b.guestName}</div>
-                          <div className="text-gray-400">{b.guestEmail}</div>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                              style={{ background: b.appointmentType.color }}
-                            />
-                            {b.appointmentType.name}
-                          </div>
-                        </td>
-                        <td className="text-gray-600">{formatDateTimeFull(b.startAt, userTz)}</td>
-                        <td>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[b.status] ?? ''}`}
-                          >
-                            {b.status}
-                          </span>
-                        </td>
-                        <td>
-                          {b.status !== 'CANCELLED' && (
-                            <button
-                              onClick={() => void handleCancelBooking(b.id)}
-                              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50"
+                    {bookings.map((b) => {
+                      const busy = cancellingBookingId === b.id
+                      return (
+                        <tr key={b.id} className="transition hover:bg-white/65">
+                          <td>
+                            <div className="font-medium text-gray-900">{b.guestName}</div>
+                            <div className="text-gray-400">{b.guestEmail}</div>
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                                style={{ background: b.appointmentType.color }}
+                              />
+                              {b.appointmentType.name}
+                            </div>
+                          </td>
+                          <td className="text-gray-600">{formatDateTimeFull(b.startAt, userTz)}</td>
+                          <td>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[b.status] ?? ''}`}
                             >
-                              Cancel
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                              {b.status}
+                            </span>
+                          </td>
+                          <td>
+                            {b.status !== 'CANCELLED' && (
+                              <button
+                                disabled={busy || cancellingBookingId !== null}
+                                onClick={() => void handleCancelBooking(b.id)}
+                                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                {busy ? 'Cancelling...' : 'Cancel'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )}

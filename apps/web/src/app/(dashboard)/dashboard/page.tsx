@@ -43,11 +43,10 @@ interface AnalyticsSummary {
 
 interface ContactRow {
   id: string
-  firstName: string
-  lastName: string
-  email: string
+  name: string
+  email?: string | null
   phone?: string
-  crmStage?: string
+  crmPipeline?: { stage: string } | null
   createdAt: string
 }
 
@@ -66,7 +65,7 @@ interface Deal {
   stage: string
   closeDate?: string
   probability?: number
-  contact?: { firstName: string; lastName: string }
+  contact?: { name?: string | null }
 }
 
 interface TaskItem {
@@ -74,7 +73,7 @@ interface TaskItem {
   title: string
   dueAt?: string
   completed: boolean
-  contact?: { firstName: string; lastName: string }
+  contact?: { name?: string | null }
 }
 
 interface FunnelStage {
@@ -89,8 +88,8 @@ interface CrmFunnel {
 
 interface AppointmentType {
   id: string
-  title: string
-  durationMinutes: number
+  name: string
+  durationMins: number
   isActive: boolean
 }
 
@@ -672,19 +671,17 @@ export default function DashboardPage(): JSX.Element {
                     className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">
-                        {c.firstName} {c.lastName}
-                      </p>
+                      <p className="truncate text-sm font-semibold text-gray-900">{c.name}</p>
                       {c.email && <p className="truncate text-xs text-gray-400">{c.email}</p>}
                     </div>
-                    {c.crmStage && (
+                    {c.crmPipeline?.stage && (
                       <span
                         className={cn(
                           'ml-3 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                          STAGE_COLORS[c.crmStage] ?? 'bg-gray-100 text-gray-500',
+                          STAGE_COLORS[c.crmPipeline.stage] ?? 'bg-gray-100 text-gray-500',
                         )}
                       >
-                        {c.crmStage}
+                        {c.crmPipeline.stage}
                       </span>
                     )}
                   </Link>
@@ -732,7 +729,7 @@ export default function DashboardPage(): JSX.Element {
                         <p className="truncate text-sm font-semibold text-gray-900">{task.title}</p>
                         {task.contact && (
                           <p className="text-xs text-gray-400">
-                            {task.contact.firstName} {task.contact.lastName}
+                            {task.contact.name ?? 'Unknown contact'}
                           </p>
                         )}
                       </div>
@@ -786,7 +783,7 @@ export default function DashboardPage(): JSX.Element {
                       <p className="truncate text-sm font-semibold text-gray-900">{deal.title}</p>
                       {deal.contact && (
                         <p className="text-xs text-gray-400">
-                          {deal.contact.firstName} {deal.contact.lastName}
+                          {deal.contact.name ?? 'Unknown contact'}
                         </p>
                       )}
                     </div>
@@ -902,9 +899,9 @@ export default function DashboardPage(): JSX.Element {
                   >
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 shrink-0 text-brand-400" />
-                      <span className="text-sm font-semibold text-gray-900">{at.title}</span>
+                      <span className="text-sm font-semibold text-gray-900">{at.name}</span>
                     </div>
-                    <span className="text-xs text-gray-400">{at.durationMinutes} min</span>
+                    <span className="text-xs text-gray-400">{at.durationMins} min</span>
                   </Link>
                 ))}
               </div>

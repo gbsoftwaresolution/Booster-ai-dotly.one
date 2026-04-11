@@ -77,6 +77,24 @@ export default function ScanResultScreen() {
   const [cardContextResolved, setCardContextResolved] = useState(false)
 
   useEffect(() => {
+    setName(sanitizeParam(params.name, 100))
+    setEmail(sanitizeParam(params.email, 254))
+    setPhone(sanitizeParam(params.phone, 30))
+    setCompany(sanitizeParam(params.company, 100))
+    setTitle(sanitizeParam(params.title, 100))
+    setWebsite(sanitizeParam(params.website, 500))
+    setAddress(sanitizeParam(params.address, 300))
+  }, [
+    params.address,
+    params.company,
+    params.email,
+    params.name,
+    params.phone,
+    params.title,
+    params.website,
+  ])
+
+  useEffect(() => {
     api
       .getCards()
       .then((cards: unknown[]) => {
@@ -174,7 +192,7 @@ export default function ScanResultScreen() {
         address: trimmedAddress || null,
       })
       Alert.alert('Contact saved', `${trimmedName} has been added to your contacts.`, [
-        { text: 'OK', onPress: () => router.back() },
+        { text: 'OK', onPress: () => router.replace('/contacts') },
       ])
     } catch (err) {
       Alert.alert('Save failed', err instanceof Error ? err.message : 'Something went wrong')
@@ -191,7 +209,7 @@ export default function ScanResultScreen() {
       <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
+          <TouchableOpacity onPress={() => router.replace('/contacts')} style={{ marginRight: 12 }}>
             <Text style={{ color: '#0ea5e9', fontSize: 16 }}>Cancel</Text>
           </TouchableOpacity>
           <Text style={{ flex: 1, fontSize: 20, fontWeight: '800', color: '#0f172a' }}>

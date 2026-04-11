@@ -30,14 +30,13 @@ export function BillingPlanProvider({ children }: { children: ReactNode }) {
     try {
       const token = await getAccessToken()
       if (!token) {
-        setPlan('FREE')
         return
       }
 
       const billing = await apiGet<BillingResponse>('/billing', token)
       setPlan(normalizePlan(billing?.user?.plan ?? billing?.plan))
     } catch {
-      setPlan('FREE')
+      // Preserve the last known plan on transient auth/network failures.
     } finally {
       setLoading(false)
     }

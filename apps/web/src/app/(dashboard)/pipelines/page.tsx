@@ -61,6 +61,8 @@ export default function PipelinesPage(): JSX.Element {
   const [isDefault, setIsDefault] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [defaultingId, setDefaultingId] = useState<string | null>(null)
 
   const fetchPipelines = useCallback(async () => {
     setLoading(true)
@@ -183,28 +185,36 @@ export default function PipelinesPage(): JSX.Element {
   }
 
   const handleDelete = async (pipeline: Pipeline) => {
+    if (deletingId || defaultingId) return
     if (
       !window.confirm(
         `Delete pipeline "${pipeline.name}"? Contacts in this pipeline will be unassigned.`,
       )
     )
       return
+    setDeletingId(pipeline.id)
     try {
       const token = await getAccessToken()
       await apiDelete(`/pipelines/${pipeline.id}`, token)
       await fetchPipelines()
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to delete pipeline')
+    } finally {
+      setDeletingId(null)
     }
   }
 
   const handleSetDefault = async (pipeline: Pipeline) => {
+    if (deletingId || defaultingId) return
+    setDefaultingId(pipeline.id)
     try {
       const token = await getAccessToken()
       await apiPatch(`/pipelines/${pipeline.id}`, { isDefault: true }, token)
       await fetchPipelines()
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to set default pipeline')
+    } finally {
+      setDefaultingId(null)
     }
   }
 
@@ -361,63 +371,73 @@ export default function PipelinesPage(): JSX.Element {
         <div className="space-y-4">
           {pipelines.map((pipeline) => (
             <div key={pipeline.id} className="app-panel rounded-[24px] p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="truncate text-base font-bold text-gray-900">{pipeline.name}</h2>
-                    {pipeline.isDefault && (
-                      <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        <Star className="h-3 w-3" /> Default
-                      </span>
-                    )}
-                  </div>
-                  {/* Stage chips with colors */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {pipeline.stages.map((stage, idx) => {
-                      const color = pipeline.stageColors?.[stage] ?? '#6366f1'
-                      return (
-                        <div key={stage} className="flex items-center gap-1">
-                          <span
-                            className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
-                            style={{ backgroundColor: color }}
-                          >
-                            {stage}
+              {(() => {
+                const rowBusy = deletingId === pipeline.id || defaultingId === pipeline.id
+                return (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h2 className="truncate text-base font-bold text-gray-900">
+                          {pipeline.name}
+                        </h2>
+                        {pipeline.isDefault && (
+                          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                            <Star className="h-3 w-3" /> Default
                           </span>
-                          {idx < pipeline.stages.length - 1 && (
-                            <span className="text-xs text-gray-300">→</span>
-                          )}
-                        </div>
-                      )
-                    })}
+                        )}
+                      </div>
+                      {/* Stage chips with colors */}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {pipeline.stages.map((stage, idx) => {
+                          const color = pipeline.stageColors?.[stage] ?? '#6366f1'
+                          return (
+                            <div key={stage} className="flex items-center gap-1">
+                              <span
+                                className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+                                style={{ backgroundColor: color }}
+                              >
+                                {stage}
+                              </span>
+                              {idx < pipeline.stages.length - 1 && (
+                                <span className="text-xs text-gray-300">→</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-400">
+                        Created {formatDate(pipeline.createdAt, userTz)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!pipeline.isDefault && (
+                        <button
+                          onClick={() => void handleSetDefault(pipeline)}
+                          disabled={rowBusy || deletingId !== null || defaultingId !== null}
+                          title="Set as default"
+                          className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-amber-50 hover:text-amber-500 disabled:opacity-50"
+                        >
+                          <Star className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openEdit(pipeline)}
+                        disabled={rowBusy || deletingId !== null || defaultingId !== null}
+                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-sky-50 hover:text-sky-600 disabled:opacity-50"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => void handleDelete(pipeline)}
+                        disabled={rowBusy || deletingId !== null || defaultingId !== null}
+                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">
-                    Created {formatDate(pipeline.createdAt, userTz)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {!pipeline.isDefault && (
-                    <button
-                      onClick={() => void handleSetDefault(pipeline)}
-                      title="Set as default"
-                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-amber-50 hover:text-amber-500"
-                    >
-                      <Star className="h-4 w-4" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => openEdit(pipeline)}
-                    className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-sky-50 hover:text-sky-600"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => void handleDelete(pipeline)}
-                    className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+                )
+              })()}
             </div>
           ))}
         </div>

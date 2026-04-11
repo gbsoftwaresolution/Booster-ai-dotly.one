@@ -96,6 +96,18 @@ export default function TeamBrandPage(): JSX.Element {
     )
   }
 
+  if (permissionDenied) {
+    return (
+      <FeatureGateCard
+        eyebrow="Admins only"
+        title="Only team admins can change branding"
+        description="Ask a team admin to update shared branding for this workspace."
+        ctaLabel="Back to team"
+        ctaHref="/team"
+      />
+    )
+  }
+
   const handleSave = async () => {
     if (!teamId) return
     setSaving(true)

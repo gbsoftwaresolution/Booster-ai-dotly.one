@@ -19,6 +19,15 @@ import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 import { ScanCardButton } from '../../components/ScanCardButton'
 
+function isPlanRestrictedError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return (
+    normalized.includes('pro and above') ||
+    normalized.includes('upgrade your plan') ||
+    normalized.includes('available on pro')
+  )
+}
+
 interface CrmPipeline {
   stage: string
 }
@@ -393,13 +402,17 @@ export default function ContactsTab() {
   // M6: Debounced server-side search — search is sent to the API,
   // not filtered client-side, so it works across all pages.
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestSearchRef = useRef('')
+  const contactsRequestIdRef = useRef(0)
 
   const fetchContacts = useCallback(
     async (reset = false, currentPage?: number, searchQuery?: string) => {
+      const requestId = ++contactsRequestIdRef.current
       try {
         const pageToFetch = reset ? 1 : (currentPage ?? 1)
-        const q = searchQuery !== undefined ? searchQuery : search
+        const q = searchQuery !== undefined ? searchQuery : latestSearchRef.current
         const data = await api.getContacts(pageToFetch, 50, q)
+        if (contactsRequestIdRef.current !== requestId) return
         const nextContacts = data.contacts as Contact[]
         if (reset) {
           setContacts(nextContacts)
@@ -412,23 +425,30 @@ export default function ContactsTab() {
         setPlanError(false)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('403')) {
+        if (isPlanRestrictedError(msg)) {
           setPlanError(true)
         } else {
           setFetchError(msg || 'Failed to load contacts')
         }
       } finally {
+        if (contactsRequestIdRef.current !== requestId) return
         setLoading(false)
         setRefreshing(false)
         setLoadingMore(false)
       }
     },
-    [search],
+    [],
   )
 
   useEffect(() => {
     void fetchContacts(true)
   }, [fetchContacts])
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -465,6 +485,7 @@ export default function ContactsTab() {
   // M6: Server-side search with 350ms debounce
   const handleSearchChange = (text: string) => {
     setSearch(text)
+    latestSearchRef.current = text
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
     searchDebounceRef.current = setTimeout(() => {
       setLoading(true)

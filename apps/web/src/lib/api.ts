@@ -66,6 +66,18 @@ async function throwApiError(res: Response): Promise<never> {
   })
 }
 
+async function parseApiSuccess<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T
+
+  const contentType = res.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    return res.json() as Promise<T>
+  }
+
+  const text = await res.text()
+  return text as T
+}
+
 export async function apiGet<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -73,7 +85,7 @@ export async function apiGet<T>(path: string, token?: string, signal?: AbortSign
     signal,
   })
   if (!res.ok) return throwApiError(res)
-  return res.json() as Promise<T>
+  return parseApiSuccess<T>(res)
 }
 
 export async function apiPost<T>(
@@ -92,7 +104,7 @@ export async function apiPost<T>(
     signal,
   })
   if (!res.ok) return throwApiError(res)
-  return res.json() as Promise<T>
+  return parseApiSuccess<T>(res)
 }
 
 export async function apiPut<T>(path: string, body: unknown, token?: string): Promise<T> {
@@ -105,7 +117,7 @@ export async function apiPut<T>(path: string, body: unknown, token?: string): Pr
     body: JSON.stringify(body),
   })
   if (!res.ok) return throwApiError(res)
-  return res.json() as Promise<T>
+  return parseApiSuccess<T>(res)
 }
 
 export async function apiPatch<T>(path: string, body: unknown, token?: string): Promise<T> {
@@ -118,7 +130,7 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
     body: JSON.stringify(body),
   })
   if (!res.ok) return throwApiError(res)
-  return res.json() as Promise<T>
+  return parseApiSuccess<T>(res)
 }
 
 export async function apiDelete<T = void>(
@@ -132,7 +144,24 @@ export async function apiDelete<T = void>(
     signal,
   })
   if (!res.ok) return throwApiError(res)
-  // 204 No Content — no body to parse
-  if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  return parseApiSuccess<T>(res)
+}
+
+export async function apiDeleteWithBody<T = void>(
+  path: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok) return throwApiError(res)
+  return parseApiSuccess<T>(res)
 }

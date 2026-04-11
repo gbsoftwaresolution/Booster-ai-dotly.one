@@ -120,6 +120,14 @@ function validateEditableContact(input: {
   return null
 }
 
+function normalizeDateOnlyInput(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const parsed = new Date(`${trimmed}T00:00:00.000Z`)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed.toISOString()
+}
+
 function openEmail(email: string) {
   if (!EMAIL_RE.test(email)) {
     Alert.alert('Invalid email', 'This email address does not appear to be valid.')
@@ -477,12 +485,14 @@ export default function ContactDetailScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueAt, setNewTaskDueAt] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
+  const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set())
 
   // Deals state
   const [deals, setDeals] = useState<ContactDeal[]>([])
   const [newDealTitle, setNewDealTitle] = useState('')
   const [newDealValue, setNewDealValue] = useState('')
   const [dealSaving, setDealSaving] = useState(false)
+  const [busyDealIds, setBusyDealIds] = useState<Set<string>>(new Set())
 
   // Custom fields state
   const [customFields, setCustomFields] = useState<
@@ -516,6 +526,29 @@ export default function ContactDetailScreen() {
   const [deleting, setDeleting] = useState(false)
   const [userTz, setUserTz] = useState<string | null>(null)
 
+  const reloadContact = useCallback(async () => {
+    if (!id) return
+    const [data, notesData, tasksData, dealsData] = await Promise.all([
+      api.getContact(id),
+      api.getContactNotes(id),
+      api.getContactTasks(id),
+      api.getDeals(id),
+    ])
+
+    const contactData = data as ContactDetail
+    setContact(contactData)
+    setNotes(notesData as ContactNote[])
+    setTasks(tasksData as ContactTask[])
+    setDeals(dealsData as ContactDeal[])
+    const cfv: Record<string, string> = {}
+    for (const cfVal of (
+      contactData as { customFieldValues?: { fieldId: string; value: string }[] }
+    ).customFieldValues ?? []) {
+      cfv[cfVal.fieldId] = cfVal.value
+    }
+    setCustomFieldValues(cfv)
+  }, [id])
+
   useEffect(() => {
     if (!id) return
     void (async () => {
@@ -529,7 +562,7 @@ export default function ContactDetailScreen() {
           pipelinesData,
           templatesData,
           tz,
-        ] = await Promise.all([
+        ] = await Promise.allSettled([
           api.getContact(id),
           api.getContactNotes(id),
           api.getContactTasks(id),
@@ -539,23 +572,36 @@ export default function ContactDetailScreen() {
           api.getEmailTemplates(),
           getUserTimezone(),
         ])
-        const contactData = data as ContactDetail
+
+        if (data.status !== 'fulfilled') {
+          throw data.reason
+        }
+
+        const contactData = data.value as ContactDetail
         setContact(contactData)
-        setNotes(notesData as ContactNote[])
-        setTasks(tasksData as ContactTask[])
-        setDeals(dealsData as ContactDeal[])
-        setUserTz(tz)
+        setNotes(notesData.status === 'fulfilled' ? (notesData.value as ContactNote[]) : [])
+        setTasks(tasksData.status === 'fulfilled' ? (tasksData.value as ContactTask[]) : [])
+        setDeals(dealsData.status === 'fulfilled' ? (dealsData.value as ContactDeal[]) : [])
+        setUserTz(tz.status === 'fulfilled' ? tz.value : 'UTC')
         setCustomFields(
-          fieldsData as {
-            id: string
-            label: string
-            fieldType: string
-            options: string[] | null
-          }[],
+          fieldsData.status === 'fulfilled'
+            ? (fieldsData.value as {
+                id: string
+                label: string
+                fieldType: string
+                options: string[] | null
+              }[])
+            : [],
         )
-        setPipelines(pipelinesData as { id: string; name: string; isDefault: boolean }[])
+        setPipelines(
+          pipelinesData.status === 'fulfilled'
+            ? (pipelinesData.value as { id: string; name: string; isDefault: boolean }[])
+            : [],
+        )
         setEmailTemplates(
-          templatesData as { id: string; name: string; subject: string; body: string }[],
+          templatesData.status === 'fulfilled'
+            ? (templatesData.value as { id: string; name: string; subject: string; body: string }[])
+            : [],
         )
         // Build initial custom field values map from contact
         const cfv: Record<string, string> = {}
@@ -578,7 +624,7 @@ export default function ContactDetailScreen() {
     setStageLoading(true)
     try {
       await api.updateContactStage(id, stage)
-      setContact((prev) => (prev ? { ...prev, crmPipeline: { ...prev.crmPipeline, stage } } : prev))
+      await reloadContact()
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update contact stage')
     } finally {
@@ -600,7 +646,7 @@ export default function ContactDetailScreen() {
             setDeleting(true)
             try {
               await api.deleteContact(id)
-              router.back()
+              router.replace('/contacts')
             } catch (err: unknown) {
               Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete contact')
               setDeleting(false)
@@ -630,14 +676,23 @@ export default function ContactDetailScreen() {
   const handleDeleteNote = useCallback(
     async (noteId: string) => {
       if (!id) return
-      try {
-        await api.deleteNote(noteId, id)
-        setNotes((prev) => prev.filter((n) => n.id !== noteId))
-      } catch (err: unknown) {
-        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete note')
-      }
+      Alert.alert('Delete Note', 'Are you sure you want to delete this note?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deleteNote(noteId, id)
+              await reloadContact()
+            } catch (err: unknown) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete note')
+            }
+          },
+        },
+      ])
     },
-    [id],
+    [id, reloadContact],
   )
 
   const handleStartEditNote = useCallback((note: ContactNote) => {
@@ -651,9 +706,7 @@ export default function ContactDetailScreen() {
       setEditNoteSaving(true)
       try {
         await api.updateNote(noteId, id, editNoteContent.trim())
-        setNotes((prev) =>
-          prev.map((n) => (n.id === noteId ? { ...n, content: editNoteContent.trim() } : n)),
-        )
+        await reloadContact()
         setEditingNoteId(null)
         setEditNoteContent('')
       } catch (err: unknown) {
@@ -662,7 +715,7 @@ export default function ContactDetailScreen() {
         setEditNoteSaving(false)
       }
     },
-    [id, editNoteContent],
+    [id, editNoteContent, reloadContact],
   )
 
   const handleCancelEditNote = useCallback(() => {
@@ -672,20 +725,23 @@ export default function ContactDetailScreen() {
 
   const handleCreateTask = useCallback(async () => {
     if (!id || !newTaskTitle.trim()) return
+    const dueAt = normalizeDateOnlyInput(newTaskDueAt)
+    if (newTaskDueAt.trim() && !dueAt) {
+      Alert.alert('Validation', 'Enter a valid due date in YYYY-MM-DD format.')
+      return
+    }
     setTaskSaving(true)
     try {
-      const dueAt = newTaskDueAt.trim() || undefined
       await api.createTask(id, newTaskTitle.trim(), dueAt)
       setNewTaskTitle('')
       setNewTaskDueAt('')
-      const tasksData = await api.getContactTasks(id)
-      setTasks(tasksData as ContactTask[])
+      await reloadContact()
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create task')
     } finally {
       setTaskSaving(false)
     }
-  }, [id, newTaskTitle, newTaskDueAt])
+  }, [id, newTaskTitle, newTaskDueAt, reloadContact])
 
   const handleToggleTask = useCallback(async (task: ContactTask) => {
     try {
@@ -718,21 +774,25 @@ export default function ContactDetailScreen() {
 
   const handleCreateDeal = useCallback(async () => {
     if (!id || !newDealTitle.trim()) return
+    const parsedValue = newDealValue.trim() ? Number(newDealValue) : undefined
+    if (newDealValue.trim() && (!Number.isFinite(parsedValue ?? NaN) || (parsedValue ?? 0) < 0)) {
+      Alert.alert('Validation', 'Enter a valid non-negative deal value.')
+      return
+    }
     setDealSaving(true)
     try {
       const body: { title: string; value?: number } = { title: newDealTitle.trim() }
-      if (newDealValue.trim()) body.value = parseFloat(newDealValue)
+      if (parsedValue !== undefined) body.value = parsedValue
       await api.createDeal(id, body)
       setNewDealTitle('')
       setNewDealValue('')
-      const dealsData = await api.getDeals(id)
-      setDeals(dealsData as ContactDeal[])
+      await reloadContact()
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create deal')
     } finally {
       setDealSaving(false)
     }
-  }, [id, newDealTitle, newDealValue])
+  }, [id, newDealTitle, newDealValue, reloadContact])
 
   const handleDeleteDeal = useCallback((dealId: string) => {
     Alert.alert('Delete Deal', 'Are you sure you want to delete this deal?', [
@@ -908,7 +968,10 @@ export default function ContactDetailScreen() {
         <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>
           {error || 'Contact not found'}
         </Text>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16, padding: 12 }}>
+        <TouchableOpacity
+          onPress={() => router.replace('/contacts')}
+          style={{ marginTop: 16, padding: 12 }}
+        >
           <Text
             accessible
             accessibilityRole="button"
@@ -946,7 +1009,7 @@ export default function ContactDetailScreen() {
           justifyContent: 'space-between',
         }}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.replace('/contacts')}>
           <Text
             accessible
             accessibilityRole="button"
@@ -1479,96 +1542,101 @@ export default function ContactDetailScreen() {
           </Text>
           {deals.length > 0 && (
             <View style={{ gap: 8, marginBottom: 12 }}>
-              {deals.map((deal) => (
-                <View
-                  key={deal.id}
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    borderRadius: 10,
-                    padding: 10,
-                    borderWidth: 1,
-                    borderColor: '#e2e8f0',
-                  }}
-                >
+              {deals.map((deal) => {
+                const busy = busyDealIds.has(deal.id)
+                return (
                   <View
+                    key={deal.id}
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: 10,
+                      padding: 10,
+                      borderWidth: 1,
+                      borderColor: '#e2e8f0',
                     }}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a', flex: 1 }}>
-                      {deal.title}
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        onPress={() => void handleChangeDealStage(deal)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Change stage for deal ${deal.title}`}
-                        accessibilityHint="Cycles this deal to the next stage"
-                      >
-                        <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
-                          Stage
-                        </Text>
-                      </TouchableOpacity>
-                      <Feather name="chevron-right" size={14} color="#0ea5e9" />
-                      <TouchableOpacity
-                        onPress={() => handleDeleteDeal(deal.id)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Delete deal ${deal.title}`}
-                        accessibilityHint="Deletes this deal after confirmation"
-                      >
-                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
-                          Delete
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}
-                  >
-                    {Number(deal.value) > 0 && (
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a' }}>
-                        {new Intl.NumberFormat(undefined, {
-                          style: 'currency',
-                          currency: deal.currency || 'USD',
-                          maximumFractionDigits: 0,
-                        }).format(Number(deal.value))}
-                      </Text>
-                    )}
                     <View
                       style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 20,
-                        backgroundColor:
-                          deal.stage === 'CLOSED_WON'
-                            ? '#dcfce7'
-                            : deal.stage === 'CLOSED_LOST'
-                              ? '#fee2e2'
-                              : '#eff6ff',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                       }}
                     >
-                      <Text
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a', flex: 1 }}>
+                        {deal.title}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                        <TouchableOpacity
+                          disabled={busy}
+                          onPress={() => void handleChangeDealStage(deal)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Change stage for deal ${deal.title}`}
+                          accessibilityHint="Cycles this deal to the next stage"
+                        >
+                          <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
+                            {busy ? 'Working…' : 'Stage'}
+                          </Text>
+                        </TouchableOpacity>
+                        <Feather name="chevron-right" size={14} color="#0ea5e9" />
+                        <TouchableOpacity
+                          disabled={busy}
+                          onPress={() => handleDeleteDeal(deal.id)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete deal ${deal.title}`}
+                          accessibilityHint="Deletes this deal after confirmation"
+                        >
+                          <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                            {busy ? 'Working…' : 'Delete'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}
+                    >
+                      {Number(deal.value) > 0 && (
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a' }}>
+                          {new Intl.NumberFormat(undefined, {
+                            style: 'currency',
+                            currency: deal.currency || 'USD',
+                            maximumFractionDigits: 0,
+                          }).format(Number(deal.value))}
+                        </Text>
+                      )}
+                      <View
                         style={{
-                          fontSize: 10,
-                          fontWeight: '700',
-                          color:
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 20,
+                          backgroundColor:
                             deal.stage === 'CLOSED_WON'
-                              ? '#15803d'
+                              ? '#dcfce7'
                               : deal.stage === 'CLOSED_LOST'
-                                ? '#b91c1c'
-                                : '#1d4ed8',
+                                ? '#fee2e2'
+                                : '#eff6ff',
                         }}
                       >
-                        {deal.stage.replace('_', ' ')}
-                      </Text>
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '700',
+                            color:
+                              deal.stage === 'CLOSED_WON'
+                                ? '#15803d'
+                                : deal.stage === 'CLOSED_LOST'
+                                  ? '#b91c1c'
+                                  : '#1d4ed8',
+                          }}
+                        >
+                          {deal.stage.replace('_', ' ')}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                )
+              })}
             </View>
           )}
           {deals.length === 0 && (

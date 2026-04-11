@@ -84,6 +84,9 @@ export function useCardBuilder(cardId: string) {
   const pendingThemeChanges = useRef<Partial<CardThemeData>>({})
   const pendingSocialLinks = useRef<SocialLinkData[] | null>(null)
   const pendingMediaBlocks = useRef<MediaBlockData[] | null>(null)
+  const handleRequestIdRef = useRef(0)
+  const templateRequestIdRef = useRef(0)
+  const vcardPolicyRequestIdRef = useRef(0)
   // Always reflects the latest card.fields so the debounced flush can read the
   // full snapshot without closing over stale state.
   const latestFieldsRef = useRef<CardData['fields'] | null>(null)
@@ -220,6 +223,8 @@ export function useCardBuilder(cardId: string) {
 
   const updateHandle = useCallback(
     (handle: string) => {
+      const previousHandle = state.card?.handle ?? null
+      const requestId = ++handleRequestIdRef.current
       setState((prev) => {
         if (!prev.card) return prev
         return { ...prev, card: { ...prev.card, handle } }
@@ -230,14 +235,23 @@ export function useCardBuilder(cardId: string) {
         try {
           const token = await getAccessToken()
           await apiPut(`/cards/${cardId}`, { handle }, token)
+          if (handleRequestIdRef.current !== requestId) return
           setState((prev) => ({ ...prev, saveStatus: 'saved' }))
           setTimeout(() => setState((prev) => ({ ...prev, saveStatus: 'idle' })), 2000)
         } catch {
-          setState((prev) => ({ ...prev, saveStatus: 'error' }))
+          if (handleRequestIdRef.current !== requestId) return
+          setState((prev) => ({
+            ...prev,
+            saveStatus: 'error',
+            card:
+              previousHandle === null || !prev.card
+                ? prev.card
+                : { ...prev.card, handle: previousHandle },
+          }))
         }
       })()
     },
-    [cardId],
+    [cardId, state.card?.handle],
   )
 
   const updateTheme = useCallback(
@@ -251,6 +265,8 @@ export function useCardBuilder(cardId: string) {
 
   const updateTemplate = useCallback(
     (templateId: CardTemplate) => {
+      const previousTemplateId = state.card?.templateId ?? null
+      const requestId = ++templateRequestIdRef.current
       setState((prev) => {
         if (!prev.card) return prev
         return { ...prev, card: { ...prev.card, templateId } }
@@ -260,14 +276,23 @@ export function useCardBuilder(cardId: string) {
         try {
           const token = await getAccessToken()
           await apiPut(`/cards/${cardId}`, { templateId }, token)
+          if (templateRequestIdRef.current !== requestId) return
           setState((prev) => ({ ...prev, saveStatus: 'saved' }))
           setTimeout(() => setState((prev) => ({ ...prev, saveStatus: 'idle' })), 2000)
         } catch {
-          setState((prev) => ({ ...prev, saveStatus: 'error' }))
+          if (templateRequestIdRef.current !== requestId) return
+          setState((prev) => ({
+            ...prev,
+            saveStatus: 'error',
+            card:
+              previousTemplateId === null || !prev.card
+                ? prev.card
+                : { ...prev.card, templateId: previousTemplateId },
+          }))
         }
       })()
     },
-    [cardId],
+    [cardId, state.card?.templateId],
   )
 
   const updateSocialLinks = useCallback(
@@ -328,6 +353,8 @@ export function useCardBuilder(cardId: string) {
 
   const updateVcardPolicy = useCallback(
     (policy: VcardPolicy) => {
+      const previousPolicy = state.card?.vcardPolicy ?? state.vcardPolicy
+      const requestId = ++vcardPolicyRequestIdRef.current
       setState((prev) => ({
         ...prev,
         vcardPolicy: policy,
@@ -338,14 +365,21 @@ export function useCardBuilder(cardId: string) {
         try {
           const token = await getAccessToken()
           await apiPut(`/cards/${cardId}`, { vcardPolicy: policy }, token)
+          if (vcardPolicyRequestIdRef.current !== requestId) return
           setState((prev) => ({ ...prev, saveStatus: 'saved' }))
           setTimeout(() => setState((prev) => ({ ...prev, saveStatus: 'idle' })), 2000)
         } catch {
-          setState((prev) => ({ ...prev, saveStatus: 'error' }))
+          if (vcardPolicyRequestIdRef.current !== requestId) return
+          setState((prev) => ({
+            ...prev,
+            saveStatus: 'error',
+            vcardPolicy: previousPolicy,
+            card: prev.card ? { ...prev.card, vcardPolicy: previousPolicy } : prev.card,
+          }))
         }
       })()
     },
-    [cardId],
+    [cardId, state.card?.vcardPolicy, state.vcardPolicy],
   )
 
   return {

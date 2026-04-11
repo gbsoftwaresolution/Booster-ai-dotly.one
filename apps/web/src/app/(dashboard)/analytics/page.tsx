@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { SelectField } from '@/components/ui/SelectField'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import {
@@ -37,6 +38,8 @@ interface CardSummary {
   handle: string
   fields: Record<string, string>
 }
+
+const API_URL = getPublicApiUrl()
 
 interface AnalyticsData {
   summary: {
@@ -199,8 +202,7 @@ export default function AnalyticsPage(): JSX.Element {
       from.setUTCHours(0, 0, 0, 0)
       params.set('from', from.toISOString())
       params.set('to', to.toISOString())
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-      const res = await fetch(`${apiBase}/lead-submissions/export?${params.toString()}`, {
+      const res = await fetch(`${API_URL}/lead-submissions/export?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       })
       if (!res.ok) {

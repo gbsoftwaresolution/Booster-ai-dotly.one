@@ -57,6 +57,29 @@ export interface Memory {
   createdAt: string
 }
 
+function serializeMemoryContent(memory: Pick<Memory, 'metAt' | 'date' | 'tags' | 'notes'>): string {
+  return JSON.stringify(memory)
+}
+
+function parseMemoryContent(
+  content: string,
+): Pick<Memory, 'metAt' | 'date' | 'tags' | 'notes'> | null {
+  try {
+    const parsed = JSON.parse(content) as Partial<Memory>
+    if (typeof parsed !== 'object' || parsed === null) return null
+    return {
+      metAt: typeof parsed.metAt === 'string' ? parsed.metAt : '',
+      date: typeof parsed.date === 'string' ? parsed.date : '',
+      tags: Array.isArray(parsed.tags)
+        ? parsed.tags.filter((tag): tag is ContextTag => CONTEXT_TAGS.includes(tag as ContextTag))
+        : [],
+      notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+    }
+  } catch {
+    return null
+  }
+}
+
 // ─── Local persistence ────────────────────────────────────────────────────────
 
 function storageKey(contactId: string) {
@@ -260,7 +283,14 @@ function AddMemoryForm({
       await fetch(`${API_URL}/contacts/${contactId}/memories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(newMemory),
+        body: JSON.stringify({
+          content: serializeMemoryContent({
+            metAt: newMemory.metAt,
+            date: newMemory.date,
+            tags: newMemory.tags,
+            notes: newMemory.notes,
+          }),
+        }),
       })
     })
 
@@ -398,8 +428,20 @@ export function MeetingMemory({
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) return
-        const data = (await res.json()) as Memory[]
-        const sorted = [...data].sort(
+        const data = (await res.json()) as Array<{ id: string; content: string; createdAt: string }>
+        const normalized = data.map((item) => {
+          const parsed = parseMemoryContent(item.content)
+          return {
+            id: item.id,
+            contactId,
+            metAt: parsed?.metAt ?? '',
+            date: parsed?.date ?? '',
+            tags: parsed?.tags ?? [],
+            notes: parsed?.notes ?? item.content,
+            createdAt: item.createdAt,
+          }
+        })
+        const sorted = [...normalized].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         )
         setMemories(sorted)

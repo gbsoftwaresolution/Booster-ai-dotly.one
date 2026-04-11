@@ -43,6 +43,49 @@ const PRESET_COLORS = [
   '#0284c7',
 ]
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validateCardDraft(input: {
+  name: string
+  email: string
+  website: string
+  primaryColor: string
+  socialLinks: Array<{ platform: string; url: string }>
+}): string | null {
+  if (!input.name.trim()) return 'Name is required.'
+  if (input.email.trim() && !EMAIL_RE.test(input.email.trim()))
+    return 'Enter a valid email address.'
+
+  if (input.website.trim()) {
+    try {
+      const normalized = /^https?:\/\//i.test(input.website.trim())
+        ? input.website.trim()
+        : `https://${input.website.trim()}`
+      const url = new URL(normalized)
+      if (!['http:', 'https:'].includes(url.protocol)) return 'Enter a valid website URL.'
+    } catch {
+      return 'Enter a valid website URL.'
+    }
+  }
+
+  if (!/^#[0-9a-fA-F]{6}$/.test(input.primaryColor)) {
+    return 'Primary color must be a valid hex color like #0ea5e9.'
+  }
+
+  for (const link of input.socialLinks) {
+    if (!link.url.trim()) continue
+    try {
+      const url = new URL(link.url.trim())
+      if (!['http:', 'https:'].includes(url.protocol))
+        return 'Social links must use http or https URLs.'
+    } catch {
+      return 'Enter valid URLs for social links.'
+    }
+  }
+
+  return null
+}
+
 interface SocialLink {
   id: string
   platform: string
@@ -69,6 +112,33 @@ interface CardDetail {
     primaryColor?: string
   }
   socialLinks?: SocialLink[]
+}
+
+function applyCardSnapshot(
+  card: CardDetail,
+  setState: {
+    setName: (value: string) => void
+    setTagline: (value: string) => void
+    setBio: (value: string) => void
+    setPhone: (value: string) => void
+    setEmail: (value: string) => void
+    setWebsite: (value: string) => void
+    setTemplate: (value: Template) => void
+    setPrimaryColor: (value: string) => void
+    setSocialLinks: (value: Array<{ platform: string; url: string }>) => void
+  },
+) {
+  setState.setName(card.fields?.name ?? '')
+  setState.setTagline(card.fields?.title ?? '')
+  setState.setBio(card.fields?.bio ?? '')
+  setState.setPhone(card.fields?.phone ?? '')
+  setState.setEmail(card.fields?.email ?? '')
+  setState.setWebsite(card.fields?.website ?? '')
+  setState.setTemplate(card.templateId ?? 'MINIMAL')
+  setState.setPrimaryColor(card.theme?.primaryColor ?? '#0ea5e9')
+  setState.setSocialLinks(
+    (card.socialLinks ?? []).map((l) => ({ platform: l.platform, url: l.url })),
+  )
 }
 
 type Tab = 'profile' | 'links' | 'theme'
@@ -112,15 +182,17 @@ export default function EditCardScreen() {
       .getCard(id)
       .then((data) => {
         const card = data as CardDetail
-        setName(card.fields?.name ?? '')
-        setTagline(card.fields?.title ?? '')
-        setBio(card.fields?.bio ?? '')
-        setPhone(card.fields?.phone ?? '')
-        setEmail(card.fields?.email ?? '')
-        setWebsite(card.fields?.website ?? '')
-        setTemplate(card.templateId ?? 'MINIMAL')
-        setPrimaryColor(card.theme?.primaryColor ?? '#0ea5e9')
-        setSocialLinks((card.socialLinks ?? []).map((l) => ({ platform: l.platform, url: l.url })))
+        applyCardSnapshot(card, {
+          setName,
+          setTagline,
+          setBio,
+          setPhone,
+          setEmail,
+          setWebsite,
+          setTemplate,
+          setPrimaryColor,
+          setSocialLinks,
+        })
         setLoading(false)
         // Mark initial load done after state settles
         setTimeout(() => {
@@ -135,6 +207,12 @@ export default function EditCardScreen() {
 
   const saveChanges = useCallback(async () => {
     if (isInitialLoad.current || !id) return true
+
+    const validationError = validateCardDraft({ name, email, website, primaryColor, socialLinks })
+    if (validationError) {
+      setSaveError(validationError)
+      return false
+    }
 
     setSaving(true)
     setSaveError(null)
@@ -156,6 +234,18 @@ export default function EditCardScreen() {
             })),
         ),
       ])
+      const refreshed = (await api.getCard(id)) as CardDetail
+      applyCardSnapshot(refreshed, {
+        setName,
+        setTagline,
+        setBio,
+        setPhone,
+        setEmail,
+        setWebsite,
+        setTemplate,
+        setPrimaryColor,
+        setSocialLinks,
+      })
       return true
     } catch {
       setSaveError('Could not save your latest changes.')
@@ -194,7 +284,7 @@ export default function EditCardScreen() {
       return
     }
 
-    router.back()
+    router.replace(`/card/${id}`)
   }, [router, saveChanges])
 
   useLayoutEffect(() => {

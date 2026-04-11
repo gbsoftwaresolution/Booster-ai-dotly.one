@@ -576,7 +576,16 @@ export default function SettingsPage(): JSX.Element {
   >({})
 
   // ── Notifications state ───────────────────────────────────────────────────
-  const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS)
+  const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(() => {
+    if (typeof window === 'undefined') return DEFAULT_NOTIF_PREFS
+
+    try {
+      const stored = localStorage.getItem(NOTIF_KEY)
+      return stored ? (JSON.parse(stored) as NotifPrefs) : DEFAULT_NOTIF_PREFS
+    } catch {
+      return DEFAULT_NOTIF_PREFS
+    }
+  })
   const [notifSaving, setNotifSaving] = useState(false)
   const [notifSaved, setNotifSaved] = useState(false)
   const [notifError, setNotifError] = useState<string | null>(null)
@@ -628,11 +637,11 @@ export default function SettingsPage(): JSX.Element {
       setEmail(user.email ?? '')
       setCountry(user.country ?? detectBrowserCountry())
       setTimezone(user.timezone ?? detectBrowserTimezone())
-      setNotifPrefs((prev) => ({
-        leadCaptured: user.notifLeadCaptured ?? prev.leadCaptured,
-        weeklyDigest: user.notifWeeklyDigest ?? prev.weeklyDigest,
-        productUpdates: user.notifProductUpdates ?? prev.productUpdates,
-      }))
+      setNotifPrefs({
+        leadCaptured: user.notifLeadCaptured ?? DEFAULT_NOTIF_PREFS.leadCaptured,
+        weeklyDigest: user.notifWeeklyDigest ?? DEFAULT_NOTIF_PREFS.weeklyDigest,
+        productUpdates: user.notifProductUpdates ?? DEFAULT_NOTIF_PREFS.productUpdates,
+      })
     } catch {
       setProfileLoadError('Could not load your profile. Retry before making changes.')
     } finally {
@@ -643,16 +652,6 @@ export default function SettingsPage(): JSX.Element {
   useEffect(() => {
     void loadProfile()
   }, [loadProfile])
-
-  // Load notification prefs from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(NOTIF_KEY)
-      if (stored) setNotifPrefs(JSON.parse(stored) as NotifPrefs)
-    } catch {
-      // ignore parse errors — keep defaults
-    }
-  }, [])
 
   // Load billing when the Billing tab is active
   useEffect(() => {

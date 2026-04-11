@@ -33,6 +33,10 @@ function assertAllowedMimeType(mimeType: string, context: string): void {
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return {}
+  const {
     data: { session },
   } = await supabase.auth.getSession()
   if (!session) return {}
@@ -59,7 +63,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       },
     })
     if (!res.ok) throw new Error(`API error ${res.status}`)
-    return res.json() as Promise<T>
+    if (res.status === 204) return undefined as T
+
+    const text = await res.text()
+    if (!text.trim()) return undefined as T
+
+    return JSON.parse(text) as T
   } finally {
     clearTimeout(timeoutId)
   }
@@ -287,6 +296,12 @@ export async function savePushToken(token: string): Promise<void> {
   await apiFetch('/users/push-token', {
     method: 'PATCH',
     body: JSON.stringify({ pushToken: token }),
+  })
+}
+
+export async function clearPushToken(): Promise<void> {
+  await apiFetch('/users/push-token', {
+    method: 'DELETE',
   })
 }
 

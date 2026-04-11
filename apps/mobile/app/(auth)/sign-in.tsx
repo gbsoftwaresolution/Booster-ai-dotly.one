@@ -75,7 +75,7 @@ export default function SignInScreen() {
     setFieldErrors((prev) => ({ ...prev, email: undefined }))
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-        redirectTo: 'https://dotly.one/auth?mode=reset',
+        redirectTo: 'dotly://auth/callback',
       })
       if (resetError) throw resetError
       setResetMessage('Password reset link sent. Check your email.')

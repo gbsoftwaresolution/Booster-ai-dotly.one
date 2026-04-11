@@ -13,6 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons'
 import { api } from '../../lib/api'
 import { formatDateTime, getUserTimezone } from '../../lib/tz'
+import { useAuthz } from '../../components/AuthzProvider'
 
 interface AppointmentType {
   id: string
@@ -43,6 +44,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function SchedulingScreen() {
+  const { schedulingAllowed, loading: authzLoading } = useAuthz()
   const [aptTypes, setAptTypes] = useState<AppointmentType[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,6 +95,21 @@ export default function SchedulingScreen() {
         },
       },
     ])
+  }
+
+  if (!authzLoading && !schedulingAllowed) {
+    return (
+      <View style={styles.centered}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
+          Scheduling is available on paid plans
+        </Text>
+        <Text
+          style={{ color: '#64748b', textAlign: 'center', marginTop: 8, paddingHorizontal: 24 }}
+        >
+          Upgrade your plan to manage appointment types and bookings from mobile.
+        </Text>
+      </View>
+    )
   }
 
   if (loading) {

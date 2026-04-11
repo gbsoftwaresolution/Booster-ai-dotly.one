@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   RadioTower,
   Plus,
@@ -187,12 +187,14 @@ function EndpointCard({
   onDelete,
   onRegenerateSecret,
   onTestFire,
+  busy,
 }: {
   endpoint: WebhookEndpoint
   onToggle: (enabled: boolean) => void
   onDelete: () => void
   onRegenerateSecret: () => Promise<void>
   onTestFire: () => Promise<WebhookTestResult>
+  busy: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [showLog, setShowLog] = useState(false)
@@ -236,6 +238,7 @@ function EndpointCard({
         <button
           type="button"
           onClick={() => onToggle(!endpoint.enabled)}
+          disabled={busy}
           className="shrink-0"
           aria-label={endpoint.enabled ? 'Disable' : 'Enable'}
         >
@@ -272,6 +275,7 @@ function EndpointCard({
         <button
           type="button"
           onClick={() => setExpanded((x) => !x)}
+          disabled={busy}
           className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors shrink-0"
         >
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -307,7 +311,7 @@ function EndpointCard({
             <button
               type="button"
               onClick={() => void handleRegenerate()}
-              disabled={regenerating}
+              disabled={regenerating || busy}
               className="mt-2 flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={cn('h-3 w-3', regenerating && 'animate-spin')} />
@@ -320,7 +324,7 @@ function EndpointCard({
             <button
               type="button"
               onClick={() => void handleTest()}
-              disabled={testing}
+              disabled={testing || busy}
               className={cn(
                 'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 disabled:opacity-60',
                 testResult === 'ok'
@@ -343,7 +347,8 @@ function EndpointCard({
             <button
               type="button"
               onClick={() => setShowLog((x) => !x)}
-              className="flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
               Delivery log
             </button>
@@ -351,7 +356,8 @@ function EndpointCard({
             <button
               type="button"
               onClick={onDelete}
-              className="ml-auto flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+              disabled={busy}
+              className="ml-auto flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
             >
               <Trash2 className="h-3 w-3" />
               Delete
@@ -502,11 +508,13 @@ function CreateModal({
 
 export default function WebhooksPage(): JSX.Element {
   const { plan, loading: planLoading } = useBillingPlan()
+  const loadRequestIdRef = useRef(0)
   const [endpoints, setEndpoints] = useState<WebhookEndpoint[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [busyEndpointId, setBusyEndpointId] = useState<string | null>(null)
   const enabledCount = endpoints.filter((endpoint) => endpoint.enabled).length
   const focusMessage = loading
     ? 'Loading webhook endpoints and delivery tooling.'
@@ -515,11 +523,14 @@ export default function WebhooksPage(): JSX.Element {
       : `${enabledCount} endpoint${enabledCount === 1 ? '' : 's'} are enabled and ready to receive Dotly events.`
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current
     try {
       const token = await getAccessToken()
       const data = await apiGet<WebhookEndpoint[]>('/webhooks', token)
+      if (loadRequestIdRef.current !== requestId) return
       setEndpoints(data)
     } catch (e) {
+      if (loadRequestIdRef.current !== requestId) return
       if (isApiError(e) && (e.statusCode === 403 || e.statusCode === 401)) {
         setPermissionDenied(true)
         setPageError('You do not have permission to manage webhooks.')
@@ -527,6 +538,7 @@ export default function WebhooksPage(): JSX.Element {
         setPageError(e instanceof Error ? e.message : 'Failed to load webhooks.')
       }
     } finally {
+      if (loadRequestIdRef.current !== requestId) return
       setLoading(false)
     }
   }, [])
@@ -553,35 +565,57 @@ export default function WebhooksPage(): JSX.Element {
   }
 
   async function handleToggle(id: string, enabled: boolean) {
+    if (busyEndpointId) return
+    setBusyEndpointId(id)
     try {
       const token = await getAccessToken()
       const updated = await apiPut<WebhookEndpoint>(`/webhooks/${id}`, { enabled }, token)
       setEndpoints((prev) => prev.map((ep) => (ep.id === id ? updated : ep)))
     } catch (e) {
       setPageError(e instanceof Error ? e.message : 'Failed to toggle webhook.')
+    } finally {
+      setBusyEndpointId((current) => (current === id ? null : current))
     }
   }
 
   async function handleDelete(id: string) {
+    if (busyEndpointId) return
     if (!confirm('Delete this webhook endpoint? All delivery logs will be removed.')) return
+    setBusyEndpointId(id)
     try {
       const token = await getAccessToken()
       await apiDelete(`/webhooks/${id}`, token)
       setEndpoints((prev) => prev.filter((ep) => ep.id !== id))
     } catch (e) {
       setPageError(e instanceof Error ? e.message : 'Failed to delete webhook.')
+    } finally {
+      setBusyEndpointId((current) => (current === id ? null : current))
     }
   }
 
   async function handleRegenerateSecret(id: string) {
-    const token = await getAccessToken()
-    const updated = await apiPost<WebhookEndpoint>(`/webhooks/${id}/secret`, {}, token)
-    setEndpoints((prev) => prev.map((ep) => (ep.id === id ? updated : ep)))
+    if (busyEndpointId) return
+    setBusyEndpointId(id)
+    try {
+      const token = await getAccessToken()
+      const updated = await apiPost<WebhookEndpoint>(`/webhooks/${id}/secret`, {}, token)
+      setEndpoints((prev) => prev.map((ep) => (ep.id === id ? updated : ep)))
+    } catch (e) {
+      setPageError(e instanceof Error ? e.message : 'Failed to regenerate webhook secret.')
+    } finally {
+      setBusyEndpointId((current) => (current === id ? null : current))
+    }
   }
 
   async function handleTestFire(id: string) {
-    const token = await getAccessToken()
-    return apiPost<WebhookTestResult>(`/webhooks/${id}/test`, {}, token)
+    if (busyEndpointId) throw new Error('Another webhook action is already in progress.')
+    setBusyEndpointId(id)
+    try {
+      const token = await getAccessToken()
+      return await apiPost<WebhookTestResult>(`/webhooks/${id}/test`, {}, token)
+    } finally {
+      setBusyEndpointId((current) => (current === id ? null : current))
+    }
   }
 
   return (
@@ -789,6 +823,7 @@ export default function WebhooksPage(): JSX.Element {
               onDelete={() => void handleDelete(ep.id)}
               onRegenerateSecret={() => handleRegenerateSecret(ep.id)}
               onTestFire={() => handleTestFire(ep.id)}
+              busy={busyEndpointId !== null}
             />
           ))}
         </div>

@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { getServerApiUrl } from '@/lib/server-api'
 import { TeamSignInClient } from './TeamSignInClient'
 
@@ -27,7 +27,7 @@ export default async function TeamSignInPage({ params }: { params: Promise<{ slu
   const team = await getTeamBySlug(slug)
 
   if (!team) {
-    redirect('/auth')
+    notFound()
   }
 
   return <TeamSignInClient team={team} />

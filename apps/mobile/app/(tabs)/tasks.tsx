@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
+import { useAuthz } from '../../components/AuthzProvider'
 
 interface Task {
   id: string
@@ -44,12 +45,23 @@ function isOverdue(task: Task): boolean {
 
 export default function TasksScreen() {
   const router = useRouter()
+  const { crmAllowed, loading: authzLoading } = useAuthz()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending')
   const [userTz, setUserTz] = useState<string | null>(null)
+  const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set())
+
+  const mutateBusyTaskState = useCallback((taskId: string, busy: boolean) => {
+    setBusyTaskIds((prev) => {
+      const next = new Set(prev)
+      if (busy) next.add(taskId)
+      else next.delete(taskId)
+      return next
+    })
+  }, [])
 
   const loadTasks = useCallback(async () => {
     try {
@@ -72,34 +84,50 @@ export default function TasksScreen() {
     setRefreshing(false)
   }, [loadTasks])
 
-  const handleToggle = useCallback(async (task: Task) => {
-    try {
-      await api.updateTask(task.id, { completed: !task.completed })
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t)),
-      )
-    } catch (err: unknown) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update task')
-    }
-  }, [])
+  const handleToggle = useCallback(
+    async (task: Task) => {
+      if (busyTaskIds.has(task.id)) return
+      const nextCompleted = !task.completed
+      mutateBusyTaskState(task.id, true)
+      try {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === task.id ? { ...t, completed: nextCompleted } : t)),
+        )
+        await api.updateTask(task.id, { completed: nextCompleted })
+      } catch (err: unknown) {
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)))
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update task')
+      } finally {
+        mutateBusyTaskState(task.id, false)
+      }
+    },
+    [busyTaskIds, mutateBusyTaskState],
+  )
 
-  const handleDelete = useCallback((taskId: string) => {
-    Alert.alert('Delete Task', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.deleteTask(taskId)
-            setTasks((prev) => prev.filter((t) => t.id !== taskId))
-          } catch (err: unknown) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete task')
-          }
+  const handleDelete = useCallback(
+    (taskId: string) => {
+      if (busyTaskIds.has(taskId)) return
+      Alert.alert('Delete Task', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            mutateBusyTaskState(taskId, true)
+            try {
+              await api.deleteTask(taskId)
+              setTasks((prev) => prev.filter((t) => t.id !== taskId))
+            } catch (err: unknown) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete task')
+            } finally {
+              mutateBusyTaskState(taskId, false)
+            }
+          },
         },
-      },
-    ])
-  }, [])
+      ])
+    },
+    [busyTaskIds, mutateBusyTaskState],
+  )
 
   const filtered = tasks.filter((t) => {
     if (filter === 'pending') return !t.completed
@@ -109,6 +137,27 @@ export default function TasksScreen() {
 
   const pendingCount = tasks.filter((t) => !t.completed).length
   const overdueCount = tasks.filter(isOverdue).length
+
+  if (!authzLoading && !crmAllowed) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+          backgroundColor: '#f8fafc',
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
+          Tasks are available on paid plans
+        </Text>
+        <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 8 }}>
+          Upgrade your plan to manage CRM tasks from mobile.
+        </Text>
+      </View>
+    )
+  }
 
   if (loading) {
     return (
@@ -228,6 +277,7 @@ export default function TasksScreen() {
         }
         renderItem={({ item: task }) => {
           const overdue = isOverdue(task)
+          const busy = busyTaskIds.has(task.id)
           return (
             <View
               style={{
@@ -243,6 +293,7 @@ export default function TasksScreen() {
             >
               {/* Checkbox */}
               <TouchableOpacity
+                disabled={busy}
                 onPress={() => void handleToggle(task)}
                 style={{
                   width: 22,
@@ -255,6 +306,7 @@ export default function TasksScreen() {
                   justifyContent: 'center',
                   flexShrink: 0,
                   marginTop: 1,
+                  opacity: busy ? 0.5 : 1,
                 }}
               >
                 {task.completed && <Feather name="check" size={12} color="#ffffff" />}
@@ -324,11 +376,14 @@ export default function TasksScreen() {
 
               {/* Delete */}
               <TouchableOpacity
+                disabled={busy}
                 onPress={() => handleDelete(task.id)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{ paddingTop: 2 }}
+                style={{ paddingTop: 2, opacity: busy ? 0.5 : 1 }}
               >
-                <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>Delete</Text>
+                <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>
+                  {busy ? 'Working…' : 'Delete'}
+                </Text>
               </TouchableOpacity>
             </View>
           )

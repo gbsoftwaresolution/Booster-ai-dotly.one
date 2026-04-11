@@ -2,12 +2,13 @@ import 'react-native-url-polyfill/auto'
 import { useEffect, useRef, useState } from 'react'
 import { Slot, useRouter, useSegments } from 'expo-router'
 import * as Linking from 'expo-linking'
+import * as Notifications from 'expo-notifications'
 import { supabase } from '../lib/supabase'
 import { View, ActivityIndicator } from 'react-native'
 import type { Session } from '@supabase/supabase-js'
-import type * as Notifications from 'expo-notifications'
 import { registerForPushNotifications, setupNotificationListeners } from '../lib/notifications'
 import { savePushToken } from '../lib/api'
+import { AuthzProvider } from '../components/AuthzProvider'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
@@ -50,8 +51,13 @@ export default function RootLayout() {
       // Supabase sometimes encodes tokens in the fragment; expo-linking puts them in queryParams
       const accessToken = params['access_token'] as string | undefined
       const refreshToken = params['refresh_token'] as string | undefined
+      const type = params['type'] as string | undefined
       if (accessToken && refreshToken) {
         await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        if (type === 'recovery') {
+          router.replace('/(auth)/reset-password')
+          return
+        }
       }
     }
 
@@ -98,6 +104,19 @@ export default function RootLayout() {
   }, [])
 
   useEffect(() => {
+    void (async () => {
+      const response = await Notifications.getLastNotificationResponseAsync()
+      if (!response || notificationResponseRef.current) return
+      notificationResponseRef.current = response
+      const data = response.notification.request.content.data as Record<string, unknown>
+      const contactId = typeof data?.contactId === 'string' ? data.contactId : null
+      if (contactId) {
+        router.push(`/contact/${contactId}`)
+      }
+    })()
+  }, [router])
+
+  useEffect(() => {
     if (loading) return
     const inAuthGroup = segments[0] === '(auth)'
     if (!session && !inAuthGroup) {
@@ -115,5 +134,9 @@ export default function RootLayout() {
     )
   }
 
-  return <Slot />
+  return (
+    <AuthzProvider>
+      <Slot />
+    </AuthzProvider>
+  )
 }

@@ -72,7 +72,7 @@ export class UsersController {
   // by the time /users/me is called the DB row MUST already exist.
   @Get('me')
   getMe(@CurrentUser() user: { id: string }) {
-    return this.usersService.findById(user.id)
+    return this.usersService.getMe(user.id)
   }
 
   @ApiOperation({ summary: 'Update display name, country, timezone and notification preferences' })
@@ -107,6 +107,12 @@ export class UsersController {
   ): Promise<{ ok: boolean }> {
     await this.usersService.savePushToken(user.id, body.pushToken)
     return { ok: true }
+  }
+
+  @Delete('push-token')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clearPushToken(@CurrentUser() user: { id: string }): Promise<void> {
+    await this.usersService.clearPushToken(user.id)
   }
 
   @ApiOperation({ summary: 'GDPR — export all user data as JSON' })

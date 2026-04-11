@@ -163,6 +163,11 @@ class CreateContactDto {
   sourceCardId?: string
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sourceHandle?: string
+
+  @IsOptional()
   @IsIn(['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'])
   stage?: string
 

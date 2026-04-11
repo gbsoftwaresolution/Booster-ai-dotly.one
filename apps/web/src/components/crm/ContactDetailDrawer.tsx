@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import React, { useState, useEffect, useCallback, type JSX } from 'react'
 import { formatDate as tzFormatDate } from '@/lib/tz'
 import { useUserTimezone } from '@/hooks/useUserLocale'
@@ -138,6 +139,7 @@ interface ContactDetailDrawerProps {
   contactId: string | null
   onClose: () => void
   onUpdate?: (contact: ContactDetail) => void
+  onMutate?: () => void
 }
 
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
@@ -279,9 +281,11 @@ export function ContactDetailDrawer({
   contactId,
   onClose,
   onUpdate,
+  onMutate,
 }: ContactDetailDrawerProps): JSX.Element | null {
   const drawerRef = React.useRef<HTMLDivElement>(null)
   const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+  const loadRequestIdRef = React.useRef(0)
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const userTz = useUserTimezone()
   const [loading, setLoading] = useState(false)
@@ -312,6 +316,7 @@ export function ContactDetailDrawer({
   const [loadingDuplicates, setLoadingDuplicates] = useState(false)
   const [mergeCandidates, setMergeCandidates] = useState<DuplicateContact[]>([])
   const [mergingDuplicateId, setMergingDuplicateId] = useState<string | null>(null)
+  const [savingCustomFieldId, setSavingCustomFieldId] = useState<string | null>(null)
   const [dealForm, setDealForm] = useState({
     title: '',
     value: '',
@@ -321,6 +326,7 @@ export function ContactDetailDrawer({
   })
 
   const loadContact = useCallback(async (id: string) => {
+    const requestId = ++loadRequestIdRef.current
     setLoading(true)
     setDrawerError(null)
     try {
@@ -336,6 +342,7 @@ export function ContactDetailDrawer({
           apiGet<ContactEmail[]>(`/contacts/${id}/emails`, token).catch(() => []),
         ])
 
+      if (loadRequestIdRef.current !== requestId) return
       setEmails(emailHistory)
       setContact({
         ...data,
@@ -346,14 +353,25 @@ export function ContactDetailDrawer({
       })
       setCustomFields(fieldDefinitions)
     } catch (err) {
+      if (loadRequestIdRef.current !== requestId) return
       setDrawerError(err instanceof Error ? err.message : 'Failed to load contact')
     } finally {
+      if (loadRequestIdRef.current !== requestId) return
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (contactId) void loadContact(contactId)
+    if (contactId) {
+      void loadContact(contactId)
+      return
+    }
+
+    loadRequestIdRef.current += 1
+    setContact(null)
+    setEmails([])
+    setCustomFields([])
+    setDrawerError(null)
   }, [contactId, loadContact])
 
   useEffect(() => {
@@ -418,6 +436,7 @@ export function ContactDetailDrawer({
         )
         setContact((prev) => (prev ? { ...prev, ...updated } : prev))
         onUpdate?.(updated)
+        onMutate?.()
       } catch (err) {
         setDrawerError(err instanceof Error ? err.message : 'Failed to save field')
       }
@@ -434,6 +453,7 @@ export function ContactDetailDrawer({
         setContact((prev) =>
           prev ? { ...prev, crmPipeline: { ...prev.crmPipeline, stage } } : prev,
         )
+        onMutate?.()
       } catch (err) {
         setDrawerError(err instanceof Error ? err.message : 'Failed to update stage')
       }
@@ -449,6 +469,7 @@ export function ContactDetailDrawer({
       await apiPut(`/contacts/${contact.id}`, { tags }, token)
       setContact((prev) => (prev ? { ...prev, tags } : prev))
       setNewTag('')
+      onMutate?.()
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Failed to add tag')
     }
@@ -462,6 +483,7 @@ export function ContactDetailDrawer({
         const token = await getToken()
         await apiPut(`/contacts/${contact.id}`, { tags }, token)
         setContact((prev) => (prev ? { ...prev, tags } : prev))
+        onMutate?.()
       } catch (err) {
         setDrawerError(err instanceof Error ? err.message : 'Failed to remove tag')
       }
@@ -479,6 +501,7 @@ export function ContactDetailDrawer({
       setNewNote('')
       setContact((prev) => (prev ? { ...prev, notes: content } : prev))
       await loadContact(contact.id)
+      onMutate?.()
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Failed to add note')
     } finally {
@@ -489,6 +512,8 @@ export function ContactDetailDrawer({
   const deleteNote = useCallback(
     async (noteId: string) => {
       if (!contact) return
+      const confirmed = window.confirm('Delete this note? This cannot be undone.')
+      if (!confirmed) return
       setDeletingNoteId(noteId)
       try {
         const token = await getToken()
@@ -501,13 +526,14 @@ export function ContactDetailDrawer({
               }
             : prev,
         )
+        onMutate?.()
       } catch (err) {
         setDrawerError(err instanceof Error ? err.message : 'Failed to delete note')
       } finally {
         setDeletingNoteId(null)
       }
     },
-    [contact],
+    [contact, onMutate],
   )
 
   const startEditNote = useCallback((note: ContactNote) => {
@@ -543,16 +569,22 @@ export function ContactDetailDrawer({
         )
         setEditingNoteId(null)
         setEditNoteContent('')
+        onMutate?.()
       } catch (err) {
         setDrawerError(err instanceof Error ? err.message : 'Failed to update note')
       } finally {
         setSavingEditNoteId(null)
       }
     },
-    [contact, editNoteContent],
+    [contact, editNoteContent, onMutate],
   )
   const addTask = useCallback(async () => {
     if (!contact || !taskTitle.trim()) return
+    const normalizedDueAt = taskDueAt ? new Date(`${taskDueAt}T00:00:00.000Z`) : null
+    if (taskDueAt && Number.isNaN(normalizedDueAt?.getTime() ?? NaN)) {
+      setDrawerError('Task due date must be a valid date.')
+      return
+    }
     setAddingTask(true)
     try {
       const token = await getToken()
@@ -560,7 +592,7 @@ export function ContactDetailDrawer({
         `/contacts/${contact.id}/tasks`,
         {
           title: taskTitle.trim(),
-          dueAt: taskDueAt || undefined,
+          dueAt: normalizedDueAt?.toISOString(),
         },
         token,
       )
@@ -574,67 +606,90 @@ export function ContactDetailDrawer({
       )
       setTaskTitle('')
       setTaskDueAt('')
+      onMutate?.()
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Failed to add task')
     } finally {
       setAddingTask(false)
     }
-  }, [contact, taskDueAt, taskTitle])
+  }, [contact, onMutate, taskDueAt, taskTitle])
 
-  const toggleTask = useCallback(async (task: ContactTask) => {
-    setUpdatingTaskId(task.id)
-    try {
-      const token = await getToken()
-      const updated = await apiPatch<ContactTask>(
-        `/tasks/${task.id}`,
-        {
-          completed: !task.completed,
-        },
-        token,
-      )
-      setContact((prev) =>
-        prev
-          ? {
-              ...prev,
-              tasks: sortTasks(
-                ((prev.tasks as ContactTask[] | undefined) ?? []).map((item) =>
-                  item.id === task.id ? updated : item,
+  const toggleTask = useCallback(
+    async (task: ContactTask) => {
+      setUpdatingTaskId(task.id)
+      try {
+        const token = await getToken()
+        const updated = await apiPatch<ContactTask>(
+          `/tasks/${task.id}`,
+          {
+            completed: !task.completed,
+          },
+          token,
+        )
+        setContact((prev) =>
+          prev
+            ? {
+                ...prev,
+                tasks: sortTasks(
+                  ((prev.tasks as ContactTask[] | undefined) ?? []).map((item) =>
+                    item.id === task.id ? updated : item,
+                  ),
                 ),
-              ),
-            }
-          : prev,
-      )
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to update task')
-    } finally {
-      setUpdatingTaskId(null)
-    }
-  }, [])
+              }
+            : prev,
+        )
+        onMutate?.()
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to update task')
+      } finally {
+        setUpdatingTaskId(null)
+      }
+    },
+    [onMutate],
+  )
 
-  const deleteTask = useCallback(async (taskId: string) => {
-    setDeletingTaskId(taskId)
-    try {
-      const token = await getToken()
-      await apiDelete(`/tasks/${taskId}`, token)
-      setContact((prev) =>
-        prev
-          ? {
-              ...prev,
-              tasks: ((prev.tasks as ContactTask[] | undefined) ?? []).filter(
-                (t) => t.id !== taskId,
-              ),
-            }
-          : prev,
-      )
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to delete task')
-    } finally {
-      setDeletingTaskId(null)
-    }
-  }, [])
+  const deleteTask = useCallback(
+    async (taskId: string) => {
+      const confirmed = window.confirm('Delete this task? This cannot be undone.')
+      if (!confirmed) return
+      setDeletingTaskId(taskId)
+      try {
+        const token = await getToken()
+        await apiDelete(`/tasks/${taskId}`, token)
+        setContact((prev) =>
+          prev
+            ? {
+                ...prev,
+                tasks: ((prev.tasks as ContactTask[] | undefined) ?? []).filter(
+                  (t) => t.id !== taskId,
+                ),
+              }
+            : prev,
+        )
+        onMutate?.()
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to delete task')
+      } finally {
+        setDeletingTaskId(null)
+      }
+    },
+    [onMutate],
+  )
 
   const addDeal = useCallback(async () => {
     if (!contact || !dealForm.title.trim()) return
+    const parsedValue = dealForm.value ? Number(dealForm.value) : undefined
+    if (dealForm.value && (!Number.isFinite(parsedValue ?? NaN) || (parsedValue ?? 0) < 0)) {
+      setDrawerError('Deal value must be a non-negative number.')
+      return
+    }
+    const normalizedCloseDate = dealForm.closeDate
+      ? new Date(`${dealForm.closeDate}T00:00:00.000Z`)
+      : null
+    if (dealForm.closeDate && Number.isNaN(normalizedCloseDate?.getTime() ?? NaN)) {
+      setDrawerError('Close date must be a valid date.')
+      return
+    }
     setAddingDeal(true)
     try {
       const token = await getToken()
@@ -642,10 +697,10 @@ export function ContactDetailDrawer({
         `/contacts/${contact.id}/deals`,
         {
           title: dealForm.title.trim(),
-          value: dealForm.value ? Number(dealForm.value) : undefined,
+          value: parsedValue ?? undefined,
           currency: dealForm.currency,
           stage: dealForm.stage,
-          closeDate: dealForm.closeDate || undefined,
+          closeDate: normalizedCloseDate?.toISOString(),
         },
         token,
       )
@@ -662,56 +717,67 @@ export function ContactDetailDrawer({
         closeDate: '',
       })
       setDealsExpanded(false)
+      onMutate?.()
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Failed to add deal')
     } finally {
       setAddingDeal(false)
     }
-  }, [contact, dealForm])
+  }, [contact, dealForm, onMutate])
 
-  const updateDealStage = useCallback(async (dealId: string, stage: string) => {
-    setUpdatingDealId(dealId)
-    try {
-      const token = await getToken()
-      const updated = await apiPatch<ContactDeal>(`/deals/${dealId}`, { stage }, token)
-      setContact((prev) =>
-        prev
-          ? {
-              ...prev,
-              deals: ((prev.deals as ContactDeal[] | undefined) ?? []).map((deal) =>
-                deal.id === dealId ? updated : deal,
-              ),
-            }
-          : prev,
-      )
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to update deal')
-    } finally {
-      setUpdatingDealId(null)
-    }
-  }, [])
+  const updateDealStage = useCallback(
+    async (dealId: string, stage: string) => {
+      setUpdatingDealId(dealId)
+      try {
+        const token = await getToken()
+        const updated = await apiPatch<ContactDeal>(`/deals/${dealId}`, { stage }, token)
+        setContact((prev) =>
+          prev
+            ? {
+                ...prev,
+                deals: ((prev.deals as ContactDeal[] | undefined) ?? []).map((deal) =>
+                  deal.id === dealId ? updated : deal,
+                ),
+              }
+            : prev,
+        )
+        onMutate?.()
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to update deal')
+      } finally {
+        setUpdatingDealId(null)
+      }
+    },
+    [onMutate],
+  )
 
-  const deleteDeal = useCallback(async (dealId: string) => {
-    setDeletingDealId(dealId)
-    try {
-      const token = await getToken()
-      await apiDelete(`/deals/${dealId}`, token)
-      setContact((prev) =>
-        prev
-          ? {
-              ...prev,
-              deals: ((prev.deals as ContactDeal[] | undefined) ?? []).filter(
-                (deal) => deal.id !== dealId,
-              ),
-            }
-          : prev,
-      )
-    } catch (err) {
-      setDrawerError(err instanceof Error ? err.message : 'Failed to delete deal')
-    } finally {
-      setDeletingDealId(null)
-    }
-  }, [])
+  const deleteDeal = useCallback(
+    async (dealId: string) => {
+      const confirmed = window.confirm('Delete this deal? This cannot be undone.')
+      if (!confirmed) return
+      setDeletingDealId(dealId)
+      try {
+        const token = await getToken()
+        await apiDelete(`/deals/${dealId}`, token)
+        setContact((prev) =>
+          prev
+            ? {
+                ...prev,
+                deals: ((prev.deals as ContactDeal[] | undefined) ?? []).filter(
+                  (deal) => deal.id !== dealId,
+                ),
+              }
+            : prev,
+        )
+        onMutate?.()
+      } catch (err) {
+        setDrawerError(err instanceof Error ? err.message : 'Failed to delete deal')
+      } finally {
+        setDeletingDealId(null)
+      }
+    },
+    [onMutate],
+  )
 
   const saveCustomFieldValue = useCallback(
     async (fieldId: string, value: string) => {
@@ -1048,6 +1114,7 @@ export function ContactDetailDrawer({
                           Boolean(task.dueAt) &&
                           !task.completed &&
                           new Date(task.dueAt as string) < new Date()
+                        const busy = updatingTaskId === task.id || deletingTaskId === task.id
 
                         return (
                           <div
@@ -1057,7 +1124,7 @@ export function ContactDetailDrawer({
                             <input
                               type="checkbox"
                               checked={task.completed}
-                              disabled={updatingTaskId === task.id}
+                              disabled={busy}
                               onChange={() => void toggleTask(task)}
                               className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                             />
@@ -1081,7 +1148,7 @@ export function ContactDetailDrawer({
                             <button
                               type="button"
                               onClick={() => void deleteTask(task.id)}
-                              disabled={deletingTaskId === task.id}
+                              disabled={busy}
                               className="app-touch-target text-gray-400 hover:text-red-500 disabled:opacity-50"
                               aria-label="Delete task"
                             >
@@ -1149,61 +1216,68 @@ export function ContactDetailDrawer({
                 <div className="app-panel-subtle space-y-3 rounded-[24px] p-3">
                   {deals.length > 0 ? (
                     <div className="space-y-2">
-                      {deals.map((deal) => (
-                        <div key={deal.id} className="rounded-lg border border-gray-100 px-3 py-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-gray-800">
-                                {deal.title}
-                              </p>
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getDealStageClasses(deal.stage)}`}
-                                >
-                                  {deal.stage}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {formatCurrency(deal.value, deal.currency)}
-                                </span>
-                                {deal.closeDate && (
-                                  <span className="text-xs text-gray-400">
-                                    Close {formatDate(deal.closeDate, userTz)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void deleteDeal(deal.id)}
-                              disabled={deletingDealId === deal.id}
-                              className="app-touch-target text-gray-400 hover:text-red-500 disabled:opacity-50"
-                              aria-label="Delete deal"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                      {deals.map((deal) => {
+                        const busy = updatingDealId === deal.id || deletingDealId === deal.id
 
-                          <div className="mt-3 flex items-center gap-2">
-                            <SelectField
-                              value={deal.stage}
-                              onChange={(e) => void updateDealStage(deal.id, e.target.value)}
-                              disabled={updatingDealId === deal.id}
-                              className="app-touch-target rounded-xl px-3 py-2.5 pr-9 text-xs focus:border-indigo-400 focus:ring-indigo-100"
-                            >
-                              {DEAL_STAGES.map((stage) => (
-                                <option key={stage} value={stage}>
-                                  {stage}
-                                </option>
-                              ))}
-                            </SelectField>
-                            {deal.probability != null && (
-                              <span className="text-xs text-gray-400">
-                                {deal.probability}% probability
-                              </span>
-                            )}
+                        return (
+                          <div
+                            key={deal.id}
+                            className="rounded-lg border border-gray-100 px-3 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-gray-800">
+                                  {deal.title}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getDealStageClasses(deal.stage)}`}
+                                  >
+                                    {deal.stage}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {formatCurrency(deal.value, deal.currency)}
+                                  </span>
+                                  {deal.closeDate && (
+                                    <span className="text-xs text-gray-400">
+                                      Close {formatDate(deal.closeDate, userTz)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void deleteDeal(deal.id)}
+                                disabled={busy}
+                                className="app-touch-target text-gray-400 hover:text-red-500 disabled:opacity-50"
+                                aria-label="Delete deal"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <div className="mt-3 flex items-center gap-2">
+                              <SelectField
+                                value={deal.stage}
+                                onChange={(e) => void updateDealStage(deal.id, e.target.value)}
+                                disabled={busy}
+                                className="app-touch-target rounded-xl px-3 py-2.5 pr-9 text-xs focus:border-indigo-400 focus:ring-indigo-100"
+                              >
+                                {DEAL_STAGES.map((stage) => (
+                                  <option key={stage} value={stage}>
+                                    {stage}
+                                  </option>
+                                ))}
+                              </SelectField>
+                              {deal.probability != null && (
+                                <span className="text-xs text-gray-400">
+                                  {deal.probability}% probability
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <p className="text-sm text-gray-400">No deals yet.</p>
@@ -1290,12 +1364,12 @@ export function ContactDetailDrawer({
                 {customFields.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-sm text-gray-400">
                     No custom fields.{' '}
-                    <a
+                    <Link
                       href="/crm/custom-fields"
                       className="font-medium text-indigo-600 hover:underline"
                     >
                       Manage custom fields
-                    </a>
+                    </Link>
                   </div>
                 ) : (
                   <div className="app-panel-subtle space-y-2 rounded-[24px] p-3">
@@ -1310,6 +1384,7 @@ export function ContactDetailDrawer({
                           field={field}
                           value={existingValue?.value ?? ''}
                           onSave={(value) => void saveCustomFieldValue(field.id, value)}
+                          saving={savingCustomFieldId === field.id}
                         />
                       )
                     })}
@@ -1655,10 +1730,12 @@ function EditableCustomField({
   field,
   value,
   onSave,
+  saving,
 }: {
   field: CustomFieldDefinition
   value: string
   onSave: (value: string) => void
+  saving: boolean
 }): JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -1679,9 +1756,11 @@ function EditableCustomField({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => {
+              if (saving) return
               setEditing(false)
               onSave(draft)
             }}
+            disabled={saving}
             className="rounded-xl border-indigo-300 px-3 py-2.5 pr-9 text-sm focus:border-indigo-500 focus:ring-indigo-100"
           >
             <option value="">Select an option</option>
@@ -1706,15 +1785,18 @@ function EditableCustomField({
             value={field.fieldType === 'DATE' ? formatDateInputValue(draft) : draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => {
+              if (saving) return
               setEditing(false)
               onSave(draft)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') e.currentTarget.blur()
             }}
+            disabled={saving}
             className="w-full rounded border border-indigo-300 px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         )}
+        {saving && <p className="mt-2 text-xs text-indigo-600">Saving...</p>}
       </div>
     )
   }
@@ -1723,7 +1805,8 @@ function EditableCustomField({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className="flex w-full items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
+      disabled={saving}
+      className="flex w-full items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-left hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <div className="min-w-0">
         <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{field.label}</p>

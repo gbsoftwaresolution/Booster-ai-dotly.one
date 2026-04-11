@@ -4,6 +4,7 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiDelete } from '@/lib/api'
+import { getPublicApiUrl } from '@/lib/public-env'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import {
   Inbox,
@@ -36,6 +37,8 @@ interface LeadSubmission {
   submittedAt: string
   contact: SubmissionContact | null
 }
+
+const API_URL = getPublicApiUrl()
 
 interface LeadSubmissionsResponse {
   submissions: LeadSubmission[]
@@ -93,6 +96,10 @@ export default function LeadsPage(): JSX.Element {
           token,
         )
         setSubmissions(data.submissions)
+        setSelectedIds((prev) => {
+          const visibleIds = new Set(data.submissions.map((submission) => submission.id))
+          return new Set([...prev].filter((id) => visibleIds.has(id)))
+        })
         setTotal(data.total)
         setPage(p)
       } catch (err) {
@@ -143,10 +150,9 @@ export default function LeadsPage(): JSX.Element {
       const params = new URLSearchParams()
       if (cardFilter) params.set('cardId', cardFilter)
       if (search.trim()) params.set('search', search.trim())
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? ''}/lead-submissions/export?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${token ?? ''}` } },
-      )
+      const res = await fetch(`${API_URL}/lead-submissions/export?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+      })
       if (!res.ok) {
         const message = await res.text().catch(() => '')
         if (message.includes('CSV export is available on Pro.')) {
@@ -193,8 +199,26 @@ export default function LeadsPage(): JSX.Element {
     if (!window.confirm(`Delete ${selectedIds.size} submission(s)? This cannot be undone.`)) return
     try {
       const token = await getAccessToken()
-      await Promise.all([...selectedIds].map((id) => apiDelete(`/lead-submissions/${id}`, token)))
-      setSelectedIds(new Set())
+      const ids = [...selectedIds]
+      const results = await Promise.allSettled(
+        ids.map((id) => apiDelete(`/lead-submissions/${id}`, token)),
+      )
+      const succeededIds = ids.filter((_, index) => results[index]?.status === 'fulfilled')
+      const failedCount = results.length - succeededIds.length
+
+      if (succeededIds.length > 0) {
+        setSubmissions((prev) => prev.filter((submission) => !succeededIds.includes(submission.id)))
+        setSelectedIds((prev) => new Set([...prev].filter((id) => !succeededIds.includes(id))))
+      }
+
+      if (failedCount > 0) {
+        setError(
+          failedCount === results.length
+            ? 'Failed to delete selected submissions.'
+            : `Deleted ${succeededIds.length} submission(s), but ${failedCount} failed.`,
+        )
+      }
+
       void loadSubmissions(page, cardFilter, search)
     } catch {
       setError('Failed to delete one or more submissions.')
