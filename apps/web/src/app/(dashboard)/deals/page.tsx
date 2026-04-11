@@ -87,6 +87,82 @@ function normalizePercent(value: number): number {
   return value <= 1 ? value * 100 : value
 }
 
+function isValidDateInput(value: string): boolean {
+  if (!value) return false
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return !Number.isNaN(parsed.getTime())
+}
+
+function validateDealForm(values: {
+  title: string
+  selectedContactId?: string
+  value: string
+  probability: string
+  closeDate: string
+  notes: string
+}): {
+  fieldErrors: Partial<
+    Record<'title' | 'contact' | 'value' | 'probability' | 'closeDate' | 'notes', string>
+  >
+  trimmedTitle: string
+  trimmedNotes: string
+  parsedValue?: number
+  parsedProbability?: number
+  closeDateIso?: string | null
+} {
+  const trimmedTitle = values.title.trim()
+  const trimmedNotes = values.notes.trim()
+  const nextFieldErrors: Partial<
+    Record<'title' | 'contact' | 'value' | 'probability' | 'closeDate' | 'notes', string>
+  > = {}
+  let parsedValue: number | undefined
+  let parsedProbability: number | undefined
+  let closeDateIso: string | null | undefined
+
+  if (!trimmedTitle) {
+    nextFieldErrors.title = 'Deal title is required.'
+  }
+
+  if (values.selectedContactId !== undefined && !values.selectedContactId) {
+    nextFieldErrors.contact = 'Please select a contact.'
+  }
+
+  if (values.value.trim()) {
+    parsedValue = Number(values.value)
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+      nextFieldErrors.value = 'Value must be a non-negative number.'
+    }
+  }
+
+  if (values.probability.trim()) {
+    parsedProbability = Number(values.probability)
+    if (!Number.isInteger(parsedProbability) || parsedProbability < 0 || parsedProbability > 100) {
+      nextFieldErrors.probability = 'Probability must be a whole number between 0 and 100.'
+    }
+  }
+
+  if (values.closeDate) {
+    if (!isValidDateInput(values.closeDate)) {
+      nextFieldErrors.closeDate = 'Close date must be a valid date.'
+    } else {
+      closeDateIso = new Date(`${values.closeDate}T00:00:00.000Z`).toISOString()
+    }
+  }
+
+  if (trimmedNotes.length > 5000) {
+    nextFieldErrors.notes = 'Notes must be 5000 characters or less.'
+  }
+
+  return {
+    fieldErrors: nextFieldErrors,
+    trimmedTitle,
+    trimmedNotes,
+    parsedValue,
+    parsedProbability,
+    closeDateIso,
+  }
+}
+
 // ─── Create Deal Modal ────────────────────────────────────────────────────────
 
 interface CreateDealModalProps {
@@ -109,6 +185,9 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<'title' | 'contact' | 'value' | 'probability' | 'closeDate' | 'notes', string>>
+  >({})
 
   useEffect(() => {
     previousActiveElementRef.current = document.activeElement as HTMLElement | null
@@ -150,27 +229,36 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
   }, [onClose])
 
   async function handleSubmit() {
-    if (!title.trim()) {
-      setError('Deal title is required')
+    const validation = validateDealForm({
+      title,
+      selectedContactId,
+      value,
+      probability,
+      closeDate,
+      notes,
+    })
+
+    if (Object.keys(validation.fieldErrors).length > 0) {
+      setFieldErrors(validation.fieldErrors)
+      setError('Fix the highlighted fields before creating the deal.')
       return
     }
-    if (!selectedContactId) {
-      setError('Please select a contact')
-      return
-    }
+
     setSaving(true)
     setError(null)
+    setFieldErrors({})
     try {
       const token = await getAccessToken()
       const body: Record<string, unknown> = {
-        title: title.trim(),
+        title: validation.trimmedTitle,
         stage,
         currency,
       }
-      if (value) body.value = parseFloat(value)
-      if (probability) body.probability = parseFloat(probability)
-      if (closeDate) body.closeDate = new Date(closeDate).toISOString()
-      if (notes.trim()) body.notes = notes.trim()
+      if (validation.parsedValue !== undefined) body.value = validation.parsedValue
+      if (validation.parsedProbability !== undefined)
+        body.probability = validation.parsedProbability
+      if (validation.closeDateIso) body.closeDate = validation.closeDateIso
+      if (validation.trimmedNotes) body.notes = validation.trimmedNotes
 
       const created = await apiPost<Deal>(`/contacts/${selectedContactId}/deals`, body, token)
       onCreated(created)
@@ -253,6 +341,9 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
                 )}
               </div>
             )}
+            {fieldErrors.contact && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.contact}</p>
+            )}
           </div>
 
           {/* Title */}
@@ -263,11 +354,21 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, title: undefined }))
+              }}
               placeholder="e.g. Enterprise contract"
               maxLength={300}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              aria-invalid={fieldErrors.title ? 'true' : 'false'}
+              aria-describedby={fieldErrors.title ? 'create-deal-title-error' : undefined}
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${fieldErrors.title ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'}`}
             />
+            {fieldErrors.title && (
+              <p id="create-deal-title-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.title}
+              </p>
+            )}
           </div>
 
           {/* Value + Currency */}
@@ -279,10 +380,20 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
                 min="0"
                 step="0.01"
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={(e) => {
+                  setValue(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, value: undefined }))
+                }}
                 placeholder="0"
-                className={DEAL_INPUT_CLASS}
+                aria-invalid={fieldErrors.value ? 'true' : 'false'}
+                aria-describedby={fieldErrors.value ? 'create-deal-value-error' : undefined}
+                className={`${DEAL_INPUT_CLASS} ${fieldErrors.value ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {fieldErrors.value && (
+                <p id="create-deal-value-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.value}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
@@ -327,19 +438,43 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
                 min="0"
                 max="100"
                 value={probability}
-                onChange={(e) => setProbability(e.target.value)}
+                onChange={(e) => {
+                  setProbability(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, probability: undefined }))
+                }}
                 placeholder="50"
-                className={DEAL_INPUT_CLASS}
+                aria-invalid={fieldErrors.probability ? 'true' : 'false'}
+                aria-describedby={
+                  fieldErrors.probability ? 'create-deal-probability-error' : undefined
+                }
+                className={`${DEAL_INPUT_CLASS} ${fieldErrors.probability ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {fieldErrors.probability && (
+                <p id="create-deal-probability-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.probability}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Close date</label>
               <input
                 type="date"
                 value={closeDate}
-                onChange={(e) => setCloseDate(e.target.value)}
-                className={DEAL_INPUT_CLASS}
+                onChange={(e) => {
+                  setCloseDate(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, closeDate: undefined }))
+                }}
+                aria-invalid={fieldErrors.closeDate ? 'true' : 'false'}
+                aria-describedby={
+                  fieldErrors.closeDate ? 'create-deal-close-date-error' : undefined
+                }
+                className={`${DEAL_INPUT_CLASS} ${fieldErrors.closeDate ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {fieldErrors.closeDate && (
+                <p id="create-deal-close-date-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.closeDate}
+                </p>
+              )}
             </div>
           </div>
 
@@ -348,12 +483,22 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                setNotes(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, notes: undefined }))
+              }}
               rows={3}
-              maxLength={2000}
+              maxLength={5000}
               placeholder="Deal context, next steps..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              aria-invalid={fieldErrors.notes ? 'true' : 'false'}
+              aria-describedby={fieldErrors.notes ? 'create-deal-notes-error' : undefined}
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${fieldErrors.notes ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'}`}
             />
+            {fieldErrors.notes && (
+              <p id="create-deal-notes-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.notes}
+              </p>
+            )}
           </div>
         </div>
 
@@ -401,24 +546,38 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
   const [closeDate, setCloseDate] = useState(deal.closeDate ? deal.closeDate.slice(0, 10) : '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<'title' | 'value' | 'probability' | 'closeDate', string>>
+  >({})
 
   async function handleSubmit() {
-    if (!title.trim()) {
-      setError('Deal title is required')
+    const validation = validateDealForm({
+      title,
+      value,
+      probability,
+      closeDate,
+      notes: '',
+    })
+
+    if (Object.keys(validation.fieldErrors).length > 0) {
+      setFieldErrors(validation.fieldErrors)
+      setError('Fix the highlighted fields before saving the deal.')
       return
     }
+
     setSaving(true)
     setError(null)
+    setFieldErrors({})
     try {
       const token = await getAccessToken()
       const body: Record<string, unknown> = {
-        title: title.trim(),
+        title: validation.trimmedTitle,
         stage,
         currency,
       }
-      body.value = value ? parseFloat(value) : 0
-      body.probability = probability ? parseFloat(probability) : 0
-      body.closeDate = closeDate ? new Date(closeDate).toISOString() : null
+      body.value = validation.parsedValue ?? 0
+      body.probability = validation.parsedProbability ?? 0
+      body.closeDate = validation.closeDateIso ?? null
 
       const updated = await apiPatch<Deal>(`/deals/${deal.id}`, body, token)
       onUpdated(updated)
@@ -479,10 +638,20 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, title: undefined }))
+              }}
               maxLength={300}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              aria-invalid={fieldErrors.title ? 'true' : 'false'}
+              aria-describedby={fieldErrors.title ? 'edit-deal-title-error' : undefined}
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${fieldErrors.title ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'}`}
             />
+            {fieldErrors.title && (
+              <p id="edit-deal-title-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.title}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -493,10 +662,20 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
                 min="0"
                 step="0.01"
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={(e) => {
+                  setValue(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, value: undefined }))
+                }}
                 placeholder="0"
-                className={DEAL_INPUT_CLASS}
+                aria-invalid={fieldErrors.value ? 'true' : 'false'}
+                aria-describedby={fieldErrors.value ? 'edit-deal-value-error' : undefined}
+                className={`${DEAL_INPUT_CLASS} ${fieldErrors.value ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {fieldErrors.value && (
+                <p id="edit-deal-value-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.value}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
@@ -539,19 +718,41 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
                 min="0"
                 max="100"
                 value={probability}
-                onChange={(e) => setProbability(e.target.value)}
+                onChange={(e) => {
+                  setProbability(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, probability: undefined }))
+                }}
                 placeholder="50"
-                className={DEAL_INPUT_CLASS}
+                aria-invalid={fieldErrors.probability ? 'true' : 'false'}
+                aria-describedby={
+                  fieldErrors.probability ? 'edit-deal-probability-error' : undefined
+                }
+                className={`${DEAL_INPUT_CLASS} ${fieldErrors.probability ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {fieldErrors.probability && (
+                <p id="edit-deal-probability-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.probability}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Close date</label>
               <input
                 type="date"
                 value={closeDate}
-                onChange={(e) => setCloseDate(e.target.value)}
-                className={DEAL_INPUT_CLASS}
+                onChange={(e) => {
+                  setCloseDate(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, closeDate: undefined }))
+                }}
+                aria-invalid={fieldErrors.closeDate ? 'true' : 'false'}
+                aria-describedby={fieldErrors.closeDate ? 'edit-deal-close-date-error' : undefined}
+                className={`${DEAL_INPUT_CLASS} ${fieldErrors.closeDate ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
               />
+              {fieldErrors.closeDate && (
+                <p id="edit-deal-close-date-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.closeDate}
+                </p>
+              )}
               {closeDate && (
                 <button
                   type="button"

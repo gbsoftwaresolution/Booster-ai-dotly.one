@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
 import { Feather } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
 
@@ -42,6 +43,7 @@ function isOverdue(task: Task): boolean {
 }
 
 export default function TasksScreen() {
+  const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -274,7 +276,11 @@ export default function TasksScreen() {
 
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                   {task.contact && (
-                    <Text style={{ fontSize: 11, color: '#64748b' }}>{task.contact.name}</Text>
+                    <TouchableOpacity onPress={() => router.push(`/contact/${task.contact!.id}`)}>
+                      <Text style={{ fontSize: 11, color: '#0ea5e9', fontWeight: '600' }}>
+                        {task.contact.name}
+                      </Text>
+                    </TouchableOpacity>
                   )}
                   {task.dueAt && (
                     <Text

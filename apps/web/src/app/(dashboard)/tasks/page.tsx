@@ -48,6 +48,13 @@ function isOverdue(task: TaskItem): boolean {
   return Boolean(task.dueAt && !task.completed && new Date(task.dueAt).getTime() < Date.now())
 }
 
+function parseTaskDueAt(value: string): string | null | undefined {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed.toISOString()
+}
+
 export default function TasksPage(): JSX.Element {
   const userTz = useUserTimezone()
   const [tasks, setTasks] = useState<TaskItem[]>([])
@@ -64,6 +71,9 @@ export default function TasksPage(): JSX.Element {
   const [editDueAt, setEditDueAt] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [editFieldErrors, setEditFieldErrors] = useState<
+    Partial<Record<'title' | 'dueAt', string>>
+  >({})
 
   // Create task modal state
   const [showCreate, setShowCreate] = useState(false)
@@ -75,6 +85,9 @@ export default function TasksPage(): JSX.Element {
   const [createSaving, setCreateSaving] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createContactLoadError, setCreateContactLoadError] = useState<string | null>(null)
+  const [createFieldErrors, setCreateFieldErrors] = useState<
+    Partial<Record<'contact' | 'title' | 'dueAt', string>>
+  >({})
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -190,6 +203,7 @@ export default function TasksPage(): JSX.Element {
     setEditTitle(task.title)
     setEditDueAt(toDatetimeLocal(task.dueAt))
     setEditError(null)
+    setEditFieldErrors({})
   }
 
   function closeEdit() {
@@ -197,23 +211,39 @@ export default function TasksPage(): JSX.Element {
     setEditTitle('')
     setEditDueAt('')
     setEditError(null)
+    setEditFieldErrors({})
   }
 
   async function handleSaveEdit() {
     if (!editingTask) return
-    if (!editTitle.trim()) {
-      setEditError('Title is required')
+    const trimmedTitle = editTitle.trim()
+    const dueAtIso = parseTaskDueAt(editDueAt)
+    const nextFieldErrors: Partial<Record<'title' | 'dueAt', string>> = {}
+
+    if (!trimmedTitle) {
+      nextFieldErrors.title = 'Title is required.'
+    }
+
+    if (dueAtIso === undefined) {
+      nextFieldErrors.dueAt = 'Due date must be a valid date and time.'
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setEditFieldErrors(nextFieldErrors)
+      setEditError('Fix the highlighted fields before saving.')
       return
     }
+
     setEditSaving(true)
     setEditError(null)
+    setEditFieldErrors({})
     try {
       const token = await getAccessToken()
       const updated = await apiPatch<TaskItem>(
         `/tasks/${editingTask.id}`,
         {
-          title: editTitle.trim(),
-          dueAt: editDueAt ? new Date(editDueAt).toISOString() : null,
+          title: trimmedTitle,
+          dueAt: dueAtIso,
         },
         token,
       )
@@ -251,29 +281,44 @@ export default function TasksPage(): JSX.Element {
     setCreateContactId('')
     setCreateContactSearch('')
     setCreateError(null)
+    setCreateFieldErrors({})
     setShowCreate(true)
   }
 
   function closeCreate() {
     setShowCreate(false)
     setCreateError(null)
+    setCreateFieldErrors({})
   }
 
   async function handleCreateTask() {
-    if (!createTitle.trim()) {
-      setCreateError('Title is required')
-      return
+    const trimmedTitle = createTitle.trim()
+    const dueAtIso = parseTaskDueAt(createDueAt)
+    const nextFieldErrors: Partial<Record<'contact' | 'title' | 'dueAt', string>> = {}
+
+    if (!trimmedTitle) {
+      nextFieldErrors.title = 'Title is required.'
     }
     if (!createContactId) {
-      setCreateError('Please select a contact')
+      nextFieldErrors.contact = 'Please select a contact.'
+    }
+    if (dueAtIso === undefined) {
+      nextFieldErrors.dueAt = 'Due date must be a valid date and time.'
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setCreateFieldErrors(nextFieldErrors)
+      setCreateError('Fix the highlighted fields before creating the task.')
       return
     }
+
     setCreateSaving(true)
     setCreateError(null)
+    setCreateFieldErrors({})
     try {
       const token = await getAccessToken()
-      const body: Record<string, unknown> = { title: createTitle.trim() }
-      if (createDueAt) body.dueAt = new Date(createDueAt).toISOString()
+      const body: Record<string, unknown> = { title: trimmedTitle }
+      if (dueAtIso) body.dueAt = dueAtIso
       const created = await apiPost<TaskItem>(`/contacts/${createContactId}/tasks`, body, token)
       setTasks((prev) => [created, ...prev])
       closeCreate()
@@ -624,19 +669,39 @@ export default function TasksPage(): JSX.Element {
                 <input
                   type="text"
                   value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
+                  onChange={(e) => {
+                    setEditTitle(e.target.value)
+                    setEditFieldErrors((prev) => ({ ...prev, title: undefined }))
+                  }}
                   maxLength={500}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-invalid={editFieldErrors.title ? 'true' : 'false'}
+                  aria-describedby={editFieldErrors.title ? 'edit-task-title-error' : undefined}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${editFieldErrors.title ? 'border-red-300 focus:ring-red-100' : 'border-gray-300 focus:ring-indigo-500'}`}
                 />
+                {editFieldErrors.title && (
+                  <p id="edit-task-title-error" className="mt-1 text-xs text-red-600">
+                    {editFieldErrors.title}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Due date</label>
                 <input
                   type="datetime-local"
                   value={editDueAt}
-                  onChange={(e) => setEditDueAt(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onChange={(e) => {
+                    setEditDueAt(e.target.value)
+                    setEditFieldErrors((prev) => ({ ...prev, dueAt: undefined }))
+                  }}
+                  aria-invalid={editFieldErrors.dueAt ? 'true' : 'false'}
+                  aria-describedby={editFieldErrors.dueAt ? 'edit-task-due-error' : undefined}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${editFieldErrors.dueAt ? 'border-red-300 focus:ring-red-100' : 'border-gray-300 focus:ring-indigo-500'}`}
                 />
+                {editFieldErrors.dueAt && (
+                  <p id="edit-task-due-error" className="mt-1 text-xs text-red-600">
+                    {editFieldErrors.dueAt}
+                  </p>
+                )}
                 {editDueAt && (
                   <button
                     type="button"
@@ -760,6 +825,9 @@ export default function TasksPage(): JSX.Element {
                     )}
                   </div>
                 )}
+                {createFieldErrors.contact && (
+                  <p className="mt-1 text-xs text-red-600">{createFieldErrors.contact}</p>
+                )}
               </div>
 
               {/* Title */}
@@ -770,11 +838,21 @@ export default function TasksPage(): JSX.Element {
                 <input
                   type="text"
                   value={createTitle}
-                  onChange={(e) => setCreateTitle(e.target.value)}
+                  onChange={(e) => {
+                    setCreateTitle(e.target.value)
+                    setCreateFieldErrors((prev) => ({ ...prev, title: undefined }))
+                  }}
                   maxLength={500}
                   placeholder="e.g. Follow up with proposal"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  aria-invalid={createFieldErrors.title ? 'true' : 'false'}
+                  aria-describedby={createFieldErrors.title ? 'create-task-title-error' : undefined}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${createFieldErrors.title ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'}`}
                 />
+                {createFieldErrors.title && (
+                  <p id="create-task-title-error" className="mt-1 text-xs text-red-600">
+                    {createFieldErrors.title}
+                  </p>
+                )}
               </div>
 
               {/* Due date */}
@@ -783,9 +861,19 @@ export default function TasksPage(): JSX.Element {
                 <input
                   type="datetime-local"
                   value={createDueAt}
-                  onChange={(e) => setCreateDueAt(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  onChange={(e) => {
+                    setCreateDueAt(e.target.value)
+                    setCreateFieldErrors((prev) => ({ ...prev, dueAt: undefined }))
+                  }}
+                  aria-invalid={createFieldErrors.dueAt ? 'true' : 'false'}
+                  aria-describedby={createFieldErrors.dueAt ? 'create-task-due-error' : undefined}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${createFieldErrors.dueAt ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'}`}
                 />
+                {createFieldErrors.dueAt && (
+                  <p id="create-task-due-error" className="mt-1 text-xs text-red-600">
+                    {createFieldErrors.dueAt}
+                  </p>
+                )}
                 {createDueAt && (
                   <button
                     type="button"

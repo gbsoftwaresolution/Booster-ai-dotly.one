@@ -73,6 +73,49 @@ const MONTHS = [
   'December',
 ]
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function isValidQuestionAnswer(question: BookingQuestion, value: string): string | null {
+  const trimmed = value.trim()
+
+  if (question.required && question.type !== 'CHECKBOX' && !trimmed) {
+    return `${question.label} is required.`
+  }
+
+  if (question.type === 'CHECKBOX') {
+    if (question.required && value !== 'true') {
+      return `${question.label} is required.`
+    }
+    return null
+  }
+
+  if (!trimmed) return null
+
+  if (trimmed.length > 5000) {
+    return `${question.label} must be 5000 characters or less.`
+  }
+
+  if (question.type === 'EMAIL' && !EMAIL_REGEX.test(trimmed)) {
+    return `Enter a valid ${question.label.toLowerCase()}.`
+  }
+
+  if (
+    question.type === 'SELECT' &&
+    question.options.length > 0 &&
+    !question.options.includes(trimmed)
+  ) {
+    return `Select a valid ${question.label.toLowerCase()}.`
+  }
+
+  return null
+}
+
+function clearErrorKey(errors: Record<string, string>, key: string): Record<string, string> {
+  if (!errors[key]) return errors
+  const next = { ...errors }
+  delete next[key]
+  return next
+}
 
 function isoDate(d: Date): string {
   // HIGH-4: Calendar cells are built as local-midnight Dates (new Date(y, m, d)).
@@ -269,6 +312,7 @@ export default function BookingPage(): JSX.Element {
   const [guestEmail, setGuestEmail] = useState('')
   const [guestNotes, setGuestNotes] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmedBooking, setConfirmedBooking] = useState<{ startAt: string } | null>(null)
@@ -341,6 +385,54 @@ export default function BookingPage(): JSX.Element {
   async function handleSubmitBooking(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedSlot) return
+
+    const trimmedGuestName = guestName.trim()
+    const trimmedGuestEmail = guestEmail.trim().toLowerCase()
+    const trimmedGuestNotes = guestNotes.trim()
+    const nextFieldErrors: Record<string, string> = {}
+    const nextAnswers: Record<string, string> = {}
+
+    if (!trimmedGuestName) {
+      nextFieldErrors.guestName = 'Full name is required.'
+    } else if (trimmedGuestName.length > 120) {
+      nextFieldErrors.guestName = 'Full name must be 120 characters or less.'
+    }
+
+    if (!trimmedGuestEmail) {
+      nextFieldErrors.guestEmail = 'Email address is required.'
+    } else if (!EMAIL_REGEX.test(trimmedGuestEmail)) {
+      nextFieldErrors.guestEmail = 'Enter a valid email address.'
+    } else if (trimmedGuestEmail.length > 254) {
+      nextFieldErrors.guestEmail = 'Email address must be 254 characters or less.'
+    }
+
+    if (trimmedGuestNotes.length > 1000) {
+      nextFieldErrors.guestNotes = 'Notes must be 1000 characters or less.'
+    }
+
+    for (const question of apt?.questions ?? []) {
+      const normalizedValue =
+        question.type === 'CHECKBOX'
+          ? (answers[question.id] ?? 'false')
+          : (answers[question.id] ?? '').trim()
+      nextAnswers[question.id] = normalizedValue
+      const validationError = isValidQuestionAnswer(question, normalizedValue)
+      if (validationError) {
+        nextFieldErrors[question.id] = validationError
+      }
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setGuestName(trimmedGuestName)
+      setGuestEmail(trimmedGuestEmail)
+      setGuestNotes(trimmedGuestNotes)
+      setAnswers((prev) => ({ ...prev, ...nextAnswers }))
+      setSubmitError('Fix the highlighted fields before confirming your booking.')
+      return
+    }
+
+    setFieldErrors({})
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -349,16 +441,16 @@ export default function BookingPage(): JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           startAt: selectedSlot,
-          guestName,
-          guestEmail,
-          guestNotes,
+          guestName: trimmedGuestName,
+          guestEmail: trimmedGuestEmail,
+          guestNotes: trimmedGuestNotes || undefined,
           answers:
             apt?.questions
               ?.map((q) => ({
                 questionId: q.id,
-                value: answers[q.id] ?? '',
+                value: nextAnswers[q.id] ?? (q.type === 'CHECKBOX' ? 'false' : ''),
               }))
-              .filter((a) => a.value !== '') ?? [],
+              .filter((a) => a.value !== '' && a.value !== 'false') ?? [],
         }),
       })
       if (!res.ok) {
@@ -638,11 +730,22 @@ export default function BookingPage(): JSX.Element {
                 <input
                   required
                   value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
+                  onChange={(e) => {
+                    setGuestName(e.target.value)
+                    setFieldErrors((prev) => clearErrorKey(prev, 'guestName'))
+                  }}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                   placeholder="Your full name"
                   autoComplete="name"
+                  maxLength={120}
+                  aria-invalid={fieldErrors.guestName ? 'true' : 'false'}
+                  aria-describedby={fieldErrors.guestName ? 'booking-name-error' : undefined}
                 />
+                {fieldErrors.guestName && (
+                  <p id="booking-name-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.guestName}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
@@ -652,11 +755,22 @@ export default function BookingPage(): JSX.Element {
                   required
                   type="email"
                   value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
+                  onChange={(e) => {
+                    setGuestEmail(e.target.value)
+                    setFieldErrors((prev) => clearErrorKey(prev, 'guestEmail'))
+                  }}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                   placeholder="you@example.com"
                   autoComplete="email"
+                  maxLength={254}
+                  aria-invalid={fieldErrors.guestEmail ? 'true' : 'false'}
+                  aria-describedby={fieldErrors.guestEmail ? 'booking-email-error' : undefined}
                 />
+                {fieldErrors.guestEmail && (
+                  <p id="booking-email-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.guestEmail}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
@@ -665,11 +779,22 @@ export default function BookingPage(): JSX.Element {
                 </label>
                 <textarea
                   value={guestNotes}
-                  onChange={(e) => setGuestNotes(e.target.value)}
+                  onChange={(e) => {
+                    setGuestNotes(e.target.value)
+                    setFieldErrors((prev) => clearErrorKey(prev, 'guestNotes'))
+                  }}
                   rows={3}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                   placeholder="Anything you'd like to share before the meeting…"
+                  maxLength={1000}
+                  aria-invalid={fieldErrors.guestNotes ? 'true' : 'false'}
+                  aria-describedby={fieldErrors.guestNotes ? 'booking-notes-error' : undefined}
                 />
+                {fieldErrors.guestNotes && (
+                  <p id="booking-notes-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.guestNotes}
+                  </p>
+                )}
               </div>
               {/* Custom questions */}
               {apt.questions &&
@@ -684,20 +809,27 @@ export default function BookingPage(): JSX.Element {
                       <textarea
                         required={q.required}
                         value={answers[q.id] ?? ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                        }
+                          setFieldErrors((prev) => clearErrorKey(prev, q.id))
+                        }}
                         rows={3}
                         className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        maxLength={5000}
+                        aria-invalid={fieldErrors[q.id] ? 'true' : 'false'}
+                        aria-describedby={fieldErrors[q.id] ? `${q.id}-error` : undefined}
                       />
                     ) : q.type === 'SELECT' ? (
                       <SelectField
                         required={q.required}
                         value={answers[q.id] ?? ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                        }
+                          setFieldErrors((prev) => clearErrorKey(prev, q.id))
+                        }}
                         className="rounded-xl px-4 py-3 pr-10 focus:border-sky-500 focus:ring-sky-100"
+                        aria-invalid={fieldErrors[q.id] ? 'true' : 'false'}
+                        aria-describedby={fieldErrors[q.id] ? `${q.id}-error` : undefined}
                       >
                         <option value="">Select an option…</option>
                         {q.options.map((opt) => (
@@ -712,13 +844,16 @@ export default function BookingPage(): JSX.Element {
                           type="checkbox"
                           required={q.required}
                           checked={answers[q.id] === 'true'}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setAnswers((prev) => ({
                               ...prev,
                               [q.id]: e.target.checked ? 'true' : 'false',
                             }))
-                          }
+                            setFieldErrors((prev) => clearErrorKey(prev, q.id))
+                          }}
                           className="rounded border-gray-300"
+                          aria-invalid={fieldErrors[q.id] ? 'true' : 'false'}
+                          aria-describedby={fieldErrors[q.id] ? `${q.id}-error` : undefined}
                         />
                         <span className="text-sm text-gray-600">{q.label}</span>
                       </label>
@@ -727,11 +862,20 @@ export default function BookingPage(): JSX.Element {
                         type={q.type === 'EMAIL' ? 'email' : q.type === 'PHONE' ? 'tel' : 'text'}
                         required={q.required}
                         value={answers[q.id] ?? ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                        }
+                          setFieldErrors((prev) => clearErrorKey(prev, q.id))
+                        }}
                         className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        maxLength={5000}
+                        aria-invalid={fieldErrors[q.id] ? 'true' : 'false'}
+                        aria-describedby={fieldErrors[q.id] ? `${q.id}-error` : undefined}
                       />
+                    )}
+                    {fieldErrors[q.id] && (
+                      <p id={`${q.id}-error`} className="mt-1 text-xs text-red-600">
+                        {fieldErrors[q.id]}
+                      </p>
                     )}
                   </div>
                 ))}

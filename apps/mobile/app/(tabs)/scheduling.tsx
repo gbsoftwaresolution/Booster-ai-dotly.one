@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 import { api } from '../../lib/api'
@@ -102,8 +103,18 @@ export default function SchedulingScreen() {
     )
   }
 
+  function openWebSchedulingManager() {
+    void Linking.openURL('https://dotly.one/apps/scheduling')
+  }
+
   const renderAptType = ({ item }: { item: AppointmentType }) => (
-    <View style={styles.card}>
+    <TouchableOpacity
+      onPress={openWebSchedulingManager}
+      style={styles.card}
+      accessibilityRole="link"
+      accessibilityLabel={`Manage appointment type ${item.name}`}
+      accessibilityHint="Opens scheduling management in your browser"
+    >
       <View style={[styles.colorDot, { backgroundColor: item.color }]} />
       <View style={styles.cardContent}>
         <View style={styles.cardHeader}>
@@ -127,8 +138,9 @@ export default function SchedulingScreen() {
           ) : null}
         </View>
         <Text style={styles.bookingsCount}>{item._count.bookings} total bookings</Text>
+        <Text style={styles.manageHint}>Manage on web</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   )
 
   const renderBooking = ({ item }: { item: Booking }) => (
@@ -302,6 +314,7 @@ const styles = StyleSheet.create({
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   metaText: { fontSize: 12, color: '#94a3b8' },
   bookingsCount: { fontSize: 12, color: '#94a3b8' },
+  manageHint: { fontSize: 12, color: '#0ea5e9', fontWeight: '600', marginTop: 8 },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',

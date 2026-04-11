@@ -14,6 +14,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { createContact } from '../lib/api'
 import { api } from '../lib/api'
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_REGEX = /^[+]?[0-9()\-\s]{7,20}$/
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 interface Card {
   id: string
   handle: string
@@ -53,10 +65,16 @@ export default function ScanResultScreen() {
   const [phone, setPhone] = useState(sanitizeParam(params.phone, 30))
   const [company, setCompany] = useState(sanitizeParam(params.company, 100))
   const [title, setTitle] = useState(sanitizeParam(params.title, 100))
-  const [website, setWebsite] = useState(sanitizeParam(params.website, 2048))
+  const [website, setWebsite] = useState(sanitizeParam(params.website, 500))
   const [address, setAddress] = useState(sanitizeParam(params.address, 300))
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<
+      Record<'name' | 'email' | 'phone' | 'company' | 'title' | 'website' | 'address', string>
+    >
+  >({})
   const [firstCardId, setFirstCardId] = useState<string | null>(null)
+  const [cardContextResolved, setCardContextResolved] = useState(false)
 
   useEffect(() => {
     api
@@ -66,25 +84,96 @@ export default function ScanResultScreen() {
         if (list.length > 0 && list[0]) setFirstCardId(list[0].id)
       })
       .catch(() => void 0)
+      .finally(() => setCardContextResolved(true))
   }, [])
 
+  const setFieldValue = (
+    field: keyof typeof fieldErrors,
+    setter: (value: string) => void,
+    value: string,
+  ) => {
+    setter(value)
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter a contact name.')
+    const trimmedName = name.trim()
+    const trimmedEmail = email.trim()
+    const trimmedPhone = phone.trim()
+    const trimmedCompany = company.trim()
+    const trimmedTitle = title.trim()
+    const trimmedWebsite = website.trim()
+    const trimmedAddress = address.trim()
+    const nextFieldErrors: Partial<
+      Record<'name' | 'email' | 'phone' | 'company' | 'title' | 'website' | 'address', string>
+    > = {}
+
+    if (!trimmedName) {
+      nextFieldErrors.name = 'Please enter a contact name.'
+    } else if (trimmedName.length > 200) {
+      nextFieldErrors.name = 'Name must be 200 characters or less.'
+    }
+
+    if (trimmedEmail) {
+      if (!EMAIL_REGEX.test(trimmedEmail)) {
+        nextFieldErrors.email = 'Enter a valid email address.'
+      } else if (trimmedEmail.length > 254) {
+        nextFieldErrors.email = 'Email must be 254 characters or less.'
+      }
+    }
+
+    if (trimmedPhone) {
+      if (!PHONE_REGEX.test(trimmedPhone)) {
+        nextFieldErrors.phone = 'Enter a valid phone number.'
+      } else if (trimmedPhone.length > 50) {
+        nextFieldErrors.phone = 'Phone must be 50 characters or less.'
+      }
+    }
+
+    if (trimmedCompany.length > 500) {
+      nextFieldErrors.company = 'Company must be 500 characters or less.'
+    }
+
+    if (trimmedTitle.length > 200) {
+      nextFieldErrors.title = 'Title must be 200 characters or less.'
+    }
+
+    if (trimmedWebsite) {
+      if (!isValidHttpUrl(trimmedWebsite)) {
+        nextFieldErrors.website = 'Enter a valid website starting with http:// or https://.'
+      } else if (trimmedWebsite.length > 500) {
+        nextFieldErrors.website = 'Website must be 500 characters or less.'
+      }
+    }
+
+    if (trimmedAddress.length > 500) {
+      nextFieldErrors.address = 'Address must be 500 characters or less.'
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      Alert.alert('Fix the highlighted fields', 'Review the contact details and try again.')
       return
     }
+
+    setFieldErrors({})
     setSaving(true)
     try {
       await createContact(firstCardId ?? '', {
-        name: name.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        company: company.trim() || null,
-        title: title.trim() || null,
-        website: website.trim() || null,
-        address: address.trim() || null,
+        name: trimmedName,
+        email: trimmedEmail || null,
+        phone: trimmedPhone || null,
+        company: trimmedCompany || null,
+        title: trimmedTitle || null,
+        website: trimmedWebsite || null,
+        address: trimmedAddress || null,
       })
-      Alert.alert('Contact saved', `${name} has been added to your contacts.`, [
+      Alert.alert('Contact saved', `${trimmedName} has been added to your contacts.`, [
         { text: 'OK', onPress: () => router.back() },
       ])
     } catch (err) {
@@ -114,37 +203,62 @@ export default function ScanResultScreen() {
           Review and edit the extracted information, then save to your contacts.
         </Text>
 
-        {[
-          { label: 'Name *', value: name, setter: setName },
-          { label: 'Email', value: email, setter: setEmail },
-          { label: 'Phone', value: phone, setter: setPhone },
-          { label: 'Company', value: company, setter: setCompany },
-          { label: 'Title / Role', value: title, setter: setTitle },
-          { label: 'Website', value: website, setter: setWebsite },
-          { label: 'Address', value: address, setter: setAddress },
-        ].map(({ label, value, setter }) => (
-          <View key={label} style={{ marginBottom: 14 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 4 }}>
-              {label}
+        {cardContextResolved && !firstCardId ? (
+          <View
+            style={{
+              marginBottom: 16,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#fde68a',
+              backgroundColor: '#fffbeb',
+              padding: 12,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: '#92400e', lineHeight: 18 }}>
+              This contact will be saved without a source card because no card is available on this
+              device.
             </Text>
-            <TextInput
-              value={value}
-              onChangeText={setter}
-              placeholder={label.replace(' *', '')}
-              placeholderTextColor="#94a3b8"
-              style={{
-                backgroundColor: '#ffffff',
-                borderWidth: 1,
-                borderColor: '#e2e8f0',
-                borderRadius: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                fontSize: 15,
-                color: '#0f172a',
-              }}
-            />
           </View>
-        ))}
+        ) : null}
+
+        {[
+          { label: 'Name *', value: name, setter: setName, fieldKey: 'name' as const },
+          { label: 'Email', value: email, setter: setEmail, fieldKey: 'email' as const },
+          { label: 'Phone', value: phone, setter: setPhone, fieldKey: 'phone' as const },
+          { label: 'Company', value: company, setter: setCompany, fieldKey: 'company' as const },
+          { label: 'Title / Role', value: title, setter: setTitle, fieldKey: 'title' as const },
+          { label: 'Website', value: website, setter: setWebsite, fieldKey: 'website' as const },
+          { label: 'Address', value: address, setter: setAddress, fieldKey: 'address' as const },
+        ].map(({ label, value, setter, fieldKey }) => {
+          return (
+            <View key={label} style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 4 }}>
+                {label}
+              </Text>
+              <TextInput
+                value={value}
+                onChangeText={(nextValue) => setFieldValue(fieldKey, setter, nextValue)}
+                placeholder={label.replace(' *', '')}
+                placeholderTextColor="#94a3b8"
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: fieldErrors[fieldKey] ? '#dc2626' : '#e2e8f0',
+                  borderRadius: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 15,
+                  color: '#0f172a',
+                }}
+              />
+              {fieldErrors[fieldKey] ? (
+                <Text style={{ marginTop: 4, fontSize: 12, color: '#dc2626' }}>
+                  {fieldErrors[fieldKey]}
+                </Text>
+              ) : null}
+            </View>
+          )
+        })}
 
         <TouchableOpacity
           onPress={() => void handleSave()}

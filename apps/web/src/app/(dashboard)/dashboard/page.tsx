@@ -890,14 +890,14 @@ export default function DashboardPage(): JSX.Element {
             <div>
               <SectionHeader
                 title="Scheduling"
-                href="/apps/scheduling?tab=types"
+                href="/apps/scheduling/appointment-types"
                 linkLabel="Manage"
               />
               <div className="space-y-2">
                 {appointmentTypes.slice(0, 4).map((at) => (
                   <Link
                     key={at.id}
-                    href="/apps/scheduling?tab=types"
+                    href="/apps/scheduling/appointment-types"
                     className="app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 transition-shadow hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.24)]"
                   >
                     <div className="flex items-center gap-3">

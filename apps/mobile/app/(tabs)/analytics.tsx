@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native'
+import { useRouter } from 'expo-router'
 import { api, type AnalyticsSummary } from '../../lib/api'
 
 interface CardItem {
@@ -42,6 +44,7 @@ function StatTile({ label, value, color }: { label: string; value: number; color
 }
 
 export default function AnalyticsTab() {
+  const router = useRouter()
   const [cards, setCards] = useState<CardItem[]>([])
   const [analytics, setAnalytics] = useState<CardAnalytics[]>([])
   const [loading, setLoading] = useState(true)
@@ -169,8 +172,9 @@ export default function AnalyticsTab() {
             </View>
           ) : (
             analytics.map(({ card, summary, failed }) => (
-              <View
+              <TouchableOpacity
                 key={card.id}
+                onPress={() => router.push(`/card/${card.id}`)}
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: 16,
@@ -178,6 +182,9 @@ export default function AnalyticsTab() {
                   borderWidth: 1,
                   borderColor: '#e2e8f0',
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open analytics source card ${card.fields?.name ?? card.handle}`}
+                accessibilityHint="Opens this card's details"
               >
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#0f172a' }}>
                   {card.fields?.name ?? card.handle}
@@ -234,7 +241,7 @@ export default function AnalyticsTab() {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>

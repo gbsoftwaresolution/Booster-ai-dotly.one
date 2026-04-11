@@ -1458,6 +1458,8 @@ function AddContactModal({
 
     if (trimmedWebsite && !isValidUrl(trimmedWebsite)) {
       nextFieldErrors.website = 'Enter a valid website URL starting with http:// or https://.'
+    } else if (trimmedWebsite.length > 500) {
+      nextFieldErrors.website = 'Website must be 500 characters or less.'
     }
 
     if (trimmedNotes.length > 1000) {
@@ -1631,7 +1633,7 @@ function AddContactModal({
               inputMode="url"
               placeholder="https://acme.com"
               value={website}
-              maxLength={2048}
+              maxLength={500}
               onChange={(e) => setFieldValue('website', setWebsite, e.target.value)}
               aria-invalid={fieldErrors.website ? 'true' : 'false'}
               aria-describedby={fieldErrors.website ? 'ac-website-error' : undefined}

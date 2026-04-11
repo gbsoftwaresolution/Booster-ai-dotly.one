@@ -443,20 +443,20 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
       nextFieldErrors.name = 'Name is required.'
     } else if (trimmedName.length < 2) {
       nextFieldErrors.name = 'Name must be at least 2 characters.'
-    } else if (trimmedName.length > 80) {
-      nextFieldErrors.name = 'Name must be 80 characters or less.'
+    } else if (trimmedName.length > 120) {
+      nextFieldErrors.name = 'Name must be 120 characters or less.'
     }
 
     if (!normalizedSlug) {
       nextFieldErrors.slug = 'Slug is required.'
     } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
       nextFieldErrors.slug = 'Use lowercase letters, numbers, and hyphens only.'
-    } else if (normalizedSlug.length > 80) {
-      nextFieldErrors.slug = 'Slug must be 80 characters or less.'
+    } else if (normalizedSlug.length > 100) {
+      nextFieldErrors.slug = 'Slug must be 100 characters or less.'
     }
 
-    if (trimmedDescription.length > 300) {
-      nextFieldErrors.description = 'Description must be 300 characters or less.'
+    if (trimmedDescription.length > 2000) {
+      nextFieldErrors.description = 'Description must be 2000 characters or less.'
     }
 
     if (!Number.isFinite(durationMins) || durationMins < 5 || durationMins > 480) {
@@ -471,8 +471,8 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
       nextFieldErrors.bufferAfterMins = 'Buffer after must be between 0 and 240 minutes.'
     }
 
-    if (trimmedLocation.length > 200) {
-      nextFieldErrors.location = 'Location must be 200 characters or less.'
+    if (trimmedLocation.length > 500) {
+      nextFieldErrors.location = 'Location must be 500 characters or less.'
     }
 
     if (!timezone || !ALL_TIMEZONES.includes(timezone)) {
@@ -557,7 +557,7 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
               <input
                 required
                 minLength={2}
-                maxLength={80}
+                maxLength={120}
                 value={name}
                 onChange={(e) => {
                   clearFieldError('name')
@@ -579,7 +579,7 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
               <input
                 required
                 pattern="[a-z0-9-]+"
-                maxLength={80}
+                maxLength={100}
                 value={slug}
                 onChange={(e) => {
                   clearFieldError('slug')
@@ -609,7 +609,7 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
               <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
               <textarea
                 value={description}
-                maxLength={300}
+                maxLength={2000}
                 onChange={(e) => {
                   clearFieldError('description')
                   setDescription(e.target.value)
@@ -623,7 +623,7 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
               />
               <div className="mt-1 flex items-center justify-between gap-2 text-xs text-gray-400">
                 <span id="apt-description-help">Optional summary shown on your booking page.</span>
-                <span>{description.length}/300</span>
+                <span>{description.length}/2000</span>
               </div>
               {fieldErrors.description && (
                 <p id="apt-description-error" className="mt-1 text-xs text-red-600">
@@ -672,7 +672,7 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
               </label>
               <input
                 value={location}
-                maxLength={200}
+                maxLength={500}
                 onChange={(e) => {
                   clearFieldError('location')
                   setLocation(e.target.value)

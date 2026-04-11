@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
 
@@ -51,6 +52,7 @@ function formatValue(value: number | string, currency: string): string {
 }
 
 export default function DealsScreen() {
+  const router = useRouter()
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -227,7 +229,11 @@ export default function DealsScreen() {
                 </View>
               ) : (
                 group.items.map((deal, idx) => (
-                  <View
+                  <TouchableOpacity
+                    disabled={!deal.contact?.id}
+                    onPress={() => {
+                      if (deal.contact?.id) router.push(`/contact/${deal.contact.id}`)
+                    }}
                     key={deal.id}
                     style={{
                       paddingHorizontal: 14,
@@ -235,6 +241,13 @@ export default function DealsScreen() {
                       borderTopWidth: idx === 0 ? 1 : 1,
                       borderTopColor: '#f1f5f9',
                     }}
+                    accessibilityRole={deal.contact?.id ? 'button' : undefined}
+                    accessibilityLabel={
+                      deal.contact?.id ? `Open contact for deal ${deal.title}` : undefined
+                    }
+                    accessibilityHint={
+                      deal.contact?.id ? 'Opens the related contact details' : undefined
+                    }
                   >
                     <View
                       style={{
@@ -293,7 +306,7 @@ export default function DealsScreen() {
                         </TouchableOpacity>
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </View>
