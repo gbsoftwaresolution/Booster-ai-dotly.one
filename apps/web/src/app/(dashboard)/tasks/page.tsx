@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckSquare,
   Pencil,
@@ -824,14 +824,45 @@ function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }): JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    cancelButtonRef.current?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousActiveElementRef.current?.focus()
+    }
+  }, [onCancel])
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onCancel} aria-hidden="true" />
-      <div className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
-        <h3 className="text-sm font-semibold text-gray-900">Confirm</h3>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tasks-confirm-dialog-title"
+        className="fixed inset-x-4 top-1/2 z-50 w-full max-w-sm -translate-y-1/2 rounded-xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+      >
+        <h3 id="tasks-confirm-dialog-title" className="text-sm font-semibold text-gray-900">
+          Confirm
+        </h3>
         <p className="mt-1 text-sm text-gray-500">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
+            ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

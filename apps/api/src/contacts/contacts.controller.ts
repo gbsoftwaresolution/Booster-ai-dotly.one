@@ -115,8 +115,8 @@ class CreateLeadDto {
   sourceHandle?: string
 
   // Custom lead form field values keyed by normalised label.
-  // Accepted and forwarded to the service but not persisted until
-  // LeadSubmission storage is implemented (see schema.prisma TODO).
+  // The service persists these into LeadSubmission when a LeadForm exists,
+  // and also records the default name/email/phone-only flow.
   @IsOptional()
   @IsObject()
   fields?: Record<string, string>
@@ -757,9 +757,16 @@ export class ContactsController {
     @Res() res: Response,
     @Query('cardId') cardId?: string,
     @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     await this.assertCsvExportAccess(user.id)
-    const result = await this.contactsService.exportLeadSubmissions(user.id, { cardId, search })
+    const result = await this.contactsService.exportLeadSubmissions(user.id, {
+      cardId,
+      search,
+      from,
+      to,
+    })
     const filename = `lead-submissions-${new Date().toISOString().slice(0, 10)}.csv`
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
@@ -873,12 +880,16 @@ export class ContactsController {
   getLeadSubmissions(
     @CurrentUser() user: { id: string },
     @Query('cardId') cardId: string,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
     @Query() query: LeadSubmissionsQuery,
   ) {
     return this.contactsService.getLeadSubmissions(user.id, cardId, {
       page: query.page,
       limit: query.limit,
       search: query.search,
+      from,
+      to,
     })
   }
 

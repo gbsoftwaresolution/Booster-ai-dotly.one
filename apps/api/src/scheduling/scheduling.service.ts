@@ -567,6 +567,7 @@ export class SchedulingService {
     // used in the conflict query by bufferAfterMins so that the overlap check
     // correctly blocks slots that fall within the post-meeting buffer.
     const busyUntil = new Date(endAt.getTime() + apt.bufferAfterMins * 60_000)
+    const conflictWindowStart = new Date(startAt.getTime() - apt.bufferAfterMins * 60_000)
 
     const answers = dto.answers ?? []
     const normalizedQuestions = apt.questions.map((question) =>
@@ -608,10 +609,11 @@ export class SchedulingService {
             where: {
               appointmentTypeId: apt.id,
               status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
-              // A conflict exists when intervals overlap including buffers:
-              // existing.startAt < newBusyUntil  AND  existing.endAt > newStartAt
+              // A conflict exists when intervals overlap including the
+              // appointment type's post-meeting buffer on the existing booking:
+              // existing.startAt < newBusyUntil  AND  existing.endAt > (newStartAt - bufferAfter)
               startAt: { lt: busyUntil },
-              endAt: { gt: startAt },
+              endAt: { gt: conflictWindowStart },
             },
           })
           if (conflict) throw new ConflictException('This time slot is no longer available')
@@ -863,6 +865,7 @@ export class SchedulingService {
     const newEndAt = new Date(newStartAt.getTime() + apt.durationMins * 60_000)
     // LOW-1: Extend the conflict window by bufferAfterMins (see createBooking)
     const newBusyUntil = new Date(newEndAt.getTime() + apt.bufferAfterMins * 60_000)
+    const conflictWindowStart = new Date(newStartAt.getTime() - apt.bufferAfterMins * 60_000)
 
     // CRITICAL-1: Wrap conflict check + update in a serializable transaction to
     // prevent two concurrent reschedules landing on the same slot.
@@ -876,7 +879,7 @@ export class SchedulingService {
               status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
               id: { not: booking.id },
               startAt: { lt: newBusyUntil },
-              endAt: { gt: newStartAt },
+              endAt: { gt: conflictWindowStart },
             },
           })
           if (conflict) throw new ConflictException('This time slot is no longer available')

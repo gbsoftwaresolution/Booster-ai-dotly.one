@@ -50,6 +50,32 @@ function scoreBadgeColors(score: number): { bg: string; text: string } {
 }
 
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^\+?[\d\s\-().]{5,20}$/
+
+function normalizeWebsite(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+}
+
+function validateContactFields(input: {
+  email?: string
+  phone?: string
+  website?: string
+}): string | null {
+  if (input.email && !EMAIL_RE.test(input.email)) return 'Enter a valid email address.'
+  if (input.phone && !PHONE_RE.test(input.phone)) return 'Enter a valid phone number.'
+  if (input.website) {
+    try {
+      const url = new URL(normalizeWebsite(input.website) ?? '')
+      if (!['http:', 'https:'].includes(url.protocol)) return 'Enter a valid website URL.'
+    } catch {
+      return 'Enter a valid website URL.'
+    }
+  }
+  return null
+}
 
 function Avatar({ name, id }: { name: string; id: string }) {
   const colors = ['#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
@@ -115,6 +141,15 @@ function CreateContactModal({
       Alert.alert('Name required', 'Please enter a contact name.')
       return
     }
+    const validationError = validateContactFields({
+      email: email.trim() || undefined,
+      phone: phone.trim() || undefined,
+      website: website.trim() || undefined,
+    })
+    if (validationError) {
+      Alert.alert('Validation', validationError)
+      return
+    }
     setSubmitting(true)
     try {
       await api.createContact({
@@ -123,7 +158,7 @@ function CreateContactModal({
         phone: phone.trim() || undefined,
         company: company.trim() || undefined,
         title: title.trim() || undefined,
-        website: website.trim() || undefined,
+        website: normalizeWebsite(website),
         address: address.trim() || undefined,
         notes: notes.trim() || undefined,
         tags: tags
@@ -512,6 +547,9 @@ export default function ContactsTab() {
           {/* M9: Add Contact button */}
           <TouchableOpacity
             onPress={() => setShowCreateModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Add contact"
+            accessibilityHint="Opens the create contact form"
             style={{
               backgroundColor: '#0ea5e9',
               borderRadius: 10,
@@ -553,6 +591,9 @@ export default function ContactsTab() {
               <Pressable
                 key={mode}
                 onPress={() => setViewMode(mode)}
+                accessibilityRole="button"
+                accessibilityLabel={mode === 'list' ? 'List view' : 'Board view'}
+                accessibilityState={{ selected: active }}
                 style={{
                   flex: 1,
                   paddingVertical: 10,
@@ -592,7 +633,13 @@ export default function ContactsTab() {
         >
           <Text style={{ color: '#b91c1c', fontSize: 13, flex: 1 }}>{fetchError}</Text>
           <TouchableOpacity onPress={handleRefresh}>
-            <Text style={{ color: '#b91c1c', fontWeight: '700', fontSize: 13, marginLeft: 12 }}>
+            <Text
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading contacts"
+              accessibilityHint="Reloads the contacts list"
+              style={{ color: '#b91c1c', fontWeight: '700', fontSize: 13, marginLeft: 12 }}
+            >
               Retry
             </Text>
           </TouchableOpacity>
@@ -636,6 +683,9 @@ export default function ContactsTab() {
             return (
               <TouchableOpacity
                 onPress={() => router.push(`/contact/${item.id}` as never)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open contact ${item.name}`}
+                accessibilityHint="Opens this contact's details"
                 style={{
                   marginHorizontal: 16,
                   marginVertical: 4,

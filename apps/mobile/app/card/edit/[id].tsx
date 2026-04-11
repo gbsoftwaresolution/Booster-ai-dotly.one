@@ -229,7 +229,7 @@ export default function EditCardScreen() {
         try {
           await uploadAvatar(id, asset.base64, asset.mimeType ?? 'image/jpeg')
         } catch {
-          Alert.alert('Upload failed', 'Could not upload avatar. Changes saved locally.')
+          Alert.alert('Upload failed', 'Could not upload avatar. Please try again before leaving.')
         }
       }
     }

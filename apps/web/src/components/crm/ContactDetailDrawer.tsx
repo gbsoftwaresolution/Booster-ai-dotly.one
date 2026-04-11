@@ -280,6 +280,8 @@ export function ContactDetailDrawer({
   onClose,
   onUpdate,
 }: ContactDetailDrawerProps): JSX.Element | null {
+  const drawerRef = React.useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const userTz = useUserTimezone()
   const [loading, setLoading] = useState(false)
@@ -355,12 +357,54 @@ export function ContactDetailDrawer({
   }, [contactId, loadContact])
 
   useEffect(() => {
+    if (!contactId) return
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+
+    const focusFirst = () => {
+      if (!drawerRef.current) return
+      const focusable = Array.from(
+        drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      focusable[0]?.focus()
+    }
+
+    queueMicrotask(focusFirst)
+
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+
+      if (e.key !== 'Tab' || !drawerRef.current) return
+
+      const focusable = Array.from(
+        drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last?.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first?.focus()
+      }
     }
     document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+    return () => {
+      document.removeEventListener('keydown', handler)
+      previousActiveElementRef.current?.focus()
+    }
+  }, [contactId, onClose])
 
   const saveField = useCallback(
     async (field: string, value: string) => {
@@ -793,6 +837,7 @@ export function ContactDetailDrawer({
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       <div
+        ref={drawerRef}
         className="app-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col rounded-l-[32px] border-l border-white/80 shadow-2xl"
         role="dialog"
         aria-modal="true"

@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config'
 import { WalletPassesService } from './wallet-passes.service'
 
 describe('WalletPassesService', () => {
-  it('public Apple pass generation does not re-run owner auth checks', async () => {
+  it('public Apple pass endpoint fails closed without re-running owner auth checks', async () => {
     const prisma = {} as never
     const config = {
       get: jest.fn((key: string) => {
@@ -28,9 +28,6 @@ describe('WalletPassesService', () => {
 
     const generateApplePassSpy = jest.spyOn(service, 'generateApplePass')
     jest
-      .spyOn(service as unknown as { signManifest: () => Promise<Buffer> }, 'signManifest')
-      .mockResolvedValue(Buffer.from('signature'))
-    jest
       .spyOn(
         service as unknown as { getPublishedCardByHandle: () => Promise<typeof fakeCard> },
         'getPublishedCardByHandle',
@@ -48,7 +45,9 @@ describe('WalletPassesService', () => {
         vcardPolicy: 'PUBLIC',
       })
 
-    await expect(service.getPublicPassForHandle('alice', null)).resolves.toBeInstanceOf(Buffer)
+    await expect(service.getPublicPassForHandle('alice', null)).rejects.toThrow(
+      'Apple Wallet passes are not yet available on this server. Use Google Wallet instead.',
+    )
     expect(generateApplePassSpy).not.toHaveBeenCalled()
   })
 })

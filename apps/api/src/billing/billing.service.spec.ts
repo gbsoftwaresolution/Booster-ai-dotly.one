@@ -69,3 +69,15 @@ describe('assertTxOrigin (pure logic)', () => {
     expect(() => checkTxOrigin('0xdeadbeef', wallet)).toThrow(BadRequestException)
   })
 })
+
+describe('wallet normalization (pure logic)', () => {
+  function normalizeWalletAddress(walletAddress: string): string {
+    return walletAddress.toLowerCase()
+  }
+
+  it('normalizes checksum-case addresses before persistence/comparison', () => {
+    expect(normalizeWalletAddress('0xAbCdEf1234567890ABCDEF1234567890abCDef12')).toBe(
+      '0xabcdef1234567890abcdef1234567890abcdef12',
+    )
+  })
+})

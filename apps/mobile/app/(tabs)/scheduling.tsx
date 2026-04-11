@@ -203,6 +203,16 @@ export default function SchedulingScreen() {
               <Text style={styles.emptySubtext}>Create them from the web dashboard.</Text>
             </View>
           }
+          ListHeaderComponent={
+            aptTypes.length > 0 ? (
+              <View style={styles.infoBanner}>
+                <Text style={styles.infoBannerText}>
+                  This screen is read-only. Create and edit appointment types from the web
+                  dashboard.
+                </Text>
+              </View>
+            ) : null
+          }
         />
       ) : (
         <FlatList
@@ -257,6 +267,15 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
   tabTextActive: { color: '#0ea5e9' },
   list: { padding: 16, gap: 10, paddingBottom: 32 },
+  infoBanner: {
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+    backgroundColor: '#f0f9ff',
+    padding: 12,
+  },
+  infoBannerText: { fontSize: 13, color: '#0369a1', lineHeight: 18 },
   card: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',

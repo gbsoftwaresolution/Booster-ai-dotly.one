@@ -312,6 +312,14 @@ export class TeamsService {
       throw new ForbiddenException('This invite was sent to a different email address')
     }
 
+    const existingMembership = await this.prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: invite.teamId, userId } },
+      select: { id: true },
+    })
+    if (existingMembership) {
+      throw new ConflictException('You are already a member of this team')
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await this.assertTeamHasSeatCapacity(tx, invite.teamId)
 

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { View, Text, SafeAreaView, ActivityIndicator, ScrollView, RefreshControl } from 'react-native'
+import {
+  View,
+  Text,
+  SafeAreaView,
+  ActivityIndicator,
+  ScrollView,
+  RefreshControl,
+} from 'react-native'
 import { api, type AnalyticsSummary } from '../../lib/api'
 
 interface CardItem {
@@ -13,6 +20,7 @@ interface CardItem {
 interface CardAnalytics {
   card: CardItem
   summary: AnalyticsSummary | null
+  failed?: boolean
 }
 
 function StatTile({ label, value, color }: { label: string; value: number; color: string }) {
@@ -50,9 +58,9 @@ export default function AnalyticsTab() {
         cardList.map(async (card) => {
           try {
             const summary = await api.getAnalyticsSummary(card.id)
-            return { card, summary }
+            return { card, summary, failed: false }
           } catch {
-            return { card, summary: null }
+            return { card, summary: null, failed: true }
           }
         }),
       )
@@ -95,7 +103,15 @@ export default function AnalyticsTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadAnalytics() }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true)
+              void loadAnalytics()
+            }}
+          />
+        }
         contentContainerStyle={{ paddingBottom: 32 }}
       >
         <View
@@ -135,39 +151,85 @@ export default function AnalyticsTab() {
 
         <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 12 }}>
           {analytics.length === 0 ? (
-            <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#0f172a' }}>No cards yet</Text>
+            <View
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 16,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#0f172a' }}>
+                No cards yet
+              </Text>
               <Text style={{ fontSize: 13, color: '#64748b', marginTop: 6, lineHeight: 20 }}>
                 Create and share a card to start collecting views, clicks, and leads.
               </Text>
             </View>
           ) : (
-            analytics.map(({ card, summary }) => (
+            analytics.map(({ card, summary, failed }) => (
               <View
                 key={card.id}
-                style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' }}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                }}
               >
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#0f172a' }}>
                   {card.fields?.name ?? card.handle}
                 </Text>
                 <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>@{card.handle}</Text>
+                {failed ? (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      borderRadius: 10,
+                      backgroundColor: '#fff7ed',
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#c2410c' }}>
+                      This card&apos;s analytics could not be loaded. Values below may be
+                      incomplete.
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-                  <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}>
+                  <View
+                    style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}
+                  >
                     <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>Views</Text>
-                    <Text style={{ fontSize: 18, color: '#0f172a', fontWeight: '800', marginTop: 4 }}>
+                    <Text
+                      style={{ fontSize: 18, color: '#0f172a', fontWeight: '800', marginTop: 4 }}
+                    >
                       {summary?.totalViews ?? 0}
                     </Text>
                   </View>
-                  <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}>
-                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>Clicks</Text>
-                    <Text style={{ fontSize: 18, color: '#0f172a', fontWeight: '800', marginTop: 4 }}>
+                  <View
+                    style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}
+                  >
+                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>
+                      Clicks
+                    </Text>
+                    <Text
+                      style={{ fontSize: 18, color: '#0f172a', fontWeight: '800', marginTop: 4 }}
+                    >
                       {summary?.totalClicks ?? 0}
                     </Text>
                   </View>
-                  <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}>
+                  <View
+                    style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}
+                  >
                     <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>Leads</Text>
-                    <Text style={{ fontSize: 18, color: '#0f172a', fontWeight: '800', marginTop: 4 }}>
+                    <Text
+                      style={{ fontSize: 18, color: '#0f172a', fontWeight: '800', marginTop: 4 }}
+                    >
                       {summary?.totalLeads ?? 0}
                     </Text>
                   </View>

@@ -214,7 +214,14 @@ function MessageTab({
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
     const guard = check()
-    if (guard) return
+    if (guard) {
+      setError(
+        guard === 'too_fast'
+          ? 'Please wait a moment before sending your message.'
+          : 'Submission blocked. Please refresh and try again.',
+      )
+      return
+    }
     if (!name.trim() || !body.trim()) {
       setError('Name and message are required.')
       return

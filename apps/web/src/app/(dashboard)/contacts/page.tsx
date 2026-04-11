@@ -143,6 +143,17 @@ function avatarColour(name: string): string {
   return AVATAR_COLOURS[h % AVATAR_COLOURS.length]!
 }
 
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter(
+    (element) =>
+      !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true',
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
@@ -1026,8 +1037,12 @@ export default function ContactsPage(): JSX.Element {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </td>
-                        <td className="px-4 py-3" onClick={() => setDrawerContactId(contact.id)}>
-                          <div className="flex items-center gap-2.5">
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => setDrawerContactId(contact.id)}
+                            className="flex w-full items-center gap-2.5 rounded-lg text-left outline-none transition-colors hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                          >
                             <div
                               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColour(contact.name)}`}
                             >
@@ -1042,7 +1057,7 @@ export default function ContactsPage(): JSX.Element {
                                 </p>
                               )}
                             </div>
-                          </div>
+                          </button>
                         </td>
                         <td
                           className="px-4 py-3 text-gray-500"
@@ -1232,13 +1247,42 @@ function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }): JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
+
   // Close on Escape
   useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    cancelButtonRef.current?.focus()
+
     const handle = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onCancel()
+        return
+      }
+
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      const focusable = getFocusableElements(dialogRef.current)
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last?.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first?.focus()
+      }
     }
     document.addEventListener('keydown', handle)
-    return () => document.removeEventListener('keydown', handle)
+    return () => {
+      document.removeEventListener('keydown', handle)
+      previousActiveElementRef.current?.focus()
+    }
   }, [onCancel])
 
   return (
@@ -1249,7 +1293,12 @@ function ConfirmDialog({
         aria-hidden="true"
       />
       {/* Mobile: bottom sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5 shadow-2xl sm:hidden">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5 shadow-2xl sm:hidden"
+      >
         <div className="mb-4 h-1 w-10 rounded-full bg-gray-300 mx-auto" />
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -1271,6 +1320,7 @@ function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
+            ref={cancelButtonRef}
             className="w-full rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel
@@ -1278,7 +1328,12 @@ function ConfirmDialog({
         </div>
       </div>
       {/* Desktop: centered modal */}
-      <div className="fixed inset-x-4 top-1/2 z-50 hidden w-full max-w-sm -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl sm:block sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-x-4 top-1/2 z-50 hidden w-full max-w-sm -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl sm:block sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+      >
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
             <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -1292,6 +1347,7 @@ function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
+            ref={cancelButtonRef}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel

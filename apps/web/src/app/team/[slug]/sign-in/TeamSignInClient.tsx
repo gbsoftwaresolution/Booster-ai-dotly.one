@@ -33,7 +33,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
   const supabase = createClient()
   const brandColor = team.brandColor ?? '#0ea5e9'
   const displayName = team.brandName ?? team.name
-  const teamNext = `/team/${team.slug}/sign-in`
+  const teamNext = '/team'
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()

@@ -246,7 +246,7 @@ function CardAnalyticsRow({
 
   return (
     <Link
-      href={`/cards/${card.id}/edit`}
+      href={`/apps/cards/${card.id}/edit`}
       className="app-panel group flex items-center gap-3 rounded-[24px] p-4 transition-shadow hover:shadow-[0_24px_52px_-34px_rgba(15,23,42,0.24)] active:shadow-none"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-bold text-white">
@@ -849,7 +849,7 @@ export default function DashboardPage(): JSX.Element {
 
           {/* My Cards */}
           <div>
-            <SectionHeader title="My Cards" href="/cards" />
+            <SectionHeader title="My Cards" href="/apps/cards" />
             {loading ? (
               <SkeletonList rows={2} />
             ) : cards.length === 0 ? (
@@ -874,7 +874,7 @@ export default function DashboardPage(): JSX.Element {
                 ))}
                 {cards.length > 3 && (
                   <Link
-                    href="/cards"
+                    href="/apps/cards"
                     className="app-panel-subtle flex w-full items-center justify-center gap-1.5 rounded-[24px] py-3 text-sm font-medium text-gray-500 hover:bg-white"
                   >
                     View all {cards.length} cards

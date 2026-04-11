@@ -85,8 +85,9 @@ export default function RootLayout() {
       (response: Notifications.NotificationResponse) => {
         notificationResponseRef.current = response
         const data = response.notification.request.content.data as Record<string, unknown>
-        if (data?.contactId) {
-          router.push(`/(tabs)/contacts`)
+        const contactId = typeof data?.contactId === 'string' ? data.contactId : null
+        if (contactId) {
+          router.push(`/contact/${contactId}`)
         }
       },
     )

@@ -36,10 +36,7 @@ export default function SignInScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View
           style={{
             flex: 1,
@@ -85,6 +82,7 @@ export default function SignInScreen() {
               autoComplete="email"
               value={email}
               onChangeText={setEmail}
+              accessibilityLabel="Email"
             />
 
             <TextInput
@@ -104,6 +102,7 @@ export default function SignInScreen() {
               autoComplete="current-password"
               value={password}
               onChangeText={setPassword}
+              accessibilityLabel="Password"
             />
 
             {error ? (
@@ -122,6 +121,9 @@ export default function SignInScreen() {
             <TouchableOpacity
               onPress={handleSignIn}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+              accessibilityHint="Signs in with your email and password"
               style={{
                 backgroundColor: loading ? '#7dd3fc' : '#0ea5e9',
                 borderRadius: 12,
@@ -133,9 +135,7 @@ export default function SignInScreen() {
               {loading ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700' }}>
-                  Sign In
-                </Text>
+                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700' }}>Sign In</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -150,13 +150,9 @@ export default function SignInScreen() {
               gap: 4,
             }}
           >
-            <Text style={{ color: '#64748b', fontSize: 14 }}>
-              Don&apos;t have an account?
-            </Text>
+            <Text style={{ color: '#64748b', fontSize: 14 }}>Don&apos;t have an account?</Text>
             <Link href="/(auth)/sign-up">
-              <Text style={{ color: '#0ea5e9', fontWeight: '600', fontSize: 14 }}>
-                Sign up
-              </Text>
+              <Text style={{ color: '#0ea5e9', fontWeight: '600', fontSize: 14 }}>Sign up</Text>
             </Link>
           </View>
         </View>

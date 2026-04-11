@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BriefcaseBusiness,
   Pencil,
@@ -95,6 +95,8 @@ interface CreateDealModalProps {
 }
 
 function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Element {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
   const [contacts, setContacts] = useState<ContactOption[]>([])
   const [contactSearch, setContactSearch] = useState('')
   const [selectedContactId, setSelectedContactId] = useState('')
@@ -109,6 +111,8 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+
     void (async () => {
       try {
         const token = await getAccessToken()
@@ -120,10 +124,30 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
         )
         setContacts(data.contacts)
       } catch {
-        // silently ignore contact search errors
+        setError('Could not load matching contacts. Try again.')
       }
     })()
   }, [contactSearch])
+
+  useEffect(() => {
+    const focusable = modalRef.current?.querySelector<HTMLElement>(
+      'input, button, textarea, select',
+    )
+    focusable?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousActiveElementRef.current?.focus()
+    }
+  }, [onClose])
 
   async function handleSubmit() {
     if (!title.trim()) {
@@ -162,10 +186,18 @@ function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): JSX.Elem
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-deal-title"
+        className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-gray-900">New Deal</h2>
+          <h2 id="create-deal-title" className="text-lg font-bold text-gray-900">
+            New Deal
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
           </button>
@@ -357,6 +389,8 @@ interface EditDealModalProps {
 }
 
 function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.Element {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
   const [title, setTitle] = useState(deal.title)
   const [value, setValue] = useState(deal.value > 0 ? String(deal.value) : '')
   const [currency, setCurrency] = useState(deal.currency || 'USD')
@@ -396,11 +430,40 @@ function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps): JSX.El
     }
   }
 
+  useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    const focusable = modalRef.current?.querySelector<HTMLElement>(
+      'input, button, textarea, select',
+    )
+    focusable?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousActiveElementRef.current?.focus()
+    }
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-deal-title"
+        className="app-panel w-full max-w-lg rounded-[28px] shadow-2xl"
+      >
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-gray-900">Edit Deal</h2>
+          <h2 id="edit-deal-title" className="text-lg font-bold text-gray-900">
+            Edit Deal
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
           </button>

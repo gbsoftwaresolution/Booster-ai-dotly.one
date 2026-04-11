@@ -6,10 +6,11 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import * as path from 'path'
+import { RedisService } from '../redis/redis.service'
 
 // ─── Allowed MIME types ────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ interface InboxUploadTokenPayload {
   contentType: string
   fileSizeBytes: number
   category: 'voice' | 'dropbox'
+  nonce: string
   exp: number
 }
 
@@ -69,6 +71,7 @@ export class InboxService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly redis: RedisService,
   ) {
     const accountId = this.config.getOrThrow<string>('R2_ACCOUNT_ID')
     const accessKeyId = this.config.getOrThrow<string>('R2_ACCESS_KEY_ID')
@@ -117,6 +120,43 @@ export class InboxService {
       throw new BadRequestException('Upload token has expired')
     }
     return payload
+  }
+
+  private getObjectKeyFromPublicUrl(publicUrl: string): string {
+    const publicBase = this.r2PublicUrl.replace(/\/$/, '')
+    if (!publicUrl.startsWith(`${publicBase}/`)) {
+      throw new BadRequestException('Upload token contains an invalid asset URL')
+    }
+    return publicUrl.slice(publicBase.length + 1)
+  }
+
+  private async assertObjectExists(publicUrl: string): Promise<void> {
+    const key = this.getObjectKeyFromPublicUrl(publicUrl)
+    try {
+      await this.r2Client.send(
+        new HeadObjectCommand({
+          Bucket: this.r2Bucket,
+          Key: key,
+        }),
+      )
+    } catch {
+      throw new BadRequestException('Uploaded file could not be verified')
+    }
+  }
+
+  private async consumeUploadNonce(payload: InboxUploadTokenPayload): Promise<void> {
+    const ttlSeconds = Math.max(1, Math.ceil((payload.exp - Date.now()) / 1000))
+    const redisClient = this.redis.getClient()
+    const nonceKey = `inbox:upload-token:${payload.category}:${payload.nonce}`
+    try {
+      const result = await redisClient.set(nonceKey, '1', 'EX', ttlSeconds, 'NX')
+      if (result !== 'OK') {
+        throw new BadRequestException('Upload token has already been used')
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error
+      throw new BadRequestException('Upload confirmation is temporarily unavailable')
+    }
   }
 
   /** Assert the requesting user owns the card */
@@ -235,6 +275,7 @@ export class InboxService {
       contentType,
       fileSizeBytes,
       category: 'voice',
+      nonce: randomBytes(12).toString('hex'),
       exp: Date.now() + 5 * 60 * 1000,
     })
     return { uploadUrl, publicUrl, uploadToken, cardId: card.id }
@@ -252,6 +293,8 @@ export class InboxService {
     if (upload.category !== 'voice' || upload.cardId !== card.id) {
       throw new BadRequestException('Upload token does not match this voice upload')
     }
+    await this.assertObjectExists(upload.publicUrl)
+    await this.consumeUploadNonce(upload)
     return this.prisma.cardVoiceNote.create({
       data: {
         cardId: card.id,
@@ -330,6 +373,7 @@ export class InboxService {
       contentType,
       fileSizeBytes,
       category: 'dropbox',
+      nonce: randomBytes(12).toString('hex'),
       exp: Date.now() + 5 * 60 * 1000,
     })
     return { uploadUrl, publicUrl, uploadToken, cardId: card.id }
@@ -347,6 +391,8 @@ export class InboxService {
     if (upload.category !== 'dropbox' || upload.cardId !== card.id) {
       throw new BadRequestException('Upload token does not match this file upload')
     }
+    await this.assertObjectExists(upload.publicUrl)
+    await this.consumeUploadNonce(upload)
     return this.prisma.cardDropboxFile.create({
       data: {
         cardId: card.id,

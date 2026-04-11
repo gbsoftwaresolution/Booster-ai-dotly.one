@@ -200,13 +200,15 @@ export default function AnalyticsPage(): JSX.Element {
       params.set('from', from.toISOString())
       params.set('to', to.toISOString())
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-      const res = await fetch(`${apiBase}/contacts/export?${params.toString()}`, {
+      const res = await fetch(`${apiBase}/lead-submissions/export?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       })
       if (!res.ok) {
         const message = await res.text().catch(() => '')
         if (message.includes('CSV export is available on Pro.')) {
-          throw new Error('CSV export is available on Pro. Upgrade in billing to export leads.')
+          throw new Error(
+            'CSV export is available on Pro. Upgrade in billing to export lead submissions.',
+          )
         }
         throw new Error(`Export failed: ${res.status}`)
       }
@@ -222,7 +224,7 @@ export default function AnalyticsPage(): JSX.Element {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `lead-submissions-${new Date().toISOString().slice(0, 10)}.csv`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -393,7 +395,7 @@ export default function AnalyticsPage(): JSX.Element {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
                 <Download className="h-4 w-4 text-emerald-500" />
-                Export Leads CSV
+                Export lead submissions CSV
               </button>
             </div>
           </div>
@@ -745,7 +747,7 @@ export default function AnalyticsPage(): JSX.Element {
                   className="flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white/85 px-3 py-1.5 text-sm text-gray-700 hover:bg-white"
                 >
                   <Download className="h-4 w-4" />
-                  Export CSV
+                  Export lead submissions CSV
                 </button>
               </div>
               <p className="text-sm text-gray-500">

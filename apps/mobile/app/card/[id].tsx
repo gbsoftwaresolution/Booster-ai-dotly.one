@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
+  Image,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -128,24 +129,38 @@ export default function CardDetailScreen() {
           {/* Color band */}
           <View style={{ height: 64, backgroundColor: primaryColor }} />
 
-          {/* Avatar placeholder */}
+          {/* Avatar */}
           <View style={{ alignItems: 'center', marginTop: -28 }}>
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: primaryColor,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 3,
-                borderColor: '#ffffff',
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 20 }}>
-                {((fields.name ?? card.handle ?? 'C')[0] ?? 'C').toUpperCase()}
-              </Text>
-            </View>
+            {fields.avatarUrl ? (
+              <Image
+                source={{ uri: fields.avatarUrl }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  borderWidth: 3,
+                  borderColor: '#ffffff',
+                  backgroundColor: '#e2e8f0',
+                }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: primaryColor,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 3,
+                  borderColor: '#ffffff',
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 20 }}>
+                  {((fields.name ?? card.handle ?? 'C')[0] ?? 'C').toUpperCase()}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={{ padding: 16, alignItems: 'center' }}>
@@ -175,7 +190,7 @@ export default function CardDetailScreen() {
           </View>
         </View>
 
-        {/* QR Code placeholder — react-native-qrcode-svg requires native build */}
+        {/* Card URL */}
         <View
           style={{
             backgroundColor: '#ffffff',
@@ -187,28 +202,28 @@ export default function CardDetailScreen() {
             marginBottom: 16,
           }}
         >
-          <Text style={{ fontWeight: '600', color: '#0f172a', marginBottom: 12 }}>
-            Your QR Code
-          </Text>
-          {/* QR placeholder — install react-native-qrcode-svg with native build for actual QR */}
+          <Text style={{ fontWeight: '600', color: '#0f172a', marginBottom: 12 }}>Card URL</Text>
           <View
             style={{
-              width: 200,
-              height: 200,
+              width: '100%',
               backgroundColor: '#f1f5f9',
               borderRadius: 8,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
               borderColor: '#e2e8f0',
+              paddingHorizontal: 16,
+              paddingVertical: 20,
             }}
           >
-            <Text style={{ color: '#94a3b8', textAlign: 'center', fontSize: 13, padding: 12 }}>
-              QR Code{'\n'}dotly.one/card/{card.handle}
+            <Text
+              style={{ color: '#0f172a', textAlign: 'center', fontSize: 14, fontWeight: '600' }}
+            >
+              {cardUrl}
             </Text>
           </View>
           <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>
-            dotly.one/card/{card.handle}
+            Share or copy this link from mobile. QR display is not available in this build.
           </Text>
         </View>
 

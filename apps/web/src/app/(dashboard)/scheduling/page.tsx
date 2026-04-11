@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { getPublicApiUrl } from '@/lib/public-env'
@@ -356,6 +356,8 @@ interface AptTypeFormProps {
 }
 
 function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Element {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
   const [name, setName] = useState(initial?.name ?? '')
   const [slug, setSlug] = useState(initial?.slug ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
@@ -509,11 +511,38 @@ function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX.Elemen
     }
   }
 
+  useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    const focusable = modalRef.current?.querySelector<HTMLElement>(
+      'input, button, textarea, select',
+    )
+    focusable?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousActiveElementRef.current?.focus()
+    }
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="app-panel flex max-h-[90vh] w-full max-w-lg flex-col rounded-[28px] shadow-2xl">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="appointment-type-modal-title"
+        className="app-panel flex max-h-[90vh] w-full max-w-lg flex-col rounded-[28px] shadow-2xl"
+      >
         <div className="flex items-center justify-between border-b border-gray-100 p-5 flex-shrink-0">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 id="appointment-type-modal-title" className="text-lg font-semibold text-gray-900">
             {initial?.id ? 'Edit Appointment Type' : 'New Appointment Type'}
           </h3>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
@@ -786,6 +815,8 @@ function QuestionsBuilder({
   onSave,
   onClose,
 }: QuestionsBuilderProps): JSX.Element {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
   const [questions, setQuestions] = useState<Omit<BookingQuestion, 'id'>[]>(() =>
     initial.map((q) => ({
       label: q.label,
@@ -868,11 +899,40 @@ function QuestionsBuilder({
     }
   }
 
+  useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    const focusable = modalRef.current?.querySelector<HTMLElement>(
+      'input, button, textarea, select',
+    )
+    focusable?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousActiveElementRef.current?.focus()
+    }
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="app-panel flex max-h-[90vh] w-full max-w-xl flex-col rounded-[28px] shadow-2xl">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-questions-modal-title"
+        className="app-panel flex max-h-[90vh] w-full max-w-xl flex-col rounded-[28px] shadow-2xl"
+      >
         <div className="flex items-center justify-between border-b border-gray-100 p-5 flex-shrink-0">
-          <h3 className="text-lg font-semibold text-gray-900">Custom Booking Questions</h3>
+          <h3 id="booking-questions-modal-title" className="text-lg font-semibold text-gray-900">
+            Custom Booking Questions
+          </h3>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
             <X className="h-5 w-5 text-gray-500" />
           </button>

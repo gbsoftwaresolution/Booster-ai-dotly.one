@@ -43,6 +43,10 @@ export class BillingService {
     private boosterAi: BoosterAiClient,
   ) {}
 
+  private normalizeWalletAddress(walletAddress: string): string {
+    return walletAddress.toLowerCase()
+  }
+
   /**
    * Verify on-chain subscription for a wallet address and sync to DB.
    * Called after user submits a transaction hash.
@@ -54,11 +58,12 @@ export class BillingService {
     txHash: string,
     chainId: number,
   ) {
+    const normalizedWallet = this.normalizeWalletAddress(walletAddress)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { walletAddress: true },
     })
-    if (!user?.walletAddress || user.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+    if (!user?.walletAddress || user.walletAddress.toLowerCase() !== normalizedWallet) {
       throw new BadRequestException(
         'Provided wallet address does not match the wallet on your account',
       )
@@ -68,9 +73,9 @@ export class BillingService {
     // Without this check, any user could submit a tx hash from another wallet,
     // claim that wallet's on-chain plan, and upgrade their account for free.
     // We read the transaction from the chain and assert tx.from === walletAddress.
-    await this.assertTxOrigin(walletAddress, txHash, chainId)
+    await this.assertTxOrigin(normalizedWallet, txHash, chainId)
 
-    const { plan, expiresAt } = await this.getOnChainPlan(walletAddress, chainId)
+    const { plan, expiresAt } = await this.getOnChainPlan(normalizedWallet, chainId)
 
     await this.prisma.subscription.upsert({
       where: { userId },
@@ -78,7 +83,7 @@ export class BillingService {
         userId,
         plan,
         status: 'ACTIVE',
-        contractSubscriptionId: walletAddress,
+        contractSubscriptionId: normalizedWallet,
         txHash,
         chainId,
         currentPeriodEnd: expiresAt,
@@ -98,7 +103,7 @@ export class BillingService {
         userId,
         action: 'billing.subscribed',
         resourceType: 'subscription',
-        metadata: { plan, txHash, chainId, walletAddress },
+        metadata: { plan, txHash, chainId, walletAddress: normalizedWallet },
       })
       .catch(() => void 0)
 
@@ -231,9 +236,10 @@ export class BillingService {
   }
 
   async setWalletAddress(userId: string, walletAddress: string) {
+    const normalizedWallet = this.normalizeWalletAddress(walletAddress)
     return this.prisma.user.update({
       where: { id: userId },
-      data: { walletAddress },
+      data: { walletAddress: normalizedWallet },
     })
   }
 
@@ -274,7 +280,7 @@ export class BillingService {
     }
 
     const amountUsdt = this.boosterAi.getAmountUsdt(params.plan, params.duration)
-    const normalizedWallet = params.walletAddress.toLowerCase()
+    const normalizedWallet = this.normalizeWalletAddress(params.walletAddress)
 
     await this.prisma.user.update({
       where: { id: userId },

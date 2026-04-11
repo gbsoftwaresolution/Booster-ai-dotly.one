@@ -226,8 +226,15 @@ export class ContactsService {
           },
         })
 
-        // Persist custom lead form field answers if provided and a LeadForm exists
-        if (dto.fields && Object.keys(dto.fields).length > 0) {
+        // Persist every public lead submission when a lead form exists, including
+        // the default name/email/phone-only form used by cards with no custom fields.
+        const submissionAnswers = {
+          ...(dto.fields ?? {}),
+          ...(resolvedName ? { name: resolvedName } : {}),
+          ...(resolvedEmail ? { email: resolvedEmail } : {}),
+          ...(resolvedPhone ? { phone: resolvedPhone } : {}),
+        }
+        if (Object.keys(submissionAnswers).length > 0) {
           const leadForm = await tx.leadForm.findUnique({
             where: { cardId: dto.cardId },
             select: { id: true },
@@ -237,7 +244,7 @@ export class ContactsService {
               data: {
                 leadFormId: leadForm.id,
                 contactId: c.id,
-                answers: dto.fields,
+                answers: submissionAnswers,
               },
             })
           }
@@ -821,7 +828,7 @@ export class ContactsService {
   async getLeadSubmissions(
     userId: string,
     cardId: string | undefined,
-    params: { page?: number; limit?: number; search?: string },
+    params: { page?: number; limit?: number; search?: string; from?: string; to?: string },
   ) {
     if (cardId) {
       // Verify the card belongs to the requesting user
@@ -847,6 +854,20 @@ export class ContactsService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let submissionWhere: Record<string, any> = { leadFormId: { in: leadFormIds } }
 
+    const submittedAt: { gte?: Date; lte?: Date } = {}
+    if (params.from) submittedAt.gte = new Date(params.from)
+    if (params.to) {
+      const toDate = new Date(params.to)
+      toDate.setUTCHours(23, 59, 59, 999)
+      submittedAt.lte = toDate
+    }
+    if (Object.keys(submittedAt).length > 0) {
+      submissionWhere = {
+        ...submissionWhere,
+        submittedAt,
+      }
+    }
+
     if (params.search) {
       // Filter by contact name or email
       const matchingContacts = await this.prisma.contact.findMany({
@@ -861,6 +882,7 @@ export class ContactsService {
       })
       const contactIds = matchingContacts.map((c) => c.id)
       submissionWhere = {
+        ...(Object.keys(submittedAt).length > 0 ? { submittedAt } : {}),
         leadFormId: { in: leadFormIds },
         contactId: { in: contactIds },
       }
@@ -1599,18 +1621,20 @@ export class ContactsService {
     })
 
     const csv = [csvHeader, ...rows].join('\n')
-    return { csv, truncated, total: page.length }
+    return { csv, truncated, total: contacts.length }
   }
 
   async exportLeadSubmissions(
     userId: string,
-    opts?: { cardId?: string; search?: string },
+    opts?: { cardId?: string; search?: string; from?: string; to?: string },
   ): Promise<{ csv: string; truncated: boolean; total: number }> {
     const EXPORT_CAP = 10_000
     const submissionsResult = await this.getLeadSubmissions(userId, opts?.cardId, {
       page: 1,
       limit: EXPORT_CAP + 1,
       search: opts?.search,
+      from: opts?.from,
+      to: opts?.to,
     })
 
     const truncated = submissionsResult.submissions.length > EXPORT_CAP
@@ -1661,7 +1685,7 @@ export class ContactsService {
     return {
       csv: [csvHeader, ...rows].join('\n'),
       truncated,
-      total: page.length,
+      total: submissionsResult.submissions.length,
     }
   }
 

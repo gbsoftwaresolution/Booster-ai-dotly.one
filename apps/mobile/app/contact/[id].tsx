@@ -78,6 +78,48 @@ const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^\+?[\d\s\-().]{5,20}$/
 
+function normalizeWebsite(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+}
+
+function openWebsite(website: string) {
+  const normalized = normalizeWebsite(website)
+  if (!normalized) {
+    Alert.alert('Invalid website', 'This website URL does not appear to be valid.')
+    return
+  }
+  try {
+    const url = new URL(normalized)
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      Alert.alert('Invalid website', 'This website URL does not appear to be valid.')
+      return
+    }
+    void Linking.openURL(url.toString())
+  } catch {
+    Alert.alert('Invalid website', 'This website URL does not appear to be valid.')
+  }
+}
+
+function validateEditableContact(input: {
+  email?: string
+  phone?: string
+  website?: string
+}): string | null {
+  if (input.email && !EMAIL_RE.test(input.email)) return 'Enter a valid email address.'
+  if (input.phone && !PHONE_RE.test(input.phone)) return 'Enter a valid phone number.'
+  if (input.website) {
+    try {
+      const url = new URL(normalizeWebsite(input.website) ?? '')
+      if (!['http:', 'https:'].includes(url.protocol)) return 'Enter a valid website URL.'
+    } catch {
+      return 'Enter a valid website URL.'
+    }
+  }
+  return null
+}
+
 function openEmail(email: string) {
   if (!EMAIL_RE.test(email)) {
     Alert.alert('Invalid email', 'This email address does not appear to be valid.')
@@ -218,6 +260,15 @@ function EditContactModal({ visible, contact, onClose, onSaved }: EditContactMod
       Alert.alert('Validation', 'Name is required.')
       return
     }
+    const validationError = validateEditableContact({
+      email: email.trim() || undefined,
+      phone: phone.trim() || undefined,
+      website: website.trim() || undefined,
+    })
+    if (validationError) {
+      Alert.alert('Validation', validationError)
+      return
+    }
     setSaving(true)
     try {
       await api.updateContact(contact.id, {
@@ -226,7 +277,7 @@ function EditContactModal({ visible, contact, onClose, onSaved }: EditContactMod
         phone: phone.trim() || undefined,
         company: company.trim() || undefined,
         title: title.trim() || undefined,
-        website: website.trim() || undefined,
+        website: normalizeWebsite(website),
         address: address.trim() || undefined,
       })
       onSaved({
@@ -236,7 +287,7 @@ function EditContactModal({ visible, contact, onClose, onSaved }: EditContactMod
         phone: phone.trim() || undefined,
         company: company.trim() || undefined,
         title: title.trim() || undefined,
-        website: website.trim() || undefined,
+        website: normalizeWebsite(website),
         address: address.trim() || undefined,
       })
       onClose()
@@ -528,8 +579,8 @@ export default function ContactDetailScreen() {
     try {
       await api.updateContactStage(id, stage)
       setContact((prev) => (prev ? { ...prev, crmPipeline: { ...prev.crmPipeline, stage } } : prev))
-    } catch {
-      // silently ignore
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update contact stage')
     } finally {
       setStageLoading(false)
     }
@@ -858,7 +909,15 @@ export default function ContactDetailScreen() {
           {error || 'Contact not found'}
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16, padding: 12 }}>
-          <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Go Back</Text>
+          <Text
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            accessibilityHint="Returns to the previous screen"
+            style={{ color: '#0ea5e9', fontWeight: '600' }}
+          >
+            Go Back
+          </Text>
         </TouchableOpacity>
       </View>
     )
@@ -888,7 +947,15 @@ export default function ContactDetailScreen() {
         }}
       >
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: '#0ea5e9', fontSize: 16, fontWeight: '600' }}>← Back</Text>
+          <Text
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Returns to the contacts list"
+            style={{ color: '#0ea5e9', fontSize: 16, fontWeight: '600' }}
+          >
+            ← Back
+          </Text>
         </TouchableOpacity>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -896,6 +963,9 @@ export default function ContactDetailScreen() {
           {/* Edit button */}
           <TouchableOpacity
             onPress={() => setEditModalOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit contact"
+            accessibilityHint="Opens the edit contact form"
             style={{
               paddingHorizontal: 12,
               paddingVertical: 5,
@@ -909,6 +979,9 @@ export default function ContactDetailScreen() {
           <TouchableOpacity
             onPress={handleDelete}
             disabled={deleting}
+            accessibilityRole="button"
+            accessibilityLabel="Delete contact"
+            accessibilityHint="Deletes this contact after confirmation"
             style={{
               paddingHorizontal: 12,
               paddingVertical: 5,
@@ -975,6 +1048,9 @@ export default function ContactDetailScreen() {
           {contact.email && (
             <TouchableOpacity
               onPress={() => openEmail(contact.email!)}
+              accessibilityRole="link"
+              accessibilityLabel={`Email ${contact.email}`}
+              accessibilityHint="Opens your email app"
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
             >
               <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Email</Text>
@@ -984,6 +1060,9 @@ export default function ContactDetailScreen() {
           {contact.phone && (
             <TouchableOpacity
               onPress={() => openPhone(contact.phone!)}
+              accessibilityRole="link"
+              accessibilityLabel={`Call ${contact.phone}`}
+              accessibilityHint="Opens your phone app"
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
             >
               <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Phone</Text>
@@ -991,10 +1070,16 @@ export default function ContactDetailScreen() {
             </TouchableOpacity>
           )}
           {contact.website && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => openWebsite(contact.website!)}
+              accessibilityRole="link"
+              accessibilityLabel={`Open website ${contact.website}`}
+              accessibilityHint="Opens this website in your browser"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+            >
               <Text style={{ color: '#94a3b8', fontSize: 13, width: 56 }}>Web</Text>
-              <Text style={{ color: '#475569', fontSize: 14, flex: 1 }}>{contact.website}</Text>
-            </View>
+              <Text style={{ color: '#0ea5e9', fontSize: 14, flex: 1 }}>{contact.website}</Text>
+            </TouchableOpacity>
           )}
           {contact.address && (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
@@ -1014,6 +1099,9 @@ export default function ContactDetailScreen() {
           {contact.email && (
             <TouchableOpacity
               onPress={() => setEmailModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Send email"
+              accessibilityHint="Opens the send email form for this contact"
               style={{
                 marginTop: 4,
                 paddingVertical: 9,

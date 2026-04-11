@@ -27,13 +27,16 @@ export default function CardsTab() {
   const [cards, setCards] = useState<CardItem[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const fetchCards = useCallback(async () => {
     try {
+      setError(null)
       const data = await api.getCards()
       setCards(data as CardItem[])
     } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load cards')
       if (__DEV__) {
         console.error('Failed to fetch cards', e)
       }
@@ -77,6 +80,26 @@ export default function CardsTab() {
       <FlatList
         data={cards}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={
+          error ? (
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginTop: 16,
+                backgroundColor: '#fef2f2',
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: '#fecaca',
+              }}
+            >
+              <Text style={{ color: '#b91c1c', fontSize: 13, lineHeight: 18 }}>{error}</Text>
+              <TouchableOpacity onPress={() => void fetchCards()} style={{ marginTop: 10 }}>
+                <Text style={{ color: '#b91c1c', fontWeight: '700', fontSize: 13 }}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -98,13 +121,18 @@ export default function CardsTab() {
             }}
           >
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 8 }}>
-              No cards yet
+              {error ? 'Could not load cards' : 'No cards yet'}
             </Text>
             <Text style={{ fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 20 }}>
-              Tap the + button to create your first card
+              {error
+                ? 'Check your connection and try again.'
+                : 'Tap the + button to create your first card'}
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/(tabs)/create-card')}
+              accessibilityRole="button"
+              accessibilityLabel="Create card"
+              accessibilityHint="Opens the card creation screen"
               style={{
                 marginTop: 20,
                 backgroundColor: '#0ea5e9',
@@ -120,6 +148,9 @@ export default function CardsTab() {
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => router.push(`/card/${item.id}`)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open card ${item.fields?.name ?? item.handle}`}
+            accessibilityHint="Opens this card's details"
             style={{
               marginHorizontal: 16,
               marginTop: 12,
@@ -167,6 +198,9 @@ export default function CardsTab() {
                     e.stopPropagation()
                     router.push(`/card/edit/${item.id}`)
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit card ${item.fields?.name ?? item.handle}`}
+                  accessibilityHint="Opens the edit screen for this card"
                   style={{
                     paddingHorizontal: 10,
                     paddingVertical: 6,
@@ -208,6 +242,9 @@ export default function CardsTab() {
       {/* FAB — Create new card */}
       <TouchableOpacity
         onPress={() => router.push('/(tabs)/create-card')}
+        accessibilityRole="button"
+        accessibilityLabel="Create a new card"
+        accessibilityHint="Opens the card creation screen"
         style={{
           position: 'absolute',
           bottom: 24,

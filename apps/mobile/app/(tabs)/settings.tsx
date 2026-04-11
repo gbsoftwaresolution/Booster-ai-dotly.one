@@ -1,11 +1,5 @@
 import { useState, useEffect } from 'react'
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
-  ActivityIndicator,
-} from 'react-native'
+import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native'
 import { supabase } from '../../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 
@@ -27,8 +21,14 @@ export default function SettingsTab() {
 
   async function handleSignOut() {
     setSigningOut(true)
-    await supabase.auth.signOut()
-    setSigningOut(false)
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+    } catch (error) {
+      Alert.alert('Sign out failed', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   return (
@@ -43,9 +43,7 @@ export default function SettingsTab() {
           borderBottomColor: '#e2e8f0',
         }}
       >
-        <Text
-          style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 }}
-        >
+        <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 }}>
           Settings
         </Text>
       </View>
