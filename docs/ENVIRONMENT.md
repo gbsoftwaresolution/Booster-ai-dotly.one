@@ -28,7 +28,6 @@ Copy the relevant `.env.example` to `.env` in each app directory, fill in the va
 | `R2_PUBLIC_URL`          | Public base URL for R2-served assets                          | Yes                         | Cloudflare R2 bucket settings       |
 | `POLYGON_RPC_URL`        | RPC endpoint for the billing smart contract chain             | Yes                         | Chain provider (e.g. Polygon RPC)   |
 | `DOTLY_CONTRACT_ADDRESS` | Deployed billing smart contract address                       | Yes                         | Deployment output                   |
-| `CONTRACT_CHAIN_ID`      | EVM chain ID for the billing contract (137 = Polygon)         | Yes                         | Chain documentation                 |
 | `PORT`                   | Port the API server listens on                                | No (default: `3001`)        | —                                   |
 | `NODE_ENV`               | Node environment (`development` / `production`)               | No (default: `development`) | —                                   |
 | `WEB_URL`                | Base URL of the web app (used for CORS and email links)       | Yes                         | `http://localhost:3000` locally     |
@@ -37,28 +36,28 @@ Copy the relevant `.env.example` to `.env` in each app directory, fill in the va
 
 ## `apps/web`
 
-| Variable                           | Description                                           | Required            | Source                                                          |
-| ---------------------------------- | ----------------------------------------------------- | ------------------- | --------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`         | Supabase project URL (browser-visible)                | Yes                 | Supabase dashboard → Settings → API                             |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | Supabase public anon key (browser-visible)            | Yes                 | Supabase dashboard → Settings → API                             |
-| `NEXT_PUBLIC_API_URL`              | Base URL of the NestJS API                            | Yes                 | `http://localhost:3001` locally                                 |
-| `NEXT_PUBLIC_APP_URL`              | Base URL of this web app                              | Yes                 | `http://localhost:3000` locally                                 |
-| `NEXT_PUBLIC_ENABLE_APPLE_WALLET`  | Show Apple Wallet actions in web UI (`true`/`false`)  | No                  | Set to `true` only when Apple Wallet is configured server-side  |
-| `NEXT_PUBLIC_ENABLE_GOOGLE_WALLET` | Show Google Wallet actions in web UI (`true`/`false`) | No                  | Set to `true` only when Google Wallet is configured server-side |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS`     | Billing smart contract address (browser-visible)      | Yes                 | Deployment output                                               |
-| `NEXT_PUBLIC_CONTRACT_CHAIN_ID`    | EVM chain ID for billing contract (browser-visible)   | No (default: `137`) | Chain documentation                                             |
+| Variable                           | Description                                                     | Required | Source                                                          |
+| ---------------------------------- | --------------------------------------------------------------- | -------- | --------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`         | Supabase project URL (browser-visible)                          | Yes      | Supabase dashboard → Settings → API                             |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | Supabase public anon key (browser-visible)                      | Yes      | Supabase dashboard → Settings → API                             |
+| `NEXT_PUBLIC_API_URL`              | Base URL of the NestJS API                                      | Yes      | `http://localhost:3001` locally                                 |
+| `NEXT_PUBLIC_APP_URL`              | App base URL used by middleware and auth callback safety checks | Yes      | `http://localhost:3000` locally                                 |
+| `NEXT_PUBLIC_WEB_URL`              | Public web base URL used for share links and app metadata       | Yes      | `http://localhost:3000` locally                                 |
+| `NEXT_PUBLIC_SITE_URL`             | Canonical site URL used for public card/share metadata          | Yes      | `http://localhost:3000` locally                                 |
+| `API_URL`                          | Preferred server-side API URL for Next.js SSR/route handlers    | Yes      | `http://localhost:3001` locally                                 |
+| `INTERNAL_API_URL`                 | Legacy alias for `API_URL`                                      | No       | `http://localhost:3001` locally                                 |
+| `NEXT_PUBLIC_ENABLE_APPLE_WALLET`  | Show Apple Wallet actions in web UI (`true`/`false`)            | No       | Set to `true` only when Apple Wallet is configured server-side  |
+| `NEXT_PUBLIC_ENABLE_GOOGLE_WALLET` | Show Google Wallet actions in web UI (`true`/`false`)           | No       | Set to `true` only when Google Wallet is configured server-side |
 
 ---
 
 ## `apps/mobile`
 
-| Variable                        | Description                                          | Required            | Source                                                 |
-| ------------------------------- | ---------------------------------------------------- | ------------------- | ------------------------------------------------------ |
-| `EXPO_PUBLIC_SUPABASE_URL`      | Supabase project URL (bundled into app)              | Yes                 | Supabase dashboard → Settings → API                    |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase public anon key (bundled into app)          | Yes                 | Supabase dashboard → Settings → API                    |
-| `EXPO_PUBLIC_API_URL`           | Base URL of the NestJS API                           | Yes                 | `http://localhost:3001` locally (use LAN IP on device) |
-| `EXPO_PUBLIC_CONTRACT_ADDRESS`  | Billing smart contract address (bundled into app)    | Yes                 | Deployment output                                      |
-| `EXPO_PUBLIC_CONTRACT_CHAIN_ID` | EVM chain ID for billing contract (bundled into app) | No (default: `137`) | Chain documentation                                    |
+| Variable                        | Description                                 | Required | Source                                                 |
+| ------------------------------- | ------------------------------------------- | -------- | ------------------------------------------------------ |
+| `EXPO_PUBLIC_SUPABASE_URL`      | Supabase project URL (bundled into app)     | Yes      | Supabase dashboard → Settings → API                    |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase public anon key (bundled into app) | Yes      | Supabase dashboard → Settings → API                    |
+| `EXPO_PUBLIC_API_URL`           | Base URL of the NestJS API                  | Yes      | `http://localhost:3001` locally (use LAN IP on device) |
 
 ---
 
@@ -67,4 +66,5 @@ Copy the relevant `.env.example` to `.env` in each app directory, fill in the va
 - Variables prefixed with `NEXT_PUBLIC_` are inlined into the Next.js browser bundle at build time — never put secrets in them.
 - Variables prefixed with `EXPO_PUBLIC_` are bundled into the Expo app at build time — never put secrets in them.
 - Server-only secrets (`SUPABASE_JWT_SECRET`, `MAILGUN_API_KEY`, AWS keys, R2 keys, `POLYGON_RPC_URL`) must **never** appear in `apps/web` or `apps/mobile` env files.
+- `apps/web` currently requires both `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_WEB_URL`; keep them in sync unless and until the runtime usage is consolidated in code.
 - `.env` files are git-ignored. Only `.env.example` files are committed. Copy `.env.example` → `.env` and fill in real values locally.

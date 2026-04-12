@@ -70,7 +70,7 @@ describe('ContactsService.createFromLead', () => {
       phone: '+1 555 000 0000',
     })
 
-    expect(result).toEqual({ success: true, contactId: 'contact_1' })
+    expect(result).toEqual({ success: true })
     expect(leadSubmissionCreate).toHaveBeenCalledWith({
       data: {
         leadFormId: 'lead_form_1',

@@ -43,7 +43,8 @@ Confirm envs are set:
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - web server-side:
-  - `API_URL` or `INTERNAL_API_URL`
+  - `API_URL`
+  - `INTERNAL_API_URL` only if still using the legacy alias
 - api:
   - `WEB_URL`
   - `SUPABASE_JWT_SECRET`
@@ -190,6 +191,7 @@ Pass condition:
 
 ### 10. Operational checks
 
+- Confirm `https://dotly.one/api/health` returns `200`
 - Check web Sentry for new production errors after deploy
 - Check API logs for startup/config errors
 - Check billing/order logs for payment failures

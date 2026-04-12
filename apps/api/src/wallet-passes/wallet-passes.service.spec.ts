@@ -46,7 +46,7 @@ describe('WalletPassesService', () => {
       })
 
     await expect(service.getPublicPassForHandle('alice', null)).rejects.toThrow(
-      'Apple Wallet passes are not yet available on this server. Use Google Wallet instead.',
+      'Apple Wallet passes are temporarily unavailable',
     )
     expect(generateApplePassSpy).not.toHaveBeenCalled()
   })

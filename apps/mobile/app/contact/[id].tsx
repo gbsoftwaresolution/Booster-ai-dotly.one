@@ -3,7 +3,6 @@ import type {
   ContactDetailResponse,
   ContactNoteResponse,
   ContactTaskResponse,
-  ContactTimelineEventResponse,
   CustomFieldDefinitionResponse,
   PipelineResponse,
 } from '@dotly/types'
@@ -33,7 +32,6 @@ import { Feather } from '@expo/vector-icons'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
 
-type TimelineEvent = ContactTimelineEventResponse
 type ContactNote = ContactNoteResponse
 type ContactTask = ContactTaskResponse
 type ContactDeal = ContactDealResponse
@@ -129,59 +127,6 @@ const STAGE_COLORS: Record<
 
 function getStageStyle(stage: string) {
   return STAGE_COLORS[stage] ?? DEFAULT_STAGE_STYLE
-}
-
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
-function eventDotColor(event: TimelineEvent): string {
-  switch (event.event) {
-    case 'ENRICHMENT_FAILED':
-      return '#ef4444'
-    case 'ENRICHMENT_COMPLETED':
-      return '#22c55e'
-    case 'EMAIL_SENT':
-      return '#2563eb'
-    case 'STAGE_CHANGED':
-      return '#a855f7'
-    case 'NOTE_ADDED':
-      return '#f59e0b'
-    default:
-      return '#0ea5e9'
-  }
-}
-
-function eventLabel(event: TimelineEvent): string {
-  switch (event.event) {
-    case 'LEAD_CAPTURED':
-      return `Lead captured${event.metadata?.sourceHandle ? ` from @${event.metadata.sourceHandle}` : ''}`
-    case 'STAGE_CHANGED':
-      return `Stage changed: ${event.metadata?.from ?? '?'} → ${event.metadata?.to ?? '?'}`
-    case 'NOTE_ADDED':
-      return `Note: ${String(event.metadata?.content ?? '').slice(0, 60)}`
-    case 'EMAIL_SENT':
-      return event.metadata?.subject
-        ? `Email sent: ${String(event.metadata.subject).slice(0, 50)}`
-        : 'Email sent'
-    case 'CONTACT_UPDATED':
-      return 'Contact details updated'
-    case 'ENRICHMENT_QUEUED':
-      return 'AI enrichment queued'
-    case 'ENRICHMENT_COMPLETED':
-      return 'AI enrichment completed'
-    case 'ENRICHMENT_FAILED':
-      return `Enrichment failed${event.metadata?.reason ? `: ${String(event.metadata.reason)}` : ''}`
-    default:
-      return event.event
-  }
 }
 
 // ─── Card style reused across sections ───────────────────────────────────────
@@ -450,7 +395,7 @@ export default function ContactDetailScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueAt, setNewTaskDueAt] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
-  const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set())
+  const [, setBusyTaskIds] = useState<Set<string>>(new Set())
 
   // Deals state
   const [deals, setDeals] = useState<ContactDeal[]>([])
@@ -527,8 +472,9 @@ export default function ContactDetailScreen() {
       applyContactDetail(data)
       setError(null)
     } finally {
-      if (requestIdRef.current !== requestId) return
-      setLoading(false)
+      if (requestIdRef.current === requestId) {
+        setLoading(false)
+      }
     }
   }, [applyContactDetail, id])
 
@@ -551,8 +497,9 @@ export default function ContactDetailScreen() {
         if (requestIdRef.current !== requestId) return
         setError(err instanceof Error ? err.message : 'Failed to load contact')
       } finally {
-        if (requestIdRef.current !== requestId) return
-        setLoading(false)
+        if (requestIdRef.current === requestId) {
+          setLoading(false)
+        }
       }
     })()
     return () => {

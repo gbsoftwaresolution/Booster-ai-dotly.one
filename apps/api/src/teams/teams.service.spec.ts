@@ -1,6 +1,14 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
 import { TeamsService } from './teams.service'
 
+type TeamTransaction = {
+  team: { findUnique: jest.Mock }
+  teamMember: {
+    findUnique: jest.Mock
+    count: jest.Mock
+  }
+}
+
 describe('TeamsService.acceptInvite', () => {
   it('throws ConflictException when the user is already a team member', async () => {
     const prisma = {
@@ -54,7 +62,7 @@ describe('TeamsService authorization hardening', () => {
 
   it('prevents removing the team owner', async () => {
     const prisma = {
-      $transaction: jest.fn(async (fn: (tx: any) => Promise<unknown>) =>
+      $transaction: jest.fn(async (fn: (tx: TeamTransaction) => Promise<unknown>) =>
         fn({
           team: { findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner_1' }) },
           teamMember: {
@@ -73,7 +81,7 @@ describe('TeamsService authorization hardening', () => {
 
   it('prevents demoting the team owner', async () => {
     const prisma = {
-      $transaction: jest.fn(async (fn: (tx: any) => Promise<unknown>) =>
+      $transaction: jest.fn(async (fn: (tx: TeamTransaction) => Promise<unknown>) =>
         fn({
           team: { findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner_1' }) },
           teamMember: {

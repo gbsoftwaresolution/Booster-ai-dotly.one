@@ -13,7 +13,6 @@ import type {
   ItemsResponse,
   PaginatedResponse,
   PipelineResponse,
-  SocialLinkData,
   UserMeResponse,
 } from '@dotly/types'
 

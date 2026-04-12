@@ -13,7 +13,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'
 import { useLayoutEffect } from 'react'
-import type { CardEditorResponse, SocialLinkData } from '@dotly/types'
+import type { CardEditorResponse } from '@dotly/types'
 import * as ImagePicker from 'expo-image-picker'
 import * as Linking from 'expo-linking'
 import { Feather } from '@expo/vector-icons'

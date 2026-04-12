@@ -115,8 +115,9 @@ export default function CreateCardScreen() {
           err instanceof Error ? err.message : 'Could not verify handle availability.',
         )
       } finally {
-        if (handleRequestIdRef.current !== requestId) return
-        setCheckingHandle(false)
+        if (handleRequestIdRef.current === requestId) {
+          setCheckingHandle(false)
+        }
       }
     }, 500)
     return () => {

@@ -904,7 +904,6 @@ export class ContactsService {
     }
 
     const limit = Math.min(params.limit ?? 20, 100)
-    const skip = ((params.page ?? 1) - 1) * limit
 
     // Find all lead form IDs belonging to the user (optionally filtered by card)
     const leadForms = await this.prisma.leadForm.findMany({

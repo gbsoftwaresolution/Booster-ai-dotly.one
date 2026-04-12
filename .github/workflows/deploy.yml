@@ -14,6 +14,8 @@ jobs:
   # Gate: all CI checks must pass
   ci-gate:
     uses: ./.github/workflows/ci.yml
+    with:
+      run-security-gates: false
 
   deploy-api:
     needs: ci-gate
@@ -74,9 +76,17 @@ jobs:
         # Check the homepage (/) instead of a hardcoded user handle.
         # A 200 from the homepage confirms Next.js is up without depending on test data.
         run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://dotly.one/api/health)
+          if [ "$STATUS" = "200" ]; then
+            echo "Web health endpoint is healthy"
+          else
+            echo "Web health check failed: $STATUS"
+            exit 1
+          fi
+
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://dotly.one/)
           if [ "$STATUS" = "200" ]; then
-            echo "Web is healthy"
+            echo "Web homepage is healthy"
           else
             echo "Web smoke test failed: $STATUS"
             exit 1

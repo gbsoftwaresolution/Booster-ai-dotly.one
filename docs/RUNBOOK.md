@@ -13,18 +13,18 @@
 
 ## Service URLs
 
-| Service               | URL                                    |
-| --------------------- | -------------------------------------- |
-| Web (Production)      | https://dotly.one                      |
-| API Health            | https://api.dotly.one/health           |
-| Swagger Docs          | https://api.dotly.one/api/docs         |
-| Sentry (API errors)   | https://sentry.io/organizations/dotly  |
-| PostHog (Analytics)   | https://app.posthog.com                |
-| Railway (API hosting) | https://railway.app/project/dotly-api  |
-| Vercel (Web hosting)  | https://vercel.com/dotly/web           |
-| Supabase (Auth/DB)    | https://app.supabase.com/project/dotly |
-| Redis Cloud           | https://app.redislabs.com              |
-| Mailgun               | https://app.mailgun.com                |
+| Service               | URL                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| Web (Production)      | https://dotly.one                                                                              |
+| API Health            | https://api.dotly.one/health                                                                   |
+| Swagger Docs          | Available at `/api/docs` outside production, or in production only when `SWAGGER_ENABLED=true` |
+| Sentry (API errors)   | https://sentry.io/organizations/dotly                                                          |
+| PostHog (Analytics)   | https://app.posthog.com                                                                        |
+| Railway (API hosting) | https://railway.app/project/dotly-api                                                          |
+| Vercel (Web hosting)  | https://vercel.com/dotly/web                                                                   |
+| Supabase (Auth/DB)    | https://app.supabase.com/project/dotly                                                         |
+| Redis Cloud           | https://app.redislabs.com                                                                      |
+| Mailgun               | https://app.mailgun.com                                                                        |
 
 ---
 
@@ -97,7 +97,7 @@
 2. The API is designed to fall back to direct DB writes — queue jobs may be delayed
 3. Verify fallback is active: check API logs for `Redis unavailable — fallback mode active`
 4. Once Redis recovers, Bull will automatically reconnect (lazyConnect mode)
-5. Re-queue any failed jobs via Bull board if available
+5. Re-queue failed work manually only after identifying the affected flow; no Bull board is currently documented in this repo
 
 ---
 
@@ -108,9 +108,9 @@
 **Steps:**
 
 1. Check Mailgun dashboard → Logs → filter by domain `mg.dotly.one`
-2. If Mailgun is down: SES fallback should activate automatically (check `EMAIL_PROVIDER` env var)
+2. If Mailgun is down: SES fallback should activate automatically when AWS SES credentials are configured
 3. Verify SES sending limits have not been exceeded in AWS console
-4. Test delivery manually: `curl -X POST /api/test-email`
+4. Verify delivery by triggering a real product flow that sends email (for example a staging booking confirmation or team invite)
 5. Check SPF/DKIM DNS records if delivery rates drop suddenly
 
 ---
@@ -132,11 +132,11 @@ pnpm --filter @dotly/web run verify
 vercel --prod
 ```
 
-Vercel preview URLs are generated for every PR automatically.
+Vercel preview URLs are typically generated for Vercel-managed preview deployments; verify in the Vercel dashboard for the specific change.
 
 ### API (Railway)
 
-Deployments are triggered automatically when `apps/api` changes are merged to `main`.
+Deployments are triggered automatically on push to `main`; API deployment then runs as part of the production workflow.
 
 Preflight:
 

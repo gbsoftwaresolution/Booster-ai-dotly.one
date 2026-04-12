@@ -11,7 +11,6 @@
     "NEXT_PUBLIC_WEB_URL": "@dotly-web-url",
     "NEXT_PUBLIC_SITE_URL": "@dotly-web-url",
     "API_URL": "@dotly-api-url",
-    "NEXT_PUBLIC_DOTLY_CONTRACT_ADDRESS": "@dotly-contract-address",
     "NEXT_PUBLIC_SENTRY_DSN": "@dotly-sentry-dsn",
     "NEXT_PUBLIC_POSTHOG_KEY": "@dotly-posthog-key",
     "NEXT_PUBLIC_POSTHOG_HOST": "@dotly-posthog-host",
@@ -33,7 +32,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://app.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.dotly.one https://*.supabase.co wss://*.supabase.co https://sentry.io https://app.posthog.com https://*.r2.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://app.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://*.dotly.one https://*.supabase.co wss://*.supabase.co https://sentry.io https://app.posthog.com https://*.r2.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
         }
       ]
     },
@@ -47,12 +46,6 @@
           "comment": "Card pages are embeddable in same-origin iframes (e.g. preview panel). Override the global DENY."
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/health",
-      "destination": "https://api.dotly.one/health"
     }
   ]
 }

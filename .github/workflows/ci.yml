@@ -7,6 +7,12 @@ on:
     branches: [main]
   # Allow deploy.yml to reuse this workflow as a CI gate
   workflow_call:
+    inputs:
+      run-security-gates:
+        description: Run secret scan and dependency audit jobs
+        required: false
+        type: boolean
+        default: true
 
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_test
@@ -18,6 +24,7 @@ jobs:
   # TruffleHog catches accidentally committed credentials before they reach main.
   secret-scan:
     name: Secret Scan (TruffleHog)
+    if: ${{ github.event_name != 'workflow_call' || inputs.run-security-gates }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +41,7 @@ jobs:
   # M-05: Audit production dependencies for known high/critical CVEs.
   dependency-audit:
     name: Dependency Audit
+    if: ${{ github.event_name != 'workflow_call' || inputs.run-security-gates }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

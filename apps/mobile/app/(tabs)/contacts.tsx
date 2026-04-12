@@ -431,10 +431,11 @@ export default function ContactsTab() {
         }
         if (!reset) setFailedPage(pageToFetch)
       } finally {
-        if (contactsRequestIdRef.current !== requestId) return
-        setLoading(false)
-        setRefreshing(false)
-        setLoadingMore(false)
+        if (contactsRequestIdRef.current === requestId) {
+          setLoading(false)
+          setRefreshing(false)
+          setLoadingMore(false)
+        }
       }
     },
     [],

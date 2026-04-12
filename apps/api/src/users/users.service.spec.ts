@@ -43,8 +43,8 @@ describe('UsersService.getMe', () => {
       notifLeadCaptured: true,
       notifWeeklyDigest: false,
       notifProductUpdates: false,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
     })
     expect(result).not.toHaveProperty('pushToken')
     expect(result).not.toHaveProperty('supabaseId')

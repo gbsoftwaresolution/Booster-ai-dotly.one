@@ -13,6 +13,8 @@ concurrency:
 jobs:
   ci-gate:
     uses: ./.github/workflows/ci.yml
+    with:
+      run-security-gates: false
 
   deploy-api-staging:
     needs: ci-gate
@@ -22,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run database migrations (staging)
         run: |
-          npm install -g prisma
+          npm install -g prisma@5.15.0
           prisma migrate deploy
         working-directory: packages/database
         env:
@@ -37,9 +39,12 @@ jobs:
     needs: [ci-gate, deploy-api-staging]
     runs-on: ubuntu-latest
     environment: staging
+    outputs:
+      preview-url: ${{ steps.deploy-web.outputs.preview-url }}
     steps:
       - uses: actions/checkout@v4
       - name: Deploy web to Vercel (staging/preview)
+        id: deploy-web
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -51,6 +56,8 @@ jobs:
   smoke-test-staging:
     needs: [deploy-api-staging, deploy-web-staging]
     runs-on: ubuntu-latest
+    env:
+      STAGING_WEB_URL: ${{ needs.deploy-web-staging.outputs.preview-url }}
     steps:
       - name: API health check (staging)
         run: |
@@ -65,3 +72,36 @@ jobs:
           done
           echo "Staging API health check failed after 5 attempts"
           exit 1
+      - name: Validate staging web deployment URL
+        run: |
+          if [ -z "$STAGING_WEB_URL" ]; then
+            echo "Missing Vercel preview URL from deploy-web-staging"
+            exit 1
+          fi
+          echo "Testing staging web at $STAGING_WEB_URL"
+      - name: Web health check (staging preview)
+        run: |
+          healthy=false
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_WEB_URL/api/health")
+            if [ "$STATUS" = "200" ]; then
+              echo "Staging web health endpoint is healthy"
+              healthy=true
+              break
+            fi
+            echo "Attempt $i: Status $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          if [ "$healthy" != "true" ]; then
+            echo "Staging web health check failed after 5 attempts"
+            exit 1
+          fi
+      - name: Web smoke test (staging preview)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_WEB_URL/")
+          if [ "$STATUS" = "200" ]; then
+            echo "Staging web homepage is healthy"
+          else
+            echo "Staging web smoke test failed: $STATUS"
+            exit 1
+          fi

@@ -1,6 +1,6 @@
 Must have to start at all: DATABASE*URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET, REDIS_URL, WEB_URL/NEXT_PUBLIC_APP_URL, R2*_ (fix R2*BUCKET_NAME → R2_BUCKET)
 Must have for full functionality: MAILGUN_API_KEY + MAILGUN_DOMAIN (or SES equivalent), OPENAI_API_KEY, DOTLY_CONTRACT_ADDRESS, POLYGON_RPC_URL
-Should have for production: SENTRY_DSN, NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_DOTLY_CONTRACT_ADDRESS
+Should have for production: SENTRY_DSN, NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_POSTHOG_KEY
 Nice to have: BASE_RPC_URL, AWS_SES*_ (only if you want SES as email fallback)
 
 supaDB password: [REDACTED — rotate this credential immediately; never commit secrets to source control]

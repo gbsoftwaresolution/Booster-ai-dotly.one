@@ -29,6 +29,7 @@ describe('InboxService upload confirmation', () => {
       get: jest.fn((key: string) => {
         const values: Record<string, string> = {
           R2_PUBLIC_URL: 'https://cdn.dotly.one',
+          INBOX_UPLOAD_TOKEN_SECRET: 'test-secret',
         }
         return values[key]
       }),
