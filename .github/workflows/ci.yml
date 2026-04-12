@@ -70,6 +70,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo lint
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          WEB_URL: http://localhost:3000
+          R2_PUBLIC_HOSTNAME: assets.dotly.one
 
   typecheck:
     name: Typecheck
@@ -85,6 +93,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo typecheck
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          WEB_URL: http://localhost:3000
+          R2_PUBLIC_HOSTNAME: assets.dotly.one
 
   unit-test:
     name: Unit Tests
