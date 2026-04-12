@@ -165,14 +165,21 @@ export function ContactDetailDrawer({
   })
   const emailHistoryState = useContactEmailHistory({ contactId })
 
+  const { resetNotesState } = notesState
+  const { resetTasksState } = tasksState
+  const { resetDealsState } = dealsState
+  const { resetTagsState } = tagsState
+  const { resetCustomFieldsState } = customFieldsState
+  const { resetEmailHistoryState } = emailHistoryState
+
   const resetTransientState = useCallback(() => {
     clearReenrichTimer()
-    notesState.resetNotesState()
-    tasksState.resetTasksState()
-    dealsState.resetDealsState()
-    tagsState.resetTagsState()
-    customFieldsState.resetCustomFieldsState()
-    emailHistoryState.resetEmailHistoryState()
+    resetNotesState()
+    resetTasksState()
+    resetDealsState()
+    resetTagsState()
+    resetCustomFieldsState()
+    resetEmailHistoryState()
     setMergeModalOpen(false)
     setLoadingDuplicates(false)
     setMergeCandidates([])
@@ -181,12 +188,12 @@ export function ContactDetailDrawer({
     setReenriching(false)
   }, [
     clearReenrichTimer,
-    customFieldsState,
-    dealsState,
-    emailHistoryState,
-    notesState,
-    tagsState,
-    tasksState,
+    resetCustomFieldsState,
+    resetDealsState,
+    resetEmailHistoryState,
+    resetNotesState,
+    resetTagsState,
+    resetTasksState,
   ])
 
   useEffect(() => {

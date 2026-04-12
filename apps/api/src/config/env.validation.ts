@@ -12,6 +12,12 @@ import {
   validateSync,
 } from 'class-validator'
 
+const httpUrlOptions = {
+  protocols: ['http', 'https'],
+  require_protocol: true,
+  require_tld: false,
+}
+
 class EnvironmentVariables {
   @IsOptional() @IsString() NODE_ENV?: string
   @IsString() DATABASE_URL!: string
@@ -32,7 +38,7 @@ class EnvironmentVariables {
   SUPABASE_SERVICE_ROLE_KEY?: string
 
   @IsString() REDIS_URL!: string
-  @IsUrl() WEB_URL!: string
+  @IsUrl(httpUrlOptions) WEB_URL!: string
 
   @IsOptional() @IsString() OPENAI_API_KEY?: string
 
@@ -87,7 +93,7 @@ class EnvironmentVariables {
   @IsOptional() @IsString() PORT?: string
 
   // BoosterAI affiliate billing integration
-  @IsOptional() @IsUrl() BOOSTERAI_API_URL?: string
+  @IsOptional() @IsUrl(httpUrlOptions) BOOSTERAI_API_URL?: string
   @IsOptional() @IsString() BOOSTERAI_INTERNAL_API_KEY?: string
   // planId mappings (defaults: STARTER=1, PRO=2, BUSINESS=3, AGENCY=4, ENTERPRISE=5)
   @IsOptional() @IsString() BOOSTERAI_PLAN_ID_STARTER?: string

@@ -288,7 +288,7 @@ export class AnalyticsService {
       // timezone here in the future when frontend sends a tz param.
       this.prisma.$queryRaw<{ date: string; count: bigint }[]>`
         SELECT DATE("createdAt" AT TIME ZONE 'UTC')::text AS date, COUNT(*)::bigint AS count
-        FROM "AnalyticsEvent"
+        FROM "analytics_events"
         WHERE "cardId" = ${cardId}
           AND "type" = 'VIEW'
           AND "createdAt" >= ${sevenDaysAgo}
@@ -297,7 +297,7 @@ export class AnalyticsService {
       `,
       this.prisma.$queryRaw<{ date: string; count: bigint }[]>`
         SELECT DATE("createdAt" AT TIME ZONE 'UTC')::text AS date, COUNT(*)::bigint AS count
-        FROM "AnalyticsEvent"
+        FROM "analytics_events"
         WHERE "cardId" = ${cardId}
           AND "type" = 'CLICK'
           AND "createdAt" >= ${sevenDaysAgo}
@@ -377,7 +377,7 @@ export class AnalyticsService {
       // countDistinct API, so we use $queryRaw with a parameterised query.
       this.prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(DISTINCT "ipHash")::bigint AS count
-        FROM "AnalyticsEvent"
+        FROM "analytics_events"
         WHERE "cardId" = ${cardId}
           AND "type" = 'VIEW'
           AND "ipHash" IS NOT NULL

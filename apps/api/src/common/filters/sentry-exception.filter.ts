@@ -21,6 +21,10 @@ function getErrorCode(status: number): string {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 @Catch()
 export class SentryExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
@@ -40,15 +44,16 @@ export class SentryExceptionFilter implements ExceptionFilter {
 
     let message = 'Internal server error'
     let details: unknown = undefined
+    let code = getErrorCode(status)
     if (exception instanceof HttpException) {
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse
-      } else if (
-        exceptionResponse &&
-        typeof exceptionResponse === 'object' &&
-        'message' in exceptionResponse
-      ) {
-        const responseMessage = (exceptionResponse as { message?: unknown }).message
+      } else if (isRecord(exceptionResponse)) {
+        if (typeof exceptionResponse.code === 'string') {
+          code = exceptionResponse.code
+        }
+
+        const responseMessage = exceptionResponse.message
         if (Array.isArray(responseMessage)) {
           message = responseMessage.join(', ')
           details = responseMessage
@@ -59,7 +64,14 @@ export class SentryExceptionFilter implements ExceptionFilter {
         }
 
         if ('details' in exceptionResponse) {
-          details = (exceptionResponse as { details?: unknown }).details
+          details = exceptionResponse.details
+        } else {
+          const extraEntries = Object.entries(exceptionResponse).filter(
+            ([key]) => !['statusCode', 'message', 'error', 'code'].includes(key),
+          )
+          if (extraEntries.length > 0) {
+            details = Object.fromEntries(extraEntries)
+          }
         }
       } else {
         message = exception.message
@@ -68,7 +80,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       statusCode: status,
-      code: getErrorCode(status),
+      code,
       timestamp: new Date().toISOString(),
       // F-22: Use request.path instead of request.url so query string
       // parameters (which may contain sensitive tokens or PII) are not

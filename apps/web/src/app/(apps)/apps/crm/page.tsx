@@ -31,6 +31,14 @@ interface ContactRow {
   createdAt: string
 }
 
+interface ApiContactRow {
+  id: string
+  name?: string | null
+  email?: string | null
+  crmPipeline?: { stage?: string | null } | null
+  createdAt: string
+}
+
 interface CRMOverview {
   contacts: ContactRow[]
   recentCount: number
@@ -44,6 +52,21 @@ interface DealRow {
 
 interface LeadSubmissionRow {
   id: string
+}
+
+function normalizeContactRow(contact: ApiContactRow): ContactRow {
+  const fullName = contact.name?.trim() || 'Unknown Contact'
+  const [firstName = 'Unknown', ...rest] = fullName.split(/\s+/)
+  const lastName = rest.join(' ')
+
+  return {
+    id: contact.id,
+    firstName,
+    lastName,
+    email: contact.email ?? '',
+    crmStage: contact.crmPipeline?.stage ?? undefined,
+    createdAt: contact.createdAt,
+  }
 }
 
 function StatPill({
@@ -92,13 +115,14 @@ export default function CRMDashboard(): JSX.Element {
     try {
       const token = await getAccessToken()
       const [contactsRes, dealsRes, leadsRes] = await Promise.all([
-        apiGet<PaginatedResponse<ContactRow>>('/contacts?limit=5', token),
+        apiGet<PaginatedResponse<ApiContactRow>>('/contacts?limit=5', token),
         apiGet<PaginatedResponse<DealRow>>('/deals', token),
         apiGet<PaginatedResponse<LeadSubmissionRow>>('/lead-submissions?limit=1', token),
       ])
+      const contacts = (contactsRes.items ?? []).map(normalizeContactRow)
       setData({
-        contacts: contactsRes.items ?? [],
-        recentCount: contactsRes.total ?? (contactsRes.items ?? []).length,
+        contacts,
+        recentCount: contactsRes.total ?? contacts.length,
         dealCount: dealsRes.items.length,
         leadCount: leadsRes.total ?? leadsRes.items.length,
       })
@@ -205,11 +229,11 @@ export default function CRMDashboard(): JSX.Element {
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                     style={{ background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }}
                   >
-                    {c.firstName[0]?.toUpperCase()}
+                    {(c.firstName[0] ?? '?').toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {c.firstName} {c.lastName}
+                      {[c.firstName, c.lastName].filter(Boolean).join(' ')}
                     </p>
                     <p className="text-xs text-gray-400 truncate">{c.email}</p>
                   </div>

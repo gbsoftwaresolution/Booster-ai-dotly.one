@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     'Dotly.one terms of service — your rights and responsibilities when using the platform.',
 }
 
-const LAST_UPDATED = 'April 8, 2026'
+const LAST_UPDATED = 'April 13, 2026'
 
 export default function TermsPage() {
   return (
@@ -97,14 +97,30 @@ export default function TermsPage() {
               </li>
             </ul>
 
-            <h2>7. Service availability</h2>
+            <h2>7. Partner programme</h2>
+            <ul>
+              <li>
+                Dotly.one may offer access to an optional BoosterAI partner programme subject to
+                separate partner terms and compliance requirements.
+              </li>
+              <li>
+                Joining that partner programme does not require purchasing a paid Dotly.one
+                subscription.
+              </li>
+              <li>
+                Any commissions or other partner rewards, if offered, depend on actual product
+                sales, refund outcomes, and payout eligibility requirements.
+              </li>
+            </ul>
+
+            <h2>8. Service availability</h2>
             <p>
               We work to keep the Service available and communicate major maintenance when
               practical, but we do not guarantee uninterrupted availability unless we explicitly
               agree to that in a separate written enterprise contract.
             </p>
 
-            <h2>8. Termination</h2>
+            <h2>9. Termination</h2>
             <p>
               We may suspend or terminate your account at our discretion if you violate these Terms
               or engage in activity harmful to other users or the Service. If the in-product delete
@@ -113,7 +129,7 @@ export default function TermsPage() {
               associated with that account may stop resolving.
             </p>
 
-            <h2>9. Disclaimers and limitation of liability</h2>
+            <h2>10. Disclaimers and limitation of liability</h2>
             <p>
               THE SERVICE IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND. TO THE
               FULLEST EXTENT PERMITTED BY LAW, DOTLY.ONE AND BOOSTERAI SHALL NOT BE LIABLE FOR ANY
@@ -125,21 +141,21 @@ export default function TermsPage() {
               exceed the amount you paid us in the twelve months preceding the claim.
             </p>
 
-            <h2>10. Governing law</h2>
+            <h2>11. Governing law</h2>
             <p>
               These Terms are governed by the laws of the jurisdiction in which BoosterAI is
               incorporated, without regard to conflict-of-law principles. Any disputes shall be
               resolved in the competent courts of that jurisdiction.
             </p>
 
-            <h2>11. Changes to these terms</h2>
+            <h2>12. Changes to these terms</h2>
             <p>
               We may update these Terms from time to time. Registered users will be notified of
               material changes via email at least 14 days before the effective date. Continued use
               after the effective date constitutes acceptance of the updated Terms.
             </p>
 
-            <h2>12. Contact</h2>
+            <h2>13. Contact</h2>
             <p>
               Questions about these Terms should be directed to:{' '}
               <a href="mailto:legal@dotly.one">legal@dotly.one</a>

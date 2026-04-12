@@ -22,14 +22,14 @@ class PartnerEligibilityQuery {
 
 /**
  * Internal endpoint called by BoosterAI during partner registration.
- * Checks whether the applicant holds an active paid Dotly subscription.
+ * Checks whether the applicant can be linked to a Dotly account.
  *
  * Protected by x-boosterai-api-key header (BoosterAiPartnerGuard).
  * NOT exposed to end users — only BoosterAI's backend calls this.
  *
  * Response shape:
  *   { eligible: true,  plan: 'PRO',  status: 'ACTIVE' }
- *   { eligible: false, reason: 'NO_ACTIVE_SUBSCRIPTION' }
+ *   { eligible: true,  plan: 'FREE', status: 'NONE' }
  *   { eligible: false, reason: 'USER_NOT_FOUND' }
  */
 @ApiTags('internal')
@@ -75,24 +75,18 @@ export class BoosterAiPartnerEligibilityController {
       return { eligible: false, reason: 'USER_NOT_FOUND' }
     }
 
-    // Check for an active paid subscription (any tier except FREE).
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId: user.id },
       select: { status: true, plan: true, currentPeriodEnd: true },
     })
 
-    const hasPaidPlan = user.plan !== 'FREE'
     const isActive = subscription?.status === 'ACTIVE'
     const notExpired = !subscription?.currentPeriodEnd || subscription.currentPeriodEnd > new Date()
 
-    if (hasPaidPlan && isActive && notExpired) {
-      return {
-        eligible: true,
-        plan: subscription?.plan ?? user.plan,
-        status: subscription?.status ?? 'ACTIVE',
-      }
+    return {
+      eligible: true,
+      plan: subscription?.plan ?? user.plan,
+      status: isActive && notExpired ? subscription?.status ?? 'ACTIVE' : 'NONE',
     }
-
-    return { eligible: false, reason: 'NO_ACTIVE_SUBSCRIPTION' }
   }
 }

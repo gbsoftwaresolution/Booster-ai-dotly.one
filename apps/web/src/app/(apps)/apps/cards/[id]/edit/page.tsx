@@ -15,7 +15,7 @@ import { QrSection } from '@/components/card-builder/QrSection'
 import { LeadFormTab } from '@/components/card-builder/LeadFormTab'
 import type { CardData, CardTemplate, SocialLinkData, MediaBlockData } from '@dotly/types'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiPost, apiDelete } from '@/lib/api'
+import { apiGet, apiDelete } from '@/lib/api'
 import {
   ArrowLeft,
   User,
@@ -29,7 +29,6 @@ import {
   AlertCircle,
   Loader2,
   ClipboardList,
-  Copy,
   Trash2,
   AlertTriangle,
 } from 'lucide-react'
@@ -185,7 +184,6 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('profile')
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
   const router = useRouter()
-  const [duplicating, setDuplicating] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -220,20 +218,6 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
   } = useCardBuilder(id)
 
   const cardLoaded = card !== null
-
-  const handleDuplicate = useCallback(async () => {
-    setDuplicating(true)
-    setActionError(null)
-    try {
-      const token = await getAccessToken()
-      const newCard = await apiPost<{ id: string }>(`/cards/${id}/duplicate`, {}, token)
-      router.push(`/apps/cards/${newCard.id}/edit`)
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Failed to duplicate card')
-    } finally {
-      setDuplicating(false)
-    }
-  }, [id, router])
 
   const handleDelete = useCallback(async () => {
     setDeleting(true)
@@ -384,22 +368,6 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
           {/* Save indicator + button */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="hidden sm:block">{saveIndicator()}</div>
-
-            {/* Duplicate button */}
-            <button
-              type="button"
-              onClick={() => void handleDuplicate()}
-              disabled={duplicating}
-              title="Duplicate card"
-              aria-label="Duplicate card"
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {duplicating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
-            </button>
 
             {/* Delete button */}
             <button

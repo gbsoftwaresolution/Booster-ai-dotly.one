@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // Hostnames that belong to the platform itself — not custom domains
 const PLATFORM_HOSTNAMES = ['localhost', 'dotly.one', 'www.dotly.one']
+const LOCAL_APP_FALLBACK = 'http://localhost:3000'
+const PRODUCTION_APP_FALLBACK = 'https://dotly.one'
 
 function isPlatformHost(hostname: string): boolean {
   if (PLATFORM_HOSTNAMES.includes(hostname)) return true
@@ -150,7 +152,10 @@ export async function middleware(request: NextRequest) {
       return response
     }
 
-    const appBase = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://dotly.one').replace(/\/$/, '')
+    const appBase = (
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (process.env.NODE_ENV === 'production' ? PRODUCTION_APP_FALLBACK : LOCAL_APP_FALLBACK)
+    ).replace(/\/$/, '')
     const resolveUrl = `${appBase}/api/resolve-domain?host=${encodeURIComponent(hostname)}`
 
     try {

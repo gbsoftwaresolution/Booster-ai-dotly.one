@@ -146,9 +146,10 @@ class ExportLeadSubmissionsQueryDto extends ExportContactsQueryDto {
 }
 
 class LeadSubmissionsFiltersDto {
+  @IsOptional()
   @IsString()
   @MaxLength(100)
-  cardId!: string
+  cardId?: string
 
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
@@ -157,6 +158,26 @@ class LeadSubmissionsFiltersDto {
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   to?: string
+}
+
+class LeadSubmissionsListQueryDto extends LeadSubmissionsFiltersDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string
 }
 
 class CreateContactDto {
@@ -337,26 +358,6 @@ class BulkDeleteDto {
   @IsString({ each: true })
   @ArrayMaxSize(500)
   ids!: string[]
-}
-
-class LeadSubmissionsQuery {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  search?: string
 }
 
 // Gap 1: Threaded Notes
@@ -969,17 +970,13 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('lead-submissions')
   @ApiOperation({ summary: 'List lead form submissions for a card' })
-  getLeadSubmissions(
-    @CurrentUser() user: { id: string },
-    @Query() filters: LeadSubmissionsFiltersDto,
-    @Query() query: LeadSubmissionsQuery,
-  ) {
-    return this.contactsService.getLeadSubmissions(user.id, filters.cardId, {
+  getLeadSubmissions(@CurrentUser() user: { id: string }, @Query() query: LeadSubmissionsListQueryDto) {
+    return this.contactsService.getLeadSubmissions(user.id, query.cardId, {
       page: query.page,
       limit: query.limit,
       search: query.search,
-      from: filters.from,
-      to: filters.to,
+      from: query.from,
+      to: query.to,
     })
   }
 
@@ -1202,8 +1199,9 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('email-templates')
   @ApiOperation({ summary: 'List all email templates for the user' })
-  getEmailTemplates(@CurrentUser() user: { id: string }) {
-    return this.contactsService.getEmailTemplates(user.id)
+  async getEmailTemplates(@CurrentUser() user: { id: string }) {
+    const items = await this.contactsService.getEmailTemplates(user.id)
+    return { items }
   }
 
   @ApiBearerAuth()

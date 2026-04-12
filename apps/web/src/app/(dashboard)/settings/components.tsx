@@ -626,7 +626,7 @@ export function BecomeAPartnerCard(): JSX.Element {
             Earn commissions by referring others to Dotly through BoosterAI&apos;s partner network.
             {partnerId
               ? ' Your referral link is pre-linked to your account — share it to get credit.'
-              : ' Sign up for the partner programme and your Dotly account will be recognised automatically.'}
+              : ' Sign up for the partner programme and your Dotly account can be linked automatically when you use the same email address.'}
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
@@ -673,7 +673,7 @@ export function BecomeAPartnerCard(): JSX.Element {
             Sign up as a partner
           </a>
           <p className="self-center text-xs text-gray-400">
-            A Dotly subscription is required to join the partner programme.
+            Joining the partner programme does not require a paid Dotly subscription.
           </p>
         </div>
       )}

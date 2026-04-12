@@ -36,12 +36,17 @@ export interface DashboardNavSection {
 export const dashboardNavItems: DashboardNavItem[] = [
   // Overview
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3, section: 'Overview' },
+  { href: '/apps/cards/analytics', label: 'Analytics', icon: BarChart3, section: 'Overview' },
 
   // Cards
   { href: '/cards', label: 'My Cards', icon: CreditCard, section: 'Cards' },
-  { href: '/email-templates', label: 'Email Templates', icon: Mail, section: 'Cards' },
-  { href: '/email-signature', label: 'Signature', icon: FileSignature, section: 'Cards' },
+  { href: '/apps/cards/email-templates', label: 'Email Templates', icon: Mail, section: 'Cards' },
+  {
+    href: '/apps/cards/email-signature',
+    label: 'Signature',
+    icon: FileSignature,
+    section: 'Cards',
+  },
 
   // Scheduling — own section so it stands out
   { href: '/scheduling', label: 'Scheduling', icon: Calendar, section: 'Scheduling' },

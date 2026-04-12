@@ -3,10 +3,26 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiPost } from '@/lib/api'
+import { apiPost, isApiError } from '@/lib/api'
 import { CardTemplate } from '@dotly/types'
 import { cn } from '@/lib/cn'
 import { Check } from 'lucide-react'
+
+function getCardPlanLimitMessage(error: unknown): string | null {
+  if (!isApiError(error) || error.code !== 'PLAN_LIMIT_REACHED') return null
+
+  const details =
+    error.details && typeof error.details === 'object'
+      ? (error.details as { limit?: unknown })
+      : undefined
+  const limit = typeof details?.limit === 'number' ? details.limit : 1
+
+  if (limit === 1) {
+    return 'Your current plan allows 1 card. Upgrade to Pro to create up to 3 cards.'
+  }
+
+  return `Your current plan allows ${limit} cards. Upgrade your billing plan to add more.`
+}
 
 // ── Template visual data ───────────────────────────────────────────────────────
 
@@ -258,12 +274,7 @@ export default function CreateCardPage() {
       const card = await apiPost<{ id: string }>('/cards', { templateId: selected }, token)
       router.push(`/apps/cards/${card.id}/edit`)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create card'
-      if (message.includes('PLAN_LIMIT_REACHED') || message.includes('maximum of 1 card')) {
-        setError('Your current plan allows 1 card. Upgrade to Pro to create up to 3 cards.')
-      } else {
-        setError(message)
-      }
+      setError(getCardPlanLimitMessage(err) ?? (err instanceof Error ? err.message : 'Failed to create card'))
       setLoading(false)
     }
   }

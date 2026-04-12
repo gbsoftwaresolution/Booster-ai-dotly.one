@@ -4,7 +4,6 @@ import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import {
   Plus,
   Eye,
@@ -18,14 +17,13 @@ import {
   ArrowRight,
   Zap,
   Users,
-  Copy,
   Trash2,
   AlertTriangle,
   ExternalLink,
   RefreshCw,
 } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiGet, apiDelete, apiPost } from '@/lib/api'
+import { apiGet, apiDelete } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { ItemsResponse } from '@dotly/types'
 
@@ -293,14 +291,10 @@ const DISPLAY_HOST = APP_URL.replace(/^https?:\/\//, '').replace(/\/$/, '') || '
 
 function CardTile({
   card,
-  onDuplicate,
   onDelete,
-  duplicating,
 }: {
   card: CardSummary
-  onDuplicate: (card: CardSummary) => void
   onDelete: (card: CardSummary) => void
-  duplicating: boolean
 }) {
   // Fix #11/#17: use safeStr() so malformed/non-string fields can't crash the tile
   const name = safeStr(card.fields['name']) || safeStr(card.fields['fullName']) || card.handle
@@ -320,28 +314,8 @@ function CardTile({
       className={cn(
         'app-panel group relative flex items-center gap-4 rounded-[26px] p-4 transition-all duration-200',
         'hover:-translate-y-px hover:shadow-md hover:shadow-gray-200/80 hover:border-gray-200',
-        duplicating && 'pointer-events-none opacity-60',
       )}
     >
-      {duplicating && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-[2px]">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#0ea5e9"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            aria-label="Duplicating"
-            style={{ animation: 'spin .75s linear infinite' }}
-          >
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-          </svg>
-        </div>
-      )}
-
       {/* Fix #15: avatarUrl served from known CDN — no longer unoptimized */}
       {avatarUrl ? (
         <Image
@@ -390,7 +364,7 @@ function CardTile({
           </span>
         </div>
 
-        {/* Fixed 5-button row — always the same width regardless of isActive */}
+        {/* Action row */}
         <div className="flex items-center gap-1">
           {/* Edit */}
           <Link
@@ -401,15 +375,6 @@ function CardTile({
           >
             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
-
-          {/* Duplicate */}
-          <ActionBtn
-            onClick={() => onDuplicate(card)}
-            label={`Duplicate ${name}`}
-            disabled={duplicating}
-          >
-            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-          </ActionBtn>
 
           {/* Per-card analytics */}
           <Link
@@ -455,7 +420,6 @@ function CardTile({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CardsDashboard(): JSX.Element {
-  const router = useRouter()
   const [cards, setCards] = useState<CardSummary[]>([])
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -464,7 +428,6 @@ export default function CardsDashboard(): JSX.Element {
   const [deleteTarget, setDeleteTarget] = useState<CardSummary | null>(null)
   const [lastFocusedRef] = useState<{ el: HTMLElement | null }>({ el: null })
   const [deleting, setDeleting] = useState(false)
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
   // Fix #13: cache the token for the lifetime of the page render cycle
   const tokenRef = useRef<string | undefined>(undefined)
@@ -570,30 +533,6 @@ export default function CardsDashboard(): JSX.Element {
       setDeleteTarget(null)
     } finally {
       setDeleting(false)
-    }
-  }
-
-  async function handleDuplicate(card: CardSummary) {
-    setDuplicatingId(card.id)
-    try {
-      const token = await getToken()
-      const newCard = await apiPost<CardSummary>(`/cards/${card.id}/duplicate`, {}, token)
-      setCards((prev) => [newCard, ...prev])
-      // Optimistically bump totalCards — the duplicate is always created as a draft.
-      setSummary((prev) =>
-        prev
-          ? {
-              ...prev,
-              totalCards: prev.totalCards + 1,
-              // activeCards unchanged — duplicates start as draft (isActive: false)
-            }
-          : prev,
-      )
-      router.push(`/apps/cards/${newCard.id}/edit`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to duplicate card')
-    } finally {
-      setDuplicatingId(null)
     }
   }
 
@@ -716,13 +655,11 @@ export default function CardsDashboard(): JSX.Element {
                 <CardTile
                   key={card.id}
                   card={card}
-                  onDuplicate={(c) => void handleDuplicate(c)}
                   onDelete={(c) => {
                     // Fix #3: capture the triggering element for focus return
                     const btn = document.activeElement as HTMLElement
                     openDeleteDialog(c, btn)
                   }}
-                  duplicating={duplicatingId === card.id}
                 />
               ))}
             </div>
