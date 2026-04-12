@@ -22,15 +22,23 @@ export async function GET(request: NextRequest) {
   // redirect gadget. NEXT_PUBLIC_APP_URL is set at build time and is not
   // attacker-controlled.
   const origin = getAppUrl()
-  const failureRedirectBase = next === '/dashboard' ? '/auth' : next
-  const failureRedirect = `${origin}${failureRedirectBase}${failureRedirectBase.includes('?') ? '&' : '?'}error=`
+  const failureRedirectUrl = new URL('/auth', origin)
+  if (next !== '/dashboard') {
+    failureRedirectUrl.searchParams.set('next', next)
+  }
+
+  function redirectWithError(errorCode: string) {
+    const url = new URL(failureRedirectUrl)
+    url.searchParams.set('error', errorCode)
+    return NextResponse.redirect(url)
+  }
 
   if (code) {
     // LOW-07: Validate code format before forwarding to Supabase.
     // Reject codes that do not look like a UUID v4 — they are not valid
     // Supabase PKCE codes and should never be sent to the auth endpoint.
     if (!SUPABASE_CODE_RE.test(code)) {
-      return NextResponse.redirect(`${failureRedirect}invalid_code`)
+      return redirectWithError('invalid_code')
     }
 
     const supabase = await createClient()
@@ -39,5 +47,5 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
-  return NextResponse.redirect(`${failureRedirect}auth_callback_failed`)
+  return redirectWithError('auth_callback_failed')
 }

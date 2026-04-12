@@ -257,6 +257,10 @@ jobs:
         run: pnpm --filter @dotly/database exec prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+      - name: Seed test data
+        run: pnpm --filter @dotly/database db:seed
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
       - name: Build API + web
         run: pnpm turbo build --filter=@dotly/api --filter=@dotly/web
         env:
@@ -310,6 +314,7 @@ jobs:
         env:
           PORT: 3000
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          API_URL: http://localhost:3001
           NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
           NEXT_PUBLIC_API_URL: http://localhost:3001
