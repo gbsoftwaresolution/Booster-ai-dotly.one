@@ -1,4 +1,11 @@
-import { PrismaClient, Plan, CardTemplate, SocialPlatform, AnalyticsEventType, SubscriptionStatus, ContactStage } from '@prisma/client'
+import {
+  PrismaClient,
+  Plan,
+  CardTemplate,
+  SocialPlatform,
+  AnalyticsEventType,
+  SubscriptionStatus,
+} from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -56,8 +63,8 @@ async function main() {
   // ─── SocialLinks ───────────────────────────────────────────────────────────
   const socialLinksData = [
     { platform: SocialPlatform.LINKEDIN, url: 'https://linkedin.com/in/testuser', displayOrder: 0 },
-    { platform: SocialPlatform.GITHUB,   url: 'https://github.com/testuser',      displayOrder: 1 },
-    { platform: SocialPlatform.TWITTER,  url: 'https://twitter.com/testuser',     displayOrder: 2 },
+    { platform: SocialPlatform.GITHUB, url: 'https://github.com/testuser', displayOrder: 1 },
+    { platform: SocialPlatform.TWITTER, url: 'https://twitter.com/testuser', displayOrder: 2 },
   ]
 
   for (const linkData of socialLinksData) {
@@ -90,9 +97,19 @@ async function main() {
 
   // ─── AnalyticsEvents ───────────────────────────────────────────────────────
   const analyticsData = [
-    { type: AnalyticsEventType.VIEW,  country: 'US', device: 'mobile',  referrer: 'https://linkedin.com' },
-    { type: AnalyticsEventType.VIEW,  country: 'IN', device: 'desktop', referrer: 'https://google.com' },
-    { type: AnalyticsEventType.CLICK, country: 'US', device: 'mobile',  referrer: null },
+    {
+      type: AnalyticsEventType.VIEW,
+      country: 'US',
+      device: 'mobile',
+      referrer: 'https://linkedin.com',
+    },
+    {
+      type: AnalyticsEventType.VIEW,
+      country: 'IN',
+      device: 'desktop',
+      referrer: 'https://google.com',
+    },
+    { type: AnalyticsEventType.CLICK, country: 'US', device: 'mobile', referrer: null },
   ]
 
   for (const evtData of analyticsData) {
@@ -121,6 +138,7 @@ async function main() {
       phone: '+1 (555) 100-0001',
       company: 'Acme Corp',
       title: 'Product Manager',
+      notes: 'Met at TechConf 2026',
       tags: ['lead', 'hot'],
       sourceCardId: card.id,
     },
@@ -138,6 +156,7 @@ async function main() {
       phone: '+1 (555) 200-0002',
       company: 'Beta Ltd',
       title: 'CEO',
+      notes: 'Followed up by email on Apr 5',
       tags: ['prospect'],
       sourceCardId: card.id,
     },
@@ -150,9 +169,7 @@ async function main() {
     update: {},
     create: {
       contactId: alice.id,
-      stage: ContactStage.NEW,
-      notes: 'Met at TechConf 2026',
-      tags: ['conference'],
+      stage: 'NEW',
       ownerUserId: user.id,
     },
   })
@@ -163,9 +180,7 @@ async function main() {
     update: {},
     create: {
       contactId: bob.id,
-      stage: ContactStage.CONTACTED,
-      notes: 'Followed up by email on Apr 5',
-      tags: ['email-sent'],
+      stage: 'CONTACTED',
       ownerUserId: user.id,
     },
   })
