@@ -179,6 +179,7 @@ jobs:
           # R2_BUCKET is the canonical name used by the API (env.validation.ts)
           R2_BUCKET: placeholder
           R2_PUBLIC_URL: https://placeholder.r2.dev
+          R2_PUBLIC_HOSTNAME: assets.dotly.one
           # Email — placeholder values
           MAILGUN_API_KEY: placeholder
           MAILGUN_DOMAIN: placeholder.mailgun.org
@@ -273,6 +274,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: placeholder
           R2_BUCKET: placeholder
           R2_PUBLIC_URL: https://placeholder.r2.dev
+          R2_PUBLIC_HOSTNAME: assets.dotly.one
           MAILGUN_API_KEY: placeholder
           MAILGUN_DOMAIN: placeholder.mailgun.org
           MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
