@@ -27,6 +27,7 @@ import {
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiDelete, apiPost } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import type { ItemsResponse } from '@dotly/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -494,13 +495,13 @@ export default function CardsDashboard(): JSX.Element {
       // Fetch cards and summary independently — a summary failure should not
       // prevent the card list from rendering, and vice versa.
       const [cardsResult, summaryResult] = await Promise.allSettled([
-        apiGet<CardSummary[]>('/cards', token, controller.signal),
+        apiGet<ItemsResponse<CardSummary>>('/cards', token, controller.signal),
         apiGet<DashboardSummary>('/analytics/dashboard-summary', token, controller.signal),
       ])
       if (controller.signal.aborted) return
 
       if (cardsResult.status === 'fulfilled') {
-        setCards(cardsResult.value)
+        setCards(cardsResult.value.items)
       } else {
         setFetchFailed(true)
         setError(
@@ -638,17 +639,6 @@ export default function CardsDashboard(): JSX.Element {
           />
         )}
 
-        {/* Fix #5: truncation notice */}
-        {isTruncated && !loading && (
-          <div
-            role="status"
-            className="flex items-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700"
-          >
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            Showing the first 100 cards. Stats reflect only those cards.
-          </div>
-        )}
-
         {/* Stats — hidden on failed load to avoid misleading zeros (Fix #2) */}
         {loading ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -694,9 +684,7 @@ export default function CardsDashboard(): JSX.Element {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">My Cards</h2>
             {!fetchFailed && totalCards != null && totalCards > 0 && (
-              <span className="text-sm text-gray-400">
-                {fmt(totalCards)} total{isTruncated ? ' (showing 100)' : ''}
-              </span>
+              <span className="text-sm text-gray-400">{fmt(totalCards)} total</span>
             )}
           </div>
 

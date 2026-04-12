@@ -27,7 +27,7 @@ import {
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import type { Request } from 'express'
-import { Plan } from '@dotly/types'
+import { Plan, type SuccessResponse } from '@dotly/types'
 
 const VALID_EVENT_TYPES = ['VIEW', 'CLICK', 'SAVE', 'LEAD_SUBMIT'] as const
 type EventType = (typeof VALID_EVENT_TYPES)[number]
@@ -170,7 +170,7 @@ export class AnalyticsController {
       device,
       referrer: req.headers['referer'],
     })
-    return { success: true }
+    return { success: true } satisfies SuccessResponse
   }
 
   @ApiBearerAuth()

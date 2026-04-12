@@ -155,7 +155,6 @@ export class CardsService {
 
   async findAllByUser(userId: string) {
     const internalUserId = await this.resolveInternalUserId(userId)
-    // L-07: Cap at 100 cards to prevent unbounded memory/query time.
     // Return only the fields the dashboard needs — theme, socialLinks, and qrCode
     // are full relations not used by the card list UI and add significant payload size.
     // Parallelise the card list + view-count groupBy so they run in a single
@@ -172,7 +171,6 @@ export class CardsService {
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
-        take: 100,
       }),
       // We fetch view counts for ALL of the user's cards at once.
       // Because we don't yet know the card IDs we can't use `in` here,

@@ -203,6 +203,89 @@
     @apply app-panel-subtle flex flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-slate-200 px-6 py-14 text-center;
   }
 
+  .app-empty-state-title {
+    @apply text-sm font-medium text-gray-700;
+  }
+
+  .app-empty-state-text {
+    @apply mt-2 max-w-md text-sm text-gray-500;
+  }
+
+  .app-modal {
+    @apply app-panel w-full rounded-[28px] shadow-2xl;
+  }
+
+  .app-dialog-shell {
+    @apply fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4;
+  }
+
+  .app-dialog-panel {
+    @apply app-panel flex w-full flex-col rounded-t-[28px] shadow-2xl sm:rounded-[28px];
+    max-height: min(92dvh, calc(100dvh - 0.5rem));
+  }
+
+  .app-dialog-body-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto overscroll-contain;
+  }
+
+  .app-dialog-footer {
+    @apply sticky bottom-0 flex flex-col-reverse gap-3 border-t border-gray-100 px-5 pt-4 backdrop-blur-xl sm:flex-row sm:justify-end sm:px-6 sm:py-4;
+    background-color: rgba(255, 255, 255, 0.92);
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .app-confirm-panel {
+    @apply app-panel fixed inset-x-0 bottom-0 z-50 flex w-full flex-col rounded-t-[28px] p-5 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px] sm:p-6;
+  }
+
+  .app-side-drawer {
+    @apply app-panel fixed z-50 flex w-full flex-col shadow-2xl;
+  }
+
+  @media (max-width: 639px) {
+    .app-side-drawer {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: auto;
+      max-height: min(92dvh, calc(100dvh - 0.5rem));
+      border-top: 1px solid rgba(255, 255, 255, 0.8);
+      border-left: 0;
+      border-radius: 32px 32px 0 0;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .app-side-drawer {
+      top: 0;
+      bottom: 0;
+      right: 0;
+      max-width: 28rem;
+      border-left: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 32px 0 0 32px;
+    }
+
+    html[dir='rtl'] .app-side-drawer {
+      left: 0;
+      right: auto;
+      border-left: 0;
+      border-right: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 0 32px 32px 0;
+    }
+  }
+
+  .app-modal-header {
+    @apply flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5;
+  }
+
+  .app-modal-body {
+    @apply px-6 py-5;
+  }
+
+  .app-modal-footer {
+    @apply flex gap-3 border-t border-gray-100 px-6 py-4;
+  }
+
   .app-table-shell {
     @apply app-panel overflow-hidden rounded-[28px];
   }

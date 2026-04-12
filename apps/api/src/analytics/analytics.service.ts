@@ -339,7 +339,7 @@ export class AnalyticsService {
       where: { id: cardId },
       select: { id: true, userId: true },
     })
-    if (!card || card.userId !== internalUserId) throw new ForbiddenException()
+    if (!card || card.userId !== internalUserId) throw new NotFoundException('Card not found')
 
     const where = { cardId, createdAt: { gte: params.from, lte: params.to } }
 
@@ -490,6 +490,10 @@ export class AnalyticsService {
     totalLeads: number
     totalCards: number
     activeCards: number
+    openDealsCount: number
+    openPipelineValue: number
+    pendingTasksCount: number
+    overdueTasksCount: number
     interactionsByAction: NameValuePair[]
     truncated: boolean
   }> {
@@ -511,7 +515,16 @@ export class AnalyticsService {
     // Previously capped at 100 cards, silently undercounting users with large
     // portfolios. We now use a single subquery / nested filter so totalViews,
     // totalClicks, and totalLeads reflect every card the user owns.
-    const [totalCards, activeCards, eventCounts, leadCount, recentEvents] = await Promise.all([
+    const [
+      totalCards,
+      activeCards,
+      eventCounts,
+      leadCount,
+      openDeals,
+      pendingTasksCount,
+      overdueTasksCount,
+      recentEvents,
+    ] = await Promise.all([
       this.prisma.card.count({ where: { userId: internalUserId } }),
       this.prisma.card.count({ where: { userId: internalUserId, isActive: true } }),
       this.prisma.analyticsEvent.groupBy({
@@ -523,6 +536,27 @@ export class AnalyticsService {
         _count: { _all: true },
       }),
       this.prisma.contact.count({ where: { sourceCard: { userId: internalUserId } } }),
+      this.prisma.deal.aggregate({
+        where: {
+          ownerUserId: userId,
+          stage: { notIn: ['CLOSED_WON', 'CLOSED_LOST'] },
+        },
+        _count: { _all: true },
+        _sum: { value: true },
+      }),
+      this.prisma.contactTask.count({
+        where: {
+          ownerUserId: userId,
+          completed: false,
+        },
+      }),
+      this.prisma.contactTask.count({
+        where: {
+          ownerUserId: userId,
+          completed: false,
+          dueAt: { lt: new Date() },
+        },
+      }),
       this.prisma.analyticsEvent.findMany({
         where: {
           type: { in: ['CLICK', 'SAVE'] },
@@ -545,6 +579,10 @@ export class AnalyticsService {
       totalLeads: leadCount,
       totalCards,
       activeCards,
+      openDealsCount: openDeals._count._all,
+      openPipelineValue: Number(openDeals._sum.value ?? 0),
+      pendingTasksCount,
+      overdueTasksCount,
       interactionsByAction: collectInteractionBreakdown(recentEvents),
       truncated: false, // All cards are now aggregated — never truncated
     }

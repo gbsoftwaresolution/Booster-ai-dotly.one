@@ -17,6 +17,7 @@ import {
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import type { ItemsResponse } from '@dotly/types'
 
 interface AppointmentType {
   id: string
@@ -47,11 +48,11 @@ export default function SchedulingDashboard(): JSX.Element {
     try {
       const token = await getAccessToken()
       const [aptTypes, bookingsArr] = await Promise.all([
-        apiGet<AppointmentType[]>('/scheduling/appointment-types', token),
-        apiGet<Booking[]>('/scheduling/bookings', token),
+        apiGet<ItemsResponse<AppointmentType>>('/scheduling/appointment-types', token),
+        apiGet<ItemsResponse<Booking>>('/scheduling/bookings', token),
       ])
-      setAppointmentTypes(Array.isArray(aptTypes) ? aptTypes : [])
-      setBookings(Array.isArray(bookingsArr) ? bookingsArr : [])
+      setAppointmentTypes(Array.isArray(aptTypes.items) ? aptTypes.items : [])
+      setBookings(Array.isArray(bookingsArr.items) ? bookingsArr.items : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load scheduling data.')
     } finally {

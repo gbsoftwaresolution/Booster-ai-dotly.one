@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
@@ -45,14 +45,26 @@ function isOverdue(task: Task): boolean {
 
 export default function TasksScreen() {
   const router = useRouter()
-  const { crmAllowed, loading: authzLoading } = useAuthz()
+  const { crmAllowed, loading: authzLoading, error: authzError, refresh: refreshAuthz } = useAuthz()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending')
   const [userTz, setUserTz] = useState<string | null>(null)
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set())
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+  const tasksCountRef = useRef(0)
+  const initialLoadCompleteRef = useRef(false)
+
+  useEffect(() => {
+    tasksCountRef.current = tasks.length
+  }, [tasks.length])
+
+  useEffect(() => {
+    initialLoadCompleteRef.current = initialLoadComplete
+  }, [initialLoadComplete])
 
   const mutateBusyTaskState = useCallback((taskId: string, busy: boolean) => {
     setBusyTaskIds((prev) => {
@@ -63,24 +75,38 @@ export default function TasksScreen() {
     })
   }, [])
 
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (options?: { refresh?: boolean }) => {
+    if (!options?.refresh) setLoading(true)
     try {
       const [data, tz] = await Promise.all([api.getAllTasks(), getUserTimezone()])
       setTasks(data as Task[])
       setUserTz(tz)
       setError(null)
+      setRefreshError(null)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load tasks')
+      const message = err instanceof Error ? err.message : 'Failed to load tasks'
+      if (options?.refresh && initialLoadCompleteRef.current && tasksCountRef.current > 0) {
+        setRefreshError(message)
+      } else {
+        setError(message)
+      }
+    } finally {
+      if (!initialLoadCompleteRef.current) {
+        initialLoadCompleteRef.current = true
+        setInitialLoadComplete(true)
+      }
+      if (!options?.refresh) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void loadTasks().finally(() => setLoading(false))
+    void loadTasks()
   }, [loadTasks])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await loadTasks()
+    setError(null)
+    await loadTasks({ refresh: true })
     setRefreshing(false)
   }, [loadTasks])
 
@@ -93,7 +119,8 @@ export default function TasksScreen() {
         setTasks((prev) =>
           prev.map((t) => (t.id === task.id ? { ...t, completed: nextCompleted } : t)),
         )
-        await api.updateTask(task.id, { completed: nextCompleted })
+        const updated = await api.updateTask(task.id, { completed: nextCompleted })
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? (updated as Task) : t)))
       } catch (err: unknown) {
         setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)))
         Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update task')
@@ -129,16 +156,42 @@ export default function TasksScreen() {
     [busyTaskIds, mutateBusyTaskState],
   )
 
-  const filtered = tasks.filter((t) => {
-    if (filter === 'pending') return !t.completed
-    if (filter === 'completed') return t.completed
-    return true
-  })
+  const filtered = useMemo(() => {
+    return tasks.filter((t) => {
+      if (filter === 'pending') return !t.completed
+      if (filter === 'completed') return t.completed
+      return true
+    })
+  }, [filter, tasks])
 
-  const pendingCount = tasks.filter((t) => !t.completed).length
-  const overdueCount = tasks.filter(isOverdue).length
+  const pendingCount = useMemo(() => tasks.filter((t) => !t.completed).length, [tasks])
+  const overdueCount = useMemo(() => tasks.filter(isOverdue).length, [tasks])
 
   if (!authzLoading && !crmAllowed) {
+    if (authzError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+            backgroundColor: '#f8fafc',
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
+            We couldn&apos;t verify access
+          </Text>
+          <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 8 }}>{authzError}</Text>
+          <TouchableOpacity
+            onPress={() => void refreshAuthz()}
+            style={{ marginTop: 16, padding: 12 }}
+          >
+            <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
     return (
       <View
         style={{
@@ -159,7 +212,7 @@ export default function TasksScreen() {
     )
   }
 
-  if (loading) {
+  if (loading && !initialLoadComplete) {
     return (
       <View
         style={{
@@ -186,7 +239,13 @@ export default function TasksScreen() {
         }}
       >
         <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
-        <TouchableOpacity onPress={() => void loadTasks()} style={{ marginTop: 16, padding: 12 }}>
+        <TouchableOpacity
+          onPress={() => {
+            setError(null)
+            void loadTasks()
+          }}
+          style={{ marginTop: 16, padding: 12 }}
+        >
           <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -195,6 +254,22 @@ export default function TasksScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      {refreshError && (
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginTop: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#fecaca',
+            backgroundColor: '#fef2f2',
+            padding: 12,
+          }}
+        >
+          <Text style={{ color: '#b91c1c', fontSize: 13 }}>{refreshError}</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View
         style={{
@@ -271,7 +346,11 @@ export default function TasksScreen() {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 48 }}>
             <Text style={{ color: '#94a3b8', fontSize: 15 }}>
-              {filter === 'completed' ? 'No completed tasks yet.' : 'No pending tasks. Great work!'}
+              {filter === 'completed'
+                ? 'No completed tasks yet.'
+                : filter === 'all'
+                  ? 'No tasks yet.'
+                  : 'No pending tasks. Great work!'}
             </Text>
           </View>
         }

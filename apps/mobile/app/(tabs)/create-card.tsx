@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import * as Linking from 'expo-linking'
 import { Feather } from '@expo/vector-icons'
 import { createCard, checkHandleAvailable, uploadAvatar } from '../../lib/api'
 
@@ -65,6 +66,7 @@ export default function CreateCardScreen() {
   const [handleAvailable, setHandleAvailable] = useState<boolean | 'unknown' | null>(null)
   const [checkingHandle, setCheckingHandle] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleRequestIdRef = useRef(0)
 
   // Step 2 fields
   const [template, setTemplate] = useState<Template>('MINIMAL')
@@ -79,35 +81,56 @@ export default function CreateCardScreen() {
 
   // Step 4
   const [creating, setCreating] = useState(false)
+  const [handleCheckError, setHandleCheckError] = useState<string | null>(null)
+  const [handleRetryToken, setHandleRetryToken] = useState(0)
 
   // Debounced handle availability check
+  const retryHandleCheck = () => {
+    setHandleCheckError(null)
+    setHandleRetryToken((current) => current + 1)
+  }
+
   useEffect(() => {
     if (!handle) {
+      handleRequestIdRef.current += 1
       setHandleAvailable(null)
+      setCheckingHandle(false)
+      setHandleCheckError(null)
       return
     }
     setHandleAvailable('unknown')
     setCheckingHandle(true)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
+      const requestId = ++handleRequestIdRef.current
       try {
         const result = await checkHandleAvailable(handle)
+        if (handleRequestIdRef.current !== requestId) return
         setHandleAvailable(result.available)
-      } catch {
+        setHandleCheckError(null)
+      } catch (err) {
+        if (handleRequestIdRef.current !== requestId) return
         setHandleAvailable(null)
+        setHandleCheckError(
+          err instanceof Error ? err.message : 'Could not verify handle availability.',
+        )
       } finally {
+        if (handleRequestIdRef.current !== requestId) return
         setCheckingHandle(false)
       }
     }, 500)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [handle])
+  }, [handle, handleRetryToken])
 
   async function pickAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Please allow access to your photo library.')
+      Alert.alert('Photo access needed', 'Allow photo library access to add an avatar.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+      ])
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -303,6 +326,13 @@ export default function CreateCardScreen() {
                   <Text style={{ color: '#22c55e', fontSize: 12, marginTop: 4 }}>
                     Handle is available!
                   </Text>
+                )}
+                {handleCheckError && (
+                  <TouchableOpacity onPress={retryHandleCheck}>
+                    <Text style={{ color: '#b91c1c', fontSize: 12, marginTop: 4 }}>
+                      {handleCheckError} Tap to retry.
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </View>
 

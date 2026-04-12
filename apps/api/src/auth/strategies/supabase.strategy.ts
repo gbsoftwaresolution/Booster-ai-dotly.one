@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 import { createPublicKey } from 'crypto'
@@ -50,11 +51,11 @@ function resolveJwtKey(raw: string): {
 
 @Injectable()
 export class SupabaseStrategy extends PassportStrategy(Strategy, 'supabase-jwt') {
-  constructor(private readonly usersService: UsersService) {
-    const raw = process.env.SUPABASE_JWT_SECRET
-    if (!raw) {
-      throw new Error('SUPABASE_JWT_SECRET environment variable is not set')
-    }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly config: ConfigService,
+  ) {
+    const raw = config.getOrThrow<string>('SUPABASE_JWT_SECRET')
     // LOW-01: Use only the algorithm that matches the key type.
     // Accepting both ES256 and HS256 simultaneously enables an
     // algorithm-confusion attack where a forged HS256 token is verified using

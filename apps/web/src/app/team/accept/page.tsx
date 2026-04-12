@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Handshake, X } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
-import { apiPost } from '@/lib/api'
+import { apiPost, isApiError } from '@/lib/api'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,9 +41,23 @@ function AcceptInviteContent(): JSX.Element {
         setStatus('success')
         setMessage('You have joined the team!')
         setTimeout(() => router.push('/team'), 2000)
-      } catch {
+      } catch (error: unknown) {
         setStatus('error')
-        setMessage('This invite is invalid or has expired.')
+        if (isApiError(error)) {
+          if (error.statusCode === 401 || error.statusCode === 403) {
+            setStatus('unauthenticated')
+            return
+          }
+          if (error.statusCode === 404 || error.statusCode === 410) {
+            setMessage('This invite is invalid or has expired.')
+            return
+          }
+          setMessage(
+            error.message || 'We could not accept this invitation right now. Please retry.',
+          )
+          return
+        }
+        setMessage('We could not accept this invitation right now. Please retry.')
       }
     }
 
@@ -117,12 +131,21 @@ function AcceptInviteContent(): JSX.Element {
         </div>
         <h1 className="text-xl font-bold text-gray-900">Invalid Invitation</h1>
         <p className="mt-2 text-sm text-gray-500">{message}</p>
-        <Link
-          href="/dashboard"
-          className="mt-6 inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-        >
-          Go to Dashboard
-        </Link>
+        <div className="mt-6 flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+          >
+            Retry
+          </button>
+          <Link
+            href="/dashboard"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
       </div>
     </div>
   )

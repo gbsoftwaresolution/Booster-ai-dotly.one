@@ -55,6 +55,7 @@ export default function CancelBookingPage(): JSX.Element {
   const [infoLoading, setInfoLoading] = useState(true)
   const [alreadyCancelled, setAlreadyCancelled] = useState(false)
   const [infoError, setInfoError] = useState<string | null>(null)
+  const [infoReloadToken, setInfoReloadToken] = useState(0)
 
   // Cancellation form state
   const [reason, setReason] = useState('')
@@ -66,6 +67,9 @@ export default function CancelBookingPage(): JSX.Element {
   useEffect(() => {
     async function loadInfo() {
       setInfoLoading(true)
+      setInfoError(null)
+      setAlreadyCancelled(false)
+      setBookingInfo(null)
       try {
         const res = await fetch(`${API_URL}/scheduling/bookings/${token}/info`)
         if (!res.ok) throw new Error(`Could not load booking (${res.status})`)
@@ -82,7 +86,7 @@ export default function CancelBookingPage(): JSX.Element {
       }
     }
     void loadInfo()
-  }, [token])
+  }, [infoReloadToken, token])
 
   async function handleCancel(e: React.FormEvent) {
     e.preventDefault()
@@ -125,6 +129,13 @@ export default function CancelBookingPage(): JSX.Element {
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
           <h2 className="text-xl font-bold text-gray-900">Unable to load booking</h2>
           <p className="mt-2 text-sm text-gray-500">{infoError}</p>
+          <button
+            type="button"
+            onClick={() => setInfoReloadToken((current) => current + 1)}
+            className="mt-6 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            Retry
+          </button>
         </div>
         <p className="mt-6 text-xs text-gray-400">
           Powered by{' '}

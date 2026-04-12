@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import type { VcardPolicy } from '@dotly/types'
+import type { PartialCardFields, VcardPolicy } from '@dotly/types'
 import { useState } from 'react'
 import {
   User,
@@ -22,7 +22,7 @@ import { AvatarUploader } from './AvatarUploader'
 
 interface ProfileTabProps {
   cardId: string
-  fields: Record<string, string>
+  fields: PartialCardFields
   handle: string
   vcardPolicy: VcardPolicy
   onFieldChange: (key: string, value: string) => void

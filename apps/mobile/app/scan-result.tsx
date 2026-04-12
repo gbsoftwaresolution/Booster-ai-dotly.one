@@ -1,3 +1,4 @@
+import type { CardListItemResponse } from '@dotly/types'
 import {
   View,
   Text,
@@ -9,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { createContact } from '../lib/api'
 import { api } from '../lib/api'
@@ -24,11 +25,6 @@ function isValidHttpUrl(value: string): boolean {
   } catch {
     return false
   }
-}
-
-interface Card {
-  id: string
-  handle: string
 }
 
 // H-06: Sanitize a string received from URL params.
@@ -75,6 +71,30 @@ export default function ScanResultScreen() {
   >({})
   const [firstCardId, setFirstCardId] = useState<string | null>(null)
   const [cardContextResolved, setCardContextResolved] = useState(false)
+  const [cardLookupError, setCardLookupError] = useState<string | null>(null)
+  const cardLookupRequestIdRef = useRef(0)
+
+  const loadCardContext = useCallback(() => {
+    const requestId = ++cardLookupRequestIdRef.current
+    setCardContextResolved(false)
+    setCardLookupError(null)
+    void api
+      .getCards()
+      .then((cards) => {
+        if (cardLookupRequestIdRef.current !== requestId) return
+        const list: CardListItemResponse[] = cards
+        setFirstCardId(list.length > 0 && list[0] ? list[0].id : null)
+      })
+      .catch((err: unknown) => {
+        if (cardLookupRequestIdRef.current !== requestId) return
+        setFirstCardId(null)
+        setCardLookupError(err instanceof Error ? err.message : 'Could not look up card context.')
+      })
+      .finally(() => {
+        if (cardLookupRequestIdRef.current !== requestId) return
+        setCardContextResolved(true)
+      })
+  }, [])
 
   useEffect(() => {
     setName(sanitizeParam(params.name, 100))
@@ -95,15 +115,8 @@ export default function ScanResultScreen() {
   ])
 
   useEffect(() => {
-    api
-      .getCards()
-      .then((cards: unknown[]) => {
-        const list = cards as Card[]
-        if (list.length > 0 && list[0]) setFirstCardId(list[0].id)
-      })
-      .catch(() => void 0)
-      .finally(() => setCardContextResolved(true))
-  }, [])
+    loadCardContext()
+  }, [loadCardContext])
 
   const setFieldValue = (
     field: keyof typeof fieldErrors,
@@ -182,7 +195,7 @@ export default function ScanResultScreen() {
     setFieldErrors({})
     setSaving(true)
     try {
-      await createContact(firstCardId ?? '', {
+      await createContact(firstCardId, {
         name: trimmedName,
         email: trimmedEmail || null,
         phone: trimmedPhone || null,
@@ -221,7 +234,27 @@ export default function ScanResultScreen() {
           Review and edit the extracted information, then save to your contacts.
         </Text>
 
-        {cardContextResolved && !firstCardId ? (
+        {cardLookupError ? (
+          <View
+            style={{
+              marginBottom: 16,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#fecaca',
+              backgroundColor: '#fef2f2',
+              padding: 12,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: '#b91c1c', lineHeight: 18 }}>
+              {cardLookupError}
+            </Text>
+            <TouchableOpacity onPress={loadCardContext} style={{ marginTop: 8 }}>
+              <Text style={{ color: '#0ea5e9', fontWeight: '600', fontSize: 12 }}>
+                Retry lookup
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : cardContextResolved && !firstCardId ? (
           <View
             style={{
               marginBottom: 16,
@@ -280,10 +313,10 @@ export default function ScanResultScreen() {
 
         <TouchableOpacity
           onPress={() => void handleSave()}
-          disabled={saving}
+          disabled={saving || !cardContextResolved}
           style={{
             marginTop: 12,
-            backgroundColor: saving ? '#94a3b8' : '#0ea5e9',
+            backgroundColor: saving || !cardContextResolved ? '#94a3b8' : '#0ea5e9',
             borderRadius: 12,
             paddingVertical: 14,
             alignItems: 'center',
@@ -292,7 +325,9 @@ export default function ScanResultScreen() {
           {saving ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>Save Contact</Text>
+            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+              {cardContextResolved ? 'Save Contact' : 'Checking source card...'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>

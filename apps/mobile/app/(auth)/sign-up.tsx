@@ -38,19 +38,24 @@ export default function SignUpScreen() {
     }
 
     setLoading(true)
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: { name: name.trim() },
-      },
-    })
-    if (signUpError) {
-      setError(signUpError.message)
-    } else {
-      setSuccess(true)
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { name: name.trim() },
+        },
+      })
+      if (signUpError) {
+        setError(signUpError.message)
+      } else {
+        setSuccess(true)
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   if (success) {

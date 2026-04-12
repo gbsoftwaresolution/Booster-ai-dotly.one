@@ -33,16 +33,39 @@ interface GoogleFreeBusyResponse {
 @Injectable()
 export class GoogleCalendarService {
   private readonly logger = new Logger(GoogleCalendarService.name)
-  private readonly stateSecret: string
+  private readonly stateSecret: string | null
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.stateSecret =
-      this.config.get<string>('GOOGLE_OAUTH_STATE_SECRET') ??
-      this.config.get<string>('SUPABASE_JWT_SECRET') ??
-      this.config.getOrThrow<string>('GOOGLE_OAUTH_CLIENT_SECRET')
+    this.stateSecret = this.config.get<string>('GOOGLE_OAUTH_STATE_SECRET') ?? null
+  }
+
+  private getStateSecret(): string {
+    if (!this.stateSecret) {
+      throw new BadRequestException('Google Calendar integration is not configured on this server')
+    }
+    return this.stateSecret
+  }
+
+  private async fetchWithTimeout(
+    input: string,
+    init: RequestInit,
+    timeoutMs = 10_000,
+  ): Promise<Response> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      return await fetch(input, { ...init, signal: controller.signal })
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new BadRequestException('Google request timed out')
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
   private get clientId(): string {
@@ -60,6 +83,7 @@ export class GoogleCalendarService {
 
   /** Build the Google OAuth2 authorization URL */
   getAuthUrl(userId: string): string {
+    this.getStateSecret()
     const payload: GoogleOAuthStatePayload = {
       userId,
       nonce: randomBytes(16).toString('hex'),
@@ -84,17 +108,24 @@ export class GoogleCalendarService {
   }
 
   private signState(payload: GoogleOAuthStatePayload): string {
+    const secret = this.getStateSecret()
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
-    const sig = createHmac('sha256', this.stateSecret).update(body).digest('base64url')
+    const sig = createHmac('sha256', secret).update(body).digest('base64url')
     return `${body}.${sig}`
   }
 
   verifyState(state: string): string {
+    const secret = this.getStateSecret()
     const [body, sig] = state.split('.')
     if (!body || !sig) throw new BadRequestException('Invalid Google OAuth state')
 
-    const expectedSig = createHmac('sha256', this.stateSecret).update(body).digest('base64url')
-    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    const expectedSig = createHmac('sha256', secret).update(body).digest('base64url')
+    const sigBuf = Buffer.from(sig)
+    const expectedSigBuf = Buffer.from(expectedSig)
+    if (sigBuf.length !== expectedSigBuf.length) {
+      throw new BadRequestException('Invalid Google OAuth state')
+    }
+    if (!timingSafeEqual(sigBuf, expectedSigBuf)) {
       throw new BadRequestException('Invalid Google OAuth state')
     }
 
@@ -108,7 +139,7 @@ export class GoogleCalendarService {
 
   /** Exchange authorization code for tokens */
   async exchangeCode(code: string): Promise<GoogleTokenResponse> {
-    const resp = await fetch('https://oauth2.googleapis.com/token', {
+    const resp = await this.fetchWithTimeout('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -129,7 +160,7 @@ export class GoogleCalendarService {
 
   /** Get Google account email from access token */
   async getGoogleEmail(accessToken: string): Promise<string> {
-    const resp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    const resp = await this.fetchWithTimeout('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     if (!resp.ok) throw new BadRequestException('Failed to fetch Google user info')
@@ -192,7 +223,7 @@ export class GoogleCalendarService {
     const conn = await this.prisma.googleCalendarConnection.findUnique({ where: { userId } })
     if (!conn) throw new NotFoundException('No Google Calendar connection found')
 
-    const resp = await fetch('https://oauth2.googleapis.com/token', {
+    const resp = await this.fetchWithTimeout('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -240,7 +271,7 @@ export class GoogleCalendarService {
       const accessToken = await this.getValidAccessToken(userId)
       const calendarId = encodeURIComponent(conn.calendarId)
 
-      const resp = await fetch(
+      const resp = await this.fetchWithTimeout(
         `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
         {
           method: 'POST',
@@ -281,7 +312,7 @@ export class GoogleCalendarService {
       const accessToken = await this.getValidAccessToken(userId)
       const calendarId = encodeURIComponent(conn.calendarId)
 
-      await fetch(
+      await this.fetchWithTimeout(
         `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`,
         {
           method: 'DELETE',
@@ -308,7 +339,7 @@ export class GoogleCalendarService {
       const accessToken = await this.getValidAccessToken(userId)
       const calendarId = encodeURIComponent(conn.calendarId)
 
-      await fetch(
+      await this.fetchWithTimeout(
         `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`,
         {
           method: 'PATCH',
@@ -339,7 +370,7 @@ export class GoogleCalendarService {
 
       const accessToken = await this.getValidAccessToken(userId)
 
-      const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+      const resp = await this.fetchWithTimeout('https://www.googleapis.com/calendar/v3/freeBusy', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,

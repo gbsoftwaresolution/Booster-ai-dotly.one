@@ -23,6 +23,7 @@ import { UpdateCardDto } from './dto/update-card.dto'
 import { UpdateThemeDto } from './dto/update-theme.dto'
 import { UpsertSocialLinksDto } from './dto/upsert-social-links.dto'
 import { UpsertMediaBlocksDto } from './dto/upsert-media-blocks.dto'
+import type { ItemsResponse } from '@dotly/types'
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
 
@@ -112,7 +113,9 @@ export class CardsController {
   })
   @Get('cards')
   findAll(@CurrentUser() user: { id: string }) {
-    return this.cardsService.findAllByUser(user.id)
+    return this.cardsService
+      .findAllByUser(user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiBearerAuth()

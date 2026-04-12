@@ -31,10 +31,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
 
-    // Capture 4xx auth errors in Sentry too — repeated 401/403s can indicate
-    // credential stuffing, token theft, or misconfigured clients and should be
-    // observable in the error dashboard alongside 5xx failures.
-    if (status >= 400) {
+    if (status >= 500) {
       Sentry.captureException(exception)
     }
 
@@ -78,7 +75,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
       // reflected back in error responses. request.path is just the
       // pathname portion (e.g. "/cards/123") without query string.
       path: request.path,
-      message,
+      message: Array.isArray(details) ? 'Validation failed' : message,
       ...(details !== undefined ? { details } : {}),
     })
   }

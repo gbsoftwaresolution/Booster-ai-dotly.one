@@ -1,4 +1,10 @@
-import { Injectable, ForbiddenException, BadRequestException, Logger } from '@nestjs/common'
+import {
+  Injectable,
+  ForbiddenException,
+  BadRequestException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
 import { Prisma } from '@dotly/database'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
@@ -36,23 +42,39 @@ export interface WebhookPayload {
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name)
   private static readonly MAX_RESPONSE_BYTES = 16 * 1024
-  private readonly encryptionKey: Buffer
+  private readonly rawEncryptionKey: string | null
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly billingService: BillingService,
   ) {
-    const rawKey =
-      this.config.get<string>('WEBHOOK_SECRET_ENCRYPTION_KEY') ??
-      this.config.get<string>('SUPABASE_JWT_SECRET') ??
-      this.config.getOrThrow<string>('R2_SECRET_ACCESS_KEY')
-    this.encryptionKey = createHash('sha256').update(rawKey).digest()
+    this.rawEncryptionKey = this.config.get<string>('WEBHOOK_SECRET_ENCRYPTION_KEY') ?? null
+  }
+
+  private getEncryptionKey(): Buffer {
+    if (!this.rawEncryptionKey) {
+      throw new BadRequestException('Webhooks are not configured on this server')
+    }
+    return createHash('sha256').update(this.rawEncryptionKey).digest()
+  }
+
+  private formatError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
+  }
+
+  private async getOwnedEndpoint(endpointId: string, internalUserId: string) {
+    const endpoint = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
+    if (!endpoint || endpoint.userId !== internalUserId) {
+      throw new NotFoundException('Webhook endpoint not found')
+    }
+    return endpoint
   }
 
   private encryptSecret(secret: string): string {
+    const encryptionKey = this.getEncryptionKey()
     const iv = randomBytes(12)
-    const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv)
+    const cipher = createCipheriv('aes-256-gcm', encryptionKey, iv)
     const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()])
     const tag = cipher.getAuthTag()
     return `${iv.toString('base64url')}.${tag.toString('base64url')}.${encrypted.toString('base64url')}`
@@ -63,10 +85,11 @@ export class WebhooksService {
     if (parts.length !== 3) return secret
 
     try {
+      const encryptionKey = this.getEncryptionKey()
       const [ivB64, tagB64, dataB64] = parts as [string, string, string]
       const decipher = createDecipheriv(
         'aes-256-gcm',
-        this.encryptionKey,
+        encryptionKey,
         Buffer.from(ivB64, 'base64url'),
       )
       decipher.setAuthTag(Buffer.from(tagB64, 'base64url'))
@@ -76,7 +99,7 @@ export class WebhooksService {
       ])
       return decrypted.toString('utf8')
     } catch {
-      return secret
+      throw new BadRequestException('Webhook secret could not be decrypted')
     }
   }
 
@@ -97,9 +120,11 @@ export class WebhooksService {
         where: { id: endpointId },
         data: { secret: encryptedSecret },
       })
-      .catch((err: unknown) =>
-        this.logger.warn(`Failed to migrate webhook secret for endpoint=${endpointId}`, err),
-      )
+      .catch((err: unknown) => {
+        this.logger.warn(
+          `Failed to migrate webhook secret for endpoint=${endpointId}: ${this.formatError(err)}`,
+        )
+      })
 
     return plaintextSecret
   }
@@ -231,7 +256,7 @@ export class WebhooksService {
     const plan = (user?.plan as Plan | undefined) ?? Plan.FREE
     const limits = this.billingService.getPlanLimits(plan)
 
-    if (!limits.csvExport) {
+    if (!limits.webhooks) {
       throw new ForbiddenException('Webhooks require Pro or higher')
     }
 
@@ -253,7 +278,7 @@ export class WebhooksService {
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       throw new BadRequestException('Webhook URL must use http or https')
     }
-    if (parsed.protocol === 'http:' && process.env['NODE_ENV'] === 'production') {
+    if (parsed.protocol === 'http:' && this.config.get<string>('NODE_ENV') === 'production') {
       throw new BadRequestException(
         'Webhook URL must use HTTPS in production — HTTP URLs transmit payloads and ' +
           'signatures in plaintext and are not permitted.',
@@ -309,8 +334,7 @@ export class WebhooksService {
     dto: { url?: string; events?: string[]; enabled?: boolean },
   ) {
     const internalId = await this.assertWebhookAccess(userId)
-    const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
-    if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
+    await this.getOwnedEndpoint(endpointId, internalId)
 
     if (dto.events) {
       const invalid = dto.events.filter((e) => !(WEBHOOK_EVENTS as readonly string[]).includes(e))
@@ -332,7 +356,7 @@ export class WebhooksService {
       if (!['http:', 'https:'].includes(parsed.protocol)) {
         throw new BadRequestException('Webhook URL must use http or https')
       }
-      if (parsed.protocol === 'http:' && process.env['NODE_ENV'] === 'production') {
+      if (parsed.protocol === 'http:' && this.config.get<string>('NODE_ENV') === 'production') {
         throw new BadRequestException(
           'Webhook URL must use HTTPS in production — HTTP URLs transmit payloads and ' +
             'signatures in plaintext and are not permitted.',
@@ -355,8 +379,7 @@ export class WebhooksService {
 
   async regenerateSecret(userId: string, endpointId: string) {
     const internalId = await this.assertWebhookAccess(userId)
-    const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
-    if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
+    await this.getOwnedEndpoint(endpointId, internalId)
     const secret = randomBytes(24).toString('hex')
     const encryptedSecret = this.encryptSecret(secret)
     const updated = await this.prisma.webhookEndpoint.update({
@@ -368,16 +391,14 @@ export class WebhooksService {
 
   async delete(userId: string, endpointId: string) {
     const internalId = await this.assertWebhookAccess(userId)
-    const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
-    if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
+    await this.getOwnedEndpoint(endpointId, internalId)
     await this.prisma.webhookEndpoint.delete({ where: { id: endpointId } })
     return { deleted: true }
   }
 
   async getDeliveries(userId: string, endpointId: string) {
     const internalId = await this.assertWebhookAccess(userId)
-    const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
-    if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
+    await this.getOwnedEndpoint(endpointId, internalId)
     return this.prisma.webhookDelivery.findMany({
       where: { endpointId },
       orderBy: { deliveredAt: 'desc' },
@@ -389,8 +410,7 @@ export class WebhooksService {
 
   async testEndpoint(userId: string, endpointId: string) {
     const internalId = await this.assertWebhookAccess(userId)
-    const ep = await this.prisma.webhookEndpoint.findUnique({ where: { id: endpointId } })
-    if (!ep || ep.userId !== internalId) throw new ForbiddenException('Not found')
+    const ep = await this.getOwnedEndpoint(endpointId, internalId)
 
     const payload: WebhookPayload = {
       event: 'lead.created',
@@ -428,7 +448,9 @@ export class WebhooksService {
         take: 20,
       })
     } catch (err) {
-      this.logger.warn(`webhooks.fanOut: DB error for userId=${userId} event=${event}`, err)
+      this.logger.warn(
+        `webhooks.fanOut: DB error for userId=${userId} event=${event}: ${this.formatError(err)}`,
+      )
       return
     }
 
@@ -443,7 +465,9 @@ export class WebhooksService {
     for (const ep of endpoints) {
       void this.resolveDeliverySecret(ep.id, ep.secret)
         .then((secret) => this.deliver(ep.id, ep.url, secret, payload, false))
-        .catch((err: unknown) => this.logger.warn(`webhook delivery failed endpoint=${ep.id}`, err))
+        .catch((err: unknown) => {
+          this.logger.warn(`webhook delivery failed endpoint=${ep.id}: ${this.formatError(err)}`)
+        })
     }
   }
 
@@ -535,7 +559,9 @@ export class WebhooksService {
           success,
         },
       })
-      .catch((e: unknown) => this.logger.warn('Failed to log webhook delivery', e))
+      .catch((e: unknown) => {
+        this.logger.warn(`Failed to log webhook delivery: ${this.formatError(e)}`)
+      })
 
     return { success, statusCode, durationMs, responseBody }
   }

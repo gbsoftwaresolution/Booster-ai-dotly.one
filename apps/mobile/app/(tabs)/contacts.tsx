@@ -14,19 +14,10 @@ import {
   Alert,
   ScrollView,
 } from 'react-native'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'expo-router'
-import { api } from '../../lib/api'
+import { api, isApiError } from '../../lib/api'
 import { ScanCardButton } from '../../components/ScanCardButton'
-
-function isPlanRestrictedError(message: string): boolean {
-  const normalized = message.toLowerCase()
-  return (
-    normalized.includes('pro and above') ||
-    normalized.includes('upgrade your plan') ||
-    normalized.includes('available on pro')
-  )
-}
 
 interface CrmPipeline {
   stage: string
@@ -61,6 +52,7 @@ function scoreBadgeColors(score: number): { bg: string; text: string } {
 const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^\+?[\d\s\-().]{5,20}$/
+const CONTACTS_PAGE_SIZE = 25
 
 function normalizeWebsite(value: string): string | undefined {
   const trimmed = value.trim()
@@ -397,7 +389,10 @@ export default function ContactsTab() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [pendingPage, setPendingPage] = useState<number | null>(null)
+  const [failedPage, setFailedPage] = useState<number | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [renderedQuery, setRenderedQuery] = useState('')
 
   // M6: Debounced server-side search — search is sent to the API,
   // not filtered client-side, so it works across all pages.
@@ -408,28 +403,33 @@ export default function ContactsTab() {
   const fetchContacts = useCallback(
     async (reset = false, currentPage?: number, searchQuery?: string) => {
       const requestId = ++contactsRequestIdRef.current
+      const pageToFetch = reset ? 1 : (currentPage ?? 1)
       try {
-        const pageToFetch = reset ? 1 : (currentPage ?? 1)
         const q = searchQuery !== undefined ? searchQuery : latestSearchRef.current
-        const data = await api.getContacts(pageToFetch, 50, q)
+        const data = await api.getContacts(pageToFetch, CONTACTS_PAGE_SIZE, q)
         if (contactsRequestIdRef.current !== requestId) return
-        const nextContacts = data.contacts as Contact[]
+        const nextContacts = data.items as Contact[]
         if (reset) {
           setContacts(nextContacts)
           setPage(1)
+          setRenderedQuery(q)
         } else {
           setContacts((prev) => (pageToFetch === 1 ? nextContacts : [...prev, ...nextContacts]))
+          setPage(pageToFetch)
         }
-        setHasMore(nextContacts.length === 50)
+        setHasMore(nextContacts.length === CONTACTS_PAGE_SIZE)
         setFetchError(null)
         setPlanError(false)
+        setPendingPage(null)
+        setFailedPage(null)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
-        if (isPlanRestrictedError(msg)) {
+        if (isApiError(err) && err.statusCode === 403) {
           setPlanError(true)
         } else {
           setFetchError(msg || 'Failed to load contacts')
         }
+        if (!reset) setFailedPage(pageToFetch)
       } finally {
         if (contactsRequestIdRef.current !== requestId) return
         setLoading(false)
@@ -453,34 +453,40 @@ export default function ContactsTab() {
   const handleRefresh = () => {
     setRefreshing(true)
     setPage(1)
+    setPendingPage(null)
+    setFailedPage(null)
     void fetchContacts(true, 1, search)
   }
 
   const handleLoadMore = () => {
-    if (!hasMore || loadingMore) return
+    if (!hasMore || loadingMore || pendingPage !== null) return
     setLoadingMore(true)
-    setPage((p) => p + 1)
+    const nextPage = failedPage ?? page + 1
+    setPendingPage(nextPage)
+    void fetchContacts(false, nextPage)
   }
 
-  useEffect(() => {
-    if (page > 1) void fetchContacts(false, page)
-  }, [page, fetchContacts])
-
-  const contactsByStage = STAGES.reduce<Record<(typeof STAGES)[number], Contact[]>>(
-    (acc, stage) => {
-      acc[stage] = []
-      return acc
-    },
-    {} as Record<(typeof STAGES)[number], Contact[]>,
+  const contactsByStage = useMemo(
+    () =>
+      contacts.reduce<Record<(typeof STAGES)[number], Contact[]>>(
+        (acc, contact) => {
+          const stage = contact.crmPipeline?.stage ?? 'NEW'
+          const normalizedStage = STAGES.includes(stage as (typeof STAGES)[number])
+            ? (stage as (typeof STAGES)[number])
+            : 'NEW'
+          acc[normalizedStage].push(contact)
+          return acc
+        },
+        {
+          NEW: [],
+          CONTACTED: [],
+          QUALIFIED: [],
+          CLOSED: [],
+          LOST: [],
+        },
+      ),
+    [contacts],
   )
-
-  contacts.forEach((contact) => {
-    const stage = contact.crmPipeline?.stage ?? 'NEW'
-    const normalizedStage = STAGES.includes(stage as (typeof STAGES)[number])
-      ? (stage as (typeof STAGES)[number])
-      : 'NEW'
-    contactsByStage[normalizedStage].push(contact)
-  })
 
   // M6: Server-side search with 350ms debounce
   const handleSearchChange = (text: string) => {
@@ -666,11 +672,22 @@ export default function ContactsTab() {
           </TouchableOpacity>
         </View>
       )}
+      {fetchError && renderedQuery !== search && contacts.length > 0 && (
+        <View style={{ backgroundColor: '#fff7ed', paddingHorizontal: 16, paddingVertical: 10 }}>
+          <Text style={{ color: '#c2410c', fontSize: 12 }}>
+            Showing results for “{renderedQuery}” because the latest search could not be loaded.
+          </Text>
+        </View>
+      )}
 
       {viewMode === 'list' ? (
         <FlatList
           data={contacts}
           keyExtractor={(item) => item.id}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
@@ -679,6 +696,13 @@ export default function ContactsTab() {
               <View style={{ paddingVertical: 16, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color="#0ea5e9" />
               </View>
+            ) : failedPage !== null && fetchError ? (
+              <TouchableOpacity
+                onPress={handleLoadMore}
+                style={{ paddingVertical: 16, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry loading more</Text>
+              </TouchableOpacity>
             ) : null
           }
           ListEmptyComponent={
@@ -818,132 +842,167 @@ export default function ContactsTab() {
               ? `No contacts match "${search}"`
               : 'Your leads will appear here\nafter someone scans your card'}
           </Text>
+          <TouchableOpacity onPress={handleRefresh} style={{ marginTop: 16 }}>
+            <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Refresh</Text>
+          </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 16 }}
-        >
-          {STAGES.map((stage) => {
-            const stageContacts = contactsByStage[stage]
-            const colors = STAGE_COLORS[stage] ?? { bg: '#f1f5f9', text: '#475569' }
+        <>
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <TouchableOpacity onPress={handleRefresh} style={{ alignSelf: 'flex-start' }}>
+              <Text style={{ color: '#0ea5e9', fontWeight: '600', fontSize: 13 }}>
+                Refresh board
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            horizontal
+            data={STAGES}
+            keyExtractor={(item) => item}
+            showsHorizontalScrollIndicator={false}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.3}
+            contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 16 }}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={{ justifyContent: 'center', paddingHorizontal: 12 }}>
+                  <ActivityIndicator size="small" color="#0ea5e9" />
+                </View>
+              ) : failedPage !== null && fetchError ? (
+                <TouchableOpacity
+                  onPress={handleLoadMore}
+                  style={{ justifyContent: 'center', paddingHorizontal: 12 }}
+                >
+                  <Text style={{ color: '#0ea5e9', fontWeight: '600', fontSize: 12 }}>
+                    Retry more
+                  </Text>
+                </TouchableOpacity>
+              ) : null
+            }
+            renderItem={({ item: stage }) => {
+              const stageContacts = contactsByStage[stage]
+              const colors = STAGE_COLORS[stage] ?? { bg: '#f1f5f9', text: '#475569' }
 
-            return (
-              <View
-                key={stage}
-                style={{
-                  width: 250,
-                  marginHorizontal: 8,
-                  backgroundColor: '#f8fafc',
-                }}
-              >
+              return (
                 <View
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 12,
+                    width: 250,
+                    marginHorizontal: 8,
+                    backgroundColor: '#f8fafc',
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>{stage}</Text>
                   <View
                     style={{
-                      borderRadius: 999,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      backgroundColor: colors.bg,
-                    }}
-                  >
-                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }}>
-                      {stageContacts.length}
-                    </Text>
-                  </View>
-                </View>
-
-                {stageContacts.map((contact) => (
-                  <Pressable
-                    key={contact.id}
-                    onPress={() => router.push(`/contact/${contact.id}` as never)}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: 14,
-                      padding: 14,
-                      marginBottom: 10,
-                      borderWidth: 1,
-                      borderColor: '#e2e8f0',
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.05,
-                      shadowRadius: 4,
-                      elevation: 1,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 10,
+                      justifyContent: 'space-between',
+                      marginBottom: 12,
                     }}
                   >
-                    <Avatar name={contact.name} id={contact.id} />
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text
-                        style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}
-                        numberOfLines={1}
-                      >
-                        {contact.name}
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                      {stage}
+                    </Text>
+                    <View
+                      style={{
+                        borderRadius: 999,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        backgroundColor: colors.bg,
+                      }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }}>
+                        {stageContacts.length}
                       </Text>
-                      {contact.company ? (
+                    </View>
+                  </View>
+
+                  {stageContacts.map((contact) => (
+                    <Pressable
+                      key={contact.id}
+                      onPress={() => router.push(`/contact/${contact.id}` as never)}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 14,
+                        padding: 14,
+                        marginBottom: 10,
+                        borderWidth: 1,
+                        borderColor: '#e2e8f0',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 4,
+                        elevation: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                      }}
+                    >
+                      <Avatar name={contact.name} id={contact.id} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Text
-                          style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}
+                          style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}
                           numberOfLines={1}
                         >
-                          {contact.company}
+                          {contact.name}
                         </Text>
-                      ) : null}
-                      {contact.enrichmentScore != null && (
-                        <View
-                          style={{
-                            marginTop: 4,
-                            alignSelf: 'flex-start',
-                            borderRadius: 8,
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            backgroundColor: scoreBadgeColors(contact.enrichmentScore).bg,
-                          }}
-                        >
+                        {contact.company ? (
                           <Text
+                            style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}
+                            numberOfLines={1}
+                          >
+                            {contact.company}
+                          </Text>
+                        ) : null}
+                        {contact.enrichmentScore != null && (
+                          <View
                             style={{
-                              color: scoreBadgeColors(contact.enrichmentScore).text,
-                              fontSize: 10,
-                              fontWeight: '700',
+                              marginTop: 4,
+                              alignSelf: 'flex-start',
+                              borderRadius: 8,
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              backgroundColor: scoreBadgeColors(contact.enrichmentScore).bg,
                             }}
                           >
-                            AI {contact.enrichmentScore}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </Pressable>
-                ))}
+                            <Text
+                              style={{
+                                color: scoreBadgeColors(contact.enrichmentScore).text,
+                                fontSize: 10,
+                                fontWeight: '700',
+                              }}
+                            >
+                              AI {contact.enrichmentScore}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </Pressable>
+                  ))}
 
-                {stageContacts.length === 0 ? (
-                  <View
-                    style={{
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderStyle: 'dashed',
-                      borderColor: '#cbd5e1',
-                      padding: 16,
-                      backgroundColor: '#ffffff',
-                    }}
-                  >
-                    <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
-                      No contacts
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            )
-          })}
-        </ScrollView>
+                  {stageContacts.length === 0 ? (
+                    <View
+                      style={{
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: '#cbd5e1',
+                        padding: 16,
+                        backgroundColor: '#ffffff',
+                      }}
+                    >
+                      <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
+                        No contacts
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              )
+            }}
+          />
+        </>
       )}
 
       {/* Scan Business Card FAB */}

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import type { Response } from 'express'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { SchedulingService } from './scheduling.service'
@@ -14,6 +15,34 @@ import { CancelBookingDto } from './dto/cancel-booking.dto'
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto'
 import { SetBookingQuestionsDto } from './dto/manage-booking-questions.dto'
 import { GoogleCalendarService } from './google-calendar.service'
+import type { DeletedResponse, ItemsResponse, SuccessResponse } from '@dotly/types'
+
+class BookingsQueryDto {
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  upcoming?: string
+}
+
+class GoogleCallbackQueryDto {
+  @IsString()
+  @MaxLength(2048)
+  code!: string
+
+  @IsString()
+  @MaxLength(4096)
+  state!: string
+}
+
+class SlotsQueryDto {
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  date!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  tz?: string
+}
 
 @ApiTags('scheduling')
 @Controller('scheduling')
@@ -38,7 +67,9 @@ export class SchedulingController {
   @ApiBearerAuth()
   @Get('appointment-types')
   getAppointmentTypes(@CurrentUser() user: { id: string }) {
-    return this.schedulingService.getAppointmentTypes(user.id)
+    return this.schedulingService
+      .getAppointmentTypes(user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiBearerAuth()
@@ -60,7 +91,9 @@ export class SchedulingController {
   @ApiBearerAuth()
   @Delete('appointment-types/:id')
   deleteAppointmentType(@CurrentUser() user: { id: string }, @Param('id') id: string) {
-    return this.schedulingService.deleteAppointmentType(user.id, id)
+    return this.schedulingService
+      .deleteAppointmentType(user.id, id)
+      .then((): DeletedResponse => ({ deleted: true }))
   }
 
   @ApiBearerAuth()
@@ -77,10 +110,12 @@ export class SchedulingController {
 
   @ApiBearerAuth()
   @Get('bookings')
-  getBookings(@CurrentUser() user: { id: string }, @Query('upcoming') upcoming?: string) {
-    return this.schedulingService.getBookings(user.id, {
-      upcoming: upcoming === 'true',
-    })
+  getBookings(@CurrentUser() user: { id: string }, @Query() query: BookingsQueryDto) {
+    return this.schedulingService
+      .getBookings(user.id, {
+        upcoming: query.upcoming === 'true',
+      })
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiBearerAuth()
@@ -139,15 +174,11 @@ export class SchedulingController {
    */
   @Public()
   @Get('google/callback')
-  async googleCallback(
-    @Query('code') code: string,
-    @Query('state') state: string,
-    @Res() res: Response,
-  ) {
+  async googleCallback(@Query() query: GoogleCallbackQueryDto, @Res() res: Response) {
     const webUrl = this.config.getOrThrow<string>('WEB_URL')
     try {
-      const userId = this.googleCalendar.verifyState(state)
-      const tokens = await this.googleCalendar.exchangeCode(code)
+      const userId = this.googleCalendar.verifyState(query.state)
+      const tokens = await this.googleCalendar.exchangeCode(query.code)
       const googleEmail = await this.googleCalendar.getGoogleEmail(tokens.access_token)
       await this.googleCalendar.saveConnection(userId, tokens, googleEmail)
       res.redirect(`${webUrl}/scheduling?google=connected`)
@@ -162,8 +193,9 @@ export class SchedulingController {
    */
   @ApiBearerAuth()
   @Delete('google/disconnect')
-  disconnectGoogle(@CurrentUser() user: { id: string }) {
-    return this.googleCalendar.disconnect(user.id)
+  async disconnectGoogle(@CurrentUser() user: { id: string }) {
+    await this.googleCalendar.disconnect(user.id)
+    return { success: true } satisfies SuccessResponse
   }
 
   // ── Public Endpoints ──────────────────────────────────────────────────────
@@ -188,11 +220,10 @@ export class SchedulingController {
   async getAvailableSlots(
     @Param('handle') handle: string,
     @Param('slug') slug: string,
-    @Query('date') date: string,
-    @Query('tz') tz?: string,
+    @Query() query: SlotsQueryDto,
   ) {
     const ownerUserId = await this.schedulingService.resolveOwnerByHandle(handle)
-    return this.schedulingService.getAvailableSlots(ownerUserId, slug, date, tz)
+    return this.schedulingService.getAvailableSlots(ownerUserId, slug, query.date, query.tz)
   }
 
   /**
@@ -260,11 +291,7 @@ export class SchedulingController {
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get('bookings/:token/slots')
-  getAvailableSlotsByToken(
-    @Param('token') token: string,
-    @Query('date') date: string,
-    @Query('tz') tz?: string,
-  ) {
-    return this.schedulingService.getAvailableSlotsByToken(token, date, tz)
+  getAvailableSlotsByToken(@Param('token') token: string, @Query() query: SlotsQueryDto) {
+    return this.schedulingService.getAvailableSlotsByToken(token, query.date, query.tz)
   }
 }

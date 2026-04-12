@@ -107,12 +107,6 @@ export class WalletPassesService {
     return card
   }
 
-  private assertAppleWalletAvailable(): never {
-    throw new BadRequestException(
-      'Apple Wallet passes are not yet available on this server. Use Google Wallet instead.',
-    )
-  }
-
   // ─── Ownership guard ─────────────────────────────────────────────────────────
 
   private async assertCardOwnerAndFetch(cardId: string, userId: string) {
@@ -146,12 +140,14 @@ export class WalletPassesService {
   // ─── Apple Wallet ─────────────────────────────────────────────────────────────
 
   async generateApplePass(cardId: string, userId: string): Promise<Buffer> {
-    await this.assertCardOwnerAndFetch(cardId, userId)
-    return this.assertAppleWalletAvailable()
+    const card = await this.assertCardOwnerAndFetch(cardId, userId)
+    return this.generateApplePassInternal(card)
   }
 
   private async generateApplePassBuffer(
-    card: Awaited<ReturnType<typeof this.assertCardOwnerAndFetch>>,
+    card:
+      | Awaited<ReturnType<typeof this.assertCardOwnerAndFetch>>
+      | Awaited<ReturnType<typeof this.getPublishedCardByHandle>>,
   ): Promise<Buffer> {
     const passTypeId = this.config.get<string>('APPLE_PASS_TYPE_ID')
     const teamId = this.config.get<string>('APPLE_TEAM_ID')
@@ -339,8 +335,8 @@ export class WalletPassesService {
 
   async getPublicPassForHandle(handle: string, requestUserId: string | null): Promise<Buffer> {
     await this.assertPublicExportAllowed(handle, requestUserId)
-    await this.getPublishedCardByHandle(handle)
-    return this.assertAppleWalletAvailable()
+    const card = await this.getPublishedCardByHandle(handle)
+    return this.generateApplePassBuffer(card)
   }
 
   async getPublicGooglePassUrlForHandle(

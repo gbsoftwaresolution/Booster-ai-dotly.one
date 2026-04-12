@@ -72,10 +72,7 @@ export function MobileAppRail(): JSX.Element {
               />
             </span>
             <span
-              className={cn(
-                'text-[10px] font-semibold',
-                isHome ? 'text-gray-950' : 'text-gray-400',
-              )}
+              className={cn('text-xs font-semibold', isHome ? 'text-gray-950' : 'text-gray-400')}
             >
               Home
             </span>
@@ -113,7 +110,7 @@ export function MobileAppRail(): JSX.Element {
                 </span>
                 <span
                   className={cn(
-                    'text-[10px] font-semibold',
+                    'text-xs font-semibold',
                     isActive ? 'text-gray-950' : 'text-gray-400',
                   )}
                 >
@@ -133,7 +130,7 @@ export function MobileAppRail(): JSX.Element {
             <span className="flex h-9 w-14 items-center justify-center rounded-full">
               <Menu className="h-[17px] w-[17px] text-gray-400" />
             </span>
-            <span className="text-[10px] font-semibold text-gray-400">More</span>
+            <span className="text-xs font-semibold text-gray-400">More</span>
           </button>
         </div>
       </nav>
@@ -158,7 +155,7 @@ export function MobileAppRail(): JSX.Element {
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
+                className="app-touch-target rounded-full p-2 text-gray-400 hover:bg-gray-100"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />

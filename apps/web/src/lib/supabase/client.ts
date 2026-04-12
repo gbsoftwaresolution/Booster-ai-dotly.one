@@ -1,10 +1,17 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+function getSupabaseEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
+    throw new Error('Supabase environment variables are missing.')
+  }
+  return { url, anonKey }
+}
+
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
+  const { url, anonKey } = getSupabaseEnv()
+  return createBrowserClient(url, anonKey)
 }
 
 /**
@@ -19,9 +26,13 @@ export function createClient() {
 export async function getAccessToken(): Promise<string | undefined> {
   const supabase = createClient()
   // Re-validate the session with Supabase Auth servers
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return undefined
   // Now safe to read the token from the session cookie
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
   return session?.access_token
 }

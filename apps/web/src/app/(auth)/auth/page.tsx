@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -10,6 +10,14 @@ import { getAuthCallbackUrl, sanitizeNextPath } from '@/lib/app-url'
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function AuthPage(): JSX.Element {
+  return (
+    <Suspense fallback={<AuthPageFallback />}>
+      <AuthPageContent />
+    </Suspense>
+  )
+}
+
+function AuthPageContent(): JSX.Element {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -395,6 +403,17 @@ export default function AuthPage(): JSX.Element {
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function AuthPageFallback(): JSX.Element {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
+      <div className="app-shell-surface w-full max-w-md rounded-[32px] p-6 text-center sm:p-8">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <p className="mt-4 text-sm text-gray-500">Loading sign-in...</p>
       </div>
     </div>
   )

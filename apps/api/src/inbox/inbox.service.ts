@@ -30,7 +30,6 @@ const DROPBOX_ALLOWED_TYPES = new Set([
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
   // Documents
   'application/pdf',
   'application/msword',
@@ -66,7 +65,7 @@ export class InboxService {
   private readonly r2Client: S3Client
   private readonly r2Bucket: string
   private readonly r2PublicUrl: string
-  private readonly uploadTokenSecret: string
+  private readonly uploadTokenSecret: string | null
 
   constructor(
     private readonly prisma: PrismaService,
@@ -79,10 +78,7 @@ export class InboxService {
     this.r2Bucket = this.config.getOrThrow<string>('R2_BUCKET')
     const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
     this.r2PublicUrl = r2Url.startsWith('http') ? r2Url : `https://${r2Url}`
-    this.uploadTokenSecret =
-      this.config.get<string>('INBOX_UPLOAD_TOKEN_SECRET') ??
-      this.config.get<string>('SUPABASE_JWT_SECRET') ??
-      secretAccessKey
+    this.uploadTokenSecret = this.config.get<string>('INBOX_UPLOAD_TOKEN_SECRET') ?? null
 
     this.r2Client = new S3Client({
       region: 'auto',
@@ -100,19 +96,31 @@ export class InboxService {
     return card
   }
 
+  private getUploadTokenSecret(): string {
+    if (!this.uploadTokenSecret) {
+      throw new BadRequestException('Inbox uploads are not configured on this server')
+    }
+    return this.uploadTokenSecret
+  }
+
   private encodeUploadToken(payload: InboxUploadTokenPayload): string {
+    const secret = this.getUploadTokenSecret()
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
-    const sig = createHmac('sha256', this.uploadTokenSecret).update(body).digest('base64url')
+    const sig = createHmac('sha256', secret).update(body).digest('base64url')
     return `${body}.${sig}`
   }
 
   private decodeUploadToken(token: string): InboxUploadTokenPayload {
+    const secret = this.getUploadTokenSecret()
     const [body, sig] = token.split('.')
     if (!body || !sig) throw new BadRequestException('Invalid upload token')
-    const expectedSig = createHmac('sha256', this.uploadTokenSecret)
-      .update(body)
-      .digest('base64url')
-    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    const expectedSig = createHmac('sha256', secret).update(body).digest('base64url')
+    const sigBuf = Buffer.from(sig)
+    const expectedSigBuf = Buffer.from(expectedSig)
+    if (sigBuf.length !== expectedSigBuf.length) {
+      throw new BadRequestException('Invalid upload token')
+    }
+    if (!timingSafeEqual(sigBuf, expectedSigBuf)) {
       throw new BadRequestException('Invalid upload token')
     }
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as InboxUploadTokenPayload

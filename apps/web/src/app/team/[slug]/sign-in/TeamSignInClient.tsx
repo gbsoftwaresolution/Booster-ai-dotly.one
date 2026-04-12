@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { getAuthCallbackUrl } from '@/lib/app-url'
 import { apiGet } from '@/lib/api'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -30,10 +30,29 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const brandColor = team.brandColor ?? '#0ea5e9'
   const displayName = team.brandName ?? team.name
   const teamNext = '/team'
+  const teamSignInPath = `/team/${team.slug}/sign-in`
+
+  useEffect(() => {
+    const authError = searchParams.get('error')
+    if (!authError) return
+
+    if (authError === 'invalid_code') {
+      setError('This sign-in link is invalid. Start again and request a new one.')
+      return
+    }
+
+    if (authError === 'auth_callback_failed') {
+      setError('We could not complete sign-in. Try again.')
+      return
+    }
+
+    setError(authError)
+  }, [searchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -109,7 +128,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${getAuthCallbackUrl()}?next=${encodeURIComponent(teamNext)}`,
+        redirectTo: `${getAuthCallbackUrl()}?next=${encodeURIComponent(teamSignInPath)}`,
       },
     })
     if (authError) setError(authError.message)

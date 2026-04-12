@@ -1,8 +1,13 @@
 import * as ImagePicker from 'expo-image-picker'
 
-export async function pickBusinessCardImage(): Promise<string | null> {
+export type ScanPickResult =
+  | { status: 'success'; base64: string; mimeType: string }
+  | { status: 'permission-denied' }
+  | { status: 'cancelled' }
+
+export async function pickBusinessCardImage(): Promise<ScanPickResult> {
   const { status } = await ImagePicker.requestCameraPermissionsAsync()
-  if (status !== 'granted') return null
+  if (status !== 'granted') return { status: 'permission-denied' }
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -12,6 +17,10 @@ export async function pickBusinessCardImage(): Promise<string | null> {
     aspect: [16, 9],
   })
 
-  if (result.canceled || !result.assets?.[0]?.base64) return null
-  return result.assets[0].base64
+  if (result.canceled || !result.assets?.[0]?.base64) return { status: 'cancelled' }
+  return {
+    status: 'success',
+    base64: result.assets[0].base64,
+    mimeType: result.assets[0].mimeType ?? 'image/jpeg',
+  }
 }

@@ -13,7 +13,7 @@ import { ThemeTab } from '@/components/card-builder/ThemeTab'
 import { PublishBar } from '@/components/card-builder/PublishBar'
 import { QrSection } from '@/components/card-builder/QrSection'
 import { LeadFormTab } from '@/components/card-builder/LeadFormTab'
-import type { CardTemplate, SocialLinkData, MediaBlockData } from '@dotly/types'
+import type { CardData, CardTemplate, SocialLinkData, MediaBlockData } from '@dotly/types'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost, apiDelete } from '@/lib/api'
 import {
@@ -46,6 +46,21 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'form', label: 'Form', icon: ClipboardList },
   { id: 'preview', label: 'Preview', icon: Eye },
 ]
+
+const EMPTY_RENDER_FIELDS: CardData['fields'] = {
+  name: '',
+  title: '',
+  company: '',
+  phone: '',
+  whatsapp: '',
+  email: '',
+  website: '',
+  bio: '',
+  address: '',
+  mapUrl: '',
+  avatarUrl: '',
+  logoUrl: '',
+}
 
 interface EditPageProps {
   params: Promise<{ id: string }>
@@ -201,6 +216,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
     publishCard,
     unpublishCard,
     saveNow,
+    retryLoad,
   } = useCardBuilder(id)
 
   const cardLoaded = card !== null
@@ -265,16 +281,33 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
         <div className="flex flex-col items-center gap-3 text-center">
           <AlertCircle className="h-10 w-10 text-red-400" />
           <p className="text-sm font-medium text-gray-700">{error ?? 'Card not found'}</p>
-          <Link href="/apps/cards" className="text-sm text-brand-600 font-medium hover:underline">
-            Back to cards
-          </Link>
+          <div className="flex items-center gap-4">
+            {error ? (
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="text-sm font-medium text-brand-600 hover:underline"
+              >
+                Retry
+              </button>
+            ) : null}
+            <Link href="/apps/cards" className="text-sm text-brand-600 font-medium hover:underline">
+              Back to cards
+            </Link>
+          </div>
         </div>
       </div>
     )
   }
 
   const rendererProps = {
-    card,
+    card: {
+      ...card,
+      fields: {
+        ...EMPTY_RENDER_FIELDS,
+        ...card.fields,
+      },
+    },
     theme,
     socialLinks,
     mediaBlocks,
@@ -321,7 +354,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
           {/* Card identity */}
           <div className="flex-1 min-w-0">
             <h1 className="text-sm font-semibold text-gray-900 truncate leading-tight">
-              {(card.fields as unknown as Record<string, string>).name || 'Untitled Card'}
+              {card.fields.name || 'Untitled Card'}
             </h1>
             <p className="text-xs text-gray-400 truncate">dotly.one/{card.handle}</p>
           </div>
@@ -469,7 +502,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                   {activeTab === 'profile' && (
                     <ProfileTab
                       cardId={id}
-                      fields={card.fields as unknown as Record<string, string>}
+                      fields={card.fields}
                       handle={card.handle}
                       vcardPolicy={vcardPolicy}
                       onFieldChange={updateField}
@@ -578,7 +611,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete card?"
-          message={`"${(card?.fields as unknown as Record<string, string>)?.name || card?.handle || 'This card'}" will be permanently deleted and its public link will stop working.`}
+          message={`"${card?.fields.name || card?.handle || 'This card'}" will be permanently deleted and its public link will stop working.`}
           confirmLabel="Delete"
           onConfirm={() => void handleDelete()}
           onCancel={() => setShowDeleteConfirm(false)}

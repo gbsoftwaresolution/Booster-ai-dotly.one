@@ -64,6 +64,10 @@ export class EmailService {
     }
   }
 
+  private formatError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
+  }
+
   async send(payload: EmailPayload): Promise<boolean> {
     // Try Mailgun first
     if (this.mailgunClient && this.mailgunDomain) {
@@ -94,7 +98,7 @@ export class EmailService {
         this.logger.log(`Email sent via Mailgun to ${maskedTo}`)
         return true
       } catch (err) {
-        this.logger.warn(`Mailgun failed, trying SES fallback: ${err}`)
+        this.logger.warn(`Mailgun failed, trying SES fallback: ${this.formatError(err)}`)
       }
     }
 
@@ -176,7 +180,7 @@ export class EmailService {
         this.logger.log(`Email sent via SES to ${payload.to.replace(/^[^@]+/, '***')}`)
         return true
       } catch (err) {
-        this.logger.error(`SES also failed: ${err}`)
+        this.logger.error(`SES also failed: ${this.formatError(err)}`)
       }
     }
 

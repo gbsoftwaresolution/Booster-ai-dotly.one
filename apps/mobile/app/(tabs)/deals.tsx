@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
@@ -54,13 +54,25 @@ function formatValue(value: number | string, currency: string): string {
 
 export default function DealsScreen() {
   const router = useRouter()
-  const { crmAllowed, loading: authzLoading } = useAuthz()
+  const { crmAllowed, loading: authzLoading, error: authzError, refresh: refreshAuthz } = useAuthz()
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [userTz, setUserTz] = useState<string | null>(null)
   const [busyDealIds, setBusyDealIds] = useState<Set<string>>(new Set())
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+  const dealsCountRef = useRef(0)
+  const initialLoadCompleteRef = useRef(false)
+
+  useEffect(() => {
+    dealsCountRef.current = deals.length
+  }, [deals.length])
+
+  useEffect(() => {
+    initialLoadCompleteRef.current = initialLoadComplete
+  }, [initialLoadComplete])
 
   const mutateBusyDealState = useCallback((dealId: string, busy: boolean) => {
     setBusyDealIds((prev) => {
@@ -71,24 +83,38 @@ export default function DealsScreen() {
     })
   }, [])
 
-  const loadDeals = useCallback(async () => {
+  const loadDeals = useCallback(async (options?: { refresh?: boolean }) => {
+    if (!options?.refresh) setLoading(true)
     try {
       const [data, tz] = await Promise.all([api.getAllDeals(), getUserTimezone()])
       setDeals(data as Deal[])
       setUserTz(tz)
       setError(null)
+      setRefreshError(null)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load deals')
+      const message = err instanceof Error ? err.message : 'Failed to load deals'
+      if (options?.refresh && initialLoadCompleteRef.current && dealsCountRef.current > 0) {
+        setRefreshError(message)
+      } else {
+        setError(message)
+      }
+    } finally {
+      if (!initialLoadCompleteRef.current) {
+        initialLoadCompleteRef.current = true
+        setInitialLoadComplete(true)
+      }
+      if (!options?.refresh) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void loadDeals().finally(() => setLoading(false))
+    void loadDeals()
   }, [loadDeals])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await loadDeals()
+    setError(null)
+    await loadDeals({ refresh: true })
     setRefreshing(false)
   }, [loadDeals])
 
@@ -100,8 +126,8 @@ export default function DealsScreen() {
       const nextStage = stages[(currentIdx + 1) % stages.length] ?? stages[0]!
       mutateBusyDealState(deal.id, true)
       try {
-        await api.updateDealStage(deal.id, nextStage)
-        setDeals((prev) => prev.map((d) => (d.id === deal.id ? { ...d, stage: nextStage } : d)))
+        const updated = await api.updateDealStage(deal.id, nextStage)
+        setDeals((prev) => prev.map((d) => (d.id === deal.id ? (updated as Deal) : d)))
       } catch (err: unknown) {
         Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update stage')
       } finally {
@@ -137,12 +163,40 @@ export default function DealsScreen() {
   )
 
   // Group deals by stage
-  const grouped = STAGE_ORDER.map((stage) => ({
-    stage,
-    items: deals.filter((d) => d.stage === stage),
-  }))
+  const grouped = useMemo(
+    () =>
+      STAGE_ORDER.map((stage) => ({
+        stage,
+        items: deals.filter((d) => d.stage === stage),
+      })),
+    [deals],
+  )
 
   if (!authzLoading && !crmAllowed) {
+    if (authzError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+            backgroundColor: '#f8fafc',
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
+            We couldn&apos;t verify access
+          </Text>
+          <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 8 }}>{authzError}</Text>
+          <TouchableOpacity
+            onPress={() => void refreshAuthz()}
+            style={{ marginTop: 16, padding: 12 }}
+          >
+            <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
     return (
       <View
         style={{
@@ -163,7 +217,7 @@ export default function DealsScreen() {
     )
   }
 
-  if (loading) {
+  if (loading && !initialLoadComplete) {
     return (
       <View
         style={{
@@ -190,7 +244,13 @@ export default function DealsScreen() {
         }}
       >
         <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
-        <TouchableOpacity onPress={() => void loadDeals()} style={{ marginTop: 16, padding: 12 }}>
+        <TouchableOpacity
+          onPress={() => {
+            setError(null)
+            void loadDeals()
+          }}
+          style={{ marginTop: 16, padding: 12 }}
+        >
           <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -199,6 +259,22 @@ export default function DealsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      {refreshError && (
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginTop: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#fecaca',
+            backgroundColor: '#fef2f2',
+            padding: 12,
+          }}
+        >
+          <Text style={{ color: '#b91c1c', fontSize: 13 }}>{refreshError}</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View
         style={{

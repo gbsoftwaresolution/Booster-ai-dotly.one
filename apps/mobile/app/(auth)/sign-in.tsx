@@ -46,14 +46,19 @@ export default function SignInScreen() {
     setLoading(true)
     setError(null)
     setFieldErrors({})
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: trimmedEmail,
-      password,
-    })
-    if (signInError) {
-      setError(signInError.message)
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      })
+      if (signInError) {
+        setError(signInError.message)
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function handleForgotPassword() {

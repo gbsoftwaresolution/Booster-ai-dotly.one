@@ -6,6 +6,7 @@ type BillingPlan = 'FREE' | 'PRO' | 'BUSINESS' | 'AGENCY' | 'ENTERPRISE'
 interface AuthzState {
   plan: BillingPlan | null
   loading: boolean
+  error: string | null
   crmAllowed: boolean
   analyticsAllowed: boolean
   schedulingAllowed: boolean
@@ -29,14 +30,17 @@ function normalizePlan(plan: unknown): BillingPlan {
 export function AuthzProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<BillingPlan | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = async () => {
     setLoading(true)
     try {
       const me = (await api.getMe()) as { plan?: string | null } | null
       setPlan(normalizePlan(me?.plan))
-    } catch {
+      setError(null)
+    } catch (err) {
       setPlan(null)
+      setError(err instanceof Error ? err.message : 'Could not verify plan access.')
     } finally {
       setLoading(false)
     }
@@ -50,12 +54,13 @@ export function AuthzProvider({ children }: { children: ReactNode }) {
     () => ({
       plan,
       loading,
-      crmAllowed: plan !== null && plan !== 'FREE',
-      analyticsAllowed: plan !== null && plan !== 'FREE',
-      schedulingAllowed: plan !== null && plan !== 'FREE',
+      error,
+      crmAllowed: error === null && plan !== null && plan !== 'FREE',
+      analyticsAllowed: error === null && plan !== null && plan !== 'FREE',
+      schedulingAllowed: error === null && plan !== null && plan !== 'FREE',
       refresh,
     }),
-    [loading, plan],
+    [error, loading, plan],
   )
 
   return <AuthzContext.Provider value={value}>{children}</AuthzContext.Provider>

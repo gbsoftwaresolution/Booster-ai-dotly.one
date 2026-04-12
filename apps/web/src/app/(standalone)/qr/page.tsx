@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { getPublicApiUrl } from '@/lib/public-env'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPost } from '@/lib/api'
+import type { ItemsResponse } from '@dotly/types'
 import jsQR from 'jsqr'
 import {
   Pencil,
@@ -1451,17 +1452,20 @@ export default function QrPage(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
+      setError('')
       try {
         const token = (await getAccessToken()) ?? ''
-        const data = await apiGet<CardSummary[]>('/cards', token)
-        if (!data?.length) {
+        const data = await apiGet<ItemsResponse<CardSummary>>('/cards', token)
+        if (!data.items?.length) {
           setCards([])
           return
         }
-        const sorted = [...data].sort((a, b) =>
+        const sorted = [...data.items].sort((a, b) =>
           a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1,
         )
         setCards(sorted)
@@ -1473,7 +1477,7 @@ export default function QrPage(): JSX.Element {
       }
     }
     void load()
-  }, [])
+  }, [reloadToken])
 
   return (
     <div
@@ -1540,6 +1544,14 @@ export default function QrPage(): JSX.Element {
             }}
           >
             <p className="text-sm text-red-400">{error}</p>
+            <button
+              type="button"
+              onClick={() => setReloadToken((current) => current + 1)}
+              className="mt-4 rounded-2xl px-5 py-2.5 text-sm font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+            >
+              Retry
+            </button>
           </div>
         )}
 

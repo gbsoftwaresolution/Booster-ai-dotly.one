@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { getPublicApiUrl } from '@/lib/public-env'
 import { SelectField } from '@/components/ui/SelectField'
@@ -305,6 +305,7 @@ export default function BookingPage(): JSX.Element {
   const [slotError, setSlotError] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [ownerTz, setOwnerTz] = useState('UTC')
+  const slotRequestIdRef = useRef(0)
   const guestTz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const [step, setStep] = useState<Step>('date')
@@ -353,6 +354,7 @@ export default function BookingPage(): JSX.Element {
   // Load slots when date selected
   const loadSlots = useCallback(
     async (date: Date) => {
+      const requestId = ++slotRequestIdRef.current
       setLoadingSlots(true)
       setSlots([])
       setSlotError(null)
@@ -364,13 +366,16 @@ export default function BookingPage(): JSX.Element {
         )
         if (!res.ok) throw new Error(`Error ${res.status}`)
         const data = (await res.json()) as { slots: string[]; ownerTimezone?: string }
+        if (slotRequestIdRef.current !== requestId) return
         setSlots(data.slots)
         if (data.ownerTimezone) setOwnerTz(data.ownerTimezone)
       } catch (e) {
+        if (slotRequestIdRef.current !== requestId) return
         // MED-3: Distinguish network/API errors from genuinely empty days
         setSlotError(e instanceof Error ? e.message : 'Failed to load available times')
         setSlots([])
       } finally {
+        if (slotRequestIdRef.current !== requestId) return
         setLoadingSlots(false)
       }
     },

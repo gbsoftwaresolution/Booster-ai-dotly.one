@@ -13,7 +13,9 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'
 import { useLayoutEffect } from 'react'
+import type { CardEditorResponse, SocialLinkData } from '@dotly/types'
 import * as ImagePicker from 'expo-image-picker'
+import * as Linking from 'expo-linking'
 import { Feather } from '@expo/vector-icons'
 import {
   api,
@@ -86,36 +88,8 @@ function validateCardDraft(input: {
   return null
 }
 
-interface SocialLink {
-  id: string
-  platform: string
-  url: string
-  displayOrder: number
-}
-
-interface CardDetail {
-  id: string
-  handle: string
-  templateId: Template
-  isActive: boolean
-  fields?: {
-    name?: string
-    title?: string
-    company?: string
-    bio?: string
-    email?: string
-    phone?: string
-    website?: string
-    avatarUrl?: string
-  }
-  theme?: {
-    primaryColor?: string
-  }
-  socialLinks?: SocialLink[]
-}
-
 function applyCardSnapshot(
-  card: CardDetail,
+  card: CardEditorResponse,
   setState: {
     setName: (value: string) => void
     setTagline: (value: string) => void
@@ -128,13 +102,17 @@ function applyCardSnapshot(
     setSocialLinks: (value: Array<{ platform: string; url: string }>) => void
   },
 ) {
+  const templateId: Template = TEMPLATES.some((template) => template.id === card.templateId)
+    ? (card.templateId as Template)
+    : 'MINIMAL'
+
   setState.setName(card.fields?.name ?? '')
   setState.setTagline(card.fields?.title ?? '')
   setState.setBio(card.fields?.bio ?? '')
   setState.setPhone(card.fields?.phone ?? '')
   setState.setEmail(card.fields?.email ?? '')
   setState.setWebsite(card.fields?.website ?? '')
-  setState.setTemplate(card.templateId ?? 'MINIMAL')
+  setState.setTemplate(templateId)
   setState.setPrimaryColor(card.theme?.primaryColor ?? '#0ea5e9')
   setState.setSocialLinks(
     (card.socialLinks ?? []).map((l) => ({ platform: l.platform, url: l.url })),
@@ -181,8 +159,7 @@ export default function EditCardScreen() {
     void api
       .getCard(id)
       .then((data) => {
-        const card = data as CardDetail
-        applyCardSnapshot(card, {
+        applyCardSnapshot(data, {
           setName,
           setTagline,
           setBio,
@@ -234,18 +211,22 @@ export default function EditCardScreen() {
             })),
         ),
       ])
-      const refreshed = (await api.getCard(id)) as CardDetail
-      applyCardSnapshot(refreshed, {
-        setName,
-        setTagline,
-        setBio,
-        setPhone,
-        setEmail,
-        setWebsite,
-        setTemplate,
-        setPrimaryColor,
-        setSocialLinks,
-      })
+      try {
+        const refreshed = await api.getCard(id)
+        applyCardSnapshot(refreshed, {
+          setName,
+          setTagline,
+          setBio,
+          setPhone,
+          setEmail,
+          setWebsite,
+          setTemplate,
+          setPrimaryColor,
+          setSocialLinks,
+        })
+      } catch {
+        setSaveError('Changes saved, but the latest card refresh failed.')
+      }
       return true
     } catch {
       setSaveError('Could not save your latest changes.')
@@ -302,7 +283,10 @@ export default function EditCardScreen() {
   async function pickAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Please allow access to your photo library.')
+      Alert.alert('Photo access needed', 'Allow photo library access to update your avatar.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+      ])
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({

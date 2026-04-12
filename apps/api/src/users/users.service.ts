@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
 import { Prisma, type PrismaClient, type User } from '@dotly/database'
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
+import type { UserMeResponse } from '@dotly/types'
 
 const LEGACY_USER_SELECT = {
   id: true,
@@ -20,22 +21,6 @@ const LEGACY_USER_SELECT = {
 } as const
 
 type LegacyUserRecord = Prisma.UserGetPayload<{ select: typeof LEGACY_USER_SELECT }>
-
-export interface MeResponse {
-  id: string
-  email: string
-  name: string | null
-  avatarUrl: string | null
-  plan: string
-  walletAddress: string | null
-  country: string | null
-  timezone: string | null
-  notifLeadCaptured: boolean | null
-  notifWeeklyDigest: boolean | null
-  notifProductUpdates: boolean | null
-  createdAt: Date
-  updatedAt: Date
-}
 
 @Injectable()
 export class UsersService {
@@ -196,7 +181,7 @@ export class UsersService {
     return this.sanitizeUser(await this.findUniqueCompat({ id })) as User | null
   }
 
-  async getMe(id: string): Promise<MeResponse | null> {
+  async getMe(id: string): Promise<UserMeResponse | null> {
     const user = await this.findById(id)
     if (!user) return null
     return {
@@ -211,8 +196,8 @@ export class UsersService {
       notifLeadCaptured: user.notifLeadCaptured ?? null,
       notifWeeklyDigest: user.notifWeeklyDigest ?? null,
       notifProductUpdates: user.notifProductUpdates ?? null,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
     }
   }
 
@@ -286,7 +271,7 @@ export class UsersService {
       notifWeeklyDigest?: boolean
       notifProductUpdates?: boolean
     },
-  ): Promise<MeResponse | null> {
+  ): Promise<UserMeResponse | null> {
     try {
       await this.prisma.user.update({
         where: { id: userId },

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServerApiUrl } from '@/lib/server-api'
+import type { BillingSummaryResponse, PaginatedResponse } from '@dotly/types'
 
 interface Contact {
   id: string
@@ -11,18 +12,6 @@ interface Contact {
   createdAt: string
   crmPipeline?: { stage: string } | null
   sourceCard?: { handle: string } | null
-}
-
-interface ContactsResponse {
-  contacts: Contact[]
-  total: number
-  page: number
-  limit: number
-}
-
-// MED-07: The billing API response shape — only the plan field matters here.
-interface BillingResponse {
-  user?: { plan?: string }
 }
 
 const CSV_EXPORT_PLANS = new Set(['PRO', 'BUSINESS', 'ENTERPRISE'])
@@ -67,8 +56,8 @@ export async function GET(): Promise<NextResponse> {
         { status: 403 },
       )
     }
-    const billing = (await billingRes.json()) as BillingResponse
-    const plan = billing?.user?.plan ?? 'FREE'
+    const billing = (await billingRes.json()) as BillingSummaryResponse
+    const plan = billing?.plan ?? 'FREE'
     if (!CSV_EXPORT_PLANS.has(plan)) {
       return NextResponse.json({ error: 'CSV export is available on Pro.' }, { status: 403 })
     }
@@ -88,8 +77,8 @@ export async function GET(): Promise<NextResponse> {
         return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: res.status })
       }
 
-      const data = (await res.json()) as ContactsResponse
-      const batch = data.contacts ?? []
+      const data = (await res.json()) as PaginatedResponse<Contact>
+      const batch = data.items ?? []
       allContacts.push(...batch)
 
       // Stop if this is the last page

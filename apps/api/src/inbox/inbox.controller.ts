@@ -13,6 +13,7 @@ import {
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
+import type { DeletedResponse } from '@dotly/types'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { InboxService } from './inbox.service'
@@ -125,6 +126,19 @@ class CreateMemoryDto {
   content!: string
 }
 
+class InboxListQueryDto {
+  @IsOptional()
+  @IsString()
+  cursor?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  limit?: number
+}
+
 // ─── Controller ───────────────────────────────────────────────────────────────
 
 @ApiTags('inbox')
@@ -217,10 +231,9 @@ export class InboxController {
   async getMessages(
     @Param('cardId') cardId: string,
     @CurrentUser() user: { id: string },
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Query() query: InboxListQueryDto,
   ) {
-    return this.inbox.getMessages(cardId, user.id, cursor, limit ? Number(limit) : 30)
+    return this.inbox.getMessages(cardId, user.id, query.cursor, query.limit ?? 30)
   }
 
   @Patch('inbox/messages/:id/read')
@@ -235,7 +248,7 @@ export class InboxController {
   @ApiOperation({ summary: 'Delete a message' })
   async deleteMessage(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     await this.inbox.deleteMessage(id, user.id)
-    return { deleted: true }
+    return { deleted: true } satisfies DeletedResponse
   }
 
   // ── Authenticated: voice notes ──────────────────────────────────────────────
@@ -246,10 +259,9 @@ export class InboxController {
   async getVoiceNotes(
     @Param('cardId') cardId: string,
     @CurrentUser() user: { id: string },
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Query() query: InboxListQueryDto,
   ) {
-    return this.inbox.getVoiceNotes(cardId, user.id, cursor, limit ? Number(limit) : 30)
+    return this.inbox.getVoiceNotes(cardId, user.id, query.cursor, query.limit ?? 30)
   }
 
   @Patch('inbox/voice-notes/:id/read')
@@ -264,7 +276,7 @@ export class InboxController {
   @ApiOperation({ summary: 'Delete a voice note' })
   async deleteVoiceNote(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     await this.inbox.deleteVoiceNote(id, user.id)
-    return { deleted: true }
+    return { deleted: true } satisfies DeletedResponse
   }
 
   // ── Authenticated: dropbox files ────────────────────────────────────────────
@@ -275,10 +287,9 @@ export class InboxController {
   async getDropboxFiles(
     @Param('cardId') cardId: string,
     @CurrentUser() user: { id: string },
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Query() query: InboxListQueryDto,
   ) {
-    return this.inbox.getDropboxFiles(cardId, user.id, cursor, limit ? Number(limit) : 30)
+    return this.inbox.getDropboxFiles(cardId, user.id, query.cursor, query.limit ?? 30)
   }
 
   @Patch('inbox/dropbox/:id/read')
@@ -293,7 +304,7 @@ export class InboxController {
   @ApiOperation({ summary: 'Delete a dropbox file' })
   async deleteDropboxFile(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     await this.inbox.deleteDropboxFile(id, user.id)
-    return { deleted: true }
+    return { deleted: true } satisfies DeletedResponse
   }
 
   // ── Authenticated: meeting memories ────────────────────────────────────────
@@ -321,6 +332,6 @@ export class InboxController {
   @ApiOperation({ summary: 'Delete a meeting memory' })
   async deleteMemory(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     await this.inbox.deleteMemory(id, user.id)
-    return { deleted: true }
+    return { deleted: true } satisfies DeletedResponse
   }
 }

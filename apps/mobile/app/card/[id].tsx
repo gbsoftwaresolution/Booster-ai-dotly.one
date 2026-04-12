@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { CardEditorResponse } from '@dotly/types'
 import {
   View,
   Text,
@@ -15,41 +16,46 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { api, type AnalyticsSummary } from '../../lib/api'
 import { NfcWriteButton } from '../../components/NfcWriteButton'
 
-interface CardDetail {
-  id: string
-  handle: string
-  templateId: string
-  isActive: boolean
-  fields?: {
-    name?: string
-    title?: string
-    company?: string
-    bio?: string
-    email?: string
-    phone?: string
-    website?: string
-    avatarUrl?: string
-  }
-  theme?: {
-    primaryColor?: string
-    secondaryColor?: string
-    fontFamily?: string
-  }
-}
-
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const [card, setCard] = useState<CardDetail | null>(null)
+  const [card, setCard] = useState<CardEditorResponse | null>(null)
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+
+  const loadAnalytics = async () => {
+    if (!id) return
+    try {
+      const summary = await api.getAnalyticsSummary(id)
+      setAnalytics(summary)
+      setAnalyticsError(null)
+    } catch (err) {
+      setAnalytics(null)
+      setAnalyticsError(err instanceof Error ? err.message : 'Analytics are unavailable.')
+    }
+  }
+
+  const loadCard = async () => {
+    if (!id) return
+    setLoading(true)
+    setError(null)
+    try {
+      const cardResult = await api.getCard(id)
+      setCard(cardResult)
+      void loadAnalytics()
+    } catch (err) {
+      setCard(null)
+      setError(err instanceof Error ? err.message : 'Failed to load card')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!id) return
-    void Promise.all([
-      api.getCard(id).then((data) => setCard(data as CardDetail)),
-      api.getAnalyticsSummary(id).then((data) => setAnalytics(data)),
-    ]).finally(() => setLoading(false))
+    void loadCard()
   }, [id])
 
   if (loading) {
@@ -57,6 +63,19 @@ export default function CardDetailScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color="#0ea5e9" />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: '#ef4444', textAlign: 'center' }}>{error}</Text>
+          <TouchableOpacity onPress={() => void loadCard()} style={{ marginTop: 16, padding: 12 }}>
+            <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
@@ -265,6 +284,23 @@ export default function CardDetailScreen() {
         <NfcWriteButton handle={card.handle} />
 
         {/* Analytics summary */}
+        {analyticsError ? (
+          <View
+            style={{
+              backgroundColor: '#fff7ed',
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: '#fdba74',
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ color: '#9a3412', fontSize: 13 }}>{analyticsError}</Text>
+            <TouchableOpacity onPress={() => void loadAnalytics()} style={{ marginTop: 8 }}>
+              <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry analytics</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {analytics && (
           <View
             style={{

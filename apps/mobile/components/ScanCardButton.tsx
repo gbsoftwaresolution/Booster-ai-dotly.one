@@ -2,6 +2,7 @@ import { TouchableOpacity, Alert, ActivityIndicator, View } from 'react-native'
 import { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
+import * as Linking from 'expo-linking'
 import { pickBusinessCardImage } from '../lib/scanner'
 import { scanBusinessCard } from '../lib/api'
 
@@ -16,13 +17,21 @@ export function ScanCardButton({ style }: ScanCardButtonProps) {
   const handleScan = async () => {
     try {
       setLoading(true)
-      const base64 = await pickBusinessCardImage()
-      if (!base64) {
+      const picked = await pickBusinessCardImage()
+      if (picked.status === 'permission-denied') {
+        Alert.alert('Camera access needed', 'Allow camera access to scan a business card.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ])
+        setLoading(false)
+        return
+      }
+      if (picked.status === 'cancelled') {
         setLoading(false)
         return
       }
 
-      const result = await scanBusinessCard(base64, 'image/jpeg')
+      const result = await scanBusinessCard(picked.base64, picked.mimeType)
 
       router.push({
         pathname: '/scan-result',

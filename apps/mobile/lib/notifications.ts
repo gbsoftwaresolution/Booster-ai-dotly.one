@@ -28,9 +28,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
   if (finalStatus !== 'granted') return null
 
+  const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID
+  if (!projectId) {
+    throw new Error('Push notifications are not configured for this build.')
+  }
+
   const token = (
     await Notifications.getExpoPushTokenAsync({
-      projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+      projectId,
     })
   ).data
 

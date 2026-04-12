@@ -33,7 +33,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
   return (
-    <html lang="en" className={`${inter.variable} ${plusJakartaSans.variable}`}>
+    <html lang="en" dir="ltr" className={`${inter.variable} ${plusJakartaSans.variable}`}>
       <body className="min-h-screen bg-background font-sans antialiased text-gray-950">
         <PostHogProvider>{children}</PostHogProvider>
         <AuthBoundary />

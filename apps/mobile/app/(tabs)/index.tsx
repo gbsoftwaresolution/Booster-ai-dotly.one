@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import type { CardListItemResponse } from '@dotly/types'
 import {
   View,
   Text,
@@ -11,20 +12,8 @@ import {
 import { useRouter } from 'expo-router'
 import { api } from '../../lib/api'
 
-interface CardItem {
-  id: string
-  handle: string
-  templateId: string
-  isActive: boolean
-  fields?: {
-    name?: string
-    title?: string
-    avatarUrl?: string
-  }
-}
-
 export default function CardsTab() {
-  const [cards, setCards] = useState<CardItem[]>([])
+  const [cards, setCards] = useState<CardListItemResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +23,7 @@ export default function CardsTab() {
     try {
       setError(null)
       const data = await api.getCards()
-      setCards(data as CardItem[])
+      setCards(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load cards')
       if (__DEV__) {
@@ -55,6 +44,33 @@ export default function CardsTab() {
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color="#0ea5e9" />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if (error && cards.length === 0) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 8 }}>
+            Could not load cards
+          </Text>
+          <Text style={{ fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 20 }}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void fetchCards()}
+            style={{
+              marginTop: 20,
+              backgroundColor: '#0ea5e9',
+              borderRadius: 12,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     )

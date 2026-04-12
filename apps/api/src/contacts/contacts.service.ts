@@ -17,6 +17,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { RedisService } from '../redis/redis.service'
 import { WebhooksService } from '../webhooks/webhooks.service'
 import { Prisma } from '@dotly/database'
+import type { DeletedResponse, ItemsResponse } from '@dotly/types'
 
 const VALID_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 type CrmStage = (typeof VALID_STAGES)[number]
@@ -93,6 +94,44 @@ function trimRequiredTemplateField(value: string, fieldName: string): string {
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
+
+  private async requireOwnedContact(contactId: string, userId: string) {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact || contact.ownerUserId !== userId) throw new NotFoundException('Contact not found')
+    return contact
+  }
+
+  private async requireOwnedNote(noteId: string, userId: string) {
+    const note = await this.prisma.contactNote.findUnique({ where: { id: noteId } })
+    if (!note || note.ownerUserId !== userId) throw new NotFoundException('Note not found')
+    return note
+  }
+
+  private async requireOwnedCustomField(fieldId: string, userId: string) {
+    const field = await this.prisma.contactCustomField.findUnique({ where: { id: fieldId } })
+    if (!field || field.ownerUserId !== userId)
+      throw new NotFoundException('Custom field not found')
+    return field
+  }
+
+  private async requireOwnedDeal(dealId: string, userId: string) {
+    const deal = await this.prisma.deal.findUnique({ where: { id: dealId } })
+    if (!deal || deal.ownerUserId !== userId) throw new NotFoundException('Deal not found')
+    return deal
+  }
+
+  private async requireOwnedTask(taskId: string, userId: string) {
+    const task = await this.prisma.contactTask.findUnique({ where: { id: taskId } })
+    if (!task || task.ownerUserId !== userId) throw new NotFoundException('Task not found')
+    return task
+  }
+
+  private async requireOwnedPipeline(pipelineId: string, userId: string) {
+    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
+    if (!pipeline || pipeline.ownerUserId !== userId)
+      throw new NotFoundException('Pipeline not found')
+    return pipeline
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -313,7 +352,9 @@ export class ContactsService {
       .add('enrich', { contactId: contact.id }, { delay: 5000 })
       .catch((err: unknown) => this.logger.warn('Enrichment queue push failed', err))
 
-    return { success: true, contactId: contact.id }
+    // Keep the public response generic so unauthenticated callers do not learn
+    // or correlate internal CRM contact identifiers.
+    return { success: true }
   }
 
   async create(userId: string, dto: CreateContactDto) {
@@ -404,7 +445,14 @@ export class ContactsService {
 
   async findAll(
     userId: string,
-    params: { stage?: string; search?: string; page?: number; limit?: number; tag?: string },
+    params: {
+      stage?: string
+      search?: string
+      page?: number
+      limit?: number
+      tag?: string
+      sortBy?: string
+    },
   ) {
     const where: Prisma.ContactWhereInput = { ownerUserId: userId }
     if (params.stage) where.crmPipeline = { stage: params.stage as CrmStage }
@@ -415,17 +463,29 @@ export class ContactsService {
         { email: { contains: params.search, mode: 'insensitive' } },
         { company: { contains: params.search, mode: 'insensitive' } },
       ]
-    const [contacts, total] = await Promise.all([
-      this.prisma.contact.findMany({
-        where,
-        select: CONTACT_LIST_SELECT,
-        orderBy: { createdAt: 'desc' },
-        skip: ((params.page || 1) - 1) * (params.limit || 20),
-        take: params.limit || 20,
-      }),
-      this.prisma.contact.count({ where }),
-    ])
-    return { contacts, total, page: params.page || 1, limit: params.limit || 20 }
+    const limit = params.limit || 20
+    const total = await this.prisma.contact.count({ where })
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const page = total === 0 ? 1 : Math.min(params.page || 1, totalPages)
+
+    const orderBy: Prisma.ContactOrderByWithRelationInput[] =
+      params.sortBy === 'name'
+        ? [{ name: 'asc' }, { createdAt: 'desc' }]
+        : params.sortBy === 'stage'
+          ? [{ crmPipeline: { stage: 'asc' } }, { createdAt: 'desc' }]
+          : params.sortBy === 'score'
+            ? [{ enrichmentScore: 'desc' }, { createdAt: 'desc' }]
+            : [{ createdAt: 'desc' }]
+
+    const contacts = await this.prisma.contact.findMany({
+      where,
+      select: CONTACT_LIST_SELECT,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+
+    return { items: contacts, total, page, limit, totalPages }
   }
 
   async getAllTags(userId: string): Promise<string[]> {
@@ -873,46 +933,41 @@ export class ContactsService {
     }
 
     if (params.search) {
-      // Filter by contact name or email
-      const matchingContacts = await this.prisma.contact.findMany({
-        where: {
+      submissionWhere = {
+        ...(Object.keys(submittedAt).length > 0 ? { submittedAt } : {}),
+        leadFormId: { in: leadFormIds },
+        contact: {
           ownerUserId: userId,
           OR: [
             { name: { contains: params.search, mode: 'insensitive' } },
             { email: { contains: params.search, mode: 'insensitive' } },
           ],
         },
-        select: { id: true },
-      })
-      const contactIds = matchingContacts.map((c) => c.id)
-      submissionWhere = {
-        ...(Object.keys(submittedAt).length > 0 ? { submittedAt } : {}),
-        leadFormId: { in: leadFormIds },
-        contactId: { in: contactIds },
       }
     }
 
-    const [submissions, total] = await Promise.all([
-      this.prisma.leadSubmission.findMany({
-        where: submissionWhere,
-        orderBy: { submittedAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.leadSubmission.count({
-        where: submissionWhere,
-      }),
-    ])
+    const total = await this.prisma.leadSubmission.count({
+      where: submissionWhere,
+    })
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const page = total === 0 ? 1 : Math.min(params.page ?? 1, totalPages)
 
-    // Attach contact data for submissions that have a contactId
-    const contactIds = submissions.map((s) => s.contactId).filter(Boolean) as string[]
-    const contacts = contactIds.length
-      ? await this.prisma.contact.findMany({
-          where: { id: { in: contactIds } },
-          select: { id: true, name: true, email: true, phone: true },
-        })
-      : []
-    const contactMap = new Map(contacts.map((c) => [c.id, c]))
+    const submissions = await this.prisma.leadSubmission.findMany({
+      where: submissionWhere,
+      include: {
+        contact: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
 
     const enrichedSubmissions = submissions.map((s) => ({
       id: s.id,
@@ -922,14 +977,15 @@ export class ContactsService {
       cardId: leadFormMap.get(s.leadFormId)?.cardId ?? null,
       answers: s.answers,
       submittedAt: s.submittedAt,
-      contact: s.contactId ? (contactMap.get(s.contactId) ?? null) : null,
+      contact: s.contact ?? null,
     }))
 
     return {
-      submissions: enrichedSubmissions,
+      items: enrichedSubmissions,
       total,
-      page: params.page ?? 1,
+      page,
       limit,
+      totalPages,
     }
   }
 
@@ -1103,13 +1159,115 @@ export class ContactsService {
     })
   }
 
-  async getAllDeals(userId: string) {
-    return this.prisma.deal.findMany({
-      where: { ownerUserId: userId },
+  async getAllDeals(
+    userId: string,
+    params?: { page?: number; limit?: number; search?: string; stage?: string },
+  ) {
+    const where: Prisma.DealWhereInput = { ownerUserId: userId }
+
+    if (params?.stage) where.stage = params.stage as Prisma.DealWhereInput['stage']
+    if (params?.search?.trim()) {
+      const query = params.search.trim()
+      where.OR = [
+        { title: { contains: query, mode: 'insensitive' } },
+        { contact: { name: { contains: query, mode: 'insensitive' } } },
+      ]
+    }
+
+    if (!params?.page && !params?.limit && !params?.search && !params?.stage) {
+      const deals = await this.prisma.deal.findMany({
+        where,
+        include: { contact: { select: { id: true, name: true, email: true } } },
+        orderBy: { updatedAt: 'desc' },
+      })
+      return { items: deals, total: deals.length, page: 1, limit: deals.length, totalPages: 1 }
+    }
+
+    const limit = params?.limit ?? 20
+    const total = await this.prisma.deal.count({ where })
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const page = total === 0 ? 1 : Math.min(params?.page ?? 1, totalPages)
+    const deals = await this.prisma.deal.findMany({
+      where,
       include: { contact: { select: { id: true, name: true, email: true } } },
       orderBy: { updatedAt: 'desc' },
-      take: 500,
+      skip: (page - 1) * limit,
+      take: limit,
     })
+
+    return { items: deals, total, page, limit, totalPages }
+  }
+
+  async getDealsSummary(userId: string) {
+    const [
+      totalDeals,
+      activeDeals,
+      totalPipelineAggregate,
+      wonDeals,
+      closedDeals,
+      avgWonDealAggregate,
+      weightedDeals,
+      nextClosingDeal,
+    ] = await Promise.all([
+      this.prisma.deal.count({ where: { ownerUserId: userId } }),
+      this.prisma.deal.count({
+        where: {
+          ownerUserId: userId,
+          stage: { notIn: ['CLOSED_WON', 'CLOSED_LOST'] },
+        },
+      }),
+      this.prisma.deal.aggregate({
+        where: { ownerUserId: userId },
+        _sum: { value: true },
+      }),
+      this.prisma.deal.count({ where: { ownerUserId: userId, stage: 'CLOSED_WON' } }),
+      this.prisma.deal.count({
+        where: { ownerUserId: userId, stage: { in: ['CLOSED_WON', 'CLOSED_LOST'] } },
+      }),
+      this.prisma.deal.aggregate({
+        where: { ownerUserId: userId, stage: 'CLOSED_WON' },
+        _avg: { value: true },
+      }),
+      this.prisma.deal.findMany({
+        where: {
+          ownerUserId: userId,
+          stage: { not: 'CLOSED_LOST' },
+        },
+        select: {
+          value: true,
+          probability: true,
+        },
+      }),
+      this.prisma.deal.findFirst({
+        where: {
+          ownerUserId: userId,
+          stage: { notIn: ['CLOSED_WON', 'CLOSED_LOST'] },
+          closeDate: { not: null },
+        },
+        orderBy: { closeDate: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          closeDate: true,
+        },
+      }),
+    ])
+
+    const weightedPipelineValue = weightedDeals.reduce(
+      (sum, deal) => sum + Number(deal.value ?? 0) * ((deal.probability ?? 0) / 100),
+      0,
+    )
+
+    return {
+      totalDeals,
+      activeDeals,
+      totalPipelineValue: Number(totalPipelineAggregate._sum.value ?? 0),
+      weightedPipelineValue,
+      wonDeals,
+      closedDeals,
+      avgWonDealValue: Number(avgWonDealAggregate._avg.value ?? 0),
+      nextClosingDeal,
+    }
   }
 
   async updateDeal(
@@ -1288,15 +1446,116 @@ export class ContactsService {
     })
   }
 
-  async getAllTasks(userId: string, params?: { completed?: boolean }) {
-    const where: { ownerUserId: string; completed?: boolean } = { ownerUserId: userId }
-    if (params?.completed !== undefined) where.completed = params.completed
-    return this.prisma.contactTask.findMany({
+  async getAllTasks(
+    userId: string,
+    params?: {
+      completed?: boolean
+      page?: number
+      limit?: number
+      search?: string
+      status?: string
+    },
+  ) {
+    const where: Prisma.ContactTaskWhereInput = { ownerUserId: userId }
+
+    if (params?.completed !== undefined) {
+      where.completed = params.completed
+    }
+
+    if (params?.status === 'PENDING') where.completed = false
+    if (params?.status === 'COMPLETED') where.completed = true
+    if (params?.status === 'OVERDUE') {
+      where.completed = false
+      where.dueAt = { lt: new Date() }
+    }
+
+    if (params?.search?.trim()) {
+      const query = params.search.trim()
+      where.OR = [
+        { title: { contains: query, mode: 'insensitive' } },
+        { contact: { name: { contains: query, mode: 'insensitive' } } },
+      ]
+    }
+
+    if (
+      !params?.page &&
+      !params?.limit &&
+      !params?.search &&
+      !params?.status &&
+      params?.completed === undefined
+    ) {
+      const tasks = await this.prisma.contactTask.findMany({
+        where,
+        include: { contact: { select: { id: true, name: true } } },
+        orderBy: [{ completed: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+      })
+      return { items: tasks, total: tasks.length, page: 1, limit: tasks.length, totalPages: 1 }
+    }
+
+    const limit = params?.limit ?? 20
+    const total = await this.prisma.contactTask.count({ where })
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const page = total === 0 ? 1 : Math.min(params?.page ?? 1, totalPages)
+    const tasks = await this.prisma.contactTask.findMany({
       where,
       include: { contact: { select: { id: true, name: true } } },
       orderBy: [{ completed: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
-      take: 500,
+      skip: (page - 1) * limit,
+      take: limit,
     })
+
+    return { items: tasks, total, page, limit, totalPages }
+  }
+
+  async getTasksSummary(userId: string) {
+    const now = new Date()
+    const dayStart = new Date(now)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(now)
+    dayEnd.setHours(23, 59, 59, 999)
+
+    const [totalTasks, pendingTasks, completedTasks, overdueTasks, dueTodayTasks, nextTask] =
+      await Promise.all([
+        this.prisma.contactTask.count({ where: { ownerUserId: userId } }),
+        this.prisma.contactTask.count({ where: { ownerUserId: userId, completed: false } }),
+        this.prisma.contactTask.count({ where: { ownerUserId: userId, completed: true } }),
+        this.prisma.contactTask.count({
+          where: {
+            ownerUserId: userId,
+            completed: false,
+            dueAt: { lt: now },
+          },
+        }),
+        this.prisma.contactTask.count({
+          where: {
+            ownerUserId: userId,
+            completed: false,
+            dueAt: { gte: dayStart, lte: dayEnd },
+          },
+        }),
+        this.prisma.contactTask.findFirst({
+          where: {
+            ownerUserId: userId,
+            completed: false,
+            dueAt: { not: null },
+          },
+          orderBy: { dueAt: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            dueAt: true,
+          },
+        }),
+      ])
+
+    return {
+      totalTasks,
+      pendingTasks,
+      completedTasks,
+      overdueTasks,
+      dueTodayTasks,
+      nextTask,
+    }
   }
 
   async updateTask(
@@ -1641,10 +1900,8 @@ export class ContactsService {
       to: opts?.to,
     })
 
-    const truncated = submissionsResult.submissions.length > EXPORT_CAP
-    const page = truncated
-      ? submissionsResult.submissions.slice(0, EXPORT_CAP)
-      : submissionsResult.submissions
+    const truncated = submissionsResult.items.length > EXPORT_CAP
+    const page = truncated ? submissionsResult.items.slice(0, EXPORT_CAP) : submissionsResult.items
 
     const answerKeys = Array.from(
       new Set(
@@ -1689,13 +1946,12 @@ export class ContactsService {
     return {
       csv: [csvHeader, ...rows].join('\n'),
       truncated,
-      total: submissionsResult.submissions.length,
+      total: submissionsResult.items.length,
     }
   }
 
   async getContactEmails(contactId: string, userId: string) {
-    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
-    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    await this.requireOwnedContact(contactId, userId)
     return this.prisma.contactEmail.findMany({
       where: { contactId },
       orderBy: { sentAt: 'desc' },
@@ -1749,10 +2005,11 @@ export class ContactsService {
   // ─── Gap 11: Multi-Pipeline Support ─────────────────────────────────────────
 
   async getPipelines(userId: string) {
-    return this.prisma.pipeline.findMany({
+    const items = await this.prisma.pipeline.findMany({
       where: { ownerUserId: userId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     })
+    return { items } satisfies ItemsResponse<(typeof items)[number]>
   }
 
   async createPipeline(
@@ -1793,8 +2050,7 @@ export class ContactsService {
       stageColors?: Record<string, string>
     },
   ) {
-    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
-    if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+    await this.requireOwnedPipeline(pipelineId, userId)
 
     if (dto.isDefault) {
       await this.prisma.pipeline.updateMany({
@@ -1813,10 +2069,9 @@ export class ContactsService {
   }
 
   async deletePipeline(pipelineId: string, userId: string) {
-    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
-    if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+    await this.requireOwnedPipeline(pipelineId, userId)
     await this.prisma.pipeline.delete({ where: { id: pipelineId } })
-    return { deleted: true }
+    return { deleted: true } satisfies DeletedResponse
   }
 
   /** Assign a contact's CRM record to a specific pipeline (and optionally set a stage) */
@@ -1826,12 +2081,10 @@ export class ContactsService {
     pipelineId: string | null,
     stage?: string,
   ) {
-    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
-    if (!contact || contact.ownerUserId !== userId) throw new ForbiddenException()
+    await this.requireOwnedContact(contactId, userId)
 
     if (pipelineId !== null) {
-      const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
-      if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+      const pipeline = await this.requireOwnedPipeline(pipelineId, userId)
 
       // Validate that the requested stage is one of the pipeline's defined stages.
       // A pipeline's `stages` field is a string[] stored as JSON; if the caller
@@ -1862,10 +2115,9 @@ export class ContactsService {
 
   /** Get all contacts currently in a given pipeline */
   async getPipelineContacts(pipelineId: string, userId: string) {
-    const pipeline = await this.prisma.pipeline.findUnique({ where: { id: pipelineId } })
-    if (!pipeline || pipeline.ownerUserId !== userId) throw new ForbiddenException()
+    await this.requireOwnedPipeline(pipelineId, userId)
 
-    return this.prisma.contact.findMany({
+    const items = await this.prisma.contact.findMany({
       where: {
         ownerUserId: userId,
         crmPipeline: { pipelineId },
@@ -1873,6 +2125,7 @@ export class ContactsService {
       select: CONTACT_LIST_SELECT,
       orderBy: { createdAt: 'desc' },
     })
+    return { items } satisfies ItemsResponse<(typeof items)[number]>
   }
 
   // ─── Gap 5: Email Tracking ────────────────────────────────────────────────────
@@ -1893,9 +2146,9 @@ export class ContactsService {
     })
   }
 
-  async recordEmailClick(trackingToken: string) {
+  async recordEmailClick(trackingToken: string): Promise<boolean> {
     const email = await this.prisma.contactEmail.findUnique({ where: { trackingToken } })
-    if (!email) return
+    if (!email) return false
     await this.prisma.contactEmail.update({
       where: { trackingToken },
       data: { clickedAt: new Date() },
@@ -1909,5 +2162,6 @@ export class ContactsService {
         },
       })
     }
+    return true
   }
 }

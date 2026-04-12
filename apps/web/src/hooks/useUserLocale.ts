@@ -33,9 +33,9 @@ async function loadUserLocale(): Promise<UserLocale> {
       return locale
     } catch {
       // Fall back gracefully — browser timezone is always safe
-      const locale: UserLocale = { timezone: null, country: null }
-      _cached = locale
-      return locale
+      return { timezone: null, country: null }
+    } finally {
+      _promise = null
     }
   })()
 

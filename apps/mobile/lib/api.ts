@@ -1,4 +1,21 @@
 import { supabase } from './supabase'
+import type {
+  AppointmentTypeResponse,
+  BookingResponse,
+  CardEditorResponse,
+  CardListItemResponse,
+  CardThemeResponse,
+  ContactDealResponse,
+  ContactDetailResponse,
+  ContactNoteResponse,
+  ContactTaskResponse,
+  CustomFieldDefinitionResponse,
+  ItemsResponse,
+  PaginatedResponse,
+  PipelineResponse,
+  SocialLinkData,
+  UserMeResponse,
+} from '@dotly/types'
 
 // H-05: Validate that EXPO_PUBLIC_API_URL is set and uses HTTPS.
 // Falling back to an HTTP localhost URL in production would silently send
@@ -16,6 +33,35 @@ if (!_rawApiUrl.startsWith('https://') && process.env.NODE_ENV === 'production')
   throw new Error(`EXPO_PUBLIC_API_URL must use HTTPS in production. Got: ${_rawApiUrl}`)
 }
 const API_URL = _rawApiUrl
+const API_TIMEOUT_MS = 15_000
+
+export class ApiError extends Error {
+  statusCode: number
+  code?: string
+  details?: unknown
+
+  constructor({
+    message,
+    statusCode,
+    code,
+    details,
+  }: {
+    message: string
+    statusCode: number
+    code?: string
+    details?: unknown
+  }) {
+    super(message)
+    this.name = 'ApiError'
+    this.statusCode = statusCode
+    this.code = code
+    this.details = details
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError
+}
 
 // H-08: Allowed image MIME types for upload endpoints.
 // Anything outside this list is rejected before hitting the network so that
@@ -50,7 +96,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   // a hung API server (deploy in progress, network drop) leaves the UI spinner
   // running indefinitely with no user-visible error on React Native.
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15_000)
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
 
   try {
     const res = await fetch(`${API_URL}${path}`, {
@@ -62,23 +108,57 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
         ...(options?.headers as Record<string, string> | undefined),
       },
     })
-    if (!res.ok) throw new Error(`API error ${res.status}`)
+    if (!res.ok) {
+      let message = `API error ${res.status}`
+      let code: string | undefined
+      let details: unknown
+      try {
+        const body = (await res.json()) as Record<string, unknown>
+        const msg = body['message']
+        if (typeof msg === 'string') message = msg
+        else if (Array.isArray(msg) && msg.length > 0) message = (msg as string[]).join('; ')
+        else if (typeof body['error'] === 'string') message = body['error']
+        if (typeof body['code'] === 'string') code = body['code']
+        if ('details' in body) details = body['details']
+      } catch {
+        // ignore parse issues
+      }
+      throw new ApiError({ message, statusCode: res.status, code, details })
+    }
     if (res.status === 204) return undefined as T
 
     const text = await res.text()
     if (!text.trim()) return undefined as T
 
     return JSON.parse(text) as T
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError({
+        message: 'The request timed out. Please try again.',
+        statusCode: 0,
+        code: 'TIMEOUT',
+      })
+    }
+    if (error instanceof TypeError) {
+      throw new ApiError({
+        message: 'Network error. Check your connection and try again.',
+        statusCode: 0,
+        code: 'NETWORK',
+      })
+    }
+    throw error
   } finally {
     clearTimeout(timeoutId)
   }
 }
 
 interface ContactsResponse {
-  contacts: unknown[]
+  items: ContactDetailResponse[]
   total: number
   page: number
   limit: number
+  totalPages: number
 }
 
 export interface AnalyticsSummary {
@@ -89,9 +169,9 @@ export interface AnalyticsSummary {
 }
 
 export const api = {
-  getCards: () => apiFetch<unknown[]>('/cards'),
-  getCard: (id: string) => apiFetch<unknown>(`/cards/${id}`),
-  getMe: () => apiFetch<unknown>('/users/me'),
+  getCards: async () => (await apiFetch<ItemsResponse<CardListItemResponse>>('/cards')).items,
+  getCard: (id: string) => apiFetch<CardEditorResponse>(`/cards/${id}`),
+  getMe: () => apiFetch<UserMeResponse | null>('/users/me'),
   getAnalyticsSummary: (id: string) => apiFetch<AnalyticsSummary>(`/cards/${id}/analytics/summary`),
   // M6: Added optional search param for server-side search
   getContacts: (page = 1, limit = 50, search?: string) => {
@@ -99,36 +179,55 @@ export const api = {
     if (search) params.set('search', search)
     return apiFetch<ContactsResponse>(`/contacts?${params.toString()}`)
   },
-  getContact: (id: string) => apiFetch<unknown>(`/contacts/${id}`),
+  getContact: (id: string) => apiFetch<ContactDetailResponse>(`/contacts/${id}`),
   updateContactStage: (id: string, stage: string) =>
     apiFetch(`/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
-  getContactNotes: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/notes`),
+  getContactNotes: (id: string) => apiFetch<ContactNoteResponse[]>(`/contacts/${id}/notes`),
   createNote: (id: string, content: string) =>
-    apiFetch(`/contacts/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
+    apiFetch<ContactNoteResponse>(`/contacts/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
   deleteNote: (noteId: string, contactId: string) =>
     apiFetch(`/contacts/${contactId}/notes/${noteId}`, { method: 'DELETE' }),
   updateNote: (noteId: string, contactId: string, content: string) =>
-    apiFetch(`/contacts/${contactId}/notes/${noteId}`, {
+    apiFetch<ContactNoteResponse>(`/contacts/${contactId}/notes/${noteId}`, {
       method: 'PATCH',
       body: JSON.stringify({ content }),
     }),
-  getContactTasks: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/tasks`),
+  getContactTasks: (id: string) => apiFetch<ContactTaskResponse[]>(`/contacts/${id}/tasks`),
   createTask: (id: string, title: string, dueAt?: string) =>
-    apiFetch(`/contacts/${id}/tasks`, { method: 'POST', body: JSON.stringify({ title, dueAt }) }),
+    apiFetch<ContactTaskResponse>(`/contacts/${id}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify({ title, dueAt }),
+    }),
   updateTask: (taskId: string, data: { completed?: boolean; title?: string }) =>
-    apiFetch(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiFetch<ContactTaskResponse>(`/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   deleteTask: (taskId: string) => apiFetch(`/tasks/${taskId}`, { method: 'DELETE' }),
-  getDeals: (id: string) => apiFetch<unknown[]>(`/contacts/${id}/deals`),
+  getDeals: (id: string) => apiFetch<ContactDealResponse[]>(`/contacts/${id}/deals`),
   createDeal: (
     id: string,
     data: { title: string; value?: number; stage?: string; closeDate?: string },
-  ) => apiFetch(`/contacts/${id}/deals`, { method: 'POST', body: JSON.stringify(data) }),
+  ) =>
+    apiFetch<ContactDealResponse>(`/contacts/${id}/deals`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   deleteDeal: (dealId: string) => apiFetch(`/deals/${dealId}`, { method: 'DELETE' }),
   updateDealStage: (dealId: string, stage: string) =>
-    apiFetch(`/deals/${dealId}`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
-  getAllDeals: () => apiFetch<unknown[]>('/deals'),
-  getAllTasks: () => apiFetch<unknown[]>('/tasks'),
-  getEmailTemplates: () => apiFetch<unknown[]>('/email-templates'),
+    apiFetch<ContactDealResponse>(`/deals/${dealId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ stage }),
+    }),
+  getAllDeals: async () => (await apiFetch<PaginatedResponse<ContactDealResponse>>('/deals')).items,
+  getAllTasks: async () => (await apiFetch<PaginatedResponse<ContactTaskResponse>>('/tasks')).items,
+  getEmailTemplates: () =>
+    apiFetch<Array<{ id: string; name: string; subject: string; body: string }>>(
+      '/email-templates',
+    ),
   getFunnel: () => apiFetch<unknown>('/crm/analytics/funnel'),
   importContacts: (csv: string) =>
     apiFetch('/contacts/import', { method: 'POST', body: JSON.stringify({ csv }) }),
@@ -153,7 +252,11 @@ export const api = {
       address: string
       notes: string
     }>,
-  ) => apiFetch(`/contacts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  ) =>
+    apiFetch<ContactDetailResponse>(`/contacts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   // M8: Delete contact
   deleteContact: (id: string) => apiFetch(`/contacts/${id}`, { method: 'DELETE' }),
   // M9: Create contact manually
@@ -168,18 +271,22 @@ export const api = {
     stage?: string
     notes?: string
     tags?: string[]
-  }) => apiFetch('/contacts', { method: 'POST', body: JSON.stringify(data) }),
+  }) =>
+    apiFetch<ContactDetailResponse>('/contacts', { method: 'POST', body: JSON.stringify(data) }),
 
   // Custom fields
-  getCustomFields: () => apiFetch<unknown[]>('/crm/custom-fields'),
+  getCustomFields: () => apiFetch<CustomFieldDefinitionResponse[]>('/crm/custom-fields'),
   setCustomFieldValue: (contactId: string, fieldId: string, value: string) =>
-    apiFetch(`/contacts/${contactId}/custom-fields/${fieldId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ value }),
-    }),
+    apiFetch<{ id?: string; fieldId: string; value: string }>(
+      `/contacts/${contactId}/custom-fields/${fieldId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ value }),
+      },
+    ),
 
   // Pipelines
-  getPipelines: () => apiFetch<unknown[]>('/pipelines'),
+  getPipelines: async () => (await apiFetch<ItemsResponse<PipelineResponse>>('/pipelines')).items,
   assignContactToPipeline: (contactId: string, pipelineId: string) =>
     apiFetch(`/contacts/${contactId}/pipeline`, {
       method: 'PATCH',
@@ -195,8 +302,10 @@ export const api = {
     }),
 
   // Scheduling
-  getAppointmentTypes: () => apiFetch<unknown[]>('/scheduling/appointment-types'),
-  getUpcomingBookings: () => apiFetch<unknown[]>('/scheduling/bookings?upcoming=true'),
+  getAppointmentTypes: async () =>
+    (await apiFetch<ItemsResponse<AppointmentTypeResponse>>('/scheduling/appointment-types')).items,
+  getUpcomingBookings: async () =>
+    (await apiFetch<ItemsResponse<BookingResponse>>('/scheduling/bookings?upcoming=true')).items,
   cancelBooking: (bookingId: string) =>
     apiFetch(`/scheduling/bookings/${bookingId}/cancel`, {
       method: 'PATCH',
@@ -215,8 +324,8 @@ export async function createCard(data: {
   phone?: string
   email?: string
   website?: string
-}): Promise<unknown> {
-  return apiFetch('/cards', {
+}): Promise<CardEditorResponse> {
+  return apiFetch<CardEditorResponse>('/cards', {
     method: 'POST',
     body: JSON.stringify({
       handle: data.handle,
@@ -233,8 +342,11 @@ export async function createCard(data: {
   })
 }
 
-export async function updateCard(id: string, data: Record<string, unknown>): Promise<unknown> {
-  return apiFetch(`/cards/${id}`, {
+export async function updateCard(
+  id: string,
+  data: Record<string, unknown>,
+): Promise<CardEditorResponse> {
+  return apiFetch<CardEditorResponse>(`/cards/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   })
@@ -243,8 +355,8 @@ export async function updateCard(id: string, data: Record<string, unknown>): Pro
 export async function updateCardTheme(
   id: string,
   data: { primaryColor?: string },
-): Promise<unknown> {
-  return apiFetch(`/cards/${id}/theme`, {
+): Promise<CardThemeResponse> {
+  return apiFetch<CardThemeResponse>(`/cards/${id}/theme`, {
     method: 'PUT',
     body: JSON.stringify(data),
   })
@@ -253,8 +365,8 @@ export async function updateCardTheme(
 export async function replaceCardSocialLinks(
   id: string,
   links: Array<{ platform: string; url: string; displayOrder: number }>,
-): Promise<unknown> {
-  return apiFetch(`/cards/${id}/social-links`, {
+): Promise<{ count?: number }> {
+  return apiFetch<{ count?: number }>(`/cards/${id}/social-links`, {
     method: 'PUT',
     body: JSON.stringify({ links }),
   })
@@ -265,9 +377,12 @@ export async function checkHandleAvailable(
 ): Promise<{ available: boolean | 'unknown' }> {
   try {
     const headers = await getAuthHeaders()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
     const res = await fetch(`${API_URL}/public/cards/${handle}`, {
       headers: { 'Content-Type': 'application/json', ...headers },
-    })
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId))
     // 200 = handle is taken, 404 = available
     return { available: res.status === 404 }
   } catch {
@@ -338,8 +453,8 @@ export async function createContact(
     notes?: string | null
     tags?: string[] | null
   },
-): Promise<unknown> {
-  return apiFetch('/contacts', {
+): Promise<ContactDetailResponse> {
+  return apiFetch<ContactDetailResponse>('/contacts', {
     method: 'POST',
     body: JSON.stringify({
       name: data.name,

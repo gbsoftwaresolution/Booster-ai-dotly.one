@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import type { AppointmentTypeResponse, BookingResponse } from '@dotly/types'
 import {
   View,
   Text,
@@ -15,27 +16,6 @@ import { api } from '../../lib/api'
 import { formatDateTime, getUserTimezone } from '../../lib/tz'
 import { useAuthz } from '../../components/AuthzProvider'
 
-interface AppointmentType {
-  id: string
-  name: string
-  slug: string
-  durationMins: number
-  color: string
-  location: string | null
-  isActive: boolean
-  _count: { bookings: number }
-}
-
-interface Booking {
-  id: string
-  startAt: string
-  endAt: string
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'NO_SHOW'
-  guestName: string
-  guestEmail: string
-  appointmentType: { name: string; color: string }
-}
-
 const STATUS_COLORS: Record<string, string> = {
   CONFIRMED: '#16a34a',
   PENDING: '#d97706',
@@ -44,31 +24,72 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function SchedulingScreen() {
-  const { schedulingAllowed, loading: authzLoading } = useAuthz()
-  const [aptTypes, setAptTypes] = useState<AppointmentType[]>([])
-  const [bookings, setBookings] = useState<Booking[]>([])
+  const {
+    schedulingAllowed,
+    loading: authzLoading,
+    error: authzError,
+    refresh: refreshAuthz,
+  } = useAuthz()
+  const [aptTypes, setAptTypes] = useState<AppointmentTypeResponse[]>([])
+  const [bookings, setBookings] = useState<BookingResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [typesError, setTypesError] = useState<string | null>(null)
+  const [bookingsError, setBookingsError] = useState<string | null>(null)
+  const [busyBookingIds, setBusyBookingIds] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'types' | 'bookings'>('types')
   const [userTz, setUserTz] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      const [types, bkgs, tz] = await Promise.all([
-        api.getAppointmentTypes() as Promise<AppointmentType[]>,
-        api.getUpcomingBookings() as Promise<Booking[]>,
-        getUserTimezone(),
-      ])
-      setAptTypes(types)
-      setBookings(bkgs)
-      setUserTz(tz)
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to load')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [])
+  const load = useCallback(
+    async (options?: { refresh?: boolean }): Promise<boolean> => {
+      try {
+        const [types, bkgs, tz] = await Promise.allSettled([
+          api.getAppointmentTypes(),
+          api.getUpcomingBookings(),
+          getUserTimezone(),
+        ])
+        if (types.status === 'fulfilled') {
+          setAptTypes(types.value)
+          setTypesError(null)
+        } else {
+          setTypesError(
+            types.reason instanceof Error
+              ? types.reason.message
+              : 'Appointment types are unavailable.',
+          )
+        }
+        if (bkgs.status === 'fulfilled') {
+          setBookings(bkgs.value)
+          setBookingsError(null)
+        } else {
+          setBookingsError(
+            bkgs.reason instanceof Error ? bkgs.reason.message : 'Bookings are unavailable.',
+          )
+        }
+        setUserTz(tz.status === 'fulfilled' ? tz.value : null)
+        setError(null)
+        setRefreshError(null)
+        if (types.status === 'rejected' && bkgs.status === 'rejected') {
+          throw new Error('Failed to load scheduling')
+        }
+        return true
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to load scheduling'
+        if (options?.refresh && (aptTypes.length > 0 || bookings.length > 0)) {
+          setRefreshError(message)
+        } else {
+          setError(message)
+        }
+        return false
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    [aptTypes.length, bookings.length],
+  )
 
   useEffect(() => {
     void load()
@@ -76,7 +97,7 @@ export default function SchedulingScreen() {
 
   function onRefresh() {
     setRefreshing(true)
-    void load()
+    void load({ refresh: true })
   }
 
   async function handleCancelBooking(bookingId: string) {
@@ -86,11 +107,26 @@ export default function SchedulingScreen() {
         text: 'Cancel Booking',
         style: 'destructive',
         onPress: async () => {
+          setBusyBookingIds((prev) => new Set(prev).add(bookingId))
           try {
             await api.cancelBooking(bookingId)
-            await load()
+            setBookings((prev) =>
+              prev.map((booking) =>
+                booking.id === bookingId ? { ...booking, status: 'CANCELLED' } : booking,
+              ),
+            )
+            const refreshed = await load({ refresh: true })
+            if (!refreshed) {
+              setRefreshError('Booking cancelled, but the latest schedule refresh failed.')
+            }
           } catch (e) {
             Alert.alert('Error', e instanceof Error ? e.message : 'Failed to cancel')
+          } finally {
+            setBusyBookingIds((prev) => {
+              const next = new Set(prev)
+              next.delete(bookingId)
+              return next
+            })
           }
         },
       },
@@ -98,6 +134,26 @@ export default function SchedulingScreen() {
   }
 
   if (!authzLoading && !schedulingAllowed) {
+    if (authzError) {
+      return (
+        <View style={styles.centered}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
+            We couldn&apos;t verify access
+          </Text>
+          <Text
+            style={{ color: '#64748b', textAlign: 'center', marginTop: 8, paddingHorizontal: 24 }}
+          >
+            {authzError}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void refreshAuthz()}
+            style={{ marginTop: 16, padding: 12 }}
+          >
+            <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
     return (
       <View style={styles.centered}>
         <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>
@@ -120,11 +176,26 @@ export default function SchedulingScreen() {
     )
   }
 
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text
+          style={{ color: '#ef4444', fontSize: 15, textAlign: 'center', paddingHorizontal: 24 }}
+        >
+          {error}
+        </Text>
+        <TouchableOpacity onPress={() => void load()} style={{ marginTop: 16, padding: 12 }}>
+          <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
   function openWebSchedulingManager() {
     void Linking.openURL('https://dotly.one/apps/scheduling')
   }
 
-  const renderAptType = ({ item }: { item: AppointmentType }) => (
+  const renderAptType = ({ item }: { item: AppointmentTypeResponse }) => (
     <TouchableOpacity
       onPress={openWebSchedulingManager}
       style={styles.card}
@@ -154,13 +225,13 @@ export default function SchedulingScreen() {
             </>
           ) : null}
         </View>
-        <Text style={styles.bookingsCount}>{item._count.bookings} total bookings</Text>
+        <Text style={styles.bookingsCount}>{item._count?.bookings ?? 0} total bookings</Text>
         <Text style={styles.manageHint}>Manage on web</Text>
       </View>
     </TouchableOpacity>
   )
 
-  const renderBooking = ({ item }: { item: Booking }) => (
+  const renderBooking = ({ item }: { item: BookingResponse }) => (
     <View style={styles.card}>
       <View style={[styles.colorDot, { backgroundColor: item.appointmentType.color }]} />
       <View style={styles.cardContent}>
@@ -177,10 +248,13 @@ export default function SchedulingScreen() {
           </View>
           {item.status !== 'CANCELLED' && (
             <TouchableOpacity
+              disabled={busyBookingIds.has(item.id)}
               onPress={() => void handleCancelBooking(item.id)}
               style={styles.cancelBtn}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={styles.cancelBtnText}>
+                {busyBookingIds.has(item.id) ? 'Cancelling…' : 'Cancel'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -190,6 +264,22 @@ export default function SchedulingScreen() {
 
   return (
     <View style={styles.container}>
+      {refreshError && (
+        <View style={styles.infoBanner}>
+          <Text style={[styles.infoBannerText, { color: '#b91c1c' }]}>{refreshError}</Text>
+        </View>
+      )}
+      {typesError && tab === 'types' && (
+        <View style={styles.infoBanner}>
+          <Text style={[styles.infoBannerText, { color: '#b91c1c' }]}>{typesError}</Text>
+        </View>
+      )}
+      {bookingsError && tab === 'bookings' && (
+        <View style={styles.infoBanner}>
+          <Text style={[styles.infoBannerText, { color: '#b91c1c' }]}>{bookingsError}</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <Feather name="calendar" size={22} color="#0ea5e9" />

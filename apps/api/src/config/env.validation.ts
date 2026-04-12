@@ -58,6 +58,10 @@ class EnvironmentVariables {
   @IsString() R2_SECRET_ACCESS_KEY!: string
   @IsString() R2_BUCKET!: string
   @IsOptional() @IsString() R2_PUBLIC_URL?: string
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  INBOX_UPLOAD_TOKEN_SECRET?: string
 
   // On-chain billing — required for subscription verification
   @IsString()
@@ -117,6 +121,16 @@ class EnvironmentVariables {
   @IsOptional() @IsString() GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL?: string
   // Base-64 encoded service account JSON key
   @IsOptional() @IsString() GOOGLE_WALLET_SERVICE_ACCOUNT_KEY?: string
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  GOOGLE_OAUTH_STATE_SECRET?: string
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  WEBHOOK_SECRET_ENCRYPTION_KEY?: string
 
   // ── CORS ─────────────────────────────────────────────────────────────────────
   // Optional comma-separated list of additional allowed origins beyond WEB_URL

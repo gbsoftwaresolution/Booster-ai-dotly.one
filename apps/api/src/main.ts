@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/node'
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from 'helmet'
 import * as express from 'express'
@@ -8,31 +9,27 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston'
 import { AppModule } from './app.module'
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter'
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV || 'development',
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-  enabled: !!process.env.SENTRY_DSN,
-})
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+  const configService = app.get(ConfigService)
+
+  const nodeEnv = configService.get<string>('NODE_ENV') ?? 'development'
+  const sentryDsn = configService.get<string>('SENTRY_DSN')
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: nodeEnv,
+    tracesSampleRate: nodeEnv === 'production' ? 0.1 : 1.0,
+    enabled: !!sentryDsn,
+  })
 
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER))
 
-  // Fail fast if critical env vars are missing
-  const webUrl = process.env['WEB_URL']
-  if (!webUrl) {
-    console.error(
-      '[Bootstrap] FATAL: WEB_URL environment variable is not set. CORS will be misconfigured. Aborting.',
-    )
-    process.exit(1)
-  }
+  const webUrl = configService.getOrThrow<string>('WEB_URL')
 
   // M-7: Support multiple allowed CORS origins via a comma-separated
   // CORS_ORIGINS env var (e.g. for staging, preview deploys, mobile dev).
   // WEB_URL is always included as a baseline origin.
-  const extraOrigins = (process.env['CORS_ORIGINS'] ?? '')
+  const extraOrigins = (configService.get<string>('CORS_ORIGINS') ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
@@ -78,7 +75,7 @@ async function bootstrap() {
 
   app.enableShutdownHooks()
 
-  const port = process.env.PORT || 3001
+  const port = configService.get<string>('PORT') || 3001
   await app.listen(port)
   const logger = app.get(WINSTON_MODULE_NEST_PROVIDER)
   const url = await app.getUrl()
@@ -103,7 +100,7 @@ async function bootstrap() {
   // (all endpoint paths, parameter shapes, and auth requirements) from being
   // publicly accessible in production where it would aid attackers.
   const swaggerEnabled =
-    process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true'
+    nodeEnv !== 'production' || configService.get<string>('SWAGGER_ENABLED') === 'true'
   if (swaggerEnabled) {
     SwaggerModule.setup('api/docs', app, document)
     logger.log(`Swagger: ${url}/api/docs`, 'Bootstrap')

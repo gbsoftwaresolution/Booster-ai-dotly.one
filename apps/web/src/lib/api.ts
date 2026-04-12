@@ -1,6 +1,7 @@
 import { getPublicApiUrl } from './public-env'
 
 const API_URL = getPublicApiUrl()
+const API_TIMEOUT_MS = 15_000
 
 export class ApiError extends Error {
   statusCode: number
@@ -27,6 +28,50 @@ export class ApiError extends Error {
     this.code = code
     this.details = details
     this.path = path
+  }
+}
+
+function normalizeNetworkError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error
+
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return new ApiError({
+      message: 'The request timed out. Please try again.',
+      statusCode: 0,
+      code: 'TIMEOUT',
+    })
+  }
+
+  if (error instanceof TypeError) {
+    return new ApiError({
+      message: 'Network error. Check your connection and try again.',
+      statusCode: 0,
+      code: 'NETWORK',
+    })
+  }
+
+  return new ApiError({
+    message: error instanceof Error ? error.message : 'Unexpected request failure.',
+    statusCode: 0,
+    code: 'UNKNOWN',
+  })
+}
+
+async function fetchWithTimeout(input: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+  const timeoutSignal = controller.signal
+  const combinedSignal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
+
+  try {
+    return await fetch(input, { ...init, signal: combinedSignal })
+  } catch (error) {
+    if (init.signal?.aborted && error instanceof DOMException && error.name === 'AbortError') {
+      throw error
+    }
+    throw normalizeNetworkError(error)
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -79,7 +124,7 @@ async function parseApiSuccess<T>(res: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: 'no-store',
     signal,
@@ -94,7 +139,7 @@ export async function apiPost<T>(
   token?: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -108,7 +153,7 @@ export async function apiPost<T>(
 }
 
 export async function apiPut<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -121,7 +166,7 @@ export async function apiPut<T>(path: string, body: unknown, token?: string): Pr
 }
 
 export async function apiPatch<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -138,7 +183,7 @@ export async function apiDelete<T = void>(
   token?: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'DELETE',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal,
@@ -153,7 +198,7 @@ export async function apiDeleteWithBody<T = void>(
   token?: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',

@@ -47,6 +47,7 @@ export function ShareBar({
   onAnalytics,
 }: ShareBarProps) {
   const [copied, setCopied] = useState(false)
+  const [walletError, setWalletError] = useState<string | null>(null)
   const { googleSupported } = useWalletSupport()
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const googleWalletEnabled = isGoogleWalletEnabled()
@@ -64,6 +65,7 @@ export function ShareBar({
   }, [])
 
   async function handleCopy() {
+    setWalletError(null)
     try {
       await navigator.clipboard.writeText(url)
     } catch {
@@ -81,6 +83,7 @@ export function ShareBar({
   }
 
   async function handleShare() {
+    setWalletError(null)
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({ title: `${ownerName}'s digital card`, url })
@@ -94,15 +97,18 @@ export function ShareBar({
   }
 
   async function handleGoogleWallet() {
+    setWalletError(null)
     try {
       const res = await fetch(`${API_URL}/public/cards/${handle}/wallet/google`)
       if (res.ok) {
         const { url: saveUrl } = (await res.json()) as { url: string }
         onAnalytics?.('SAVE', { surface: 'share_bar', action: 'google_wallet_open' })
         window.open(saveUrl, '_blank', 'noopener,noreferrer')
+        return
       }
+      setWalletError('Google Wallet is temporarily unavailable. Please try again.')
     } catch {
-      // silent fail
+      setWalletError('Google Wallet is temporarily unavailable. Please try again.')
     }
   }
 
@@ -327,6 +333,12 @@ export function ShareBar({
           )}
         </div>
       )}
+
+      {walletError ? (
+        <p role="status" style={{ margin: 0, fontSize: 12, color: '#b91c1c', textAlign: 'center' }}>
+          {walletError}
+        </p>
+      ) : null}
     </div>
   )
 }

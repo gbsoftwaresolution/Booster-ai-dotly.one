@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger'
 import { IsString, MaxLength, IsOptional, Matches, Length, IsBoolean } from 'class-validator'
+import type { SuccessResponse } from '@dotly/types'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { UsersService } from './users.service'
 
@@ -104,9 +105,9 @@ export class UsersController {
   async savePushToken(
     @CurrentUser() user: { id: string },
     @Body() body: SavePushTokenDto,
-  ): Promise<{ ok: boolean }> {
+  ): Promise<SuccessResponse> {
     await this.usersService.savePushToken(user.id, body.pushToken)
-    return { ok: true }
+    return { success: true }
   }
 
   @Delete('push-token')

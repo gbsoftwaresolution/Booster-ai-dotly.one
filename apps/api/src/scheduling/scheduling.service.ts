@@ -294,7 +294,7 @@ export class SchedulingService {
 
   async updateAppointmentType(userId: string, id: string, dto: UpdateAppointmentTypeDto) {
     const apt = await this.prisma.appointmentType.findUnique({ where: { id } })
-    if (!apt || apt.ownerUserId !== userId) throw new ForbiddenException()
+    if (!apt || apt.ownerUserId !== userId) throw new NotFoundException()
 
     if (dto.slug && dto.slug !== apt.slug) {
       const conflict = await this.prisma.appointmentType.findUnique({
@@ -322,7 +322,7 @@ export class SchedulingService {
 
   async deleteAppointmentType(userId: string, id: string) {
     const apt = await this.prisma.appointmentType.findUnique({ where: { id } })
-    if (!apt || apt.ownerUserId !== userId) throw new ForbiddenException()
+    if (!apt || apt.ownerUserId !== userId) throw new NotFoundException()
     // CRITICAL-2: Soft-delete — set deletedAt instead of destroying the row.
     // Hard-deleting would cascade-destroy all booking history (past and future).
     // The Booking FK is now RESTRICT at the DB level as a safety net.
@@ -336,7 +336,7 @@ export class SchedulingService {
 
   async setAvailabilityRules(userId: string, appointmentTypeId: string, dto: SetAvailabilityDto) {
     const apt = await this.prisma.appointmentType.findUnique({ where: { id: appointmentTypeId } })
-    if (!apt || apt.ownerUserId !== userId) throw new ForbiddenException()
+    if (!apt || apt.ownerUserId !== userId) throw new NotFoundException()
 
     // Validate: startTime < endTime for each rule
     for (const rule of dto.rules) {
@@ -369,7 +369,7 @@ export class SchedulingService {
     dto: SetBookingQuestionsDto,
   ) {
     const apt = await this.prisma.appointmentType.findUnique({ where: { id: appointmentTypeId } })
-    if (!apt || apt.ownerUserId !== userId) throw new ForbiddenException()
+    if (!apt || apt.ownerUserId !== userId) throw new NotFoundException()
 
     // Replace all questions atomically
     await this.prisma.$transaction([
@@ -780,7 +780,7 @@ export class SchedulingService {
       where: { id: bookingId },
       include: { appointmentType: { select: { name: true, location: true, timezone: true } } },
     })
-    if (!booking || booking.ownerUserId !== userId) throw new ForbiddenException()
+    if (!booking || booking.ownerUserId !== userId) throw new NotFoundException()
     if (booking.status === BookingStatus.CANCELLED)
       throw new ConflictException('Booking already cancelled')
 

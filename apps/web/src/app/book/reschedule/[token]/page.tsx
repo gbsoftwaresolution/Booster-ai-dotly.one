@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getPublicApiUrl } from '@/lib/public-env'
 import { Calendar, Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -84,6 +84,7 @@ export default function ReschedulePage(): JSX.Element {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [ownerTz, setOwnerTz] = useState('UTC')
+  const slotRequestIdRef = useRef(0)
   const guestTz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   // Fetch booking info via a public endpoint that returns booking details by token
@@ -115,6 +116,7 @@ export default function ReschedulePage(): JSX.Element {
   useEffect(() => {
     if (!bookingInfo) return
     void (async () => {
+      const requestId = ++slotRequestIdRef.current
       setSlotsLoading(true)
       setSlots([])
       setSlotsError(null)
@@ -127,12 +129,15 @@ export default function ReschedulePage(): JSX.Element {
         )
         if (!res.ok) throw new Error(`Error ${res.status}`)
         const data = (await res.json()) as { slots: string[]; ownerTimezone: string }
+        if (slotRequestIdRef.current !== requestId) return
         setSlots(data.slots ?? [])
         setOwnerTz(data.ownerTimezone ?? bookingInfo.appointmentType.timezone ?? 'UTC')
       } catch (e) {
+        if (slotRequestIdRef.current !== requestId) return
         // MED-3: Surface the error instead of silently showing empty state
         setSlotsError(e instanceof Error ? e.message : 'Failed to load available times')
       } finally {
+        if (slotRequestIdRef.current !== requestId) return
         setSlotsLoading(false)
       }
     })()

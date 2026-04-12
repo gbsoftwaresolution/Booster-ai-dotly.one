@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type {
   CardData,
+  CardEditorResponse,
+  PartialCardFields,
   CardThemeData,
   SocialLinkData,
   MediaBlockData,
@@ -13,7 +15,7 @@ import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPut, apiPatch } from '@/lib/api'
 
 export interface CardBuilderState {
-  card: CardData | null
+  card: (Omit<CardData, 'fields'> & { fields: PartialCardFields }) | null
   theme: CardThemeData
   socialLinks: SocialLinkData[]
   mediaBlocks: MediaBlockData[]
@@ -67,6 +69,7 @@ function toMediaBlockPayload(blocks: MediaBlockData[]) {
 }
 
 export function useCardBuilder(cardId: string) {
+  const [reloadToken, setReloadToken] = useState(0)
   const [state, setState] = useState<CardBuilderState>({
     card: null,
     theme: DEFAULT_THEME,
@@ -89,26 +92,29 @@ export function useCardBuilder(cardId: string) {
   const vcardPolicyRequestIdRef = useRef(0)
   // Always reflects the latest card.fields so the debounced flush can read the
   // full snapshot without closing over stale state.
-  const latestFieldsRef = useRef<CardData['fields'] | null>(null)
+  const latestFieldsRef = useRef<PartialCardFields | null>(null)
+
+  function normalizeTheme(theme?: CardEditorResponse['theme']): CardThemeData {
+    return {
+      primaryColor: theme?.primaryColor ?? DEFAULT_THEME.primaryColor,
+      secondaryColor: theme?.secondaryColor ?? DEFAULT_THEME.secondaryColor,
+      fontFamily: theme?.fontFamily ?? DEFAULT_THEME.fontFamily,
+      ...(theme?.backgroundUrl ? { backgroundUrl: theme.backgroundUrl } : {}),
+      ...(theme?.logoUrl ? { logoUrl: theme.logoUrl } : {}),
+      ...(theme?.buttonStyle ? { buttonStyle: theme.buttonStyle } : {}),
+      ...(theme?.socialButtonStyle ? { socialButtonStyle: theme.socialButtonStyle } : {}),
+    }
+  }
 
   // Load card on mount
   useEffect(() => {
     async function load() {
+      setState((prev) => ({ ...prev, loading: true, error: null, card: null }))
       try {
         const token = await getAccessToken()
-        const data = await apiGet<{
-          id: string
-          handle: string
-          templateId: string
-          fields: Record<string, string>
-          isActive: boolean
-          vcardPolicy?: VcardPolicy
-          theme?: CardThemeData
-          socialLinks?: SocialLinkData[]
-          mediaBlocks?: MediaBlockData[]
-        }>(`/cards/${cardId}`, token)
+        const data = await apiGet<CardEditorResponse>(`/cards/${cardId}`, token)
 
-        const fields = data.fields as unknown as CardData['fields']
+        const fields: PartialCardFields = data.fields
         latestFieldsRef.current = fields
 
         setState((prev) => ({
@@ -122,7 +128,7 @@ export function useCardBuilder(cardId: string) {
             isActive: data.isActive,
             vcardPolicy: data.vcardPolicy ?? 'PUBLIC',
           },
-          theme: data.theme ?? DEFAULT_THEME,
+          theme: normalizeTheme(data.theme),
           socialLinks: data.socialLinks ?? [],
           mediaBlocks: data.mediaBlocks ?? [],
           vcardPolicy: data.vcardPolicy ?? 'PUBLIC',
@@ -136,7 +142,11 @@ export function useCardBuilder(cardId: string) {
       }
     }
     void load()
-  }, [cardId])
+  }, [cardId, reloadToken])
+
+  const retryLoad = useCallback(() => {
+    setReloadToken((current) => current + 1)
+  }, [])
 
   // Core flush logic — shared by both debounced autosave and immediate saveNow.
   const flushPending = useCallback(async () => {
@@ -394,5 +404,6 @@ export function useCardBuilder(cardId: string) {
     publishCard,
     unpublishCard,
     saveNow,
+    retryLoad,
   }
 }

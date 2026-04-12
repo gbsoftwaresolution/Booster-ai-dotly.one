@@ -1,3 +1,19 @@
+import type {
+  ContactDealResponse,
+  ContactDetailResponse,
+  ContactNoteResponse,
+  ContactTaskResponse,
+  ContactTimelineEventResponse,
+  CustomFieldDefinitionResponse,
+  PipelineResponse,
+} from '@dotly/types'
+import {
+  CONTACT_STAGES,
+  DEAL_STAGES,
+  contactTimelineEventColor,
+  contactTimelineEventLabel,
+  relativeTimeLabel,
+} from '@dotly/types'
 import {
   View,
   Text,
@@ -11,68 +27,17 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
 import { api } from '../../lib/api'
 import { formatDate, getUserTimezone } from '../../lib/tz'
 
-interface TimelineEvent {
-  id: string
-  event: string
-  metadata: Record<string, unknown>
-  createdAt: string
-}
-
-interface ContactNote {
-  id: string
-  content: string
-  createdAt: string
-}
-
-interface ContactTask {
-  id: string
-  title: string
-  dueAt: string | null
-  completed: boolean
-  completedAt: string | null
-  createdAt: string
-}
-
-interface ContactDeal {
-  id: string
-  title: string
-  value: number | string
-  currency: string
-  stage: string
-  probability: number | string
-  closeDate: string | null
-}
-
-interface ContactDetail {
-  id: string
-  name: string
-  email?: string
-  phone?: string
-  company?: string
-  title?: string
-  website?: string
-  address?: string
-  notes?: string
-  tags?: string[]
-  enrichedAt?: string | null
-  enrichmentScore?: number | null
-  enrichmentSummary?: string | null
-  inferredIndustry?: string | null
-  inferredSeniority?: string | null
-  inferredCompanySize?: string | null
-  inferredLinkedIn?: string | null
-  sourceCard?: { handle: string }
-  crmPipeline?: { stage: string }
-  timeline?: TimelineEvent[]
-}
-
-const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
+type TimelineEvent = ContactTimelineEventResponse
+type ContactNote = ContactNoteResponse
+type ContactTask = ContactTaskResponse
+type ContactDeal = ContactDealResponse
+type ContactDetail = ContactDetailResponse
 
 // Allowlist-based URL openers — validate scheme before handing to the OS.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -495,15 +460,18 @@ export default function ContactDetailScreen() {
   const [busyDealIds, setBusyDealIds] = useState<Set<string>>(new Set())
 
   // Custom fields state
-  const [customFields, setCustomFields] = useState<
-    { id: string; label: string; fieldType: string; options: string[] | null }[]
-  >([])
+  const [customFields, setCustomFields] = useState<CustomFieldDefinitionResponse[]>([])
+  const [customFieldsExpanded, setCustomFieldsExpanded] = useState(false)
+  const [customFieldsLoadError, setCustomFieldsLoadError] = useState<string | null>(null)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({})
   const [fieldSavingId, setFieldSavingId] = useState<string | null>(null)
 
   // Pipeline assignment state
-  const [pipelines, setPipelines] = useState<{ id: string; name: string; isDefault: boolean }[]>([])
+  const [pipelines, setPipelines] = useState<PipelineResponse[]>([])
+  const [pipelinesExpanded, setPipelinesExpanded] = useState(false)
+  const [pipelinesLoadError, setPipelinesLoadError] = useState<string | null>(null)
   const [pipelineAssigning, setPipelineAssigning] = useState(false)
+  const [enrichmentStatusMessage, setEnrichmentStatusMessage] = useState<string | null>(null)
 
   // Email compose state
   const [emailModalOpen, setEmailModalOpen] = useState(false)
@@ -514,6 +482,9 @@ export default function ContactDetailScreen() {
     { id: string; name: string; subject: string; body: string }[]
   >([])
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
+  const [emailTemplatesLoaded, setEmailTemplatesLoaded] = useState(false)
+  const [emailTemplatesLoadError, setEmailTemplatesLoadError] = useState<string | null>(null)
+  const [emailTemplatesRetryToken, setEmailTemplatesRetryToken] = useState(0)
 
   // Tags state
   const [newTag, setNewTag] = useState('')
@@ -525,106 +496,145 @@ export default function ContactDetailScreen() {
   // Delete state
   const [deleting, setDeleting] = useState(false)
   const [userTz, setUserTz] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
+  const customFieldsRequestIdRef = useRef(0)
+  const pipelinesRequestIdRef = useRef(0)
+  const emailTemplatesRequestIdRef = useRef(0)
+  const [customFieldsRetryToken, setCustomFieldsRetryToken] = useState(0)
+  const [pipelinesRetryToken, setPipelinesRetryToken] = useState(0)
 
-  const reloadContact = useCallback(async () => {
-    if (!id) return
-    const [data, notesData, tasksData, dealsData] = await Promise.all([
-      api.getContact(id),
-      api.getContactNotes(id),
-      api.getContactTasks(id),
-      api.getDeals(id),
-    ])
-
-    const contactData = data as ContactDetail
+  const applyContactDetail = useCallback((contactData: ContactDetail) => {
     setContact(contactData)
-    setNotes(notesData as ContactNote[])
-    setTasks(tasksData as ContactTask[])
-    setDeals(dealsData as ContactDeal[])
+    setNotes(contactData.contactNotes ?? [])
+    setTasks(contactData.tasks ?? [])
+    setDeals(contactData.deals ?? [])
     const cfv: Record<string, string> = {}
-    for (const cfVal of (
-      contactData as { customFieldValues?: { fieldId: string; value: string }[] }
-    ).customFieldValues ?? []) {
+    for (const cfVal of contactData.customFieldValues ?? []) {
       cfv[cfVal.fieldId] = cfVal.value
     }
     setCustomFieldValues(cfv)
-  }, [id])
+  }, [])
+
+  const reloadContact = useCallback(async () => {
+    if (!id) return
+    const requestId = ++requestIdRef.current
+    setLoading(true)
+    try {
+      const data = await api.getContact(id)
+
+      if (requestIdRef.current !== requestId) return
+
+      applyContactDetail(data)
+      setError(null)
+    } finally {
+      if (requestIdRef.current !== requestId) return
+      setLoading(false)
+    }
+  }, [applyContactDetail, id])
 
   useEffect(() => {
     if (!id) return
+    const requestId = ++requestIdRef.current
     void (async () => {
       try {
-        const [
-          data,
-          notesData,
-          tasksData,
-          dealsData,
-          fieldsData,
-          pipelinesData,
-          templatesData,
-          tz,
-        ] = await Promise.allSettled([
-          api.getContact(id),
-          api.getContactNotes(id),
-          api.getContactTasks(id),
-          api.getDeals(id),
-          api.getCustomFields(),
-          api.getPipelines(),
-          api.getEmailTemplates(),
-          getUserTimezone(),
-        ])
+        const [data, tz] = await Promise.allSettled([api.getContact(id), getUserTimezone()])
 
         if (data.status !== 'fulfilled') {
           throw data.reason
         }
+        if (requestIdRef.current !== requestId) return
 
-        const contactData = data.value as ContactDetail
-        setContact(contactData)
-        setNotes(notesData.status === 'fulfilled' ? (notesData.value as ContactNote[]) : [])
-        setTasks(tasksData.status === 'fulfilled' ? (tasksData.value as ContactTask[]) : [])
-        setDeals(dealsData.status === 'fulfilled' ? (dealsData.value as ContactDeal[]) : [])
+        const contactData = data.value
+        applyContactDetail(contactData)
         setUserTz(tz.status === 'fulfilled' ? tz.value : 'UTC')
-        setCustomFields(
-          fieldsData.status === 'fulfilled'
-            ? (fieldsData.value as {
-                id: string
-                label: string
-                fieldType: string
-                options: string[] | null
-              }[])
-            : [],
-        )
-        setPipelines(
-          pipelinesData.status === 'fulfilled'
-            ? (pipelinesData.value as { id: string; name: string; isDefault: boolean }[])
-            : [],
-        )
-        setEmailTemplates(
-          templatesData.status === 'fulfilled'
-            ? (templatesData.value as { id: string; name: string; subject: string; body: string }[])
-            : [],
-        )
-        // Build initial custom field values map from contact
-        const cfv: Record<string, string> = {}
-        for (const cfVal of (
-          contactData as unknown as { customFieldValues?: { fieldId: string; value: string }[] }
-        ).customFieldValues ?? []) {
-          cfv[cfVal.fieldId] = cfVal.value
-        }
-        setCustomFieldValues(cfv)
       } catch (err: unknown) {
+        if (requestIdRef.current !== requestId) return
         setError(err instanceof Error ? err.message : 'Failed to load contact')
       } finally {
+        if (requestIdRef.current !== requestId) return
         setLoading(false)
       }
     })()
-  }, [id])
+    return () => {
+      requestIdRef.current += 1
+    }
+  }, [applyContactDetail, id])
+
+  useEffect(() => {
+    if (!emailModalOpen || emailTemplatesLoaded) return
+    const requestId = ++emailTemplatesRequestIdRef.current
+    void (async () => {
+      try {
+        const templates = await api.getEmailTemplates()
+        if (emailTemplatesRequestIdRef.current !== requestId) return
+        setEmailTemplates(templates)
+        setEmailTemplatesLoaded(true)
+        setEmailTemplatesLoadError(null)
+      } catch (err) {
+        if (emailTemplatesRequestIdRef.current !== requestId) return
+        setEmailTemplates([])
+        setEmailTemplatesLoadError(
+          err instanceof Error ? err.message : 'Could not load email templates.',
+        )
+      }
+    })()
+    return () => {
+      emailTemplatesRequestIdRef.current += 1
+    }
+  }, [emailModalOpen, emailTemplatesLoaded, emailTemplatesRetryToken])
+
+  useEffect(() => {
+    if (!customFieldsExpanded || customFields.length > 0) return
+    const requestId = ++customFieldsRequestIdRef.current
+    void (async () => {
+      try {
+        const fields = await api.getCustomFields()
+        if (customFieldsRequestIdRef.current !== requestId) return
+        setCustomFields(fields)
+        setCustomFieldsLoadError(null)
+      } catch (err) {
+        if (customFieldsRequestIdRef.current !== requestId) return
+        setCustomFields([])
+        setCustomFieldsLoadError(
+          err instanceof Error ? err.message : 'Could not load custom fields.',
+        )
+      }
+    })()
+    return () => {
+      customFieldsRequestIdRef.current += 1
+    }
+  }, [customFields.length, customFieldsExpanded, customFieldsRetryToken])
+
+  useEffect(() => {
+    if (!pipelinesExpanded || pipelines.length > 0) return
+    const requestId = ++pipelinesRequestIdRef.current
+    void (async () => {
+      try {
+        const pipelineData = await api.getPipelines()
+        if (pipelinesRequestIdRef.current !== requestId) return
+        setPipelines(pipelineData)
+        setPipelinesLoadError(null)
+      } catch (err) {
+        if (pipelinesRequestIdRef.current !== requestId) return
+        setPipelines([])
+        setPipelinesLoadError(err instanceof Error ? err.message : 'Could not load pipelines.')
+      }
+    })()
+    return () => {
+      pipelinesRequestIdRef.current += 1
+    }
+  }, [pipelines.length, pipelinesExpanded, pipelinesRetryToken])
 
   const handleStageChange = async (stage: string) => {
     if (!id || !contact) return
     setStageLoading(true)
     try {
       await api.updateContactStage(id, stage)
-      await reloadContact()
+      try {
+        await reloadContact()
+      } catch {
+        Alert.alert('Updated', 'Stage updated, but the latest contact refresh failed.')
+      }
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update contact stage')
     } finally {
@@ -664,8 +674,12 @@ export default function ContactDetailScreen() {
       await api.createNote(id, noteText.trim())
       setNoteText('')
       // Refresh notes list
-      const notesData = await api.getContactNotes(id)
-      setNotes(notesData as ContactNote[])
+      try {
+        const notesData = await api.getContactNotes(id)
+        setNotes(notesData)
+      } catch {
+        Alert.alert('Saved', 'Note added, but the latest notes refresh failed.')
+      }
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add note')
     } finally {
@@ -735,7 +749,11 @@ export default function ContactDetailScreen() {
       await api.createTask(id, newTaskTitle.trim(), dueAt)
       setNewTaskTitle('')
       setNewTaskDueAt('')
-      await reloadContact()
+      try {
+        await reloadContact()
+      } catch {
+        Alert.alert('Saved', 'Task created, but the latest contact refresh failed.')
+      }
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create task')
     } finally {
@@ -744,6 +762,7 @@ export default function ContactDetailScreen() {
   }, [id, newTaskTitle, newTaskDueAt, reloadContact])
 
   const handleToggleTask = useCallback(async (task: ContactTask) => {
+    setBusyTaskIds((prev) => new Set(prev).add(task.id))
     try {
       await api.updateTask(task.id, { completed: !task.completed })
       setTasks((prev) =>
@@ -751,6 +770,12 @@ export default function ContactDetailScreen() {
       )
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update task')
+    } finally {
+      setBusyTaskIds((prev) => {
+        const next = new Set(prev)
+        next.delete(task.id)
+        return next
+      })
     }
   }, [])
 
@@ -761,11 +786,18 @@ export default function ContactDetailScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          setBusyTaskIds((prev) => new Set(prev).add(taskId))
           try {
             await api.deleteTask(taskId)
             setTasks((prev) => prev.filter((t) => t.id !== taskId))
           } catch (err: unknown) {
             Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete task')
+          } finally {
+            setBusyTaskIds((prev) => {
+              const next = new Set(prev)
+              next.delete(taskId)
+              return next
+            })
           }
         },
       },
@@ -786,7 +818,11 @@ export default function ContactDetailScreen() {
       await api.createDeal(id, body)
       setNewDealTitle('')
       setNewDealValue('')
-      await reloadContact()
+      try {
+        await reloadContact()
+      } catch {
+        Alert.alert('Saved', 'Deal created, but the latest contact refresh failed.')
+      }
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create deal')
     } finally {
@@ -801,28 +837,40 @@ export default function ContactDetailScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          setBusyDealIds((prev) => new Set(prev).add(dealId))
           try {
             await api.deleteDeal(dealId)
             setDeals((prev) => prev.filter((d) => d.id !== dealId))
           } catch (err: unknown) {
             Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete deal')
+          } finally {
+            setBusyDealIds((prev) => {
+              const next = new Set(prev)
+              next.delete(dealId)
+              return next
+            })
           }
         },
       },
     ])
   }, [])
 
-  const DEAL_STAGES = ['PROSPECT', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'] as const
-
   const handleChangeDealStage = useCallback(async (deal: ContactDeal) => {
     const stages = DEAL_STAGES as readonly string[]
     const currentIdx = stages.indexOf(deal.stage)
     const nextStage = stages[(currentIdx + 1) % stages.length] ?? stages[0]!
+    setBusyDealIds((prev) => new Set(prev).add(deal.id))
     try {
       await api.updateDealStage(deal.id, nextStage)
       setDeals((prev) => prev.map((d) => (d.id === deal.id ? { ...d, stage: nextStage } : d)))
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update deal stage')
+    } finally {
+      setBusyDealIds((prev) => {
+        const next = new Set(prev)
+        next.delete(deal.id)
+        return next
+      })
     }
   }, [])
 
@@ -835,15 +883,19 @@ export default function ContactDetailScreen() {
       setEmailSubject('')
       setEmailBody('')
       Alert.alert('Sent', 'Email sent successfully.')
-      // Refresh timeline
-      const data = await api.getContact(id)
-      setContact(data as ContactDetail)
+      // Refresh timeline after a successful send
+      try {
+        const data = await api.getContact(id)
+        applyContactDetail(data)
+      } catch {
+        Alert.alert('Sent', 'Email sent, but the latest contact refresh failed.')
+      }
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to send email')
     } finally {
       setEmailSending(false)
     }
-  }, [id, emailSubject, emailBody])
+  }, [applyContactDetail, id, emailSubject, emailBody])
 
   const handleAddTag = useCallback(async () => {
     if (!id || !contact || !newTag.trim()) return
@@ -890,13 +942,19 @@ export default function ContactDetailScreen() {
       // Poll for up to 30s until enrichedAt changes
       const previousEnrichedAt = contact?.enrichedAt ?? null
       const deadline = Date.now() + 30_000
+      let enrichmentCompleted = false
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 2000))
-        const refreshed = (await api.getContact(id)) as ContactDetail
+        const refreshed = await api.getContact(id)
         if (refreshed.enrichedAt !== previousEnrichedAt) {
-          setContact(refreshed)
+          applyContactDetail(refreshed)
+          setEnrichmentStatusMessage(null)
+          enrichmentCompleted = true
           break
         }
+      }
+      if (!enrichmentCompleted) {
+        setEnrichmentStatusMessage('Enrichment is still processing. Refresh again in a moment.')
       }
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to start enrichment')
@@ -927,6 +985,12 @@ export default function ContactDetailScreen() {
       setPipelineAssigning(true)
       try {
         await api.assignContactToPipeline(id, pipelineId)
+        try {
+          await reloadContact()
+        } catch {
+          Alert.alert('Pipeline', 'Contact assigned to pipeline, but the latest refresh failed.')
+          return
+        }
         Alert.alert('Pipeline', 'Contact assigned to pipeline.')
       } catch (err: unknown) {
         Alert.alert('Error', err instanceof Error ? err.message : 'Failed to assign pipeline')
@@ -969,8 +1033,21 @@ export default function ContactDetailScreen() {
           {error || 'Contact not found'}
         </Text>
         <TouchableOpacity
-          onPress={() => router.replace('/contacts')}
+          onPress={() => {
+            setError(null)
+            setLoading(true)
+            void reloadContact().catch((err: unknown) => {
+              setError(err instanceof Error ? err.message : 'Failed to load contact')
+              setLoading(false)
+            })
+          }}
           style={{ marginTop: 16, padding: 12 }}
+        >
+          <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.replace('/contacts')}
+          style={{ marginTop: 8, padding: 12 }}
         >
           <Text
             accessible
@@ -1059,6 +1136,12 @@ export default function ContactDetailScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         {/* Header card */}
+        {enrichmentStatusMessage && (
+          <View style={{ ...cardStyle, backgroundColor: '#fff7ed', borderColor: '#fdba74' }}>
+            <Text style={{ color: '#9a3412', fontSize: 13 }}>{enrichmentStatusMessage}</Text>
+          </View>
+        )}
+
         <View style={{ ...cardStyle, alignItems: 'center' }}>
           <View
             style={{
@@ -1184,7 +1267,7 @@ export default function ContactDetailScreen() {
             Stage
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {STAGES.map((stage) => {
+            {CONTACT_STAGES.map((stage) => {
               const isActive = currentStage === stage
               const stageStyle = getStageStyle(stage)
               return (
@@ -1309,7 +1392,7 @@ export default function ContactDetailScreen() {
                         }}
                       >
                         <Text style={{ fontSize: 11, color: '#94a3b8' }}>
-                          {relativeTime(note.createdAt)}
+                          {relativeTimeLabel(note.createdAt)}
                         </Text>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                           <TouchableOpacity
@@ -1790,12 +1873,41 @@ export default function ContactDetailScreen() {
         </View>
 
         {/* Custom Fields */}
-        {customFields.length > 0 && (
-          <View style={cardStyle}>
-            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 10 }}>
-              Custom Fields
+        <View style={cardStyle}>
+          <TouchableOpacity
+            onPress={() => setCustomFieldsExpanded((prev) => !prev)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: customFieldsExpanded ? 10 : 0,
+            }}
+          >
+            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15 }}>Custom Fields</Text>
+            <Text style={{ color: '#0ea5e9', fontSize: 13, fontWeight: '600' }}>
+              {customFieldsExpanded ? 'Hide' : 'Load'}
             </Text>
-            {customFields.map((field) => {
+          </TouchableOpacity>
+          {!customFieldsExpanded ? (
+            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 10 }}>
+              Load custom field definitions only when you need to review or edit them.
+            </Text>
+          ) : customFieldsLoadError ? (
+            <View style={{ marginTop: 10, gap: 8 }}>
+              <Text style={{ color: '#ef4444', fontSize: 13 }}>{customFieldsLoadError}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCustomFieldsLoadError(null)
+                  setCustomFieldsRetryToken((current) => current + 1)
+                }}
+              >
+                <Text style={{ color: '#0ea5e9', fontSize: 13, fontWeight: '600' }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : customFields.length === 0 ? (
+            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 10 }}>No custom fields.</Text>
+          ) : (
+            customFields.map((field) => {
               const currentValue = customFieldValues[field.id] ?? ''
               const isSaving = fieldSavingId === field.id
               return (
@@ -1897,50 +2009,85 @@ export default function ContactDetailScreen() {
                   </View>
                 </View>
               )
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
 
         {/* Pipeline assignment */}
-        {pipelines.length > 0 && (
-          <View style={cardStyle}>
-            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15, marginBottom: 10 }}>
-              Pipeline
+        <View style={cardStyle}>
+          <TouchableOpacity
+            onPress={() => setPipelinesExpanded((prev) => !prev)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: pipelinesExpanded ? 10 : 0,
+            }}
+          >
+            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 15 }}>Pipeline</Text>
+            <Text style={{ color: '#0ea5e9', fontSize: 13, fontWeight: '600' }}>
+              {pipelinesExpanded ? 'Hide' : 'Load'}
             </Text>
-            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-              Assign this contact to a pipeline:
+          </TouchableOpacity>
+          {!pipelinesExpanded ? (
+            <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 10 }}>
+              Load pipeline choices only when you need to reassign this contact.
             </Text>
-            {pipelines.map((pipeline) => (
+          ) : pipelinesLoadError ? (
+            <View style={{ marginTop: 10, gap: 8 }}>
+              <Text style={{ color: '#ef4444', fontSize: 13 }}>{pipelinesLoadError}</Text>
               <TouchableOpacity
-                key={pipeline.id}
-                onPress={() => void handleAssignPipeline(pipeline.id)}
-                disabled={pipelineAssigning}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: '#e2e8f0',
-                  marginBottom: 6,
-                  backgroundColor: '#f8fafc',
+                onPress={() => {
+                  setPipelinesLoadError(null)
+                  setPipelinesRetryToken((current) => current + 1)
                 }}
               >
-                <Text style={{ fontSize: 14, color: '#0f172a', fontWeight: '500' }}>
-                  {pipeline.name}
-                  {pipeline.isDefault ? ' (default)' : ''}
-                </Text>
-                {pipelineAssigning ? (
-                  <ActivityIndicator size="small" color="#0ea5e9" />
-                ) : (
-                  <Text style={{ fontSize: 12, color: '#0ea5e9', fontWeight: '600' }}>Assign</Text>
-                )}
+                <Text style={{ color: '#0ea5e9', fontSize: 13, fontWeight: '600' }}>Retry</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        )}
+            </View>
+          ) : pipelines.length === 0 ? (
+            <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 10 }}>
+              No pipelines found.
+            </Text>
+          ) : (
+            <>
+              <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                Assign this contact to a pipeline:
+              </Text>
+              {pipelines.map((pipeline) => (
+                <TouchableOpacity
+                  key={pipeline.id}
+                  onPress={() => void handleAssignPipeline(pipeline.id)}
+                  disabled={pipelineAssigning}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                    marginBottom: 6,
+                    backgroundColor: '#f8fafc',
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: '#0f172a', fontWeight: '500' }}>
+                    {pipeline.name}
+                    {pipeline.isDefault ? ' (default)' : ''}
+                  </Text>
+                  {pipelineAssigning ? (
+                    <ActivityIndicator size="small" color="#0ea5e9" />
+                  ) : (
+                    <Text style={{ fontSize: 12, color: '#0ea5e9', fontWeight: '600' }}>
+                      Assign
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </View>
 
         {/* AI Enrichment */}
         <View style={cardStyle}>
@@ -2091,17 +2238,17 @@ export default function ContactDetailScreen() {
                       width: 8,
                       height: 8,
                       borderRadius: 4,
-                      backgroundColor: eventDotColor(event),
+                      backgroundColor: contactTimelineEventColor(event),
                       marginTop: 5,
                       flexShrink: 0,
                     }}
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20 }}>
-                      {eventLabel(event)}
+                      {contactTimelineEventLabel(event)}
                     </Text>
                     <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                      {relativeTime(event.createdAt)}
+                      {relativeTimeLabel(event.createdAt)}
                     </Text>
                   </View>
                 </View>
@@ -2181,7 +2328,22 @@ export default function ContactDetailScreen() {
               {contact.email}
             </Text>
 
-            {emailTemplates.length > 0 && (
+            {emailTemplatesLoadError ? (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, color: '#ef4444', marginBottom: 8 }}>
+                  {emailTemplatesLoadError}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setEmailTemplatesLoaded(false)
+                    setEmailTemplatesLoadError(null)
+                    setEmailTemplatesRetryToken((current) => current + 1)
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : emailTemplates.length > 0 ? (
               <View style={{ marginBottom: 16 }}>
                 <TouchableOpacity
                   onPress={() => setTemplatePickerOpen(true)}
@@ -2203,7 +2365,7 @@ export default function ContactDetailScreen() {
                   <Text style={{ fontSize: 13, color: '#4338ca' }}>›</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            ) : null}
 
             <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Subject</Text>
             <TextInput

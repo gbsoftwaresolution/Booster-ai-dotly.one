@@ -10,6 +10,7 @@ import {
   ArrayMinSize,
   IsIn,
 } from 'class-validator'
+import type { DeletedResponse, ItemsResponse } from '@dotly/types'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { WebhooksService, WEBHOOK_EVENTS } from './webhooks.service'
 
@@ -54,7 +55,9 @@ export class WebhooksController {
   @ApiOperation({ summary: 'List all webhook endpoints for authenticated user' })
   @Get()
   findAll(@CurrentUser() user: { id: string }) {
-    return this.webhooksService.findAll(user.id)
+    return this.webhooksService
+      .findAll(user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiOperation({ summary: 'Create a webhook endpoint' })
@@ -88,13 +91,15 @@ export class WebhooksController {
   @ApiOperation({ summary: 'Get delivery log for a webhook endpoint (last 50)' })
   @Get(':id/deliveries')
   deliveries(@Param('id') id: string, @CurrentUser() user: { id: string }) {
-    return this.webhooksService.getDeliveries(user.id, id)
+    return this.webhooksService
+      .getDeliveries(user.id, id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiOperation({ summary: 'Delete a webhook endpoint' })
   @Delete(':id')
   delete(@Param('id') id: string, @CurrentUser() user: { id: string }) {
-    return this.webhooksService.delete(user.id, id)
+    return this.webhooksService.delete(user.id, id).then((): DeletedResponse => ({ deleted: true }))
   }
 
   @ApiOperation({ summary: 'List all supported event types' })

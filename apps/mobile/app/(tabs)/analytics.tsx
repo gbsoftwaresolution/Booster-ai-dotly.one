@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CardListItemResponse } from '@dotly/types'
 import {
   View,
   Text,
@@ -12,16 +13,8 @@ import { useRouter } from 'expo-router'
 import { api, type AnalyticsSummary } from '../../lib/api'
 import { useAuthz } from '../../components/AuthzProvider'
 
-interface CardItem {
-  id: string
-  handle: string
-  fields?: {
-    name?: string
-  }
-}
-
 interface CardAnalytics {
-  card: CardItem
+  card: CardListItemResponse
   summary: AnalyticsSummary | null
   failed?: boolean
 }
@@ -46,8 +39,13 @@ function StatTile({ label, value, color }: { label: string; value: number; color
 
 export default function AnalyticsTab() {
   const router = useRouter()
-  const { analyticsAllowed, loading: authzLoading } = useAuthz()
-  const [cards, setCards] = useState<CardItem[]>([])
+  const {
+    analyticsAllowed,
+    loading: authzLoading,
+    error: authzError,
+    refresh: refreshAuthz,
+  } = useAuthz()
+  const [cards, setCards] = useState<CardListItemResponse[]>([])
   const [analytics, setAnalytics] = useState<CardAnalytics[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -56,7 +54,7 @@ export default function AnalyticsTab() {
   const loadAnalytics = useCallback(async () => {
     try {
       setError(null)
-      const cardList = (await api.getCards()) as CardItem[]
+      const cardList = await api.getCards()
       setCards(cardList)
 
       const summaries = await Promise.all(
@@ -94,8 +92,31 @@ export default function AnalyticsTab() {
       { views: 0, clicks: 0, leads: 0 },
     )
   }, [analytics])
+  const hasPartialAnalytics = analytics.some((entry) => entry.failed)
 
   if (!authzLoading && !analyticsAllowed) {
+    if (authzError) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+            <Text
+              style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}
+            >
+              We couldn&apos;t verify access
+            </Text>
+            <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 8 }}>
+              {authzError}
+            </Text>
+            <TouchableOpacity
+              onPress={() => void refreshAuthz()}
+              style={{ marginTop: 16, padding: 12 }}
+            >
+              <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )
+    }
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
@@ -115,6 +136,22 @@ export default function AnalyticsTab() {
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color="#0ea5e9" />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if (error && cards.length === 0 && analytics.length === 0) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
+          <TouchableOpacity
+            onPress={() => void loadAnalytics()}
+            style={{ marginTop: 16, padding: 12 }}
+          >
+            <Text style={{ color: '#0ea5e9', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
@@ -155,6 +192,13 @@ export default function AnalyticsTab() {
         {error ? (
           <View style={{ margin: 16, backgroundColor: '#fee2e2', borderRadius: 12, padding: 14 }}>
             <Text style={{ color: '#b91c1c', fontSize: 13 }}>{error}</Text>
+          </View>
+        ) : null}
+        {hasPartialAnalytics ? (
+          <View style={{ margin: 16, backgroundColor: '#fff7ed', borderRadius: 12, padding: 14 }}>
+            <Text style={{ color: '#c2410c', fontSize: 13 }}>
+              Some card analytics could not be loaded. Totals below are incomplete.
+            </Text>
           </View>
         ) : null}
 

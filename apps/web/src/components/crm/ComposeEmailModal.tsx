@@ -5,6 +5,9 @@ import { useState, useEffect, useId, useRef } from 'react'
 import { X, Send, Mail, ChevronDown } from 'lucide-react'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiPost, apiGet } from '@/lib/api'
+import type { ItemsResponse } from '@dotly/types'
+import { useDialogFocusTrap } from '@/hooks/useDialogFocusTrap'
+import { ModalBackdrop } from './ModalBackdrop'
 
 interface ComposeEmailModalProps {
   contactId: string
@@ -30,6 +33,7 @@ export function ComposeEmailModal({
   contactEmail,
   onClose,
 }: ComposeEmailModalProps): JSX.Element {
+  const modalRef = useRef<HTMLDivElement>(null)
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -42,11 +46,15 @@ export function ComposeEmailModal({
   const templateButtonRef = useRef<HTMLButtonElement>(null)
   const templateListRef = useRef<HTMLDivElement>(null)
   const templateListId = useId()
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const toFieldId = useId()
 
-  // Auto-focus subject on open
-  useEffect(() => {
-    subjectRef.current?.focus()
-  }, [])
+  useDialogFocusTrap({
+    active: true,
+    containerRef: modalRef,
+    initialFocusRef: subjectRef,
+    onEscape: onClose,
+  })
 
   // Load email templates
   useEffect(() => {
@@ -55,8 +63,12 @@ export function ComposeEmailModal({
     void (async () => {
       try {
         const token = await getToken()
-        const data = await apiGet<EmailTemplate[]>('/email-templates', token, controller.signal)
-        setTemplates(data)
+        const data = await apiGet<ItemsResponse<EmailTemplate>>(
+          '/email-templates',
+          token,
+          controller.signal,
+        )
+        setTemplates(data.items)
       } catch {
         // Non-critical — templates just won't show
       }
@@ -72,22 +84,6 @@ export function ComposeEmailModal({
       return () => clearTimeout(timer)
     }
   }, [sent, onClose])
-
-  // Escape key closes modal
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showTemplates) {
-          setShowTemplates(false)
-          templateButtonRef.current?.focus()
-          return
-        }
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose, showTemplates])
 
   useEffect(() => {
     if (!showTemplates) return
@@ -217,14 +213,11 @@ export function ComposeEmailModal({
   return (
     <>
       {/* Overlay */}
-      <div
-        className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <ModalBackdrop onClick={onClose} zIndexClass="z-60" />
 
       {/* Modal */}
       <div
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="compose-email-title"
@@ -239,6 +232,7 @@ export function ComposeEmailModal({
             </h2>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -252,8 +246,13 @@ export function ComposeEmailModal({
         <div className="space-y-4 px-5 py-4">
           {/* To field (read-only) */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">To</label>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <label htmlFor={toFieldId} className="mb-1 block text-xs font-medium text-gray-500">
+              To
+            </label>
+            <div
+              id={toFieldId}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            >
               {contactEmail}
             </div>
           </div>

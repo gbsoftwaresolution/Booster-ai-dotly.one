@@ -3,6 +3,7 @@
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import type { PaginatedResponse } from '@dotly/types'
 import {
   Users,
   Inbox,
@@ -91,18 +92,15 @@ export default function CRMDashboard(): JSX.Element {
     try {
       const token = await getAccessToken()
       const [contactsRes, dealsRes, leadsRes] = await Promise.all([
-        apiGet<{ contacts: ContactRow[]; total?: number }>('/contacts?limit=5', token),
-        apiGet<DealRow[]>('/deals', token),
-        apiGet<{ submissions: LeadSubmissionRow[]; total: number }>(
-          '/lead-submissions?limit=1',
-          token,
-        ),
+        apiGet<PaginatedResponse<ContactRow>>('/contacts?limit=5', token),
+        apiGet<PaginatedResponse<DealRow>>('/deals', token),
+        apiGet<PaginatedResponse<LeadSubmissionRow>>('/lead-submissions?limit=1', token),
       ])
       setData({
-        contacts: contactsRes.contacts ?? [],
-        recentCount: contactsRes.total ?? (contactsRes.contacts ?? []).length,
-        dealCount: dealsRes.length,
-        leadCount: leadsRes.total ?? leadsRes.submissions.length,
+        contacts: contactsRes.items ?? [],
+        recentCount: contactsRes.total ?? (contactsRes.items ?? []).length,
+        dealCount: dealsRes.items.length,
+        leadCount: leadsRes.total ?? leadsRes.items.length,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load CRM overview.')

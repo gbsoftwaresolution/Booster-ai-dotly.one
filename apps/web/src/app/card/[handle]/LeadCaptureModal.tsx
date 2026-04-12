@@ -460,8 +460,10 @@ export function LeadCaptureModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [schemaLoading, setSchemaLoading] = useState(true)
   const [schemaError, setSchemaError] = useState('')
+  const [schemaRetry, setSchemaRetry] = useState(0)
   const titleId = `lcm-title-${cardHandle}`
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const schemaRequestIdRef = useRef(0)
   // Auth-connect state — for authenticated users who skip the form
   const [authConnecting, setAuthConnecting] = useState(false)
   const [authConnected, setAuthConnected] = useState(false)
@@ -482,6 +484,7 @@ export function LeadCaptureModal({
   // Fetch form schema from public API
   useEffect(() => {
     const controller = new AbortController()
+    const requestId = ++schemaRequestIdRef.current
     setSchemaLoading(true)
     setSchemaError('')
     fetch(`${API_URL}/public/cards/${cardHandle}/lead-form`, { signal: controller.signal })
@@ -492,6 +495,7 @@ export function LeadCaptureModal({
         return (await r.json()) as LeadForm
       })
       .then((data: LeadForm) => {
+        if (schemaRequestIdRef.current !== requestId) return
         const sorted = [...data.fields].sort((a, b) => a.displayOrder - b.displayOrder)
         const merged = { ...data, fields: sorted }
         setForm(merged)
@@ -499,6 +503,7 @@ export function LeadCaptureModal({
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') return
+        if (schemaRequestIdRef.current !== requestId) return
         if (err instanceof Error && err.message === 'missing') {
           setForm(DEFAULT_FORM)
           initValues(DEFAULT_FORM.fields)
@@ -506,9 +511,12 @@ export function LeadCaptureModal({
         }
         setSchemaError('We could not load this contact form. Please retry.')
       })
-      .finally(() => setSchemaLoading(false))
+      .finally(() => {
+        if (schemaRequestIdRef.current !== requestId) return
+        setSchemaLoading(false)
+      })
     return () => controller.abort()
-  }, [cardHandle])
+  }, [cardHandle, schemaRetry])
 
   // Body scroll lock while open
   useEffect(() => {
@@ -809,7 +817,7 @@ export function LeadCaptureModal({
                 <p style={{ fontSize: 13, color: '#dc2626', margin: 0 }}>{schemaError}</p>
                 <button
                   type="button"
-                  onClick={() => window.location.reload()}
+                  onClick={() => setSchemaRetry((current) => current + 1)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: 10,

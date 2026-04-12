@@ -14,6 +14,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { IsString, IsFQDN, IsOptional } from 'class-validator'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
+import type { DeletedResponse, ItemsResponse } from '@dotly/types'
 import { CustomDomainsService } from './custom-domains.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Public } from '../auth/decorators/public.decorator'
@@ -70,14 +71,16 @@ export class CustomDomainsController {
   @ApiOperation({ summary: 'List all custom domains for the current user' })
   @Get()
   getDomains(@CurrentUser() user: { id: string }) {
-    return this.svc.getDomains(user.id)
+    return this.svc
+      .getDomains(user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a custom domain' })
   @Delete(':id')
   deleteDomain(@CurrentUser() user: { id: string }, @Param('id') id: string) {
-    return this.svc.deleteDomain(user.id, id)
+    return this.svc.deleteDomain(user.id, id).then((): DeletedResponse => ({ deleted: true }))
   }
 
   @ApiBearerAuth()

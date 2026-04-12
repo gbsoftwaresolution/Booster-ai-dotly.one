@@ -28,9 +28,11 @@ export async function getUserTimezone(): Promise<string | null> {
         const me = (await api.getMe()) as { timezone?: string | null } | null
         _cached = me?.timezone ?? null
       } catch {
-        _cached = null
+        _cached = undefined
+      } finally {
+        _fetchPromise = null
       }
-      return _cached
+      return _cached ?? null
     })()
   }
 
@@ -45,15 +47,17 @@ export async function getUserTimezone(): Promise<string | null> {
  */
 export function formatDate(value: string | null | undefined, tz?: string | null): string {
   if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return ''
   try {
     return new Intl.DateTimeFormat(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       ...(tz ? { timeZone: tz } : {}),
-    }).format(new Date(value))
+    }).format(date)
   } catch {
-    return new Date(value).toLocaleDateString()
+    return date.toLocaleDateString()
   }
 }
 
@@ -63,6 +67,8 @@ export function formatDate(value: string | null | undefined, tz?: string | null)
  */
 export function formatDateTime(value: string | null | undefined, tz?: string | null): string {
   if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return ''
   try {
     return new Intl.DateTimeFormat(undefined, {
       weekday: 'short',
@@ -71,8 +77,8 @@ export function formatDateTime(value: string | null | undefined, tz?: string | n
       hour: 'numeric',
       minute: '2-digit',
       ...(tz ? { timeZone: tz } : {}),
-    }).format(new Date(value))
+    }).format(date)
   } catch {
-    return new Date(value).toLocaleString()
+    return date.toLocaleString()
   }
 }

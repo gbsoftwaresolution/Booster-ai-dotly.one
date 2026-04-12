@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service'
 import { createPublicClient, http, type Address } from 'viem'
 import { polygon, base } from 'viem/chains'
 import { BoosterAiClient, DURATION_DAYS } from './boosterai.client'
+import type { BillingSummaryResponse } from '@dotly/types'
 
 // Minimal ABI — only the read function we need
 const DOTLY_ABI = [
@@ -42,6 +43,10 @@ export class BillingService {
     private config: ConfigService,
     private boosterAi: BoosterAiClient,
   ) {}
+
+  private formatError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
+  }
 
   private normalizeWalletAddress(walletAddress: string): string {
     return walletAddress.toLowerCase()
@@ -157,7 +162,7 @@ export class BillingService {
       // entirely and can claim any on-chain plan without a valid transaction.
       // Re-throwing as BadRequestException ensures the subscription update is
       // aborted when we cannot verify the transaction.
-      this.logger.error('assertTxOrigin: failed to fetch transaction', err)
+      this.logger.error(`assertTxOrigin: failed to fetch transaction: ${this.formatError(err)}`)
       throw new BadRequestException(
         'Could not verify transaction on chain — please try again in a moment',
       )
@@ -210,7 +215,7 @@ export class BillingService {
       }
     } catch (err) {
       if (err instanceof BadRequestException) throw err
-      this.logger.error('Failed to read on-chain subscription', err)
+      this.logger.error(`Failed to read on-chain subscription: ${this.formatError(err)}`)
       throw new BadRequestException('Could not verify on-chain subscription state')
     }
   }
@@ -228,11 +233,22 @@ export class BillingService {
     return plan
   }
 
-  async getUserSubscription(userId: string) {
-    return this.prisma.subscription.findUnique({
+  async getUserSubscription(userId: string): Promise<BillingSummaryResponse> {
+    const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
       include: { user: { select: { plan: true, walletAddress: true } } },
     })
+    return {
+      plan: subscription?.user?.plan ?? Plan.FREE,
+      status: subscription?.status ?? null,
+      currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
+      walletAddress: subscription?.user?.walletAddress ?? null,
+      txHash: subscription?.txHash ?? null,
+      chainId: subscription?.chainId ?? null,
+      boosterAiOrderId: subscription?.boosterAiOrderId ?? null,
+      billingDuration: subscription?.billingDuration ?? null,
+      amountUsdt: subscription?.amountUsdt ?? null,
+    }
   }
 
   async setWalletAddress(userId: string, walletAddress: string) {
@@ -273,7 +289,7 @@ export class BillingService {
         countryCode: params.countryCode,
       })
     } catch (err) {
-      this.logger.error('BoosterAI createOrder failed', err)
+      this.logger.error(`BoosterAI createOrder failed: ${this.formatError(err)}`)
       throw new BadRequestException(
         (err as Error).message ?? 'Failed to create order with BoosterAI — please try again',
       )
@@ -348,7 +364,9 @@ export class BillingService {
     try {
       status = await this.boosterAi.getOrderStatus(orderId)
     } catch (err) {
-      this.logger.error(`BoosterAI getOrderStatus failed for orderId=${orderId}`, err)
+      this.logger.error(
+        `BoosterAI getOrderStatus failed for orderId=${orderId}: ${this.formatError(err)}`,
+      )
       throw new BadRequestException(
         (err as Error).message ?? 'Could not retrieve order status — please try again',
       )
@@ -437,6 +455,7 @@ export class BillingService {
         cards: number
         analyticsDays: number
         csvExport: boolean
+        webhooks: boolean
         customDomain: boolean
         teamMembers: number
       }
@@ -445,6 +464,7 @@ export class BillingService {
         cards: 1,
         analyticsDays: 7,
         csvExport: false,
+        webhooks: false,
         customDomain: false,
         teamMembers: 0,
       },
@@ -452,6 +472,7 @@ export class BillingService {
         cards: 1,
         analyticsDays: 30,
         csvExport: false,
+        webhooks: false,
         customDomain: false,
         teamMembers: 0,
       },
@@ -459,6 +480,7 @@ export class BillingService {
         cards: 3,
         analyticsDays: 90,
         csvExport: true,
+        webhooks: true,
         customDomain: true,
         teamMembers: 0,
       },
@@ -466,6 +488,7 @@ export class BillingService {
         cards: 10,
         analyticsDays: 365,
         csvExport: true,
+        webhooks: true,
         customDomain: true,
         teamMembers: 10,
       },
@@ -473,6 +496,7 @@ export class BillingService {
         cards: 50,
         analyticsDays: 365,
         csvExport: true,
+        webhooks: true,
         customDomain: true,
         teamMembers: 50,
       },
@@ -480,6 +504,7 @@ export class BillingService {
         cards: -1,
         analyticsDays: -1,
         csvExport: true,
+        webhooks: true,
         customDomain: true,
         teamMembers: -1,
       },

@@ -21,7 +21,7 @@ export default function GlobalError({ error, reset }: ErrorProps): JSX.Element {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
       <h2 className="text-2xl font-bold text-gray-900">Something went wrong</h2>
       <p className="max-w-md text-sm text-gray-500">
-        {error.message ?? 'An unexpected error occurred. Please try again.'}
+        An unexpected error occurred. Please try again.
       </p>
       <button
         type="button"

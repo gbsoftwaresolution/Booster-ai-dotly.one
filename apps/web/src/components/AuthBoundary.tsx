@@ -9,6 +9,15 @@ export function AuthBoundary() {
   const pathname = usePathname()
 
   useEffect(() => {
+    const isPublicPath =
+      !pathname ||
+      pathname === '/' ||
+      pathname.startsWith('/auth') ||
+      pathname.startsWith('/card/') ||
+      pathname.startsWith('/pricing')
+
+    if (isPublicPath) return
+
     const supabase = createClient()
     const {
       data: { subscription },

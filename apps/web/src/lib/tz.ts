@@ -17,12 +17,20 @@ export function formatDate(
   if (!value) return ''
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(locale ?? undefined, {
-    timeZone: tz ?? undefined,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+  try {
+    return d.toLocaleDateString(locale ?? undefined, {
+      timeZone: tz ?? undefined,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return d.toLocaleDateString(locale ?? undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
 }
 
 /** Format a UTC ISO string (or Date) as a locale date+time, pinned to `tz`. */
@@ -34,14 +42,24 @@ export function formatDateTime(
   if (!value) return ''
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleString(locale ?? undefined, {
-    timeZone: tz ?? undefined,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  try {
+    return d.toLocaleString(locale ?? undefined, {
+      timeZone: tz ?? undefined,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return d.toLocaleString(locale ?? undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }
 }
 
 /**
@@ -56,13 +74,23 @@ export function formatDateTimeFull(
   if (!value) return ''
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleString(locale ?? undefined, {
-    timeZone: tz ?? undefined,
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  })
+  try {
+    return d.toLocaleString(locale ?? undefined, {
+      timeZone: tz ?? undefined,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    })
+  } catch {
+    return d.toLocaleString(locale ?? undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }
 }

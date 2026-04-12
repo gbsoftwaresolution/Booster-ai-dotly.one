@@ -39,6 +39,7 @@ import {
   IsNumber,
   IsDateString,
   MinLength,
+  Matches,
 } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
 import { SendEmailDto } from './dto/send-email.dto'
@@ -120,6 +121,42 @@ class CreateLeadDto {
   @IsOptional()
   @IsObject()
   fields?: Record<string, string>
+}
+
+class ExportContactsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  cardId?: string
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  from?: string
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string
+}
+
+class ExportLeadSubmissionsQueryDto extends ExportContactsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string
+}
+
+class LeadSubmissionsFiltersDto {
+  @IsString()
+  @MaxLength(100)
+  cardId!: string
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  from?: string
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string
 }
 
 class CreateContactDto {
@@ -272,6 +309,10 @@ class PaginationQuery {
   @IsString()
   @MaxLength(100)
   tag?: string
+
+  @IsOptional()
+  @IsIn(['date', 'name', 'stage', 'score'])
+  sortBy?: string
 }
 
 class PipelineQuery {
@@ -553,6 +594,19 @@ class UpdateTaskDto {
 
 class TasksQuery {
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number
+
+  @IsOptional()
   @IsBoolean()
   // @Type(() => Boolean) would coerce the string "false" → true because any
   // non-empty string is truthy.  Use @Transform to parse the raw string value.
@@ -562,6 +616,39 @@ class TasksQuery {
     return value
   })
   completed?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string
+
+  @IsOptional()
+  @IsIn(['ALL', 'PENDING', 'COMPLETED', 'OVERDUE'])
+  status?: string
+}
+
+class DealsQuery {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string
+
+  @IsOptional()
+  @IsIn(['PROSPECT', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'])
+  stage?: string
 }
 
 // Gap 10: Funnel analytics query
@@ -715,6 +802,7 @@ export class ContactsController {
       page: query.page,
       limit: query.limit,
       tag: query.tag,
+      sortBy: query.sortBy,
     })
   }
 
@@ -737,12 +825,14 @@ export class ContactsController {
   async exportContacts(
     @CurrentUser() user: { id: string },
     @Res() res: Response,
-    @Query('cardId') cardId?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query() query: ExportContactsQueryDto,
   ) {
     await this.assertCsvExportAccess(user.id)
-    const result = await this.contactsService.exportContacts(user.id, { cardId, from, to })
+    const result = await this.contactsService.exportContacts(user.id, {
+      cardId: query.cardId,
+      from: query.from,
+      to: query.to,
+    })
     const filename = `contacts-${new Date().toISOString().slice(0, 10)}.csv`
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
@@ -760,17 +850,14 @@ export class ContactsController {
   async exportLeadSubmissions(
     @CurrentUser() user: { id: string },
     @Res() res: Response,
-    @Query('cardId') cardId?: string,
-    @Query('search') search?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query() query: ExportLeadSubmissionsQueryDto,
   ) {
     await this.assertCsvExportAccess(user.id)
     const result = await this.contactsService.exportLeadSubmissions(user.id, {
-      cardId,
-      search,
-      from,
-      to,
+      cardId: query.cardId,
+      search: query.search,
+      from: query.from,
+      to: query.to,
     })
     const filename = `lead-submissions-${new Date().toISOString().slice(0, 10)}.csv`
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -884,17 +971,15 @@ export class ContactsController {
   @ApiOperation({ summary: 'List lead form submissions for a card' })
   getLeadSubmissions(
     @CurrentUser() user: { id: string },
-    @Query('cardId') cardId: string,
-    @Query('from') from: string | undefined,
-    @Query('to') to: string | undefined,
+    @Query() filters: LeadSubmissionsFiltersDto,
     @Query() query: LeadSubmissionsQuery,
   ) {
-    return this.contactsService.getLeadSubmissions(user.id, cardId, {
+    return this.contactsService.getLeadSubmissions(user.id, filters.cardId, {
       page: query.page,
       limit: query.limit,
       search: query.search,
-      from,
-      to,
+      from: filters.from,
+      to: filters.to,
     })
   }
 
@@ -1012,8 +1097,20 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('deals')
   @ApiOperation({ summary: 'Get all deals for the authenticated user' })
-  getAllDeals(@CurrentUser() user: { id: string }) {
-    return this.contactsService.getAllDeals(user.id)
+  getAllDeals(@CurrentUser() user: { id: string }, @Query() query: DealsQuery) {
+    return this.contactsService.getAllDeals(user.id, {
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+      stage: query.stage,
+    })
+  }
+
+  @ApiBearerAuth()
+  @Get('deals/summary')
+  @ApiOperation({ summary: 'Get deal summary metrics for the authenticated user' })
+  getDealsSummary(@CurrentUser() user: { id: string }) {
+    return this.contactsService.getDealsSummary(user.id)
   }
 
   @ApiBearerAuth()
@@ -1076,8 +1173,10 @@ export class ContactsController {
   @Get('track/click/:token')
   @ApiOperation({ summary: 'Track email link click and redirect' })
   async trackClick(@Param('token') token: string, @Query('url') url: string, @Res() res: Response) {
-    // Fire-and-forget
-    void this.contactsService.recordEmailClick(token).catch(() => void 0)
+    const tracked = await this.contactsService.recordEmailClick(token)
+    if (!tracked) {
+      throw new BadRequestException('Invalid tracking token')
+    }
     // Only redirect to http/https URLs — reject anything else to prevent open redirect abuse
     let destination = '/'
     try {
@@ -1159,7 +1258,20 @@ export class ContactsController {
   @Get('tasks')
   @ApiOperation({ summary: 'Get all tasks for the authenticated user' })
   getAllTasks(@CurrentUser() user: { id: string }, @Query() query: TasksQuery) {
-    return this.contactsService.getAllTasks(user.id, { completed: query.completed })
+    return this.contactsService.getAllTasks(user.id, {
+      completed: query.completed,
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+      status: query.status,
+    })
+  }
+
+  @ApiBearerAuth()
+  @Get('tasks/summary')
+  @ApiOperation({ summary: 'Get task summary metrics for the authenticated user' })
+  getTasksSummary(@CurrentUser() user: { id: string }) {
+    return this.contactsService.getTasksSummary(user.id)
   }
 
   @ApiBearerAuth()

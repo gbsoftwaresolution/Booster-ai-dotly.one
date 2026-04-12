@@ -5,13 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { apiGet } from '@/lib/api'
 import { BillingPlan, normalizePlan } from '@/lib/billing-plans'
 import { getAccessToken } from '@/lib/supabase/client'
-
-interface BillingResponse {
-  plan?: string | null
-  user?: {
-    plan?: string | null
-  } | null
-}
+import type { BillingSummaryResponse } from '@dotly/types'
 
 interface BillingPlanContextValue {
   plan: BillingPlan
@@ -33,8 +27,8 @@ export function BillingPlanProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const billing = await apiGet<BillingResponse>('/billing', token)
-      setPlan(normalizePlan(billing?.user?.plan ?? billing?.plan))
+      const billing = await apiGet<BillingSummaryResponse>('/billing', token)
+      setPlan(normalizePlan(billing?.plan))
     } catch {
       // Preserve the last known plan on transient auth/network failures.
     } finally {
