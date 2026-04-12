@@ -14,11 +14,29 @@
     },
     "lint": {
       "dependsOn": ["^lint"],
-      "inputs": ["$TURBO_DEFAULT$"]
+      "inputs": ["$TURBO_DEFAULT$"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_WEB_URL",
+        "WEB_URL",
+        "R2_PUBLIC_HOSTNAME"
+      ]
     },
     "typecheck": {
       "dependsOn": ["^typecheck"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig*.json"]
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig*.json"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_WEB_URL",
+        "WEB_URL",
+        "R2_PUBLIC_HOSTNAME"
+      ]
     },
     "test": {
       "dependsOn": ["^build"],
