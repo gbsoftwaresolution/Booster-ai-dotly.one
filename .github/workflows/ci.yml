@@ -24,7 +24,7 @@ jobs:
   # TruffleHog catches accidentally committed credentials before they reach main.
   secret-scan:
     name: Secret Scan (TruffleHog)
-    if: ${{ github.event_name != 'workflow_call' || inputs.run-security-gates }}
+    if: ${{ github.event_name != 'workflow_call' || inputs.run-security-gates == true || inputs.run-security-gates == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
   # M-05: Audit production dependencies for known high/critical CVEs.
   dependency-audit:
     name: Dependency Audit
-    if: ${{ github.event_name != 'workflow_call' || inputs.run-security-gates }}
+    if: ${{ github.event_name != 'workflow_call' || inputs.run-security-gates == true || inputs.run-security-gates == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -146,8 +146,8 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           SUPABASE_JWT_SECRET: ${{ env.SUPABASE_JWT_SECRET }}
           REDIS_URL: ${{ env.REDIS_URL }}
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
           NEXT_PUBLIC_API_URL: http://localhost:3001
           # Both names used by different parts of the app (middleware uses APP_URL, web .env uses WEB_URL)
           NEXT_PUBLIC_APP_URL: http://localhost:3000
@@ -169,8 +169,8 @@ jobs:
           POLYGON_RPC_URL: https://polygon-rpc.com
           DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
           # Supabase extras required by API
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_ANON_KEY: placeholder
+          SUPABASE_URL: https://ci.supabase.example
+          SUPABASE_ANON_KEY: ci-anon-key
           # OpenAI — placeholder value
           OPENAI_API_KEY: placeholder
 
@@ -243,8 +243,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
           SUPABASE_JWT_SECRET: test-jwt-secret
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
           NEXT_PUBLIC_API_URL: http://localhost:3001
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_WEB_URL: http://localhost:3000
@@ -260,8 +260,8 @@ jobs:
           MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
           POLYGON_RPC_URL: https://polygon-rpc.com
           DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_ANON_KEY: placeholder
+          SUPABASE_URL: https://ci.supabase.example
+          SUPABASE_ANON_KEY: ci-anon-key
           OPENAI_API_KEY: placeholder
       - name: Start NestJS API
         run: pnpm --filter @dotly/api start &
@@ -269,8 +269,8 @@ jobs:
           PORT: 3001
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
           REDIS_URL: redis://localhost:6379
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_ANON_KEY: placeholder
+          SUPABASE_URL: https://ci.supabase.example
+          SUPABASE_ANON_KEY: ci-anon-key
           SUPABASE_JWT_SECRET: test-jwt-secret
           WEB_URL: http://localhost:3000
           CORS_ORIGINS: http://localhost:3000
@@ -290,8 +290,8 @@ jobs:
         env:
           PORT: 3000
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
           NEXT_PUBLIC_API_URL: http://localhost:3001
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_WEB_URL: http://localhost:3000
