@@ -100,6 +100,10 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "moduleNameMapper": {
+      "^@dotly/types$": "<rootDir>/../../../packages/types/src/index.ts",
+      "^@dotly/database$": "<rootDir>/../../../packages/database/src/index.ts"
+    },
     "testEnvironment": "node"
   }
 }
