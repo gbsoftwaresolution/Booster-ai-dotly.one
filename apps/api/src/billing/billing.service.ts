@@ -264,6 +264,29 @@ export class BillingService {
     }
   }
 
+  async readRecordedPaymentByTxHash(txHash: string) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { txHash },
+      select: { boosterAiOrderId: true },
+    })
+
+    if (!subscription?.boosterAiOrderId) return null
+
+    const payment = await this.readRecordedPayment(subscription.boosterAiOrderId)
+
+    return {
+      payer: payment[0],
+      userRef: payment[1],
+      amount: payment[2],
+      planId: payment[3],
+      duration: payment[4],
+      paymentRef: payment[5],
+      paidAt: payment[6],
+      refundUntil: payment[7],
+      status: payment[8],
+    }
+  }
+
   async getUserSubscription(userId: string): Promise<BillingSummaryResponse> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
