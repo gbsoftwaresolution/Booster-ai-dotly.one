@@ -283,27 +283,29 @@ export default function CreateCardPage() {
 
   return (
     <div
-      className="mx-auto max-w-2xl space-y-8"
-      style={{ animation: 'create-fade 0.4s ease both' }}
+      className="mx-auto max-w-5xl space-y-8 pb-32 sm:pb-12"
+      style={{ animation: 'create-fade 0.5s cubic-bezier(0.16, 1, 0.3, 1) both' }}
     >
       <style>{`
         @keyframes create-fade {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: none; }
+          from { opacity: 0; transform: translateY(20px); filter: blur(8px); }
+          to   { opacity: 1; transform: none; filter: blur(0px); }
         }
         @keyframes spin { to { transform: rotate(360deg) } }
       `}</style>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Choose a template</h1>
-        <p className="mt-1.5 text-sm text-gray-400">
-          Pick a starting point — you can customise everything inside the editor.
+      <div className="flex flex-col items-center text-center space-y-3 px-4 sm:px-0 mt-4 sm:mt-8 mb-8 sm:mb-12">
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600">
+          Choose a Template
+        </h1>
+        <p className="max-w-xl text-base text-gray-500">
+          Pick a starting point for your new card. You can customize everything inside the editor.
         </p>
       </div>
 
       {/* Template grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {TEMPLATES.map((tmpl) => {
           const active = selected === tmpl.id
           return (
@@ -312,39 +314,44 @@ export default function CreateCardPage() {
               type="button"
               onClick={() => setSelected(tmpl.id)}
               className={cn(
-                'group flex flex-col overflow-hidden rounded-2xl border-2 text-left transition-all duration-150 active:scale-[.98]',
+                'group relative flex flex-col overflow-hidden rounded-[24px] border-2 text-left transition-all duration-300 active:scale-[0.98]',
                 active
-                  ? 'border-brand-500 shadow-md shadow-brand-500/15'
-                  : 'border-gray-100 bg-white hover:border-gray-300 hover:shadow-sm',
+                  ? 'border-sky-500 shadow-xl shadow-sky-500/20 bg-white ring-2 ring-sky-500/20'
+                  : 'border-transparent bg-white shadow-sm ring-1 ring-gray-950/5 hover:border-gray-200 hover:shadow-md',
               )}
             >
               {/* Visual preview */}
-              <div className="relative h-36 w-full overflow-hidden bg-gray-50">
+              <div className="relative h-48 w-full overflow-hidden bg-gray-50 sm:h-56">
                 {tmpl.preview}
+                <div className={cn(
+                  "absolute inset-0 bg-sky-500/10 transition-opacity duration-300",
+                  active ? "opacity-100" : "opacity-0 group-hover:opacity-50"
+                )} />
 
                 {/* Selected checkmark */}
-                {active && (
-                  <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 shadow-md">
-                    <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
-                  </div>
-                )}
+                <div className={cn(
+                  "absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-white shadow-lg shadow-sky-500/30 transition-all duration-300",
+                  active ? "scale-100 opacity-100" : "scale-50 opacity-0"
+                )}>
+                  <Check className="h-4 w-4" strokeWidth={3} />
+                </div>
               </div>
 
               {/* Label + description */}
-              <div className="border-t border-gray-100 bg-white px-4 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p
-                    className={cn('text-sm font-bold', active ? 'text-brand-600' : 'text-gray-900')}
-                  >
+              <div className="flex flex-col flex-1 p-5">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className={cn('text-lg font-bold', active ? 'text-gray-900' : 'text-gray-900')}>
                     {tmpl.label}
                   </p>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1.5 justify-end">
                     {tmpl.tags.map((tag) => (
                       <span
                         key={tag}
                         className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                          active ? 'bg-brand-100 text-brand-600' : 'bg-gray-100 text-gray-400',
+                          'rounded-full px-2 py-0.5 text-xs font-semibold tracking-wide shadow-sm',
+                          active 
+                            ? 'bg-sky-100 text-sky-700 ring-1 ring-sky-200' 
+                            : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200',
                         )}
                       >
                         {tag}
@@ -352,7 +359,7 @@ export default function CreateCardPage() {
                     ))}
                   </div>
                 </div>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">
+                <p className="text-sm leading-relaxed text-gray-500">
                   {tmpl.description}
                 </p>
               </div>
@@ -361,65 +368,77 @@ export default function CreateCardPage() {
         })}
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2.5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#ef4444"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="shrink-0"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <div>
-            <p className="text-sm text-red-700">{error}</p>
-            {error.includes('Upgrade to Pro') && (
-              <a
-                href="/settings/billing?plan=PRO&duration=MONTHLY"
-                className="mt-1 inline-block text-sm font-semibold text-brand-600 hover:underline"
-              >
-                Upgrade in billing
-              </a>
-            )}
+      {/* Floating Action Bar (Sticky Bottom) */}
+      <div className="fixed inset-x-0 bottom-0 z-40 bg-white/80 pb-safe backdrop-blur-2xl ring-1 ring-gray-950/5 shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.1)] sm:sticky sm:bottom-auto sm:mt-12 sm:rounded-[32px] sm:bg-white/90 sm:px-6 sm:py-6 sm:shadow-2xl">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-5 py-4 sm:p-0">
+          
+          <div className="hidden sm:flex flex-col">
+            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Selected Template</p>
+            <p className="text-lg font-bold text-gray-900">{selectedMeta.label}</p>
           </div>
-        </div>
-      )}
 
-      {/* CTA */}
-      <button
-        type="button"
-        onClick={() => void handleCreate()}
-        disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 to-sky-400 py-4 text-sm font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:from-brand-600 hover:to-sky-500 hover:shadow-brand-500/30 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? (
-          <>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              style={{ animation: 'spin .75s linear infinite' }}
-            >
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            </svg>
-            Creating card…
-          </>
-        ) : (
-          `Start with ${selectedMeta.label} →`
-        )}
-      </button>
+          {/* Error */}
+          {error && (
+            <div className="flex w-full items-center gap-3 rounded-2xl border border-red-100 bg-red-50/80 backdrop-blur-sm px-4 py-3 sm:w-auto sm:max-w-md">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-[13px] font-medium text-red-800 leading-tight">{error}</p>
+                {error.includes('Upgrade to Pro') && (
+                  <a
+                    href="/settings/billing?plan=PRO&duration=MONTHLY"
+                    className="mt-1 inline-block text-[13px] font-bold text-red-600 hover:text-red-700 hover:underline"
+                  >
+                    Upgrade in billing &rarr;
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CTA */}
+          <button
+            type="button"
+            onClick={() => void handleCreate()}
+            disabled={loading}
+            className="flex w-full sm:w-auto min-w-[200px] items-center justify-center gap-2 rounded-full py-3.5 px-8 text-sm font-bold text-white shadow-lg transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', boxShadow: '0 8px 24px -8px rgba(14,165,233, 0.6)' }}
+          >
+            {loading ? (
+              <>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  style={{ animation: 'spin .75s linear infinite' }}
+                >
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                Creating...
+              </>
+            ) : (
+              <>Start with {selectedMeta.label} &rarr;</>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

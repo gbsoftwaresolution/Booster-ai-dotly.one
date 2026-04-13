@@ -2,7 +2,8 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useEffect, useId, useRef, useState } from 'react'
-import { FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { formatDate } from '@/lib/tz'
@@ -12,20 +13,23 @@ import type { EmailTemplate, TemplateField, TemplateFormValues } from './types'
 
 export function EmailTemplatesHeader({ onCreate }: { onCreate: () => void }): JSX.Element {
   return (
-    <div className="app-panel flex flex-wrap items-center justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
-        <p className="mt-2 text-sm text-gray-500">
-          Create reusable templates for outreach, follow-ups, and updates.
-        </p>
+    <div className="app-panel flex flex-col gap-4 rounded-[30px] p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+      <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Email Templates</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Create reusable templates for outreach, follow-ups, and updates.
+          </p>
+        </div>
       </div>
       <button
         type="button"
         onClick={onCreate}
-        className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+        className="inline-flex shrink-0 items-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
       >
-        <Plus className="h-4 w-4" />
-        New Template
+        <Plus className="h-5 w-5" />
+        <span className="hidden sm:inline">New Template</span>
+        <span className="sm:hidden">New</span>
       </button>
     </div>
   )
@@ -240,27 +244,37 @@ export function TemplateModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="fixed inset-0 z-40 bg-black/10 backdrop-blur-2xl transition-all"
+        onClick={onClose}
+      />
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="app-panel fixed inset-x-4 top-1/2 z-50 w-full max-w-2xl -translate-y-1/2 rounded-[28px] p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+        className="fixed inset-[1rem] z-50 m-auto flex hidden h-[calc(100%-2rem)] max-h-[800px] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden rounded-[32px] bg-white shadow-2xl ring-1 ring-black/5 hover:ring-black/10 sm:block"
       >
-        <h2 id={titleId} className="text-lg font-semibold text-gray-900">
-          {title}
-        </h2>
-        <p id={descriptionId} className="mt-1 text-sm text-gray-500">
-          Save a reusable draft for future email sends.
-        </p>
-        {error && (
-          <div id={errorId} className="mt-4">
-            <StatusNotice message={error} />
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4 sm:px-8">
+          <div>
+            <h2 id={titleId} className="text-xl font-bold tracking-tight text-gray-900">
+              {title}
+            </h2>
+            <p id={descriptionId} className="text-sm font-medium text-gray-500">
+              Draft your reusable template message.
+            </p>
           </div>
-        )}
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+          {error && (
+            <div id={errorId} className="mb-6">
+              <StatusNotice message={error} />
+            </div>
+          )}
+
+          <form id="template-form" onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="template-name" className="mb-1 block text-sm font-medium text-gray-700">
               Template name
@@ -343,41 +357,148 @@ export function TemplateModal({
               </p>
             )}
           </div>
-          <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
-            <p className="mb-1.5 text-xs font-semibold text-indigo-700">Available merge tags</p>
+          <div className="rounded-[20px] border border-indigo-100 bg-indigo-50/50 p-4 ring-1 ring-inset ring-indigo-900/5">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-600">Available merge tags</p>
             <div className="flex flex-wrap gap-2">
               {MERGE_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => insertMergeTag(tag)}
-                  className="rounded bg-white px-2 py-0.5 font-mono text-xs text-indigo-600 shadow-sm ring-1 ring-indigo-200 hover:bg-indigo-100"
+                  className="inline-flex items-center rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-700 shadow-sm ring-1 ring-black/5 transition-all hover:bg-indigo-50 active:scale-95"
                 >
                   {tag}
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-indigo-500">
+            <p className="mt-2 text-xs text-indigo-500">
               Click a tag to insert it, or type it directly into subject or body.
             </p>
           </div>
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {submitting ? 'Saving...' : submitLabel}
-            </button>
-          </div>
         </form>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/50 px-6 py-4 backdrop-blur-md sm:px-8">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-black/5 transition-all hover:bg-gray-50 active:scale-95 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            form="template-form"
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-indigo-600 transition-all hover:bg-indigo-700 hover:ring-indigo-700 active:scale-95 disabled:opacity-50"
+          >
+            {submitting ? 'Saving...' : submitLabel}
+          </button>
+        </div>
+      </div>
+      
+      {/* Mobile Bottom Sheet Modal */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-50 flex h-[90vh] flex-col rounded-t-[32px] bg-white pb-safe shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5 transition-transform duration-300 sm:hidden"
+        role="dialog"
+      >
+        <div className="flex shrink-0 items-center justify-center pt-3 pb-2">
+          <div className="h-1.5 w-12 rounded-full bg-gray-200" />
+        </div>
+        <div className="flex shrink-0 items-center justify-between px-6 pb-4">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-gray-900">{title}</h2>
+          </div>
+          <button 
+            type="button" 
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+          >
+            <span className="sr-only">Close</span>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 13L13 1M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 pb-24">
+          {error && (
+            <div className="mb-6">
+              <StatusNotice message={error} />
+            </div>
+          )}
+          <form id="template-form-mobile" onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="template-name-mobile" className="mb-1.5 block text-sm font-semibold text-gray-700">
+                Template name
+              </label>
+              <input
+                id="template-name-mobile"
+                value={values.name}
+                onChange={(event) => updateField('name', event.target.value)}
+                maxLength={TEMPLATE_LIMITS.name}
+                className={getInputClass('name')}
+              />
+              {fieldErrors.name && (
+                <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.name}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="template-subject-mobile" className="mb-1.5 block text-sm font-semibold text-gray-700">
+                Email subject
+              </label>
+              <input
+                id="template-subject-mobile"
+                value={values.subject}
+                onChange={(event) => updateField('subject', event.target.value)}
+                maxLength={TEMPLATE_LIMITS.subject}
+                className={getInputClass('subject')}
+              />
+              {fieldErrors.subject && (
+                <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.subject}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="template-body-mobile" className="mb-1.5 block text-sm font-semibold text-gray-700">
+                Email content
+              </label>
+              <textarea
+                id="template-body-mobile"
+                value={values.body}
+                onChange={(event) => updateField('body', event.target.value)}
+                maxLength={TEMPLATE_LIMITS.body}
+                rows={8}
+                className={getInputClass('body') + ' resize-none'}
+              />
+              {fieldErrors.body && (
+                <p className="my-1 text-xs font-medium text-red-600">{fieldErrors.body}</p>
+              )}
+              
+              <div className="mt-4 w-full pb-2">
+                <div className="flex flex-wrap gap-2">
+                  {MERGE_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => insertMergeTag(tag)}
+                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-1.5 text-xs font-semibold tracking-wide text-indigo-700 shadow-sm active:scale-95"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-100 bg-white/90 px-6 py-4 pb-safe backdrop-blur-xl">
+          <button
+            form="template-form-mobile"
+            type="submit"
+            disabled={submitting}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 active:scale-[0.98] disabled:opacity-50"
+          >
+            {submitting ? 'Saving...' : submitLabel}
+          </button>
+        </div>
       </div>
     </>
   )

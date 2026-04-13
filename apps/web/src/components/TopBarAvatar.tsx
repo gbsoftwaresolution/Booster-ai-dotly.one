@@ -57,40 +57,48 @@ export function TopBarAvatar({ email, name }: TopBarAvatarProps): React.JSX.Elem
 
       {open && (
         <div
-          className="absolute right-0 z-50 mt-3 w-60 origin-top-right overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_80px_-42px_rgba(15,23,42,0.38)]"
-          style={{ animation: 'avatar-menu 0.18s cubic-bezier(.32,1.2,.56,1) both' }}
+          className="absolute right-0 z-50 mt-3 w-64 origin-top-right overflow-hidden rounded-[28px] border border-white/20 bg-white/70 shadow-[0_32px_80px_-24px_rgba(15,23,42,0.35),inset_0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-2xl"
+          style={{
+            animation: 'avatar-menu 0.18s cubic-bezier(.32,1.2,.56,1) both',
+            WebkitBackdropFilter: 'blur(30px)',
+          }}
         >
           {/* User info header */}
-          <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
+          <div className="flex items-center gap-3 border-b border-gray-200/50 bg-white/40 px-4 py-4 pt-5 backdrop-blur-md">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-sm"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-[15px] font-bold text-white shadow-[0_8px_16px_-6px_rgba(14,165,233,0.5),inset_0_1px_1px_rgba(255,255,255,0.4)]"
               style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
             >
               {initial}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-gray-900">{displayName}</p>
-              {email && name && <p className="truncate text-[11px] text-gray-400">{email}</p>}
+              <p className="truncate text-[15px] font-bold text-gray-900 tracking-tight">{displayName}</p>
+              {email && name && <p className="truncate text-xs font-medium text-gray-500 mt-0.5">{email}</p>}
             </div>
           </div>
 
           {/* Actions */}
-          <div className="p-2">
+          <div className="p-2.5 space-y-1">
             <Link
               href="/settings"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-white"
+              className="group flex w-full items-center gap-3 rounded-[20px] px-3.5 py-3 text-[14px] font-semibold text-gray-700 transition-all hover:bg-white/80 hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] active:scale-[0.98]"
             >
-              <Settings className="h-4 w-4 text-gray-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-[14px] bg-gray-100/80 text-gray-500 group-hover:bg-gray-100 group-hover:text-gray-700 transition-colors">
+                <Settings className="h-4 w-4" strokeWidth={2.5} />
+              </div>
               Settings
             </Link>
+            <div className="mx-3 my-1 border-t border-gray-200/50" />
             <button
               type="button"
               onClick={() => void handleSignOut()}
               disabled={signingOut}
-              className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              className="group flex w-full items-center gap-3 rounded-[20px] px-3.5 py-3 text-[14px] font-semibold text-red-600 transition-all hover:bg-red-50/80 hover:shadow-[0_4px_12px_rgba(239,68,68,0.08)] active:scale-[0.98] disabled:opacity-50"
             >
-              <LogOut className="h-4 w-4" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-[14px] bg-red-100/50 text-red-500 group-hover:bg-red-100 transition-colors">
+                <LogOut className="h-4 w-4" strokeWidth={2.5} />
+              </div>
               {signingOut ? 'Signing out…' : 'Sign out'}
             </button>
           </div>

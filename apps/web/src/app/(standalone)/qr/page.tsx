@@ -926,25 +926,32 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
 
       {/* Header */}
       <div
-        className="flex shrink-0 items-center justify-between px-5 pb-3 z-10"
+        className="relative z-10 flex shrink-0 items-center justify-between px-6 pb-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none"
         style={{
-          paddingTop: 'max(48px, calc(env(safe-area-inset-top) + 12px))',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
+          paddingTop: 'max(48px, calc(env(safe-area-inset-top) + 16px))',
         }}
       >
-        <span className="text-[15px] font-semibold text-white">Scan a Card</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col opacity-0 translate-y-[-10px] animate-[slide-down_0.6s_ease-out_forwards]">
+          <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-md">
+            Scan Code
+          </h2>
+          <p className="text-sm font-medium text-white/70 tracking-wide mt-1">
+            Align QR within the frame
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3 pointer-events-auto">
           {torchSupported && (
             <button
               onClick={() => void toggleTorch()}
-              className="flex h-10 w-10 items-center justify-center rounded-full"
-              style={{ background: torchOn ? 'rgba(255,220,50,0.2)' : 'rgba(255,255,255,0.1)' }}
+              className="flex h-12 w-12 items-center justify-center rounded-full hover:bg-white/20 active:scale-95 transition-all backdrop-blur-3xl shadow-[0_0_30px_rgba(255,255,255,0.05)] border border-white/10"
+              style={{ background: torchOn ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.08)' }}
               aria-label={torchOn ? 'Turn off torch' : 'Turn on torch'}
             >
               {torchOn ? (
-                <Zap className="h-5 w-5" style={{ color: '#ffd632' }} />
+                <Zap className="h-6 w-6 text-black" strokeWidth={2.5} />
               ) : (
-                <ZapOff className="h-5 w-5 text-white" />
+                <ZapOff className="h-6 w-6 text-white/90" strokeWidth={2.5} />
               )}
             </button>
           )}
@@ -953,11 +960,11 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
               stopStream()
               onClose()
             }}
-            className="flex h-10 w-10 items-center justify-center rounded-full"
-            style={{ background: 'rgba(255,255,255,0.1)' }}
+            className="flex h-12 w-12 items-center justify-center rounded-full hover:bg-white/20 active:scale-95 transition-all backdrop-blur-3xl shadow-[0_0_30px_rgba(255,255,255,0.05)] border border-white/10"
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             aria-label="Close scanner"
           >
-            <X className="h-5 w-5 text-white" />
+            <X className="h-6 w-6 text-white/90" strokeWidth={2.5} />
           </button>
         </div>
       </div>
@@ -982,8 +989,8 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
 
         {/* Viewfinder box */}
         {!detected && !error && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="scanner-breathe relative" style={{ width: 260, height: 260 }}>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <div className="scanner-breathe relative mb-8" style={{ width: 280, height: 280 }}>
               {/* Corners */}
               {[
                 'top-0 left-0',
@@ -993,53 +1000,57 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
               ].map((pos, i) => (
                 <span
                   key={i}
-                  className={`absolute h-9 w-9 ${pos}`}
+                  className={`absolute h-12 w-12 ${pos}`}
                   style={{
-                    borderTop: '3px solid #55a7ff',
-                    borderLeft: '3px solid #55a7ff',
-                    borderRadius: '4px 0 0 0',
+                    borderTop: '4px solid white',
+                    borderLeft: '4px solid white',
+                    borderRadius: '8px 0 0 0',
+                    filter: 'drop-shadow(0 4px 12px rgba(255,255,255,0.5))',
                     animation: 'scanner-corner-glow 2.8s ease-in-out infinite',
                   }}
                 />
               ))}
 
               {/* Animated scan line */}
-              <span
-                className="absolute left-1 right-1 h-[2px] rounded-full"
+              <div
+                className="absolute left-2 right-2 h-[3px] rounded-full"
                 style={{
-                  background: 'linear-gradient(90deg, transparent, #55a7ff, transparent)',
-                  animation: 'scan-sweep 2.4s ease-in-out infinite',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent)',
+                  boxShadow: '0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.4)',
+                  animation: 'scan-sweep 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
                   position: 'absolute',
                 }}
               />
             </div>
 
-            <p
-              className="absolute text-xs font-medium"
-              style={{ color: 'rgba(255,255,255,0.5)', bottom: 'calc(50% - 160px)' }}
-            >
-              Point at a Dotly QR code
-            </p>
+            <div className="px-6 py-3 rounded-full bg-black/40 backdrop-blur-xl border border-white/10">
+               <p className="text-[14px] font-bold tracking-wide text-white/90">
+                 Point at a Dotly QR code
+               </p>
+            </div>
           </div>
         )}
 
         {/* Error state */}
         {error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-8 text-center bg-black/60 backdrop-blur-xl">
             <div
-              className="flex h-16 w-16 items-center justify-center rounded-full"
-              style={{ background: 'rgba(255,255,255,0.08)' }}
+              className="flex h-20 w-20 items-center justify-center rounded-full shadow-[0_0_40px_rgba(255,255,255,0.05)] border border-white/10"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
             >
-              <Camera className="h-7 w-7 text-white/60" />
+              <Camera className="h-8 w-8 text-white/50" />
             </div>
-            <p className="text-sm font-semibold text-white">{error}</p>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white tracking-tight">Camera Error</h3>
+              <p className="text-[15px] font-medium text-white/60 leading-relaxed max-w-[260px] mx-auto">{error}</p>
+            </div>
             <button
               onClick={() => {
                 stopStream()
                 onClose()
               }}
-              className="rounded-2xl px-6 py-3 text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+              className="mt-4 rounded-full px-8 py-3.5 text-[15px] font-bold text-white active:scale-95 transition-transform"
+              style={{ background: 'linear-gradient(135deg, #444, #222)' }}
             >
               Go Back
             </button>
@@ -1050,37 +1061,44 @@ function QrScanner({ onClose }: { onClose: () => void }): JSX.Element {
       {/* Non-Dotly result sheet */}
       {detected && !scannedHandle && (
         <div
-          className="shrink-0 flex flex-col gap-3 rounded-t-3xl px-5 py-5 slide-up"
+          className="shrink-0 flex flex-col gap-4 rounded-t-[32px] px-6 py-6 animate-[slide-up_0.5s_cubic-bezier(0.32,0.72,0,1)_forwards] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"
           style={{
-            background: 'rgba(10,14,26,0.98)',
-            backdropFilter: 'blur(30px)',
-            paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+            background: 'rgba(20,20,20,0.85)',
+            backdropFilter: 'blur(40px)',
+            paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
           }}
         >
-          <p
-            className="text-[10px] font-bold uppercase tracking-[0.12em]"
-            style={{ color: '#55a7ff' }}
-          >
-            QR Code Detected
-          </p>
-          <p className="truncate text-sm font-medium text-white">{detected}</p>
-          <div className="flex gap-2.5">
-            <button
-              onClick={scanAgain}
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white"
-              style={{ background: 'rgba(255,255,255,0.08)' }}
+          <div className="mx-auto w-12 h-1.5 rounded-full bg-white/20 mb-2" />
+          
+          <div>
+            <p
+              className="text-[11px] font-bold uppercase tracking-[0.15em] mb-1"
+              style={{ color: '#55a7ff' }}
             >
-              <RotateCcw className="h-4 w-4" /> Scan Again
-            </button>
+              External Link Detected
+            </p>
+            <p className="text-[17px] font-semibold text-white/90 break-words leading-tight">
+              {detected}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 mt-2">
             <a
               href={detected.startsWith('http') ? detected : `https://${detected}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+              className="flex items-center justify-center gap-2 rounded-2xl py-4 text-[16px] font-bold text-white transition-transform active:scale-95 shadow-[0_4px_20px_rgba(85,167,255,0.3)]"
+              style={{ background: 'linear-gradient(135deg, #55a7ff, #7d6bff)' }}
             >
-              Open <ExternalLink className="h-4 w-4" />
+              Open Link <ExternalLink className="h-5 w-5" />
             </a>
+            <button
+              onClick={scanAgain}
+              className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-bold text-white transition-transform active:scale-95"
+              style={{ background: 'rgba(255,255,255,0.08)' }}
+            >
+              <RotateCcw className="h-4 w-4" /> Scan Again
+            </button>
           </div>
         </div>
       )}
@@ -1189,26 +1207,26 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
   const ini = initials(name)
 
   return (
-    <div className="flex flex-col items-center w-full gap-4">
+    <div className="flex flex-col items-center w-full gap-5">
       {/* Identity + QR card */}
       <div
-        className="w-full rounded-3xl overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}
+        className="w-full rounded-[32px] overflow-hidden backdrop-blur-3xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] transition-all duration-500 hover:shadow-[0_24px_70px_rgba(0,0,0,0.5)]"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
       >
         {/* Name / title header */}
-        <div className="px-6 pt-6 pb-4 text-center">
+        <div className="px-6 pt-8 pb-5 text-center">
           <div
-            className="mx-auto mb-3 flex h-[72px] w-[72px] items-center justify-center rounded-[20px] text-2xl font-black text-white"
+            className="mx-auto mb-4 flex h-[84px] w-[84px] items-center justify-center rounded-[24px] text-[28px] font-black text-white relative"
             style={{
-              background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
-              boxShadow: '0 6px 20px rgba(85,167,255,0.3)',
+              background: 'linear-gradient(135deg, #55a7ff, #7d6bff)',
+              boxShadow: '0 8px 32px rgba(85,167,255,0.4), inset 0 1px 2px rgba(255,255,255,0.4)',
             }}
           >
             {ini}
           </div>
-          <h2 className="text-xl font-black tracking-tight text-white">{name}</h2>
+          <h2 className="text-[22px] font-black tracking-tight text-white mb-0.5">{name}</h2>
           {jobTitle && (
-            <p className="mt-0.5 text-sm font-medium" style={{ color: '#a5b0c8' }}>
+            <p className="text-[15px] font-medium text-white/50">
               {jobTitle}
             </p>
           )}
@@ -1216,11 +1234,11 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
             href={publicUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold"
+            className="mt-2 inline-flex items-center gap-1.5 text-[14px] font-bold tracking-wide hover:opacity-80 transition-opacity"
             style={{ color: '#55a7ff' }}
           >
             dotly.one/{card.handle}
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
 
@@ -1266,70 +1284,76 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
       </div>
 
       {/* Action row: Copy + Share */}
-      <div className="flex w-full gap-2.5">
+      <div className="flex w-full gap-3">
         <button
           onClick={() => void handleCopy()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white transition-opacity active:opacity-80"
+          className="flex flex-1 items-center justify-center gap-2 rounded-[20px] py-4 text-[16px] font-bold text-white transition-all active:scale-[0.96]"
           style={{
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
           }}
         >
           {copied ? (
             <>
-              <Check className="h-4 w-4 text-green-400" /> Copied!
+              <Check className="h-5 w-5 text-green-400" /> Copied!
             </>
           ) : (
             <>
-              <Copy className="h-4 w-4" /> Copy Link
+              <Copy className="h-5 w-5 text-white/80" /> Copy Link
             </>
           )}
         </button>
         <button
           onClick={() => void handleShare()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white"
+          className="flex flex-1 items-center justify-center gap-2 rounded-[20px] py-4 text-[16px] font-bold text-white transition-transform active:scale-[0.96]"
           style={{
-            background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
-            boxShadow: '0 4px 18px rgba(85,167,255,0.25)',
+            background: 'linear-gradient(135deg, #55a7ff, #7d6bff)',
+            boxShadow: '0 8px 24px rgba(85,167,255,0.4), inset 0 1px 1px rgba(255,255,255,0.3)',
           }}
         >
-          <Share2 className="h-4 w-4" /> Share Card
+          <Share2 className="h-5 w-5" /> Share Card
         </button>
       </div>
 
       {/* NFC — only shown when supported */}
       {nfcSupported && (
         <div
-          className="w-full rounded-2xl overflow-hidden"
+          className="w-full rounded-[24px] overflow-hidden"
           style={{
-            background: 'rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.03)',
             border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
           }}
         >
           <button
             onClick={() => void toggleNfc()}
             disabled={nfcBusy}
-            className="flex w-full items-center gap-4 px-5 py-4 text-left disabled:opacity-60"
+            className="flex w-full items-center gap-4 px-6 py-5 text-left disabled:opacity-60 transition-colors hover:bg-white/[0.02] active:bg-white/[0.04]"
           >
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl relative overflow-hidden"
               style={{
-                background: nfcEnabled ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.08)',
+                background: nfcEnabled ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.05)',
               }}
             >
+              {nfcEnabled && (
+                <div className="absolute inset-0 bg-teal-400/20 blur-xl animate-[pulse_2s_ease-in-out_infinite]" />
+              )}
               {nfcBusy ? (
-                <Loader2 className="h-4.5 w-4.5 animate-spin text-white" />
+                <Loader2 className="h-5 w-5 animate-spin text-white relative z-10" />
               ) : nfcEnabled ? (
-                <Wifi className="h-4.5 w-4.5" style={{ color: '#2dd4bf' }} />
+                <Wifi className="h-5 w-5 relative z-10" style={{ color: '#2dd4bf' }} strokeWidth={2.5} />
               ) : (
-                <WifiOff className="h-4.5 w-4.5 text-white/50" />
+                <WifiOff className="h-5 w-5 text-white/40 relative z-10" strokeWidth={2.5} />
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white">
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <p className="text-[17px] font-bold text-white tracking-tight leading-tight">
                 {nfcEnabled ? 'NFC Sharing On' : 'Enable NFC Sharing'}
               </p>
-              <p className="text-xs" style={{ color: '#6b7a96' }}>
+              <p className="text-[13px] font-medium mt-1 leading-snug" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {nfcStatus === 'on'
                   ? 'Hold phone near another device to share'
                   : nfcStatus === 'error'
@@ -1338,10 +1362,10 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
               </p>
             </div>
             <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              className="h-3 w-3 shrink-0 rounded-full transition-colors duration-300"
               style={{
-                background: nfcEnabled ? '#2dd4bf' : '#374151',
-                boxShadow: nfcEnabled ? '0 0 0 4px rgba(45,212,191,0.2)' : 'none',
+                background: nfcEnabled ? '#2dd4bf' : 'rgba(255,255,255,0.15)',
+                boxShadow: nfcEnabled ? '0 0 0 6px rgba(45,212,191,0.2)' : 'none',
               }}
             />
           </button>
@@ -1349,27 +1373,27 @@ function QrPanel({ card }: { card: CardSummary }): JSX.Element {
       )}
 
       {/* Download + Edit */}
-      <div className="flex w-full gap-2.5">
+      <div className="flex w-full gap-3 mt-1.5 mb-2">
         <button
           onClick={downloadPng}
           disabled={!qr || !imgLoaded}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-xs font-semibold text-white disabled:opacity-40"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-[14px] font-bold text-white transition-all hover:bg-white/[0.08] active:scale-[0.96] disabled:opacity-40"
           style={{
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
           Download QR
         </button>
         <Link
           href={`/apps/cards/${card.id}/edit`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-xs font-semibold text-white"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-[14px] font-bold text-white transition-all hover:bg-white/[0.08] active:scale-[0.96]"
           style={{
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <Pencil className="h-3.5 w-3.5" /> Edit Card
+          <Pencil className="h-4 w-4" /> Edit Card
         </Link>
       </div>
     </div>
@@ -1526,73 +1550,114 @@ export default function QrPage(): JSX.Element {
 
         {/* Loading */}
         {loading && (
-          <div className="flex flex-col items-center gap-4 pt-20">
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
-            <p className="text-sm" style={{ color: '#6b7a96' }}>
-              Loading your cards…
-            </p>
+          <div className="flex flex-col items-center justify-center gap-6 pt-32 fade-in">
+            <div className="relative flex h-20 w-20 items-center justify-center">
+              <div
+                className="absolute inset-0 animate-spin rounded-[24px]"
+                style={{
+                  border: '2px solid rgba(85,167,255,0.1)',
+                  borderTopColor: '#55a7ff',
+                  boxShadow: '0 0 20px rgba(85,167,255,0.2)'
+                }}
+              />
+              <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#55a7ff' }} />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold tracking-wide text-white">Loading your cards</p>
+              <p className="mt-1 text-xs" style={{ color: '#6b7a96' }}>Just a moment...</p>
+            </div>
           </div>
         )}
 
         {/* Error */}
         {error && !loading && (
-          <div
-            className="mt-16 rounded-3xl p-6 text-center"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.07)',
-            }}
-          >
-            <p className="text-sm text-red-400">{error}</p>
+          <div className="mt-16 flex flex-col items-center justify-center gap-6 px-4 fade-in">
+            <div
+              className="flex h-20 w-20 items-center justify-center rounded-[28px]"
+              style={{
+                background: 'linear-gradient(145deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05))',
+                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1), 0 8px 32px rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+              }}
+            >
+              <X className="h-8 w-8 text-red-500" />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-black text-white">Connection Error</p>
+              <p className="mt-2 text-sm text-red-400 max-w-[260px] mx-auto leading-relaxed">{error}</p>
+            </div>
             <button
               type="button"
               onClick={() => setReloadToken((current) => current + 1)}
-              className="mt-4 rounded-2xl px-5 py-2.5 text-sm font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg,#55a7ff,#7d6bff)' }}
+              className="mt-2 flex h-14 w-full max-w-[200px] items-center justify-center rounded-[20px] text-sm font-bold tracking-wide text-white active:scale-[0.98] transition-all"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+              }}
             >
-              Retry
+              Try Again
             </button>
           </div>
         )}
 
         {/* No cards */}
         {!loading && !error && cards.length === 0 && (
-          <div className="mt-16 flex flex-col items-center gap-5 text-center fade-in">
+          <div className="mt-16 flex flex-col items-center justify-center gap-6 px-4 text-center fade-in">
             <div
-              className="flex h-20 w-20 items-center justify-center rounded-3xl"
-              style={{ background: 'rgba(255,255,255,0.06)' }}
+              className="relative flex h-24 w-24 items-center justify-center rounded-[32px] overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))',
+                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.15), 0 8px 32px rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
             >
+              {/* Subtle glass reflection */}
+              <div 
+                className="absolute inset-0 pointer-events-none" 
+                style={{ 
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)' 
+                }} 
+              />
               <svg
-                width="32"
-                height="32"
+                width="36"
+                height="36"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#6b7a96"
+                stroke="#55a7ff"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                style={{ filter: 'drop-shadow(0 0 12px rgba(85,167,255,0.5))' }}
               >
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
+                <rect x="3" y="3" width="7" height="7" rx="2" />
+                <rect x="14" y="3" width="7" height="7" rx="2" />
+                <rect x="3" y="14" width="7" height="7" rx="2" />
                 <path d="m14 14 3 3 4-4" />
               </svg>
             </div>
-            <div>
-              <p className="text-lg font-black text-white">No cards yet</p>
-              <p className="mt-1 text-sm" style={{ color: '#6b7a96' }}>
-                Create your first digital business card to get your QR code.
+            
+            <div className="space-y-2 max-w-[280px]">
+              <h2 className="text-xl font-black tracking-tight text-white drop-shadow-md">
+                No Cards Found
+              </h2>
+              <p className="text-[13px] leading-relaxed" style={{ color: '#8a9ab3' }}>
+                Create your first digital identity to start sharing with a beautiful QR code.
               </p>
             </div>
+
             <Link
               href="/apps/cards/create"
-              className="rounded-2xl px-7 py-3.5 text-sm font-black text-white"
+              className="mt-4 flex h-14 w-full max-w-[240px] items-center justify-center rounded-[20px] text-[15px] font-bold text-white shadow-[0_8px_32px_rgba(85,167,255,0.35)] active:scale-[0.98] transition-all"
               style={{
-                background: 'linear-gradient(135deg,#55a7ff,#7d6bff)',
-                boxShadow: '0 4px 18px rgba(85,167,255,0.3)',
+                background: 'linear-gradient(135deg, #55a7ff, #7d6bff)',
+                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.3), 0 12px 32px rgba(85,167,255,0.4)',
+                border: '1px solid rgba(255,255,255,0.1)'
               }}
             >
-              Create a Card
+              Create New Card
             </Link>
           </div>
         )}
@@ -1615,21 +1680,22 @@ export default function QrPage(): JSX.Element {
 
       {/* Home FAB — single instance, always at the bottom */}
       <div
-        className="fixed left-0 right-0 flex justify-center z-40"
+        className="fixed left-0 right-0 flex justify-center z-40 fade-in"
         style={{ bottom: 'max(28px, env(safe-area-inset-bottom))' }}
       >
         <Link
           href="/dashboard"
-          className="flex items-center justify-center h-14 w-14 rounded-full text-white shadow-2xl transition-transform active:scale-90"
+          className="flex h-14 w-14 items-center justify-center rounded-[24px] text-white transition-all active:scale-[0.92] hover:scale-105"
           style={{
-            background: 'rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1.5px solid rgba(255,255,255,0.14)',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+            boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
+            border: '0.5px solid rgba(255,255,255,0.15)',
           }}
           aria-label="Go to dashboard"
         >
-          <Home className="h-5 w-5" />
+          <Home className="h-[22px] w-[22px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" strokeWidth={2.5} />
         </Link>
       </div>
     </div>

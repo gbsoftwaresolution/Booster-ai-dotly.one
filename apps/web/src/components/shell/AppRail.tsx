@@ -31,33 +31,28 @@ function RailItem({
       href={href}
       aria-label={label}
       aria-current={isActive ? 'page' : undefined}
-      className="group relative flex items-center justify-center"
+      className="group relative flex items-center justify-center p-1"
     >
       {/* Active indicator pill */}
       {isActive && (
-        <span className="absolute left-0 h-6 w-[3px] rounded-r-full bg-white opacity-90" />
+        <span className="absolute -left-3 h-[22px] w-[4px] rounded-r-full bg-brand-500 shadow-[0_0_12px_rgba(14,165,233,0.8)] transition-all duration-300" />
       )}
 
       <span
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 transition-all duration-200',
+          'flex h-12 w-12 items-center justify-center rounded-[18px] border transition-all duration-500',
           isActive
-            ? 'scale-105 shadow-[0_18px_28px_-16px_rgba(255,255,255,0.7)] ring-2 ring-white/20'
-            : 'opacity-70 hover:opacity-100 hover:scale-105 hover:border-white/20',
+            ? 'scale-110 border-white/20 bg-white/10 shadow-[0_12px_24px_-8px_rgba(0,0,0,0.5)] ring-1 ring-inset ring-white/10 backdrop-blur-md'
+            : 'border-transparent bg-transparent opacity-60 hover:scale-110 hover:border-white/10 hover:bg-white/5 hover:opacity-100 hover:shadow-lg',
         )}
-        style={
-          isActive
-            ? { background: gradient ?? 'rgba(255,255,255,0.2)' }
-            : { background: 'rgba(255,255,255,0.12)' }
-        }
+        style={isActive && gradient ? { background: gradient } : {}}
       >
-        <Icon className={cn('h-5 w-5 text-white', isHome && 'h-4.5 w-4.5')} aria-hidden="true" />
+        <Icon className={cn('h-5 w-5 text-white transition-transform duration-500', isActive ? 'scale-110 drop-shadow-md' : '', isHome && 'h-5 w-5')} aria-hidden="true" />
       </span>
 
       {/* Tooltip */}
-      <span className="pointer-events-none absolute left-full ml-3 z-50 hidden whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-xl group-hover:block">
+      <span className="pointer-events-none absolute left-[calc(100%+16px)] z-50 hidden origin-left scale-95 opacity-0 whitespace-nowrap rounded-[10px] border border-white/10 bg-gray-950/90 backdrop-blur-md px-3 py-2 text-[13px] font-bold tracking-wide text-white shadow-[0_16px_32px_-12px_rgba(0,0,0,0.6)] transition-all duration-200 group-hover:scale-100 group-hover:opacity-100 group-hover:block">
         {label}
-        <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
       </span>
     </Link>
   )
@@ -79,31 +74,28 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
   return (
     <div
       className={cn(
-        'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-2 border-r border-white/10 px-3 py-6 lg:flex',
+        'sticky top-0 hidden h-screen w-[88px] shrink-0 flex-col items-center gap-3 border-r border-gray-950/5 px-2 py-6 lg:flex',
         className,
       )}
       style={{
-        background:
-          'radial-gradient(circle at top, rgba(56,189,248,0.18), transparent 28%), linear-gradient(180deg, #07101d 0%, #0f172a 38%, #172554 100%)',
+        background: '#040b16',
       }}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/8 to-transparent" />
-
       {/* Wordmark dot */}
       <Link
         href="/dashboard"
         aria-label="Dotly home"
-        className="mb-5 flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/15 transition-transform hover:scale-[1.03]"
+        className="mb-6 flex h-14 w-14 items-center justify-center rounded-[20px] shadow-[0_0_24px_-8px_rgba(14,165,233,0.5)] transition-all duration-500 hover:scale-[1.05] hover:shadow-[0_0_32px_-12px_rgba(14,165,233,0.8)]"
         style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
       >
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <circle cx="8" cy="8" r="3.5" fill="white" />
           <circle cx="8" cy="8" r="6.5" stroke="white" strokeWidth="1.5" strokeDasharray="3 2" />
         </svg>
       </Link>
 
       {/* Divider */}
-      <div className="mb-2 h-px w-10 bg-white/10" />
+      <div className="mb-3 h-px w-12 bg-white/5" />
 
       {/* Home */}
       <RailItem href="/dashboard" label="Home" icon={Home} isActive={isHomeActive} isHome />
@@ -127,14 +119,14 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
       <div className="flex-1" />
 
       {/* Divider */}
-      <div className="mb-1 h-px w-10 bg-white/10" />
+      <div className="my-3 h-px w-12 bg-white/5" />
 
       {/* Settings */}
       <RailItem
         href="/settings"
         label="Settings"
         icon={Settings}
-        gradient="linear-gradient(135deg,#9ca3af,#6b7280)"
+        gradient="linear-gradient(135deg,#6b7280,#4b5563)"
         isActive={isSettingsActive}
       />
 
@@ -144,14 +136,13 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
         onClick={() => void handleSignOut()}
         disabled={signingOut}
         aria-label="Sign out"
-        className="group relative mt-1 flex items-center justify-center"
+        className="group relative mt-2 flex items-center justify-center p-1"
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 opacity-50 transition-all hover:bg-red-500/80 hover:opacity-100">
-          <LogOut className="h-4 w-4 text-white" aria-hidden="true" />
+        <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-transparent opacity-50 transition-all duration-500 hover:scale-110 hover:bg-white/5 hover:opacity-100 hover:text-red-400">
+          <LogOut className="h-5 w-5 text-white transition-colors group-hover:text-red-400" aria-hidden="true" />
         </span>
-        <span className="pointer-events-none absolute left-full ml-3 z-50 hidden whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-xl group-hover:block">
+        <span className="pointer-events-none absolute left-[calc(100%+16px)] z-50 hidden origin-left scale-95 opacity-0 whitespace-nowrap rounded-[10px] border border-white/10 bg-gray-950/90 backdrop-blur-md px-3 py-2 text-[13px] font-bold tracking-wide text-white shadow-[0_16px_32px_-12px_rgba(0,0,0,0.6)] transition-all duration-200 group-hover:scale-100 group-hover:opacity-100 group-hover:block">
           Sign out
-          <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
         </span>
       </button>
     </div>

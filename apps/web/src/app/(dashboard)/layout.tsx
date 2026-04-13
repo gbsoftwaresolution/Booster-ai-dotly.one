@@ -4,7 +4,8 @@ import type { JSX } from 'react'
 import { BillingPlanProvider } from '@/components/billing/BillingPlanProvider'
 import { AppRail } from '@/components/shell/AppRail'
 import { TopBarAvatar } from '@/components/TopBarAvatar'
-import { MobileAppRail, MobileAppTopBar } from '@/components/shell/MobileAppShell'
+import { MobileAppRail } from '@/components/shell/MobileAppShell'
+import { DynamicBreadcrumbs } from '@/components/shell/DynamicBreadcrumbs'
 
 export default async function DashboardLayout({
   children,
@@ -32,40 +33,23 @@ export default async function DashboardLayout({
 
         <div className="flex flex-1 flex-col min-w-0">
           <header
-            className="app-shell-surface sticky top-0 z-30 mx-2 mt-2 flex h-[calc(4.25rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 rounded-[26px] px-4 lg:mx-3 lg:px-6"
+            className="sticky top-0 z-30 mx-2 mt-2 flex h-[calc(4.25rem+env(safe-area-inset-top))] shrink-0 items-center justify-between gap-3 rounded-[32px] border border-gray-950/[0.04] bg-white/70 backdrop-blur-xl px-4 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.08)] lg:mx-4 lg:mt-4 lg:px-6 transition-all duration-500"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="flex flex-1 items-center gap-3 lg:hidden">
-              <MobileAppTopBar />
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex h-7 w-7 items-center justify-center rounded-lg"
-                  style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <circle cx="8" cy="8" r="3.5" fill="white" />
-                    <circle
-                      cx="8"
-                      cy="8"
-                      r="6.5"
-                      stroke="white"
-                      strokeWidth="1.5"
-                      strokeDasharray="3 2"
-                    />
-                  </svg>
-                </div>
-                <span className="text-base font-bold text-gray-900">
-                  Dotly<span className="text-sky-500">.one</span>
-                </span>
-              </div>
+            <div className="absolute inset-0 rounded-[32px] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay pointer-events-none"></div>
+            
+            <div className="relative flex flex-1 items-center gap-3">
+              <DynamicBreadcrumbs />
             </div>
 
-            <div className="hidden lg:flex lg:flex-1" />
+            <div className="relative hidden lg:flex lg:flex-1" />
 
-            <TopBarAvatar email={user.email} name={displayName} />
+            <div className="relative z-10">
+              <TopBarAvatar email={user.email} name={displayName} />
+            </div>
           </header>
 
-          <main className="flex-1 px-4 pb-36 pt-5 lg:px-6 lg:pb-10 lg:pt-7">{children}</main>
+          <main className="flex-1 px-4 pb-36 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
         </div>
 
         <MobileAppRail />

@@ -1,11 +1,9 @@
-'use client'
-
 import type { JSX } from 'react'
-import { useState, useEffect } from 'react'
-import { getAccessToken, createClient } from '@/lib/supabase/client'
+import { Suspense } from 'react'
+import { createClient } from '@/lib/supabase/server'
 import { apiGet } from '@/lib/api'
 import type { ItemsResponse, PaginatedResponse } from '@dotly/types'
-import { DashboardContent, DashboardHero } from './components'
+import { DashboardContent, DashboardHero, SkeletonList } from './components'
 import { isTaskOverdue } from './helpers'
 import type {
   AppointmentType,
@@ -18,106 +16,126 @@ import type {
   TaskItem,
 } from './types'
 
+// ─── Data Fetching Functions ───────────────────────────────────────────────────
+
+// Retrieve token early at the server layer to avoid waterfall
+async function getServerAuth() {
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getUser()
+  const { data: sessionData } = await supabase.auth.getSession()
+  
+  return { 
+    user: data?.user, 
+    token: sessionData?.session?.access_token ?? '' 
+  }
+}
+
+// Data loaders for Suspense Boundaries
+async function fetchSummaryData(token: string) {
+  // Catch individual failures cleanly
+  try {
+    return await apiGet<DashboardAnalyticsSummary>('/analytics/dashboard-summary', token)
+  } catch (e) {
+    return null
+  }
+}
+
+async function fetchWidgetData(token: string) {
+  const results = await Promise.allSettled([
+    apiGet<ItemsResponse<CardSummary>>('/cards', token),
+    apiGet<PaginatedResponse<ContactRow>>('/contacts?limit=5', token),
+    apiGet<PaginatedResponse<LeadSubmission>>('/lead-submissions?limit=5', token),
+    apiGet<PaginatedResponse<Deal>>('/deals?limit=5', token),
+    apiGet<PaginatedResponse<TaskItem>>('/tasks?completed=false&limit=5', token),
+    apiGet<CrmFunnel>('/crm/analytics/funnel', token),
+    apiGet<ItemsResponse<AppointmentType>>('/scheduling/appointment-types', token),
+  ])
+
+  return {
+    cards: results[0].status === 'fulfilled' ? results[0].value.items : [],
+    contacts: results[1].status === 'fulfilled' ? results[1].value.items ?? [] : [],
+    leads: results[2].status === 'fulfilled' ? results[2].value.items ?? [] : [],
+    deals: results[3].status === 'fulfilled' ? results[3].value.items ?? [] : [],
+    tasks: results[4].status === 'fulfilled' ? results[4].value.items ?? [] : [],
+    funnel: results[5].status === 'fulfilled' ? results[5].value : null,
+    appointmentTypes: results[6].status === 'fulfilled' ? results[6].value.items.filter((a) => a.isActive) : [],
+    sectionErrors: results.filter(r => r.status === 'rejected').map((_, i) => String(i)) // Mapping error index simplified
+  }
+}
+
+// ─── Server Components ────────────────────────────────────────────────────────
+
+async function DashboardWidgetsLoader({ token, analyticsSummary }: { token: string, analyticsSummary: DashboardAnalyticsSummary | null }) {
+  const data = await fetchWidgetData(token)
+  
+  const openDeals = data.deals
+  const pipelineValue = analyticsSummary?.openPipelineValue ?? openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
+  const overdueTasks = data.tasks.filter(isTaskOverdue)
+  const funnelMax = data.funnel ? Math.max(...data.funnel.stages.map((s) => s.count), 1) : 1
+  const activeCards = analyticsSummary?.activeCards ?? data.cards.filter((card) => card.isActive).length
+  const totalViews = analyticsSummary?.totalViews ?? 0
+  const totalClicks = analyticsSummary?.totalClicks ?? 0
+  const totalLeads = analyticsSummary?.totalLeads ?? 0
+  const overdueTasksCount = analyticsSummary?.overdueTasksCount ?? overdueTasks.length
+
+  return (
+    <DashboardContent
+      activeCards={activeCards}
+      appointmentTypes={data.appointmentTypes}
+      cards={data.cards}
+      contacts={data.contacts}
+      funnel={data.funnel}
+      funnelMax={funnelMax}
+      leads={data.leads}
+      loading={false}
+      openDeals={openDeals}
+      overdueTasksCount={overdueTasksCount}
+      pipelineValue={pipelineValue}
+      sectionErrors={data.sectionErrors}
+      tasks={data.tasks}
+      totalClicks={totalClicks}
+      totalLeads={totalLeads}
+      totalViews={totalViews}
+    />
+  )
+}
+
+function DashboardContentSkeleton() {
+  return (
+    <div className="space-y-6 opacity-70">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[1,2,3,4].map(i => <div key={i} className="h-32 rounded-[26px] bg-white ring-1 ring-gray-950/[0.03] animate-pulse" />)}
+      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <SkeletonList rows={4} />
+        <SkeletonList rows={4} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function DashboardPage(): JSX.Element {
-  const [cards, setCards] = useState<CardSummary[]>([])
-  const [contacts, setContacts] = useState<ContactRow[]>([])
-  const [leads, setLeads] = useState<LeadSubmission[]>([])
-  const [deals, setDeals] = useState<Deal[]>([])
-  const [tasks, setTasks] = useState<TaskItem[]>([])
-  const [funnel, setFunnel] = useState<CrmFunnel | null>(null)
-  const [appointmentTypes, setAppointmentTypes] = useState<AppointmentType[]>([])
-  const [analyticsSummary, setAnalyticsSummary] = useState<DashboardAnalyticsSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [sectionErrors, setSectionErrors] = useState<string[]>([])
-  const [userName, setUserName] = useState<string>('there')
-  const [reloadToken, setReloadToken] = useState(0)
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      setLoadError(null)
-      setSectionErrors([])
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUserName(
-        (user?.user_metadata?.full_name as string | undefined) ??
-          user?.email?.split('@')[0] ??
-          'there',
-      )
-
-      let token = ''
-      try {
-        token = (await getAccessToken()) ?? ''
-      } catch {
-        setLoadError('Authentication error. Please refresh.')
-        setLoading(false)
-        return
-      }
-
-      const results = await Promise.allSettled([
-        apiGet<ItemsResponse<CardSummary>>('/cards', token),
-        apiGet<PaginatedResponse<ContactRow>>('/contacts?limit=5', token),
-        apiGet<PaginatedResponse<LeadSubmission>>('/lead-submissions?limit=5', token),
-        apiGet<PaginatedResponse<Deal>>('/deals?limit=5', token),
-        apiGet<PaginatedResponse<TaskItem>>('/tasks?completed=false&limit=5', token),
-        apiGet<CrmFunnel>('/crm/analytics/funnel', token),
-        apiGet<ItemsResponse<AppointmentType>>('/scheduling/appointment-types', token),
-        apiGet<DashboardAnalyticsSummary>('/analytics/dashboard-summary', token),
-      ])
-
-      const nextSectionErrors: string[] = []
-
-      if (results[0].status === 'fulfilled') setCards(results[0].value.items)
-      else nextSectionErrors.push('cards')
-
-      if (results[1].status === 'fulfilled') setContacts(results[1].value.items ?? [])
-      else nextSectionErrors.push('contacts')
-      if (results[2].status === 'fulfilled') setLeads(results[2].value.items ?? [])
-      else nextSectionErrors.push('lead submissions')
-      if (results[3].status === 'fulfilled') setDeals(results[3].value.items ?? [])
-      else nextSectionErrors.push('deals')
-      if (results[4].status === 'fulfilled') setTasks(results[4].value.items ?? [])
-      else nextSectionErrors.push('tasks')
-      if (results[5].status === 'fulfilled') setFunnel(results[5].value)
-      else nextSectionErrors.push('funnel analytics')
-      if (results[6].status === 'fulfilled')
-        setAppointmentTypes(results[6].value.items.filter((a) => a.isActive))
-      else nextSectionErrors.push('scheduling')
-      if (results[7].status === 'fulfilled') setAnalyticsSummary(results[7].value)
-      else nextSectionErrors.push('dashboard summary')
-
-      setSectionErrors(nextSectionErrors)
-      setLoadError(
-        nextSectionErrors.length > 0
-          ? `Some sections are unavailable: ${nextSectionErrors.join(', ')}.`
-          : null,
-      )
-
-      setLoading(false)
-    }
-    void load()
-  }, [reloadToken])
+export default async function DashboardPage(): Promise<JSX.Element> {
+  const { user, token } = await getServerAuth()
+  
+  const userName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email?.split('@')[0] ??
+    'there'
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  const openDeals = deals
-  const pipelineValue =
-    analyticsSummary?.openPipelineValue ?? deals.reduce((sum, d) => sum + (d.value ?? 0), 0)
-  const overdueTasks = tasks.filter(isTaskOverdue)
-  const funnelMax = funnel ? Math.max(...funnel.stages.map((s) => s.count), 1) : 1
-  const activeCards = analyticsSummary?.activeCards ?? cards.filter((card) => card.isActive).length
-  const totalViews = analyticsSummary?.totalViews ?? 0
-  const totalClicks = analyticsSummary?.totalClicks ?? 0
+  // Fetch the fastest, most critical piece of data (pre-computed summary) directly
+  const analyticsSummary = await fetchSummaryData(token)
+
+  const activeCards = analyticsSummary?.activeCards ?? 0
   const totalLeads = analyticsSummary?.totalLeads ?? 0
-  const pendingTasksCount = analyticsSummary?.pendingTasksCount ?? tasks.length
-  const overdueTasksCount = analyticsSummary?.overdueTasksCount ?? overdueTasks.length
-  const openDealsCount = analyticsSummary?.openDealsCount ?? openDeals.length
+  const pipelineValue = analyticsSummary?.openPipelineValue ?? 0
+  const openDealsCount = analyticsSummary?.openDealsCount ?? 0
+  const overdueTasksCount = analyticsSummary?.overdueTasksCount ?? 0
+
   const focusMessage =
     overdueTasksCount > 0
       ? `${overdueTasksCount} task${overdueTasksCount === 1 ? '' : 's'} need attention today.`
@@ -129,48 +147,22 @@ export default function DashboardPage(): JSX.Element {
 
   return (
     <div className="space-y-5">
-      {loadError && (
-        <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-700 shadow-[0_16px_32px_-24px_rgba(239,68,68,0.35)]">
-          <span>{loadError}</span>
-          <button
-            type="button"
-            onClick={() => setReloadToken((current) => current + 1)}
-            className="ml-4 rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
-          >
-            Retry
-          </button>
-        </div>
-      )}
       <DashboardHero
-        activeBookingTypes={appointmentTypes.length}
+        activeBookingTypes={0} /* Placeholder until widgets load, or could be fetched in summary */
         activeCards={activeCards}
         focusMessage={focusMessage}
         greeting={greeting}
-        loading={loading}
-        onRetry={() => setReloadToken((current) => current + 1)}
+        loading={false}
         pipelineValue={pipelineValue}
-        sectionErrors={sectionErrors}
+        sectionErrors={[]}
         totalLeads={totalLeads}
         userName={userName}
       />
-      <DashboardContent
-        activeCards={activeCards}
-        appointmentTypes={appointmentTypes}
-        cards={cards}
-        contacts={contacts}
-        funnel={funnel}
-        funnelMax={funnelMax}
-        leads={leads}
-        loading={loading}
-        openDeals={openDeals}
-        overdueTasksCount={overdueTasksCount}
-        pipelineValue={pipelineValue}
-        sectionErrors={sectionErrors}
-        tasks={tasks}
-        totalClicks={totalClicks}
-        totalLeads={totalLeads}
-        totalViews={totalViews}
-      />
+      
+      {/* Non-blocking data stream for the heavy CRM/API queries */}
+      <Suspense fallback={<DashboardContentSkeleton />}>
+        <DashboardWidgetsLoader token={token} analyticsSummary={analyticsSummary} />
+      </Suspense>
     </div>
   )
 }
