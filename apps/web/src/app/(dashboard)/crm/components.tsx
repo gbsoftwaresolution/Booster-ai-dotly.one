@@ -120,7 +120,7 @@ export function CrmHeader({
   onPipelineChange: (value: string) => void
 }): JSX.Element {
   return (
-    <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
+    <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[24px] px-6 py-6 sm:px-8">
       <div className="flex items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600">
           <CircleDot className="h-6 w-6" />

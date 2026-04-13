@@ -327,7 +327,8 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
               onClick={addLink}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-500 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 hover:bg-brand-600 transition-colors active:scale-95"
             >
-              <Plus className="h-4 w-4" />
+                      <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.1)_0%,transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
               Add Link
             </button>
           </div>
@@ -339,7 +340,8 @@ export function LinksTab({ links, onChange }: LinksTabProps): JSX.Element {
           onClick={() => setShowAddForm(true)}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/50 py-3.5 text-sm font-semibold text-brand-600 hover:border-brand-400 hover:bg-brand-50 transition-all active:scale-95"
         >
-          <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.1)_0%,transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
           Add Link
         </button>
       )}

@@ -1,5 +1,7 @@
 'use client'
 
+import { cn } from '@/lib/cn'
+
 import type { JSX } from 'react'
 import {
   Bar,
@@ -79,7 +81,7 @@ export function AnalyticsLoadingShell(): JSX.Element {
   )
 }
 
-export function AnalyticsHero({
+function AnalyticsHeroDesktop({
   cards,
   cardsLoading,
   dashboardSummary,
@@ -127,7 +129,7 @@ export function AnalyticsHero({
   ]
 
   return (
-    <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+    <div className="app-panel relative overflow-hidden rounded-[24px] px-6 py-6 sm:px-8 sm:py-7">
       <div
         className="absolute inset-0 opacity-90"
         aria-hidden="true"
@@ -172,7 +174,7 @@ export function AnalyticsHero({
           </div>
         </div>
 
-        <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+        <div className="app-panel-subtle rounded-[24px] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
@@ -264,6 +266,173 @@ export function AnalyticsHero({
         </div>
       </div>
     </div>
+  )
+}
+
+function AnalyticsHeroMobile({
+  cards,
+  cardsLoading,
+  dashboardSummary,
+  focusMessage,
+  loading,
+  selectedCardId,
+  selectedCardLabel,
+  selectedCardHandle,
+  dateRangeDays,
+  exporting,
+  onSelectCard,
+  onSelectRange,
+  onRefresh,
+  onExport,
+}: {
+  cards: CardSummary[]
+  cardsLoading: boolean
+  dashboardSummary: DashboardSummary | null
+  focusMessage: string
+  loading: boolean
+  selectedCardId: string | null
+  selectedCardLabel: string
+  selectedCardHandle: string
+  dateRangeDays: number
+  exporting: boolean
+  onSelectCard: (value: string) => void
+  onSelectRange: (value: number) => void
+  onRefresh: () => void
+  onExport: () => void
+}): JSX.Element {
+  const metrics = [
+    { label: 'Tracked', value: cardsLoading ? '—' : cards.length },
+    { label: 'Active', value: cardsLoading ? '—' : (dashboardSummary?.activeCards ?? 0) },
+    { label: 'Views', value: cardsLoading ? '—' : (dashboardSummary?.totalViews ?? 0) },
+    { label: 'Leads', value: cardsLoading ? '—' : (dashboardSummary?.totalLeads ?? 0) },
+  ]
+
+  return (
+    <div className="relative overflow-hidden rounded-[24px] border border-white/80 bg-white/60 p-5 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      {/* Decorative background glows */}
+      <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-indigo-400/20 blur-[40px] pointer-events-none" />
+      <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-sky-400/20 blur-[40px] pointer-events-none" />
+
+      {/* Header section */}
+      <div className="relative mb-6">
+        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-indigo-50/80 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 shadow-sm backdrop-blur-md">
+          <TrendingUp className="h-3 w-3" />
+          Analytics
+        </div>
+        <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-800 leading-[1.1]">
+          See what is driving <br />
+          <span className="bg-gradient-to-r from-indigo-500 to-sky-500 bg-clip-text text-transparent">
+            performance.
+          </span>
+        </h1>
+      </div>
+
+      {/* Quick Metrics Grid */}
+      <div className="relative mb-6 grid grid-cols-4 gap-2">
+        {metrics.map(({ label, value }) => (
+          <div
+            key={label}
+            className="flex flex-col items-center justify-center rounded-[20px] border border-white/60 bg-white/40 py-3 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05)] backdrop-blur-md"
+          >
+            <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
+              {label}
+            </p>
+            <p className="mt-0.5 text-lg font-black text-slate-800">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Controls Area */}
+      <div className="relative space-y-4 rounded-[24px] border-2 border-white/60 bg-white/40 p-4 shadow-inner backdrop-blur-lg">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
+            Context
+          </p>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-indigo-600 shadow-[0_4px_12px_-4px_rgba(79,70,229,0.3)] transition-transform active:scale-90 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </button>
+        </div>
+
+        {cards.length > 0 && (
+          <SelectField
+            value={selectedCardId ?? ''}
+            onChange={(event) => onSelectCard(event.target.value)}
+            aria-label="Select card"
+            className="w-full rounded-[16px] border whitespace-nowrap overflow-hidden text-ellipsis border-white/80 bg-white/80 px-4 py-2.5 text-[14px] font-bold text-slate-700 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+          >
+            {cards.map((card) => (
+              <option key={card.id} value={card.id}>
+                /{card.handle} {card.fields['name'] ? `— ${card.fields['name']}` : ''}
+              </option>
+            ))}
+          </SelectField>
+        )}
+
+        {/* Date Ranges */}
+        <div className="flex rounded-[16px] border border-white/60 bg-white/60 p-1 shadow-inner">
+          {DATE_RANGE_OPTIONS.map((option) => (
+            <button
+              key={option.days}
+              type="button"
+              onClick={() => onSelectRange(option.days)}
+              aria-pressed={dateRangeDays === option.days}
+              className={cn(
+                'flex-1 rounded-[12px] py-2 text-[13px] font-bold transition-all duration-300',
+                dateRangeDays === option.days
+                  ? 'bg-indigo-500 text-white shadow-[0_4px_16px_-4px_rgba(79,70,229,0.4)]'
+                  : 'text-slate-500 hover:text-slate-800',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Export Button */}
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={exporting}
+          className="group relative flex w-full items-center justify-center gap-2 rounded-[16px] border-2 border-indigo-200/50 bg-indigo-50/50 px-4 py-3 text-[14px] font-bold text-indigo-700 transition-all hover:bg-white hover:border-indigo-300 hover:shadow-[0_8px_24px_-8px_rgba(79,70,229,0.2)] active:scale-[0.98] disabled:opacity-50 shadow-sm"
+        >
+          <Download className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+          {exporting ? 'Exporting…' : 'Export Leads CSV'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function AnalyticsHero(props: {
+  cards: CardSummary[]
+  cardsLoading: boolean
+  dashboardSummary: DashboardSummary | null
+  focusMessage: string
+  loading: boolean
+  selectedCardId: string | null
+  selectedCardLabel: string
+  selectedCardHandle: string
+  dateRangeDays: number
+  exporting: boolean
+  onSelectCard: (value: string) => void
+  onSelectRange: (value: number) => void
+  onRefresh: () => void
+  onExport: () => void
+}): JSX.Element {
+  return (
+    <>
+      <div className="hidden lg:block">
+        <AnalyticsHeroDesktop {...props} />
+      </div>
+      <div className="block lg:hidden">
+        <AnalyticsHeroMobile {...props} />
+      </div>
+    </>
   )
 }
 
@@ -383,7 +552,7 @@ export function InteractionActionsCard({
   const max = getMaxInteractionValue(dashboardSummary.interactionsByAction)
 
   return (
-    <div className="app-panel rounded-[28px] p-6">
+    <div className="app-panel rounded-[24px] p-6">
       <h2 className="mb-4 text-base font-semibold text-gray-900">Interaction actions</h2>
       <div className="space-y-3">
         {dashboardSummary.interactionsByAction.slice(0, 10).map((item) => {
@@ -457,7 +626,7 @@ export function AnalyticsChartsSection({
       </div>
 
       {analyticsData.charts.clicksByDay.some((item) => item.count > 0) && (
-        <div className="app-panel rounded-[28px] p-6">
+        <div className="app-panel rounded-[24px] p-6">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks over time</h2>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart
@@ -490,7 +659,7 @@ export function AnalyticsChartsSection({
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="app-panel rounded-[28px] p-6">
+        <div className="app-panel rounded-[24px] p-6">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Clicks by platform</h2>
           {analyticsData.charts.clicksByLink.length === 0 ? (
             <p className="py-8 text-center text-sm text-gray-400">No click data yet.</p>
@@ -519,7 +688,7 @@ export function AnalyticsChartsSection({
           )}
         </div>
 
-        <div className="app-panel rounded-[28px] p-6">
+        <div className="app-panel rounded-[24px] p-6">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Device breakdown</h2>
           {analyticsData.charts.deviceBreakdown.length === 0 ? (
             <p className="py-8 text-center text-sm text-gray-400">No device data yet.</p>

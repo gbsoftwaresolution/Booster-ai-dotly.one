@@ -97,13 +97,13 @@ function IconTextarea({
           'focus-within:border-brand-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/20',
         )}
       >
-        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 group-focus-within:text-brand-500 transition-colors" />
+        <Icon className="mt-1 h-[18px] w-[18px] shrink-0 text-gray-400 group-focus-within:text-brand-500 transition-transform duration-300 group-focus-within:scale-110 group-focus-within:-rotate-3" />
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           rows={3}
-          className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none"
+          className="flex-1 resize-none bg-transparent text-[14px] font-bold text-gray-900 placeholder:text-gray-400/80 outline-none tracking-tight leading-relaxed"
         />
       </div>
     </div>
@@ -113,11 +113,12 @@ function IconTextarea({
 // ── Section heading ──────────────────────────────────────────────────────────
 function SectionHeader({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 pt-2">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+        <div className="flex items-center gap-3 pt-6 pb-2">
+      <div className="h-2 w-2 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500 shadow-[0_0_12px_rgba(56,189,248,0.8)]" />
+      <p className="text-[12px] font-extrabold text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap truncate">
         {label}
       </p>
-      <div className="h-px flex-1 bg-gray-100" />
+      <div className="h-[2px] flex-1 bg-gradient-to-r from-slate-200/80 to-transparent rounded-full" />
     </div>
   )
 }
@@ -146,16 +147,19 @@ function AvatarPicker({
 
   return (
     <>
-      <div className="app-panel-subtle flex flex-col items-center gap-3 rounded-[28px] px-4 py-5">
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide self-start">
-          Profile Photo
+      <div className="relative flex flex-col items-center gap-5 rounded-[40px] bg-gradient-to-b from-white/90 to-white/40 border border-white/80 p-8 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.1)] backdrop-blur-2xl">
+        <label className="absolute top-5 left-6 text-[10px] font-extrabold text-brand-500 uppercase tracking-[0.2em] bg-brand-50/80 px-3 py-1 rounded-full border border-brand-100 shadow-sm backdrop-blur-md z-10">
+          Photo
         </label>
+        
+        {/* Decorative glowing backplate */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-brand-400/20 blur-3xl rounded-full pointer-events-none" />
 
-        {/* Avatar circle — click to open uploader */}
+        {/* Avatar circle */}
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="group relative h-24 w-24 rounded-full overflow-hidden ring-4 ring-gray-100 hover:ring-brand-200 transition-all focus:outline-none focus:ring-brand-400"
+          className="group relative h-28 w-28 rounded-full overflow-hidden ring-[6px] ring-white shadow-[0_12px_44px_-12px_rgba(14,165,233,0.4)] hover:ring-brand-100 hover:scale-105 active:scale-95 transition-all duration-300 ease-out focus:outline-none focus:ring-brand-400 z-10"
           aria-label="Change profile photo"
         >
           {avatarUrl ? (
@@ -189,7 +193,7 @@ function AvatarPicker({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+          className="text-[13px] font-bold text-brand-600 bg-brand-50 hover:bg-brand-100/80 px-4 py-2 rounded-full border border-brand-100 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105 active:scale-95 z-10"
         >
           {avatarUrl ? 'Change photo' : 'Add profile photo'}
         </button>
@@ -222,16 +226,17 @@ export function ProfileTab({
       {/* ── Handle ── */}
       <SectionHeader label="Card URL" />
       <div className="group">
-        <div
-          className={cn(
-            'flex items-center rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden',
-            'transition-all duration-150',
-            'focus-within:border-brand-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/20',
-          )}
-        >
-          <div className="flex items-center gap-2 shrink-0 pl-3.5 pr-2">
-            <AtSign className="h-4 w-4 text-gray-400 group-focus-within:text-brand-500 transition-colors" />
-            <span className="text-sm text-gray-400 font-medium">dotly.one/</span>
+              <div
+        className={cn(
+          'relative flex items-center rounded-[24px] border border-white/80 bg-white/60 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.04)] backdrop-blur-xl overflow-hidden',
+          'transition-all duration-300 ease-out z-10',
+          'hover:shadow-[0_8px_24px_-8px_rgba(15,23,42,0.08)] hover:bg-white/80 hover:border-white',
+          'focus-within:!border-brand-300 focus-within:!bg-white focus-within:shadow-[0_16px_40px_-12px_rgba(14,165,233,0.3)] focus-within:ring-4 focus-within:ring-brand-500/10 focus-within:scale-[1.02] focus-within:z-20',
+        )}
+      >
+          <div className="flex h-full items-center gap-2 bg-transparent shrink-0 pl-4 pr-2">
+            <AtSign className="h-[18px] w-[18px] text-gray-400 group-focus-within:text-brand-500 transition-transform duration-300 group-focus-within:scale-110" />
+            <span className="text-[14px] text-gray-400 font-bold group-focus-within:text-gray-600 transition-colors tracking-tight">dotly.one/</span>
           </div>
           <input
             type="text"
@@ -240,10 +245,10 @@ export function ProfileTab({
               onHandleChange(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
             }
             placeholder="your-handle"
-            className="flex-1 bg-transparent py-3 pr-3.5 text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none"
+            className="flex-1 bg-transparent py-4 pr-4 text-[14px] font-bold text-gray-900 placeholder:text-gray-400/80 outline-none tracking-tight"
           />
         </div>
-        <p className="mt-1.5 px-1 text-xs text-gray-400">
+        <p className="mt-2.5 px-2 text-[11px] font-semibold text-gray-400 tracking-wide uppercase">
           Only lowercase letters, numbers, and hyphens.
         </p>
       </div>
@@ -409,16 +414,16 @@ export function ProfileTab({
             </span>
             <div>
               <p
-                className={cn(
-                  'text-sm font-semibold',
-                  vcardPolicy === 'MEMBERS_ONLY' ? 'text-brand-700' : 'text-gray-800',
-                )}
-              >
-                Members only
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Only signed-in Dotly users can download your contact.
-              </p>
+                  className={cn(
+                    'text-[15px] font-extrabold tracking-tight transition-colors',
+                    vcardPolicy === 'MEMBERS_ONLY' ? 'text-brand-700' : 'text-gray-800',
+                  )}
+                >
+                  Members only
+                </p>
+              <p className={cn("text-[13px] font-medium leading-snug transition-colors", vcardPolicy === 'MEMBERS_ONLY' ? 'text-brand-600/80' : 'text-gray-400')}>
+                  Requires signed-in users to download your contact.
+                </p>
             </div>
           </button>
         </div>

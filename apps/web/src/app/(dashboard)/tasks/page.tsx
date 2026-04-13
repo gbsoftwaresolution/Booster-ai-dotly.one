@@ -181,7 +181,7 @@ export default function TasksPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="app-panel relative overflow-hidden rounded-[28px] px-6 py-6 sm:px-8 sm:py-7">
+      <div className="app-panel relative overflow-hidden rounded-[24px] px-6 py-6 sm:px-8 sm:py-7">
         <div
           className="absolute inset-0 opacity-90"
           aria-hidden="true"
@@ -314,10 +314,10 @@ export default function TasksPage(): JSX.Element {
             ))}
           </div>
         ) : error && !hasLoadedOnce ? (
-          <div className="app-empty-state rounded-none border-0 shadow-none">
-            <CheckSquare className="mb-4 h-12 w-12 text-gray-300" />
-            <p className="app-empty-state-title">Tasks are unavailable</p>
-            <p className="app-empty-state-text mt-1">{error}</p>
+          <div className="relative overflow-hidden rounded-[24px] border border-white/80 bg-white/60 px-6 py-12 text-center backdrop-blur-xl shadow-sm transition-all m-4">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-rose-50 to-red-50/50 shadow-inner mb-6"><CheckSquare size={32} className="text-red-400" /></div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Tasks are unavailable</h3>
+            <p className="mx-auto max-w-sm text-sm font-medium text-slate-500 mb-8">{error}</p>
             <button
               type="button"
               onClick={() => void loadTasks()}
@@ -327,9 +327,9 @@ export default function TasksPage(): JSX.Element {
             </button>
           </div>
         ) : tasks.length === 0 ? (
-          <div className="app-empty-state rounded-none border-0 shadow-none">
-            <CheckSquare className="mb-4 h-12 w-12 text-gray-300" />
-            <p className="app-empty-state-title">No tasks in this view</p>
+          <div className="relative overflow-hidden rounded-[24px] border border-white/80 bg-white/60 px-6 py-12 text-center backdrop-blur-xl shadow-sm transition-all m-4">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 to-blue-50/50 shadow-inner mb-6"><CheckSquare size={32} className="text-indigo-400" /></div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">No tasks in this view</h3>
             <p className="app-empty-state-text mt-1">
               Tasks will appear here as they are assigned and completed.
             </p>
@@ -342,7 +342,7 @@ export default function TasksPage(): JSX.Element {
                 const busy = busyTaskIds.has(task.id)
 
                 return (
-                  <div key={task.id} className="app-panel rounded-[24px] p-4">
+                  <div key={task.id} className="group relative flex flex-col gap-4 rounded-[24px] border border-slate-200/60 bg-white/60 p-5 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)] hover:bg-white">
                     <div className="flex items-start gap-3">
                       <input
                         type="checkbox"
@@ -361,33 +361,27 @@ export default function TasksPage(): JSX.Element {
                               {task.title}
                             </p>
                             <p
-                              className={`mt-1 text-sm ${overdue ? 'text-red-600' : 'text-gray-500'}`}
+                              className={`mt-1 text-sm font-medium ${overdue ? "text-rose-500" : "text-slate-500"}`}
                             >
                               {formatDueDate(task.dueAt, userTz)}
                             </p>
                           </div>
                           <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                              task.completed
-                                ? 'bg-green-100 text-green-700'
-                                : overdue
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-blue-100 text-blue-700'
-                            }`}
+                            className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${task.completed ? "bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-500/20" : overdue ? "bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-500/20" : "bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-500/20"}`}
                           >
                             {task.completed ? 'Completed' : overdue ? 'Overdue' : 'Pending'}
                           </span>
                         </div>
 
-                        <div className="flex flex-col gap-2 rounded-2xl bg-gray-50/80 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                        <div className="flex flex-col gap-2 rounded-2xl bg-slate-50/80 p-3.5 border border-slate-100/50">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                             Contact
                           </p>
                           {task.contact ? (
                             <button
                               type="button"
                               onClick={() => setDrawerContactId(task.contact?.id ?? null)}
-                              className="text-left text-sm font-medium text-indigo-600 hover:underline"
+                              className="text-left text-[14px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
                             >
                               {task.contact.name}
                             </button>
@@ -426,34 +420,34 @@ export default function TasksPage(): JSX.Element {
             </div>
 
             <div className="hidden md:block">
-              <table className="app-table">
+              <table className="min-w-full text-left text-sm whitespace-nowrap">
                 <thead>
                   <tr>
-                    <th className="w-12 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    <th className="w-12 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-3">
                       Done
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-3">
                       Task
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-3 hidden md:table-cell">
                       Contact
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-3 hidden lg:table-cell">
                       Due date
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-3">
                       Status
                     </th>
                     <th className="w-24 px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100/80">
+                <tbody className="divide-y divide-slate-100/50">
                   {tasks.map((task) => {
                     const overdue = isOverdue(task)
                     const busy = busyTaskIds.has(task.id)
 
                     return (
-                      <tr key={task.id} className="transition hover:bg-white/65">
+                      <tr key={task.id} className="group relative bg-white/60 backdrop-blur-xl transition-all hover:bg-white hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)] focus-within:bg-white">
                         <td className="px-4 py-3 align-top">
                           <input
                             type="checkbox"
@@ -467,7 +461,7 @@ export default function TasksPage(): JSX.Element {
                         <td className="px-4 py-3">
                           <div>
                             <p
-                              className={`font-medium ${task.completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
+                              className={`text-[15px] font-bold ${task.completed ? "text-slate-400 line-through decoration-slate-300" : "text-slate-900"}`}
                             >
                               {task.title}
                             </p>

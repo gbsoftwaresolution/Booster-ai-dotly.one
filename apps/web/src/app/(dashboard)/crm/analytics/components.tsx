@@ -34,7 +34,7 @@ export function CrmAnalyticsHeader({
   onClear: () => void
 }): JSX.Element {
   return (
-    <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[30px] px-6 py-6 sm:px-8">
+    <div className="app-panel flex flex-wrap items-start justify-between gap-4 rounded-[24px] px-6 py-6 sm:px-8">
       <div>
         <Link
           href="/contacts"
@@ -184,7 +184,7 @@ export function PipelineValueSection({
   maxValue: number
 }): JSX.Element {
   return (
-    <section className="app-panel rounded-[28px] p-5">
+    <section className="app-panel rounded-[24px] p-5">
       <div className="mb-5 flex items-center gap-2">
         <TrendingUp className="h-5 w-5 text-indigo-600" />
         <h2 className="text-base font-semibold text-gray-900">Pipeline value by stage</h2>
@@ -246,7 +246,7 @@ export function ContactFunnelSection({
   funnelMaxCount: number
 }): JSX.Element {
   return (
-    <section className="app-panel rounded-[28px] p-5">
+    <section className="app-panel rounded-[24px] p-5">
       <div className="mb-5 flex items-center gap-2">
         <BarChart3 className="h-5 w-5 text-indigo-600" />
         <h2 className="text-base font-semibold text-gray-900">Contact stage funnel</h2>

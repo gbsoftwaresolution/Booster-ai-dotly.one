@@ -194,7 +194,7 @@ export function ThemeTab({
       {/* ── Template picker ── */}
       <div className="space-y-3">
         <SectionHeader label="Template" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           {CARD_TEMPLATES.map((tmpl) => {
             const active = templateId === tmpl.id
             return (

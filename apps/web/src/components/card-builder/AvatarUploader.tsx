@@ -14,6 +14,7 @@
 
 import type { JSX } from 'react'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 import { X, Upload, Camera, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react'
@@ -54,7 +55,7 @@ function useFocusTrap(
     const last = focusable[focusable.length - 1]
 
     // Auto-focus first focusable element
-    first?.focus()
+    first?.focus({ preventScroll: true })
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -70,12 +71,12 @@ function useFocusTrap(
       if (e.shiftKey) {
         if (document.activeElement === first) {
           e.preventDefault()
-          last?.focus()
+          last?.focus({ preventScroll: true })
         }
       } else {
         if (document.activeElement === last) {
           e.preventDefault()
-          first?.focus()
+          first?.focus({ preventScroll: true })
         }
       }
     }
@@ -555,8 +556,11 @@ export function AvatarUploader({
 
   // Focus trap + Escape key inside the panel
   useFocusTrap(panelRef, true, onClose)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return <></>
 
-  return (
+  return createPortal(
     /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
@@ -572,7 +576,7 @@ export function AvatarUploader({
         role="dialog"
         aria-modal="true"
         aria-labelledby="avatar-dialog-title"
-        className="relative z-10 w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl"
+        className="relative z-10 flex w-full max-w-sm flex-col max-h-[90dvh] rounded-t-[32px] sm:rounded-[32px] bg-white p-5 shadow-[0_-8px_40px_rgba(0,0,0,0.12)] mb-[env(safe-area-inset-bottom)] sm:mb-0"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -637,9 +641,13 @@ export function AvatarUploader({
         </div>
 
         {/* Tab content */}
-        {tab === 'upload' && <UploadTab cardId={cardId} onConfirm={handleConfirm} />}
+        <div className="flex-1 min-h-0 overflow-y-auto w-full">
+          {tab === 'upload' && <UploadTab cardId={cardId} onConfirm={handleConfirm} />}
+        </div>
         {tab === 'camera' && <CameraTab cardId={cardId} onConfirm={handleConfirm} />}
+
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

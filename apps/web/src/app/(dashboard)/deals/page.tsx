@@ -200,77 +200,69 @@ export default function DealsPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      {/* Header row */}
-      <div className="app-panel relative overflow-hidden rounded-[28px] px-6 py-6 sm:px-8 sm:py-7">
-        <div
-          className="absolute inset-0 opacity-90"
-          aria-hidden="true"
-          style={{
-            background:
-              'radial-gradient(circle at top left, rgba(99,102,241,0.14), transparent 34%), radial-gradient(circle at right center, rgba(59,130,246,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
-          }}
-        />
-        <div className="relative space-y-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 sm:text-[2rem]">Deals</h1>
-              <p className="mt-2 max-w-2xl text-sm text-gray-600 sm:text-[15px]">
-                Track active revenue opportunities, keep stage movement clear, and stay focused on
-                the deals most likely to close.
-              </p>
+      {/* Premium Header */}
+      <div className="relative overflow-hidden rounded-[24px] border border-slate-200/60 bg-white/60 p-4 sm:p-6 backdrop-blur-xl mb-6 shadow-sm">
+        {/* Background glows */}
+                        <div className="absolute left-1/2 top-1/2 h-full w-full -translate-x-1/2 -translate-y-1/2 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at center, #94a3b8 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+
+        <div className="relative z-10 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50/50 px-3 py-1 shadow-inner backdrop-blur-sm">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600">Sales Pipeline</span>
             </div>
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+              Active <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-emerald-600">Deals</span>
+            </h1>
+            <p className="mt-3 max-w-xl text-sm font-medium text-slate-500 sm:text-base">
+              Track revenue opportunities, keep stage movement clear, and stay focused on the deals most likely to close.
+            </p>
+          </div>
+          
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            {/* Quick Stats in Header */}
+            <div className="flex gap-4 rounded-2xl border border-sky-100 bg-sky-50/50 px-5 py-4 backdrop-blur-md">
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pipeline Value</p>
+                    <p className="mt-1 flex items-baseline gap-2 text-2xl font-bold tracking-tight text-slate-900">
+                        {loading ? '—' : formatCurrency(totalPipelineValue, pipelineCurrency)}
+                    </p>
+                </div>
+                <div className="h-10 w-px bg-slate-200/60" />
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Win Rate</p>
+                    <p className="mt-1 flex items-baseline gap-2 text-2xl font-bold tracking-tight text-slate-900">
+                        {loading ? '—' : winRate != null ? `${Math.round(winRate)}%` : '—'}
+                    </p>
+                </div>
+            </div>
+
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 self-start rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+              className="group relative flex items-center gap-2 overflow-hidden rounded-2xl bg-white px-5 py-4 text-sm font-bold text-slate-900 shadow-lg transition-all hover:scale-105 active:scale-95"
             >
-              <Plus className="h-4 w-4" />
-              New Deal
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-100 to-emerald-100 opacity-0 transition-opacity group-hover:opacity-100" />
+              <Plus className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">New Deal</span>
             </button>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:max-w-3xl sm:grid-cols-4">
-            {[
-              { label: 'Active Deals', value: loading ? '—' : activeDealsCount },
-              {
-                label: 'Pipeline Value',
-                value: loading ? '—' : formatCurrency(totalPipelineValue, pipelineCurrency),
-              },
-              {
-                label: 'Weighted Value',
-                value: loading ? '—' : formatCurrency(weightedPipelineValue, pipelineCurrency),
-              },
-              {
-                label: 'Win Rate',
-                value: loading ? '—' : winRate != null ? `${Math.round(winRate)}%` : '—',
-              },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-white/80 bg-white/88 px-3 py-3 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.16)]"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                  {label}
-                </p>
-                <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex max-w-full items-start gap-3 rounded-2xl border border-white/80 bg-white/88 px-4 py-3 text-sm text-gray-700 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.18)]">
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-              <TrendingUp className="h-4 w-4" />
+        </div>
+        
+        {/* Pipeline Focus Message */}
+        <div className="relative z-10 mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm shadow-inner backdrop-blur-md">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300">
+                <Target className="h-3 w-3" />
             </span>
             <div className="min-w-0">
-              <p className="font-medium text-gray-900">Pipeline focus</p>
-              <p className="mt-1 text-sm text-gray-600">{focusMessage}</p>
+                <p className="font-semibold text-indigo-100">Pipeline focus</p>
+                <p className="mt-0.5 text-[13px] text-indigo-200/80">{focusMessage}</p>
             </div>
-          </div>
         </div>
       </div>
 
       {/* Search + filter bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl bg-white/40 p-2 shadow-sm border border-white/60 backdrop-blur-md">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <div className="relative w-full sm:w-auto">
             <label htmlFor={searchId} className="sr-only">
@@ -284,7 +276,7 @@ export default function DealsPage(): JSX.Element {
               onChange={(e) => {
                 setSearch(e.target.value)
               }}
-              className="w-full rounded-xl border border-gray-300 py-2.5 pl-3 pr-4 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:w-64"
+              className="w-full rounded-[18px] border-none shadow-sm bg-white py-2.5 pl-4 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 sm:w-72"
             />
           </div>
           <label htmlFor={stageFilterId} className="sr-only">
@@ -294,7 +286,7 @@ export default function DealsPage(): JSX.Element {
             id={stageFilterId}
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value as DealStage | 'ALL')}
-            className="w-full rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100 sm:w-auto"
+            className="w-full rounded-[18px] border-none shadow-sm bg-white px-4 py-2.5 pr-10 font-medium focus:ring-2 focus:ring-indigo-500/50 sm:w-auto"
           >
             <option value="ALL">All stages</option>
             {DEAL_STAGES.map((s) => (

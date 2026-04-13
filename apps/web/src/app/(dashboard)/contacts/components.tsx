@@ -68,7 +68,7 @@ export function ContactsHeader({
 }): JSX.Element {
   return (
     <>
-      <div className="app-panel relative hidden overflow-hidden rounded-[34px] px-5 py-6 md:block md:px-8 md:py-7">
+      <div className="app-panel relative hidden overflow-hidden rounded-[24px] px-5 py-6 md:block md:px-8 md:py-7">
         <div
           className="absolute inset-0 opacity-90"
           aria-hidden="true"
@@ -145,7 +145,7 @@ export function ContactsHeader({
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/70 bg-white/72 p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] sm:app-panel-subtle sm:rounded-[30px] sm:border-0 sm:bg-transparent sm:p-5 sm:shadow-none">
+          <div className="rounded-[24px] border border-white/70 bg-white/72 p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] sm:app-panel-subtle sm:rounded-[24px] sm:border-0 sm:bg-transparent sm:p-5 sm:shadow-none">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">

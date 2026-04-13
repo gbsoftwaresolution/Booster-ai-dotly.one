@@ -74,7 +74,7 @@ export function EditTaskModal({
   }
 
   return (
-    <div className="app-dialog-shell">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-md transition-all sm:p-6">
       <div
         ref={dialogRef}
         role="dialog"
@@ -99,7 +99,7 @@ export function EditTaskModal({
             type="button"
             onClick={onClose}
             aria-label="Close edit task dialog"
-            className="app-touch-target rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
           >
             <span className="sr-only">Close</span>
             <X size={20} />
@@ -109,7 +109,7 @@ export function EditTaskModal({
           <div>
             <label
               htmlFor="edit-task-title"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
             >
               Title <span className="text-red-500">*</span>
             </label>
@@ -135,7 +135,7 @@ export function EditTaskModal({
           <div>
             <label
               htmlFor="edit-task-due-at"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
             >
               Due date
             </label>
@@ -297,7 +297,7 @@ export function CreateTaskModal({
   }
 
   return (
-    <div className="app-dialog-shell">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-md transition-all sm:p-6">
       <div
         ref={dialogRef}
         role="dialog"
@@ -322,7 +322,7 @@ export function CreateTaskModal({
             type="button"
             onClick={onClose}
             aria-label="Close create task dialog"
-            className="app-touch-target rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
           >
             <span className="sr-only">Close</span>
             <X size={20} />
@@ -337,7 +337,7 @@ export function CreateTaskModal({
           <div>
             <label
               htmlFor="create-task-contact-search"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
             >
               Contact <span className="text-red-500">*</span>
             </label>
@@ -413,7 +413,7 @@ export function CreateTaskModal({
           <div>
             <label
               htmlFor="create-task-title"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
             >
               Title <span className="text-red-500">*</span>
             </label>
@@ -440,7 +440,7 @@ export function CreateTaskModal({
           <div>
             <label
               htmlFor="create-task-due-at"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
             >
               Due date
             </label>
@@ -521,7 +521,7 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="tasks-confirm-dialog-title"
-        className="app-confirm-panel"
+        className="relative mx-auto w-full max-w-sm rounded-[24px] bg-white/95 p-6 sm:p-8 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
       >
         <h3 id="tasks-confirm-dialog-title" className="text-sm font-semibold text-gray-900">
           {title}

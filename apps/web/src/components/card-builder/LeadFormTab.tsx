@@ -146,9 +146,13 @@ function newField(order: number): LeadField {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
-      {children}
-    </p>
+    <div className="flex items-center gap-3 pt-6 pb-2">
+      <div className="h-2 w-2 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+      <p className="text-[12px] font-extrabold text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap truncate">
+        {children}
+      </p>
+      <div className="h-[2px] flex-1 bg-gradient-to-r from-slate-200/80 to-transparent rounded-full" />
+    </div>
   )
 }
 
@@ -165,7 +169,7 @@ function TextInput({
 }) {
   return (
     <div>
-      <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+      <label className="block text-[12px] font-extrabold uppercase tracking-widest text-gray-400 mb-2 ml-1">
         {label}
       </label>
       <input
@@ -173,7 +177,7 @@ function TextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-300 outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/10"
+        className="w-full rounded-[20px] border border-white/80 bg-white/60 px-4 py-3 text-[15px] font-medium text-gray-900 placeholder-gray-400 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.04)] backdrop-blur-xl outline-none transition-all duration-300 ease-out focus:border-emerald-300 focus:bg-white focus:shadow-[0_16px_40px_-12px_rgba(16,185,129,0.25)] focus:ring-4 focus:ring-emerald-500/10 focus:scale-[1.01]"
       />
     </div>
   )
@@ -191,7 +195,7 @@ function FieldTypeSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as LeadFieldType)}
-        className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 pr-8 text-sm text-gray-900 outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/10"
+        className="w-full appearance-none rounded-[20px] border border-white/80 bg-white/60 px-4 py-3 pr-10 text-[15px] font-medium text-gray-900 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.04)] backdrop-blur-xl outline-none transition-all duration-300 ease-out focus:border-emerald-300 focus:bg-white focus:shadow-[0_16px_40px_-12px_rgba(16,185,129,0.25)] focus:ring-4 focus:ring-emerald-500/10 focus:scale-[1.01]"
       >
         {(Object.keys(FIELD_TYPE_LABELS) as LeadFieldType[]).map((t) => (
           <option key={t} value={t}>
@@ -234,104 +238,107 @@ function FieldCard({
   }
 
   return (
-    <div className="app-panel rounded-[24px] overflow-hidden">
+    <div className="relative overflow-hidden rounded-[32px] border border-white/80 bg-white/60 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.06)] backdrop-blur-xl transition-all duration-300 hover:shadow-[0_12px_36px_-12px_rgba(15,23,42,0.12)] hover:bg-white">
       {/* Header row */}
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        {/* Drag handle (visual only) */}
-        <div className="flex flex-col gap-0.5 text-gray-300 shrink-0">
-          <GripVertical className="h-4 w-4" />
-        </div>
+      <div className="flex flex-wrap items-center gap-y-3 gap-x-2 px-4 py-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+          {/* Drag handle (visual only) */}
+          <div className="flex flex-col gap-0.5 text-gray-300 shrink-0">
+            <GripVertical className="h-4 w-4" />
+          </div>
 
-        {/* Type badge */}
-        <span className="flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-500 shrink-0">
-          {FIELD_TYPE_ICONS[field.fieldType]}
-          {FIELD_TYPE_LABELS[field.fieldType]}
-        </span>
-
-        {/* Label preview */}
-        <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">
-          {field.label || <span className="text-gray-300 italic">Untitled field</span>}
-        </span>
-
-        {field.required && (
-          <span className="shrink-0 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-500">
-            Required
+          {/* Type badge */}
+          <span className="flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-500 shrink-0">
+            {FIELD_TYPE_ICONS[field.fieldType]}
+            {FIELD_TYPE_LABELS[field.fieldType]}
           </span>
-        )}
 
-        {/* Reorder */}
-        <div className="flex items-center gap-0.5 shrink-0">
+          {/* Label preview */}
+          <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">
+            {field.label || <span className="text-gray-300 italic">Untitled field</span>}
+          </span>
+
+          {field.required && (
+            <span className="shrink-0 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-500">
+              Required
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
+          {/* Reorder */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={index === 0}
+              className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Move up"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={index === total - 1}
+              className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Move down"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Expand toggle */}
           <button
             type="button"
-            onClick={onMoveUp}
-            disabled={index === 0}
-            className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Move up"
+            onClick={() => setExpanded((x) => !x)}
+            className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition-colors shrink-0"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <polyline points="18 15 12 9 6 15" />
-            </svg>
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 transition-transform duration-200',
+                expanded && 'rotate-180',
+              )}
+            />
           </button>
+
+          {/* Delete */}
           <button
             type="button"
-            onClick={onMoveDown}
-            disabled={index === total - 1}
-            className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-gray-100 hover:text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Move down"
+            onClick={onDelete}
+            className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
+            aria-label="Remove field"
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
-
-        {/* Expand toggle */}
-        <button
-          type="button"
-          onClick={() => setExpanded((x) => !x)}
-          className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition-colors shrink-0"
-          aria-label={expanded ? 'Collapse' : 'Expand'}
-        >
-          <ChevronDown
-            className={cn(
-              'h-3.5 w-3.5 transition-transform duration-200',
-              expanded && 'rotate-180',
-            )}
-          />
-        </button>
-
-        {/* Delete */}
-        <button
-          type="button"
-          onClick={onDelete}
-          className="app-touch-target flex h-9 w-9 items-center justify-center rounded-xl text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
-          aria-label="Remove field"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
       </div>
 
       {/* Expanded editor */}
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50/60 px-3 py-3 flex flex-col gap-3">
+        <div className="border-t border-white/60 bg-white/40 px-5 py-5 flex flex-col gap-5">
           {/* Label + Type */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TextInput
               label="Label"
               value={field.label}
@@ -339,7 +346,7 @@ function FieldCard({
               placeholder="e.g. Company"
             />
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+              <label className="block text-[12px] font-extrabold uppercase tracking-widest text-gray-400 mb-2 ml-1">
                 Type
               </label>
               <FieldTypeSelect
@@ -360,7 +367,7 @@ function FieldCard({
           {/* SELECT options */}
           {field.fieldType === 'SELECT' && (
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+              <label className="block text-[12px] font-extrabold uppercase tracking-widest text-gray-400 mb-2 ml-1">
                 Options (one per line)
               </label>
               <textarea
@@ -368,7 +375,7 @@ function FieldCard({
                 value={field.options.join('\n')}
                 onChange={(e) => updateOptions(e.target.value)}
                 placeholder={'Option A\nOption B\nOption C'}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-300 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 resize-none"
+                className="w-full rounded-[24px] border border-white/80 bg-white/60 px-5 py-4 text-[15px] font-medium text-gray-900 placeholder-gray-400 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.04)] backdrop-blur-xl outline-none transition-all duration-300 ease-out focus:border-emerald-300 focus:bg-white focus:shadow-[0_16px_40px_-12px_rgba(16,185,129,0.25)] focus:ring-4 focus:ring-emerald-500/10 focus:scale-[1.01] resize-none"
               />
             </div>
           )}
@@ -384,18 +391,18 @@ function FieldCard({
               />
               <div
                 className={cn(
-                  'h-5 w-9 rounded-full transition-colors duration-200',
-                  field.required ? 'bg-brand-500' : 'bg-gray-200',
+                  'h-6 w-11 rounded-full transition-colors duration-300 shadow-inner',
+                  field.required ? 'bg-emerald-500' : 'bg-gray-200',
                 )}
               />
               <div
                 className={cn(
-                  'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-200',
-                  field.required ? 'left-[18px]' : 'left-0.5',
+                  'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.2)] transition-all duration-300',
+                  field.required ? 'left-[22px]' : 'left-0.5',
                 )}
               />
             </div>
-            <span className="text-sm font-medium text-gray-700">Required</span>
+            <span className="text-[14px] font-bold text-gray-800 tracking-tight">Required</span>
           </label>
         </div>
       )}
@@ -495,7 +502,7 @@ export function LeadFormTab({ cardId }: LeadFormTabProps): JSX.Element {
       {/* Form settings */}
       <section>
         <SectionLabel>Form Settings</SectionLabel>
-        <div className="app-panel rounded-[28px] p-4 flex flex-col gap-3">
+        <div className="relative rounded-[32px] border border-white/80 bg-white/60 p-6 flex flex-col gap-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.06)] backdrop-blur-xl transition-all duration-300 hover:shadow-[0_12px_36px_-12px_rgba(15,23,42,0.12)] hover:bg-white">
           <TextInput
             label="Title"
             value={form.title}

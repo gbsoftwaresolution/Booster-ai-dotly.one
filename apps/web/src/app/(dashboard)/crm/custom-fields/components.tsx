@@ -84,15 +84,15 @@ export function CustomFieldFormModal({
   }
 
   return (
-    <div className="app-dialog-shell">
-      <div ref={dialogRef} className="app-dialog-panel max-w-md">
-        <div className="app-dialog-body-scroll p-6">
-          <h2 className="mb-5 text-lg font-bold text-gray-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-md transition-all sm:p-6">
+      <div ref={dialogRef} className="relative mx-auto w-full max-w-md my-8 rounded-[24px] bg-white/95 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container">
+        <div className="max-h-[70vh] overflow-y-auto p-8 custom-scrollbar">
+          <h2 className="mb-8 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[28px]">
             {editingField ? 'Edit Custom Field' : 'New Custom Field'}
           </h2>
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
                 Label <span className="text-red-500">*</span>
               </label>
               <input
@@ -101,11 +101,11 @@ export function CustomFieldFormModal({
                 onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
                 placeholder="e.g. LinkedIn URL, Lead Source"
                 maxLength={100}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-2xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5 text-sm font-medium text-slate-900 transition-all placeholder:text-slate-400 hover:bg-white focus:border-indigo-500 focus:bg-white focus:ring-[3px] focus:ring-indigo-500/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Field Type</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Field Type</label>
               <SelectField
                 value={form.fieldType}
                 onChange={(e) =>
@@ -122,7 +122,7 @@ export function CustomFieldFormModal({
             </div>
             {form.fieldType === 'SELECT' && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
                   Options <span className="font-normal text-gray-400">(comma-separated)</span>
                 </label>
                 <input
@@ -130,18 +130,18 @@ export function CustomFieldFormModal({
                   value={form.options}
                   onChange={(e) => setForm((prev) => ({ ...prev, options: e.target.value }))}
                   placeholder="Option A, Option B, Option C"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-2xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5 text-sm font-medium text-slate-900 transition-all placeholder:text-slate-400 hover:bg-white focus:border-indigo-500 focus:bg-white focus:ring-[3px] focus:ring-indigo-500/20"
                 />
               </div>
             )}
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Display Order</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Display Order</label>
               <input
                 type="number"
                 min={0}
                 value={form.displayOrder}
                 onChange={(e) => setForm((prev) => ({ ...prev, displayOrder: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-2xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5 text-sm font-medium text-slate-900 transition-all placeholder:text-slate-400 hover:bg-white focus:border-indigo-500 focus:bg-white focus:ring-[3px] focus:ring-indigo-500/20"
               />
             </div>
             {formError && (
@@ -149,7 +149,7 @@ export function CustomFieldFormModal({
             )}
           </div>
         </div>
-        <div className="app-dialog-footer mt-0">
+        <div className="mt-0">
           <button
             ref={cancelButtonRef}
             onClick={onClose}
@@ -196,7 +196,7 @@ function SortableFieldRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
+      className="group relative flex items-center gap-4 rounded-[24px] border border-slate-200/60 bg-white/60 p-5 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)] hover:bg-white"
     >
       <button
         type="button"
@@ -210,8 +210,8 @@ function SortableFieldRow({
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate font-semibold text-gray-900">{field.label}</span>
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+          <span className="truncate text-base font-bold text-slate-900">{field.label}</span>
+          <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] uppercase tracking-wider font-bold text-indigo-600 ring-1 ring-inset ring-indigo-500/20">
             {FIELD_TYPE_LABELS[field.fieldType]}
           </span>
         </div>
@@ -220,7 +220,7 @@ function SortableFieldRow({
             {field.options.map((option) => (
               <span
                 key={option}
-                className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
+                className="rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 border border-slate-200/50"
               >
                 {option}
               </span>
@@ -232,7 +232,7 @@ function SortableFieldRow({
         <button
           onClick={() => onEdit(field)}
           disabled={reordering || deletingId !== null}
-          className="rounded p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50"
           title="Edit"
         >
           <Pencil size={14} />
@@ -240,7 +240,7 @@ function SortableFieldRow({
         <button
           onClick={() => onDelete(field)}
           disabled={reordering || deletingId !== null}
-          className="rounded p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
           title="Delete"
         >
           {deletingId === field.id ? (
@@ -328,25 +328,25 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="custom-fields-confirm-dialog-title"
-        className="app-confirm-panel"
+        className="relative mx-auto w-full max-w-sm rounded-[24px] bg-white/95 p-6 sm:p-8 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
       >
-        <h3 id="custom-fields-confirm-dialog-title" className="text-sm font-semibold text-gray-900">
+        <h3 id="custom-fields-confirm-dialog-title" className="text-xl font-extrabold tracking-tight text-slate-900">
           {title}
         </h3>
-        <p className="mt-1 text-sm text-gray-600">{message}</p>
+        <p className="mt-2 text-sm font-medium text-slate-500">{message}</p>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
-            className="app-touch-target rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="app-touch-target rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="app-touch-target rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+            className="app-touch-target rounded-2xl bg-rose-500 px-5 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-rose-600 hover:shadow-lg"
           >
             Delete
           </button>
