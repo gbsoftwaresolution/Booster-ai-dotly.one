@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
 import { GoogleCalendarService } from './google-calendar.service'
+import { ContactsService } from '../contacts/contacts.service'
 import { CreateAppointmentTypeDto } from './dto/create-appointment-type.dto'
 import { UpdateAppointmentTypeDto } from './dto/update-appointment-type.dto'
 import { SetAvailabilityDto } from './dto/set-availability.dto'
@@ -184,6 +185,7 @@ export class SchedulingService {
     private readonly email: EmailService,
     private readonly googleCalendar: GoogleCalendarService,
     private readonly config: ConfigService,
+    private readonly contactsService: ContactsService,
   ) {
     const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
     const allowedAssetHosts = new Set<string>(['cdn.dotly.one'])
@@ -698,6 +700,18 @@ export class SchedulingService {
           `sendBookingNotificationToOwner failed: ${err instanceof Error ? err.message : String(err)}`,
         ),
       )
+
+    void this.contactsService
+      .create(ownerUserId, {
+        name: dto.guestName,
+        email: dto.guestEmail,
+        notes: dto.guestNotes,
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        if (message.includes('already exists')) return
+        this.logger.warn(`create CRM contact from booking failed: ${message}`)
+      })
 
     return booking
   }

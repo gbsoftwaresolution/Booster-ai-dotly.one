@@ -57,6 +57,9 @@ describe('SchedulingService booking buffers', () => {
       updateEvent: jest.fn().mockResolvedValue(undefined),
     }
     const config = { get: jest.fn().mockReturnValue('https://cdn.dotly.one') }
+    const contactsService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    }
 
     return {
       service: new SchedulingService(
@@ -64,8 +67,10 @@ describe('SchedulingService booking buffers', () => {
         email as never,
         googleCalendar as never,
         config as never,
+        contactsService as never,
       ),
       bookingFindFirst,
+      contactsService,
     }
   }
 
@@ -147,5 +152,25 @@ describe('SchedulingService booking buffers', () => {
         }),
       }),
     )
+  })
+
+  it('creates a CRM contact after a successful booking', async () => {
+    const { service, contactsService } = createService({
+      bookingFindFirst: jest.fn().mockResolvedValue(null),
+    })
+
+    await service.createBooking('owner_1', 'intro-call', {
+      startAt: '2026-04-13T10:00:00.000Z',
+      guestName: 'Guest User',
+      guestEmail: 'guest@example.com',
+      guestNotes: 'Interested in pricing',
+      answers: [],
+    })
+
+    expect(contactsService.create).toHaveBeenCalledWith('owner_1', {
+      name: 'Guest User',
+      email: 'guest@example.com',
+      notes: 'Interested in pricing',
+    })
   })
 })

@@ -37,6 +37,14 @@ export interface AppointmentType {
   _count: { bookings: number }
 }
 
+export interface SchedulingCardOption {
+  id: string
+  handle: string
+  fields?: {
+    bookingAppointmentSlug?: string
+  }
+}
+
 export interface Booking {
   id: string
   startAt: string

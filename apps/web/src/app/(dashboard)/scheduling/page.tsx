@@ -31,7 +31,14 @@ import {
   SchedulingConfirmDialog,
 } from './components'
 import { ALL_DAYS, API_URL, copyToClipboard, statusColors } from './helpers'
-import type { AppointmentType, Booking, ConfirmState, DayOfWeek, GoogleStatusState } from './types'
+import type {
+  AppointmentType,
+  Booking,
+  ConfirmState,
+  DayOfWeek,
+  GoogleStatusState,
+  SchedulingCardOption,
+} from './types'
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -69,14 +76,16 @@ export default function SchedulingPage(): JSX.Element {
   const [showAllBookings, setShowAllBookings] = useState(false)
 
   // Cards for booking link — allow user to select which card to use
-  const [allCards, setAllCards] = useState<{ id: string; handle: string }[]>([])
+  const [allCards, setAllCards] = useState<SchedulingCardOption[]>([])
   const [cardHandle, setCardHandle] = useState<string | null>(null)
+  const [savingCardId, setSavingCardId] = useState<string | null>(null)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const getToken = useCallback(async () => (await getAccessToken()) ?? undefined, [])
   const schedulingBasePath = pathname.startsWith('/scheduling') ? '/scheduling' : '/apps/scheduling'
   const routeView =
-    pathname === '/apps/scheduling/appointment-types' || pathname === '/scheduling/appointment-types'
+    pathname === '/apps/scheduling/appointment-types' ||
+    pathname === '/scheduling/appointment-types'
       ? 'appointment-types'
       : pathname === '/apps/scheduling/availability' || pathname === '/scheduling/availability'
         ? 'availability'
@@ -158,7 +167,9 @@ export default function SchedulingPage(): JSX.Element {
     }
     const nextQuery = params.toString()
     router.replace(
-      nextQuery ? `${schedulingBasePath}/availability?${nextQuery}` : `${schedulingBasePath}/availability`,
+      nextQuery
+        ? `${schedulingBasePath}/availability?${nextQuery}`
+        : `${schedulingBasePath}/availability`,
       { scroll: false },
     )
   }
@@ -197,7 +208,7 @@ export default function SchedulingPage(): JSX.Element {
           `/scheduling/bookings${showAllBookings ? '' : '?upcoming=true'}`,
           token ?? undefined,
         ),
-        apiGet<ItemsResponse<{ id: string; handle: string }>>('/cards', token ?? undefined),
+        apiGet<ItemsResponse<SchedulingCardOption>>('/cards', token ?? undefined),
         apiGet<{ connected: boolean; googleEmail?: string }>(
           '/scheduling/google/status',
           token ?? undefined,
@@ -445,8 +456,46 @@ export default function SchedulingPage(): JSX.Element {
       }
       window.location.assign(response.url)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to start Google Calendar connection', false)
+      showToast(
+        e instanceof Error ? e.message : 'Failed to start Google Calendar connection',
+        false,
+      )
       setGoogleLoading(false)
+    }
+  }
+
+  async function handleBookingCardSetting(cardId: string, bookingAppointmentSlug: string | null) {
+    if (savingCardId) return
+    setSavingCardId(cardId)
+    try {
+      const token = await getToken()
+      await apiPut(
+        `/cards/${cardId}`,
+        { fields: { bookingAppointmentSlug: bookingAppointmentSlug ?? '' } },
+        token,
+      )
+      setAllCards((prev) =>
+        prev.map((card) => {
+          if (card.id !== cardId) return card
+          const nextFields = { ...(card.fields ?? {}) }
+          if (bookingAppointmentSlug) {
+            nextFields.bookingAppointmentSlug = bookingAppointmentSlug
+          } else {
+            delete nextFields.bookingAppointmentSlug
+          }
+          return {
+            ...card,
+            fields: nextFields,
+          }
+        }),
+      )
+      showToast(
+        bookingAppointmentSlug ? 'Public card booking enabled' : 'Public card booking turned off',
+      )
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to update card booking setting', false)
+    } finally {
+      setSavingCardId(null)
     }
   }
 
@@ -540,14 +589,26 @@ export default function SchedulingPage(): JSX.Element {
       <div className="mx-auto w-full max-w-[1400px] space-y-8">
         {/* Header */}
         <div className="group relative flex flex-col gap-6 overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] hover:bg-white/50 ring-1 ring-black/5 mb-8">
-          <div className="absolute inset-0 transition-opacity duration-1000 opacity-20 group-hover:opacity-40 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at center, #94a3b8 1.5px, transparent 1.5px)", backgroundSize: "32px 32px" }} /><div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/10 pointer-events-none" />
+          <div
+            className="absolute inset-0 transition-opacity duration-1000 opacity-20 group-hover:opacity-40 pointer-events-none"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at center, #94a3b8 1.5px, transparent 1.5px)',
+              backgroundSize: '32px 32px',
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/10 pointer-events-none" />
           <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 sm:gap-5 text-center sm:text-left w-full sm:w-auto">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-indigo-50 to-sky-50 shadow-[inset_0_2px_4px_rgba(255,255,255,0.8),0_8px_16px_-6px_rgba(79,70,229,0.2)] text-indigo-600 border border-white ring-1 ring-indigo-100 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
               <Calendar className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 sm:mb-2">{pageTitle}</h1>
-              <p className="text-sm sm:text-base font-medium text-slate-500 max-w-[280px] sm:max-w-none mx-auto sm:mx-0 leading-relaxed">{pageDescription}</p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 sm:mb-2">
+                {pageTitle}
+              </h1>
+              <p className="text-sm sm:text-base font-medium text-slate-500 max-w-[280px] sm:max-w-none mx-auto sm:mx-0 leading-relaxed">
+                {pageDescription}
+              </p>
             </div>
           </div>
           <button
@@ -557,7 +618,9 @@ export default function SchedulingPage(): JSX.Element {
             }}
             className="group/btn relative z-10 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-extrabold text-white shadow-[0_0_20px_-5px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_0_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 sm:w-auto ring-1 ring-indigo-500/50"
           >
-            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" /><Plus className="h-4 w-4 relative z-10" /> <span className="relative z-10">New Appointment Type</span>
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" />
+            <Plus className="h-4 w-4 relative z-10" />{' '}
+            <span className="relative z-10">New Appointment Type</span>
           </button>
         </div>
 
@@ -566,9 +629,13 @@ export default function SchedulingPage(): JSX.Element {
           <div className="flex items-center gap-3 rounded-[24px] border border-sky-100 bg-sky-50/50 px-5 py-4 backdrop-blur-md shadow-inner">
             <Link2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold uppercase tracking-wider text-slate-600">Google Calendar</span>
+              <span className="text-sm font-bold uppercase tracking-wider text-slate-600">
+                Google Calendar
+              </span>
               {googleStatus.state === 'connected' && googleStatus.googleEmail && (
-                <span className="ml-2 text-sm font-medium text-slate-500">{googleStatus.googleEmail}</span>
+                <span className="ml-2 text-sm font-medium text-slate-500">
+                  {googleStatus.googleEmail}
+                </span>
               )}
               {googleStatus.state === 'unavailable' && (
                 <span className="ml-2 text-xs text-amber-600">
@@ -649,7 +716,7 @@ export default function SchedulingPage(): JSX.Element {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`relative rounded-[18px] px-6 py-3 text-sm font-extrabold transition-all duration-500 ${tab === t ? "bg-white text-indigo-600 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] ring-1 ring-black/5 scale-[1.02]" : "text-slate-500 hover:text-slate-800 hover:bg-white/60 hover:shadow-sm"}`}
+                className={`relative rounded-[18px] px-6 py-3 text-sm font-extrabold transition-all duration-500 ${tab === t ? 'bg-white text-indigo-600 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] ring-1 ring-black/5 scale-[1.02]' : 'text-slate-500 hover:text-slate-800 hover:bg-white/60 hover:shadow-sm'}`}
               >
                 {t === 'types'
                   ? 'Appointment Types'
@@ -678,7 +745,9 @@ export default function SchedulingPage(): JSX.Element {
         {/* ── Card selector for booking links ───────────────────────────────── */}
         {allCards.length > 1 && !cardsError && (
           <div className="flex flex-col gap-4 rounded-[24px] border border-slate-200/60 bg-white/60 p-5 backdrop-blur-xl sm:flex-row sm:items-center">
-            <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Booking links use card:</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-slate-500">
+              Booking links use card:
+            </span>
             <SelectField
               value={cardHandle ?? ''}
               onChange={(e) => setCardHandle(e.target.value)}
@@ -693,12 +762,63 @@ export default function SchedulingPage(): JSX.Element {
           </div>
         )}
 
+        {!loading && !error && !cardsError && allCards.length > 0 && tab === 'types' && (
+          <div className="rounded-[24px] border border-slate-200/60 bg-white/60 p-5 backdrop-blur-xl">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                Public card booking control
+              </p>
+              <p className="text-sm text-slate-500">
+                Choose which appointment type each card shows on its public page, or turn booking
+                off for that card.
+              </p>
+            </div>
+            <div className="mt-4 space-y-3">
+              {allCards.map((card) => {
+                const selectedSlug = card.fields?.bookingAppointmentSlug ?? ''
+                return (
+                  <div
+                    key={card.id}
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">/{card.handle}</p>
+                      <p className="text-xs text-slate-500">
+                        Public card booking button destination
+                      </p>
+                    </div>
+                    <SelectField
+                      value={selectedSlug}
+                      disabled={savingCardId === card.id || aptTypes.length === 0}
+                      onChange={(e) => {
+                        const value = e.target.value || null
+                        void handleBookingCardSetting(card.id, value)
+                      }}
+                      className="min-w-[240px] rounded-xl px-3 py-2.5 pr-10 focus:border-sky-500 focus:ring-sky-100"
+                    >
+                      <option value="">Booking off</option>
+                      {aptTypes.map((apt) => (
+                        <option key={apt.id} value={apt.slug}>
+                          {apt.name}
+                          {!apt.isActive ? ' (inactive)' : ''}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Appointment Types Tab ─────────────────────────────────────────── */}
         {!loading && !error && tab === 'types' && (
           <div className="space-y-4">
             {isAvailabilityRoute && aptTypes.length > 0 && (
               <div className="rounded-[24px] border border-sky-100 bg-sky-50/60 px-5 py-4 text-sm text-slate-600 shadow-inner backdrop-blur-md">
-                <p className="font-bold uppercase tracking-wider text-sky-700">Availability Setup</p>
+                <p className="font-bold uppercase tracking-wider text-sky-700">
+                  Availability Setup
+                </p>
                 <p className="mt-1">
                   Availability is managed per appointment type. Choose a type below to edit its
                   weekly hours and booking windows.
@@ -708,7 +828,9 @@ export default function SchedulingPage(): JSX.Element {
             {aptTypes.length === 0 ? (
               <div className="relative mx-auto mt-8 max-w-2xl overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-12 text-center shadow-sm backdrop-blur-xl">
                 <Calendar className="mx-auto mb-6 h-20 w-20 text-sky-400 opacity-80 drop-shadow-sm" />
-                <p className="text-xl font-extrabold text-slate-900 mb-2">No appointment types yet.</p>
+                <p className="text-xl font-extrabold text-slate-900 mb-2">
+                  No appointment types yet.
+                </p>
                 <p className="mx-auto max-w-sm text-sm font-medium text-slate-500 mb-8">
                   {isAvailabilityRoute
                     ? 'Create an appointment type before setting availability windows.'
@@ -729,7 +851,10 @@ export default function SchedulingPage(): JSX.Element {
                 const bookingUrl = cardHandle ? `${webUrl}/book/${cardHandle}/${apt.slug}` : null
                 const busy = deletingAppointmentTypeId === apt.id
                 return (
-                  <div key={apt.id} className="group relative flex flex-col gap-4 rounded-[32px] border border-white/40 bg-white/40 p-6 backdrop-blur-3xl transition-all duration-500 hover:-translate-y-2 hover:scale-[1.02] hover:bg-white/60 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:border-white/80 ring-1 ring-black/5 hover:ring-black/10">
+                  <div
+                    key={apt.id}
+                    className="group relative flex flex-col gap-4 rounded-[32px] border border-white/40 bg-white/40 p-6 backdrop-blur-3xl transition-all duration-500 hover:-translate-y-2 hover:scale-[1.02] hover:bg-white/60 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:border-white/80 ring-1 ring-black/5 hover:ring-black/10"
+                  >
                     <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                       <div className="flex w-full min-w-0 items-start gap-4 sm:w-auto sm:flex-1">
                         <div
@@ -738,7 +863,9 @@ export default function SchedulingPage(): JSX.Element {
                         />
                         <div>
                           <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            <h3 className="truncate text-[17px] font-extrabold text-slate-900">{apt.name}</h3>
+                            <h3 className="truncate text-[17px] font-extrabold text-slate-900">
+                              {apt.name}
+                            </h3>
                             {!apt.isActive && (
                               <span className="flex items-center gap-1.5 rounded-full bg-slate-100/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 ring-1 ring-inset ring-slate-500/20">
                                 Inactive
@@ -877,7 +1004,9 @@ export default function SchedulingPage(): JSX.Element {
               {bookings.length === 0 ? (
                 <div className="app-empty-state rounded-none border-0 shadow-none">
                   <Calendar className="mx-auto mb-6 h-20 w-20 text-sky-400 opacity-80 drop-shadow-sm" />
-                  <p className="text-xl font-extrabold text-slate-900 mb-2">No upcoming bookings.</p>
+                  <p className="text-xl font-extrabold text-slate-900 mb-2">
+                    No upcoming bookings.
+                  </p>
                 </div>
               ) : (
                 <table className="app-table">
@@ -908,7 +1037,9 @@ export default function SchedulingPage(): JSX.Element {
                               {b.appointmentType.name}
                             </div>
                           </td>
-                          <td className="text-xl font-extrabold text-slate-900 mb-2">{formatDateTimeFull(b.startAt, userTz)}</td>
+                          <td className="text-xl font-extrabold text-slate-900 mb-2">
+                            {formatDateTimeFull(b.startAt, userTz)}
+                          </td>
                           <td>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[b.status] ?? ''}`}
