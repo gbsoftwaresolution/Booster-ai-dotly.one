@@ -136,7 +136,7 @@ function getCheckoutHref(plan: 'STARTER' | 'PRO', duration: Duration): string {
 }
 
 export default function PricingPage() {
-  const [duration, setDuration] = useState<Duration>('MONTHLY')
+  const [duration, setDuration] = useState<Duration>('ANNUAL')
 
   return (
     <div className="marketing-shell relative min-h-screen overflow-hidden bg-slate-50/50">
