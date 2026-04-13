@@ -232,8 +232,8 @@ export function CurrentPlanCard({
   expiryDate: string | null
 }): JSX.Element {
   return (
-    <div className="app-panel rounded-[28px] p-6 sm:p-7">
-      <h2 className="text-base font-semibold text-gray-900">Current Plan</h2>
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+      <h2 className="text-xl font-bold tracking-tight text-gray-950">Current Plan</h2>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <span
           className={cn(
@@ -277,13 +277,13 @@ export function CurrentPlanCard({
       )}
       {currentPlan === 'FREE' && (
         <div className="mt-4 space-y-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm sm:text-base font-medium leading-relaxed text-gray-500">
             Start on the free plan and upgrade only when you need deeper analytics, CRM, and
             follow-up features.
           </p>
           <a
             href="#upgrade"
-            className="inline-block rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
+            className="mt-2 inline-flex items-center justify-center rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-[0_20px_40px_-12px_rgba(99,102,241,0.5)] transition-all hover:scale-[1.02] hover:shadow-[0_25px_50px_-12px_rgba(99,102,241,0.6)] active:scale-[0.98] border border-indigo-400/20"
           >
             Upgrade your plan
           </a>
@@ -311,7 +311,7 @@ export function WalletCard({
   billingCountry: string | null
 }): JSX.Element {
   return (
-    <div className="app-panel rounded-[28px] p-6 sm:p-7">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
       <h2 className="text-base font-semibold text-gray-900">Crypto Checkout</h2>
       <p className="mt-1 text-sm text-gray-500">
         Dotly plans are priced in USD. Crypto checkout is available today if you want to pay with a
@@ -452,7 +452,7 @@ export function UpgradePlanCard({
 
   return (
     <div id="upgrade" className="app-panel rounded-[28px] p-6 sm:p-7">
-      <h2 className="text-base font-semibold text-gray-900">Upgrade Plan</h2>
+      <h2 className="text-xl font-bold tracking-tight text-indigo-950">Upgrade Plan</h2>
       <p className="mt-1 text-sm text-gray-500">
         Plans are priced in USD. Crypto checkout is available today, and additional payment methods
         can be added here later.
@@ -701,7 +701,7 @@ export function TransactionHistoryCard({
   expiryDate: string | null
 }): JSX.Element {
   return (
-    <div className="app-panel rounded-[28px] p-6 sm:p-7">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
       <h2 className="text-base font-semibold text-gray-900">Transaction History</h2>
       {subscription?.txHash ? (
         <div className="app-panel-subtle mt-3 rounded-[24px] p-4 text-sm text-gray-700">
