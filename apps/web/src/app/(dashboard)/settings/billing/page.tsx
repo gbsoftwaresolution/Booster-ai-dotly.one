@@ -364,7 +364,7 @@ export default function BillingSettingsPage(): JSX.Element {
   const billingCountry = subscription?.billingCountry ?? null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 sm:space-y-12 max-w-6xl mx-auto w-full">
       <BillingHero
         currentPlan={currentPlan}
         currentStatus={currentStatus}
