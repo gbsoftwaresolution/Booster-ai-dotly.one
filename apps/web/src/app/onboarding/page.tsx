@@ -381,14 +381,26 @@ export default function OnboardingPage(): JSX.Element {
                 type="button"
                 onClick={() => void handleCreateCard()}
                 disabled={cardSaving}
-                className="group/btn relative overflow-hidden rounded-[20px] bg-indigo-600 px-8 py-4.5 text-sm font-extrabold text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_12px_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 ring-1 ring-indigo-500/50 disabled:opacity-50 disabled:hover:scale-100"
+                className="group/create relative flex w-full sm:w-auto min-w-[320px] items-center justify-center gap-2 overflow-hidden rounded-[20px] bg-gray-950 px-10 py-5 text-base font-extrabold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_30px_rgba(0,0,0,0.12)] transition-all duration-500 hover:scale-[1.02] hover:bg-gray-900 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)_inset,0_20px_40px_rgba(0,0,0,0.2)] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
               >
-                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" />
-                <span className="relative z-10">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-sky-500/20 to-indigo-500/20 opacity-0 transition-opacity duration-500 group-hover/create:opacity-100" />
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/create:translate-x-[200%]" />
+                <span className="relative z-10 tracking-wide">
                   {cardSaving
                     ? 'Creating your first card...'
                     : 'Create first card and enter dashboard'}
                 </span>
+                {!cardSaving && (
+                  <svg
+                    className="relative z-10 ml-2 h-5 w-5 transition-transform duration-500 group-hover/create:translate-x-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
