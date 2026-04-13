@@ -88,14 +88,15 @@ export default function OnboardingPage(): JSX.Element {
         apiGet<{ items?: Array<{ id: string }> }>('/cards', token),
       ])
 
+      const fallbackCountry = detectBrowserCountry()
       setName(user.name ?? '')
       setEmail(user.email ?? '')
-      setCountry(user.country ?? detectBrowserCountry())
+      setCountry(user.country ?? fallbackCountry)
       setTimezone(user.timezone ?? detectBrowserTimezone())
 
       const nextStep = getOnboardingNextStep({
         profileComplete:
-          Boolean(user.name?.trim()) && Boolean((user.country ?? detectBrowserCountry()).trim()),
+          Boolean(user.name?.trim()) && Boolean((user.country ?? fallbackCountry).trim()),
         hasCard: (cards.items?.length ?? 0) > 0,
       })
 
@@ -304,7 +305,9 @@ export default function OnboardingPage(): JSX.Element {
                   className="group/btn relative overflow-hidden rounded-[20px] bg-indigo-600 px-8 py-4.5 text-sm font-extrabold text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_12px_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 ring-1 ring-indigo-500/50 disabled:opacity-50 disabled:hover:scale-100"
                 >
                   <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" />
-                  <span className="relative z-10">{profileSaving ? 'Saving profile...' : 'Continue to first card'}</span>
+                  <span className="relative z-10">
+                    {profileSaving ? 'Saving profile...' : 'Continue to first card'}
+                  </span>
                 </button>
               </div>
 
@@ -318,7 +321,9 @@ export default function OnboardingPage(): JSX.Element {
                     Your country helps Dotly show the right billing options and keeps product access
                     aligned with regional availability.
                   </p>
-                  <p className="mt-8 font-semibold uppercase tracking-wider text-[10px] text-indigo-400">Detected country</p>
+                  <p className="mt-8 font-semibold uppercase tracking-wider text-[10px] text-indigo-400">
+                    Detected country
+                  </p>
                   <p className="mt-1 text-lg font-bold text-indigo-900">{selectedCountryLabel}</p>
                 </div>
               </div>
@@ -328,7 +333,9 @@ export default function OnboardingPage(): JSX.Element {
           <div className="group relative overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 sm:p-12 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
             <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-white/20 pointer-events-none" />
             <div className="relative z-10 flex flex-col gap-4 text-center">
-              <h2 className="text-3xl font-extrabold tracking-tight text-gray-950">Create your first card</h2>
+              <h2 className="text-3xl font-extrabold tracking-tight text-gray-950">
+                Create your first card
+              </h2>
               <p className="mx-auto max-w-lg text-base font-medium text-gray-500">
                 Pick a template to create your first Dotly card. You can customize it after
                 onboarding.
@@ -365,7 +372,11 @@ export default function OnboardingPage(): JSX.Element {
                 className="group/btn relative overflow-hidden rounded-[20px] bg-indigo-600 px-8 py-4.5 text-sm font-extrabold text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_12px_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 ring-1 ring-indigo-500/50 disabled:opacity-50 disabled:hover:scale-100"
               >
                 <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" />
-                <span className="relative z-10">{cardSaving ? 'Creating your first card...' : 'Create first card and enter dashboard'}</span>
+                <span className="relative z-10">
+                  {cardSaving
+                    ? 'Creating your first card...'
+                    : 'Create first card and enter dashboard'}
+                </span>
               </button>
             </div>
           </div>

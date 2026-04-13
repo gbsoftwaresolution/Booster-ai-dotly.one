@@ -25,6 +25,7 @@ import {
   readRefCookie,
   waitForReceipt,
 } from './helpers'
+import { detectBrowserCountry } from '../helpers'
 import type {
   ActivateOrderResponse,
   CreateOrderResponse,
@@ -52,9 +53,11 @@ export default function BillingSettingsPage(): JSX.Element {
 
   const [noWalletOrder, setNoWalletOrder] = useState<NoWalletOrder | null>(null)
   const [noWalletActivating, setNoWalletActivating] = useState(false)
+  const [detectedCountry, setDetectedCountry] = useState('')
 
   useEffect(() => {
     setHasWallet(Boolean(window.ethereum && typeof window.ethereum.request === 'function'))
+    setDetectedCountry(detectBrowserCountry())
   }, [])
 
   useEffect(() => {
@@ -88,7 +91,8 @@ export default function BillingSettingsPage(): JSX.Element {
         setError('Not authenticated')
         return
       }
-      const data = await apiGet<SubscriptionData>('/billing', token)
+      const query = detectedCountry ? `?countryCode=${encodeURIComponent(detectedCountry)}` : ''
+      const data = await apiGet<SubscriptionData>(`/billing${query}`, token)
       setSubscription(data)
       setWalletAddress(data?.walletAddress ?? null)
     } catch {
@@ -96,7 +100,7 @@ export default function BillingSettingsPage(): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }, [getToken])
+  }, [detectedCountry, getToken])
 
   useEffect(() => {
     void fetchSubscription()
@@ -141,6 +145,7 @@ export default function BillingSettingsPage(): JSX.Element {
           plan: selectedPlan,
           duration: selectedDuration,
           walletAddress: walletAddr,
+          ...(detectedCountry ? { countryCode: detectedCountry } : {}),
           ...(ref ? { ref } : {}),
         },
         token,
@@ -241,6 +246,7 @@ export default function BillingSettingsPage(): JSX.Element {
           plan: selectedPlan,
           duration: selectedDuration,
           walletAddress,
+          ...(detectedCountry ? { countryCode: detectedCountry } : {}),
           ...(ref ? { ref } : {}),
         },
         token,

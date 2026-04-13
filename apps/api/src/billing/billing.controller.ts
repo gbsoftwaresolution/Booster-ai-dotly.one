@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Body, Patch, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import {
@@ -68,6 +68,15 @@ class ActivateBoosterAiOrderDto {
   chainId!: number
 }
 
+class BillingSummaryQueryDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z]{2}$/, {
+    message: 'countryCode must be a 2-letter uppercase ISO country code',
+  })
+  countryCode?: string
+}
+
 @ApiTags('billing')
 @ApiBearerAuth()
 @Controller('billing')
@@ -75,8 +84,8 @@ export class BillingController {
   constructor(private billingService: BillingService) {}
 
   @Get()
-  getSubscription(@CurrentUser() user: AuthUser) {
-    return this.billingService.getUserSubscription(user.id)
+  getSubscription(@CurrentUser() user: AuthUser, @Query() query: BillingSummaryQueryDto) {
+    return this.billingService.getUserSubscription(user.id, query.countryCode)
   }
 
   // MED-09: Rate-limit PATCH /billing/wallet to 10 per minute per user.

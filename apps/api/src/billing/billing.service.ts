@@ -288,11 +288,15 @@ export class BillingService {
     }
   }
 
-  async getUserSubscription(userId: string): Promise<BillingSummaryResponse> {
+  async getUserSubscription(
+    userId: string,
+    fallbackCountryCode?: string,
+  ): Promise<BillingSummaryResponse> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
       include: { user: { select: { plan: true, walletAddress: true, country: true } } },
     })
+    const billingCountry = subscription?.user?.country ?? fallbackCountryCode ?? null
     return {
       plan: subscription?.user?.plan ?? SharedPlan.FREE,
       status: subscription?.status ?? null,
@@ -303,8 +307,8 @@ export class BillingService {
       boosterAiOrderId: subscription?.boosterAiOrderId ?? null,
       billingDuration: subscription?.billingDuration ?? null,
       amountUsdt: subscription?.amountUsdt ?? null,
-      cryptoBlocked: isCryptoBlockedForCountry(this.config, subscription?.user?.country ?? null),
-      billingCountry: subscription?.user?.country ?? null,
+      cryptoBlocked: isCryptoBlockedForCountry(this.config, billingCountry),
+      billingCountry,
     }
   }
 
