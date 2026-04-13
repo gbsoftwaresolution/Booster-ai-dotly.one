@@ -14,7 +14,7 @@ const SUPABASE_CODE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = sanitizeNextPath(searchParams.get('next'), '/dashboard')
+  const next = sanitizeNextPath(searchParams.get('next'), '/onboarding')
 
   // F-01: Pin the origin to NEXT_PUBLIC_APP_URL rather than deriving it from
   // `request.url`. The Host header can be spoofed by a reverse proxy or a

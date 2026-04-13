@@ -87,6 +87,10 @@ class EnvironmentVariables {
   @IsString()
   DOTLY_PAYMENT_SIGNER_PRIVATE_KEY?: string
 
+  @IsOptional()
+  @IsString()
+  CRYPTO_BLOCKED_COUNTRIES?: string
+
   @IsUrl({}, { message: 'ARBITRUM_RPC_URL must be a valid HTTPS URL' })
   ARBITRUM_RPC_URL!: string
 

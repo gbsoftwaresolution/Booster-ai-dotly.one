@@ -28,6 +28,8 @@ export function BillingHero({
   expiryDate,
   focusMessage,
   loading,
+  cryptoBlocked,
+  billingCountry,
 }: {
   currentPlan: PlanId
   currentStatus: string
@@ -39,13 +41,21 @@ export function BillingHero({
   expiryDate: string | null
   focusMessage: string
   loading: boolean
+  cryptoBlocked: boolean
+  billingCountry: string | null
 }): JSX.Element {
   const metrics = [
     { label: 'Plan', value: currentPlan },
     { label: 'Status', value: currentStatus },
     {
       label: 'Crypto Checkout',
-      value: walletAddress ? 'Ready' : hasWallet === false ? 'Manual' : 'Setup',
+      value: cryptoBlocked
+        ? 'Blocked'
+        : walletAddress
+          ? 'Ready'
+          : hasWallet === false
+            ? 'Manual'
+            : 'Setup',
     },
     { label: 'Selected Price', value: selectedPrice ? `$${selectedPrice}` : '—' },
   ]
@@ -59,11 +69,17 @@ export function BillingHero({
     },
     {
       label: 'Checkout readiness',
-      value: walletAddress ? 'Ready' : 'Needs setup',
-      detail: walletAddress
-        ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
-        : 'Crypto checkout is available today',
-      tone: walletAddress ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600',
+      value: cryptoBlocked ? 'Unavailable' : walletAddress ? 'Ready' : 'Needs setup',
+      detail: cryptoBlocked
+        ? `Disabled for billing country${billingCountry ? ` ${billingCountry}` : ''}`
+        : walletAddress
+          ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
+          : 'Crypto checkout is available today',
+      tone: cryptoBlocked
+        ? 'bg-red-50 text-red-600'
+        : walletAddress
+          ? 'bg-emerald-50 text-emerald-600'
+          : 'bg-amber-50 text-amber-600',
     },
     {
       label: 'Upgrade selection',
@@ -287,12 +303,16 @@ export function WalletCard({
   connectingWallet,
   onConnectWallet,
   onManualWalletChange,
+  cryptoBlocked,
+  billingCountry,
 }: {
   walletAddress: string | null
   hasWallet: boolean | null
   connectingWallet: boolean
   onConnectWallet: () => void
   onManualWalletChange: (value: string) => void
+  cryptoBlocked: boolean
+  billingCountry: string | null
 }): JSX.Element {
   return (
     <div className="app-panel rounded-[28px] p-6 sm:p-7">
@@ -308,12 +328,30 @@ export function WalletCard({
         <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5">
           Bank transfer coming soon
         </span>
-        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">
-          Crypto available now
+        <span
+          className={cn(
+            'rounded-full border px-3 py-1.5',
+            cryptoBlocked
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700',
+          )}
+        >
+          {cryptoBlocked ? 'Crypto unavailable here' : 'Crypto available now'}
         </span>
       </div>
+      {cryptoBlocked && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Crypto checkout is unavailable for your billing country
+          {billingCountry ? ` (${billingCountry})` : ''}.
+        </div>
+      )}
       <div className="mt-4">
-        {walletAddress ? (
+        {cryptoBlocked ? (
+          <p className="text-sm text-gray-500">
+            Update your profile country if it is incorrect. Card and bank payment methods will
+            appear here when available.
+          </p>
+        ) : walletAddress ? (
           <div className="flex items-center gap-3">
             <div className="h-2 w-2 rounded-full bg-green-500" />
             <span className="font-mono text-sm text-gray-700">
@@ -392,6 +430,8 @@ export function UpgradePlanCard({
   onNoWalletTxHashChange,
   onGeneratePaymentLinks,
   onSubscribe,
+  cryptoBlocked,
+  billingCountry,
 }: {
   currentPlan: PlanId
   selectedPlan: PlanId
@@ -409,6 +449,8 @@ export function UpgradePlanCard({
   onNoWalletTxHashChange: (value: string) => void
   onGeneratePaymentLinks: () => void
   onSubscribe: () => void
+  cryptoBlocked: boolean
+  billingCountry: string | null
 }): JSX.Element | null {
   if (currentPlan === 'ENTERPRISE') return null
 
@@ -483,9 +525,20 @@ export function UpgradePlanCard({
               <p className="font-medium">Bank transfer</p>
               <p className="mt-1 text-xs">Coming soon</p>
             </div>
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <div
+              className={cn(
+                'rounded-2xl border px-4 py-3 text-sm',
+                cryptoBlocked
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              )}
+            >
               <p className="font-medium">Crypto</p>
-              <p className="mt-1 text-xs">Available now</p>
+              <p className="mt-1 text-xs">
+                {cryptoBlocked
+                  ? `Unavailable${billingCountry ? ` in ${billingCountry}` : ''}`
+                  : 'Available now'}
+              </p>
             </div>
           </div>
         </div>
@@ -533,7 +586,7 @@ export function UpgradePlanCard({
           </div>
         )}
 
-        {noWalletOrder && (
+        {!cryptoBlocked && noWalletOrder && (
           <div className="rounded-[24px] border border-blue-200/80 bg-blue-50/90 p-4 shadow-sm">
             <p className="text-sm font-semibold text-blue-900">
               Two-step crypto checkout via wallet app
@@ -596,41 +649,48 @@ export function UpgradePlanCard({
           </div>
         )}
 
-        {!noWalletOrder && (
-          <>
-            {hasWallet === false && walletAddress ? (
-              <button
-                type="button"
-                onClick={onGeneratePaymentLinks}
-                disabled={subscribing}
-                className={cn(
-                  'rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
-                )}
-              >
-                {subscribing ? 'Preparing checkout…' : 'Generate crypto payment links'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onSubscribe}
-                disabled={subscribing || !walletAddress}
-                className={cn(
-                  'rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
-                )}
-              >
-                {subscribing ? (subscribeStep ?? 'Processing…') : 'Pay with crypto'}
-              </button>
-            )}
-            {!walletAddress && (
-              <p className="text-xs text-gray-400">
-                {hasWallet === false
-                  ? 'Enter your wallet address above to generate crypto payment links.'
-                  : 'Connect your wallet above to continue with crypto checkout.'}
-              </p>
-            )}
-          </>
+        {cryptoBlocked ? (
+          <p className="text-xs text-gray-400">
+            Crypto checkout is disabled for your billing country. Update your profile country if
+            needed.
+          </p>
+        ) : (
+          !noWalletOrder && (
+            <>
+              {hasWallet === false && walletAddress ? (
+                <button
+                  type="button"
+                  onClick={onGeneratePaymentLinks}
+                  disabled={subscribing}
+                  className={cn(
+                    'rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                  )}
+                >
+                  {subscribing ? 'Preparing checkout…' : 'Generate crypto payment links'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onSubscribe}
+                  disabled={subscribing || !walletAddress || cryptoBlocked}
+                  className={cn(
+                    'rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                  )}
+                >
+                  {subscribing ? (subscribeStep ?? 'Processing…') : 'Pay with crypto'}
+                </button>
+              )}
+              {!walletAddress && (
+                <p className="text-xs text-gray-400">
+                  {hasWallet === false
+                    ? 'Enter your wallet address above to generate crypto payment links.'
+                    : 'Connect your wallet above to continue with crypto checkout.'}
+                </p>
+              )}
+            </>
+          )
         )}
       </div>
     </div>

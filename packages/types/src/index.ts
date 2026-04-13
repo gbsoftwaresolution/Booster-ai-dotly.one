@@ -280,6 +280,8 @@ export interface BillingSummaryResponse {
   boosterAiOrderId: string | null
   billingDuration: string | null
   amountUsdt: string | null
+  cryptoBlocked: boolean
+  billingCountry: string | null
 }
 
 export interface BillingCheckoutQuoteResponse {

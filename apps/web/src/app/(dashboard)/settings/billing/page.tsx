@@ -354,6 +354,8 @@ export default function BillingSettingsPage(): JSX.Element {
 
   const selectedPrice = PLAN_PRICES[selectedPlan]?.[selectedDuration]
   const focusMessage = getFocusMessage({ loading, currentPlan, currentStatus, expiryDate })
+  const cryptoBlocked = subscription?.cryptoBlocked ?? false
+  const billingCountry = subscription?.billingCountry ?? null
 
   return (
     <div className="space-y-6">
@@ -368,6 +370,8 @@ export default function BillingSettingsPage(): JSX.Element {
         expiryDate={expiryDate}
         focusMessage={focusMessage}
         loading={loading}
+        cryptoBlocked={cryptoBlocked}
+        billingCountry={billingCountry}
       />
 
       <BillingFeedback successMsg={successMsg} error={error} />
@@ -389,6 +393,8 @@ export default function BillingSettingsPage(): JSX.Element {
             connectingWallet={connectingWallet}
             onConnectWallet={() => void connectWallet()}
             onManualWalletChange={(value) => setWalletAddress(value.trim() || null)}
+            cryptoBlocked={cryptoBlocked}
+            billingCountry={billingCountry}
           />
 
           <UpgradePlanCard
@@ -415,6 +421,8 @@ export default function BillingSettingsPage(): JSX.Element {
               void handleNoWalletSubscribe(walletAddress)
             }}
             onSubscribe={() => void handleSubscribe()}
+            cryptoBlocked={cryptoBlocked}
+            billingCountry={billingCountry}
           />
 
           <TransactionHistoryCard subscription={subscription} expiryDate={expiryDate} />

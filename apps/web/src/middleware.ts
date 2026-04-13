@@ -90,6 +90,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isDashboardRoute =
+    request.nextUrl.pathname.startsWith('/onboarding') ||
     request.nextUrl.pathname.startsWith('/dashboard') ||
     request.nextUrl.pathname.startsWith('/qr') ||
     request.nextUrl.pathname.startsWith('/apps') ||
@@ -116,6 +117,13 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/auth'
     url.search = ''
     url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`)
+    return NextResponse.redirect(url)
+  }
+
+  if (user && request.nextUrl.pathname === '/auth') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/onboarding'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

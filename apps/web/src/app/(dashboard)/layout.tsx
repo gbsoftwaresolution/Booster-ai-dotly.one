@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { JSX } from 'react'
 import { BillingPlanProvider } from '@/components/billing/BillingPlanProvider'
+import { OnboardingGate } from '@/components/auth/OnboardingGate'
 import { AppRail } from '@/components/shell/AppRail'
 import { TopBarAvatar } from '@/components/TopBarAvatar'
 import { MobileAppRail } from '@/components/shell/MobileAppShell'
@@ -27,33 +28,35 @@ export default async function DashboardLayout({
     undefined
 
   return (
-    <BillingPlanProvider>
-      <div className="flex min-h-screen bg-transparent">
-        <AppRail />
+    <OnboardingGate>
+      <BillingPlanProvider>
+        <div className="flex min-h-screen bg-transparent">
+          <AppRail />
 
-        <div className="flex flex-1 flex-col min-w-0">
-          <header
-            className="sticky top-0 z-30 mx-2 mt-2 flex h-[calc(4.25rem+env(safe-area-inset-top))] shrink-0 items-center justify-between gap-3 rounded-[32px] border border-gray-950/[0.04] bg-white/70 backdrop-blur-xl px-4 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.08)] lg:mx-4 lg:mt-4 lg:px-6 transition-all duration-500"
-            style={{ paddingTop: 'env(safe-area-inset-top)' }}
-          >
-            <div className="absolute inset-0 rounded-[32px] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay pointer-events-none"></div>
-            
-            <div className="relative flex flex-1 items-center gap-3">
-              <DynamicBreadcrumbs />
-            </div>
+          <div className="flex flex-1 flex-col min-w-0">
+            <header
+              className="sticky top-0 z-30 mx-2 mt-2 flex h-[calc(4.25rem+env(safe-area-inset-top))] shrink-0 items-center justify-between gap-3 rounded-[32px] border border-gray-950/[0.04] bg-white/70 backdrop-blur-xl px-4 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.08)] lg:mx-4 lg:mt-4 lg:px-6 transition-all duration-500"
+              style={{ paddingTop: 'env(safe-area-inset-top)' }}
+            >
+              <div className="absolute inset-0 rounded-[32px] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay pointer-events-none"></div>
 
-            <div className="relative hidden lg:flex lg:flex-1" />
+              <div className="relative flex flex-1 items-center gap-3">
+                <DynamicBreadcrumbs />
+              </div>
 
-            <div className="relative z-10">
-              <TopBarAvatar email={user.email} name={displayName} />
-            </div>
-          </header>
+              <div className="relative hidden lg:flex lg:flex-1" />
 
-          <main className="flex-1 px-4 pb-36 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
+              <div className="relative z-10">
+                <TopBarAvatar email={user.email} name={displayName} />
+              </div>
+            </header>
+
+            <main className="flex-1 px-4 pb-36 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
+          </div>
+
+          <MobileAppRail />
         </div>
-
-        <MobileAppRail />
-      </div>
-    </BillingPlanProvider>
+      </BillingPlanProvider>
+    </OnboardingGate>
   )
 }

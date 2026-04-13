@@ -29,7 +29,7 @@ function AuthPageContent(): JSX.Element {
   const searchParams = useSearchParams()
   const supabase = createClient()
   const next = useMemo(
-    () => sanitizeNextPath(searchParams.get('next'), '/dashboard'),
+    () => sanitizeNextPath(searchParams.get('next'), '/onboarding'),
     [searchParams],
   )
   const authCallbackUrl = useMemo(() => getAuthCallbackUrl(), [])

@@ -8,6 +8,7 @@ import { arbitrum } from 'viem/chains'
 import { DURATION_DAYS } from './boosterai.client'
 import type { BillingSummaryResponse } from '@dotly/types'
 import { DURATION_IDS, PaymentVaultQuotes, PLAN_IDS } from './payment-vault-quotes'
+import { isCryptoBlockedForCountry } from './crypto-country-policy'
 
 const DOTLY_PAYMENT_VAULT_ABI = [
   {
@@ -290,7 +291,7 @@ export class BillingService {
   async getUserSubscription(userId: string): Promise<BillingSummaryResponse> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
-      include: { user: { select: { plan: true, walletAddress: true } } },
+      include: { user: { select: { plan: true, walletAddress: true, country: true } } },
     })
     return {
       plan: subscription?.user?.plan ?? SharedPlan.FREE,
@@ -302,6 +303,8 @@ export class BillingService {
       boosterAiOrderId: subscription?.boosterAiOrderId ?? null,
       billingDuration: subscription?.billingDuration ?? null,
       amountUsdt: subscription?.amountUsdt ?? null,
+      cryptoBlocked: isCryptoBlockedForCountry(this.config, subscription?.user?.country ?? null),
+      billingCountry: subscription?.user?.country ?? null,
     }
   }
 
@@ -332,6 +335,16 @@ export class BillingService {
 
     const normalizedWallet = this.normalizeWalletAddress(params.walletAddress)
     await this.assertWalletAvailableForUser(userId, normalizedWallet)
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { country: true },
+    })
+    const billingCountry = (user?.country ?? params.countryCode ?? null)?.toUpperCase() ?? null
+
+    if (isCryptoBlockedForCountry(this.config, billingCountry)) {
+      throw new BadRequestException('Crypto checkout is not available in your country')
+    }
 
     const partnerCode = this.normalizePartnerCode(params.ref)
     await this.assertNoSelfReferral(userId, partnerCode)
