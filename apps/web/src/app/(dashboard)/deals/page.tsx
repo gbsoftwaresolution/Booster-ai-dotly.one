@@ -250,19 +250,19 @@ export default function DealsPage(): JSX.Element {
         </div>
         
         {/* Pipeline Focus Message */}
-        <div className="relative z-10 mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm shadow-inner backdrop-blur-md">
-            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300">
+        <div className="relative z-10 mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-sky-200/50 bg-sky-50/50 px-5 py-4 text-sm shadow-inner backdrop-blur-md">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-500">
                 <Target className="h-3 w-3" />
             </span>
             <div className="min-w-0">
-                <p className="font-semibold text-indigo-100">Pipeline focus</p>
-                <p className="mt-0.5 text-[13px] text-indigo-200/80">{focusMessage}</p>
+                <p className="font-bold text-sky-900">Pipeline focus</p>
+                <p className="mt-0.5 text-[13px] font-medium text-sky-700/80">{focusMessage}</p>
             </div>
         </div>
       </div>
 
       {/* Search + filter bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl bg-white/40 p-2 shadow-sm border border-white/60 backdrop-blur-md">
+      <div className="group relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200/60 bg-white/60 p-4 backdrop-blur-xl transition-all">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <div className="relative w-full sm:w-auto">
             <label htmlFor={searchId} className="sr-only">
@@ -276,7 +276,7 @@ export default function DealsPage(): JSX.Element {
               onChange={(e) => {
                 setSearch(e.target.value)
               }}
-              className="w-full rounded-[18px] border-none shadow-sm bg-white py-2.5 pl-4 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 sm:w-72"
+              className="w-full rounded-xl border border-slate-200/60 bg-white/80 py-2.5 pl-4 pr-10 text-sm font-medium text-slate-900 shadow-sm transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-indigo-500/20 sm:w-80"
             />
           </div>
           <label htmlFor={stageFilterId} className="sr-only">
@@ -286,7 +286,7 @@ export default function DealsPage(): JSX.Element {
             id={stageFilterId}
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value as DealStage | 'ALL')}
-            className="w-full rounded-[18px] border-none shadow-sm bg-white px-4 py-2.5 pr-10 font-medium focus:ring-2 focus:ring-indigo-500/50 sm:w-auto"
+            className="w-full rounded-xl border border-slate-200/60 bg-white/80 py-2.5 pl-4 pr-10 text-sm font-medium text-slate-900 shadow-sm transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-indigo-500/20 cursor-pointer sm:w-48"
           >
             <option value="ALL">All stages</option>
             {DEAL_STAGES.map((s) => (
@@ -331,25 +331,25 @@ export default function DealsPage(): JSX.Element {
           ))}
         </div>
       ) : error && !hasLoadedOnce ? (
-        <div className="app-empty-state">
-          <BriefcaseBusiness className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-          <p className="app-empty-state-title">Deals are unavailable</p>
-          <p className="app-empty-state-text mt-1">{error}</p>
+        <div className="relative overflow-hidden rounded-[24px] border border-white/80 bg-white/60 px-6 py-12 text-center backdrop-blur-xl shadow-sm transition-all m-4">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-50 to-teal-50/50 shadow-inner mb-6"><BriefcaseBusiness size={32} className="text-emerald-400" /></div>
+          <p className="text-xl font-extrabold text-slate-900 mb-2">Deals are unavailable</p>
+          <p className="mx-auto max-w-sm text-sm font-medium text-slate-500 mb-8">{error}</p>
           <button
             type="button"
             onClick={() => void loadDeals()}
-            className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95"
           >
             Retry
           </button>
         </div>
       ) : visibleDeals.length === 0 ? (
-        <div className="app-empty-state">
-          <BriefcaseBusiness className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-          <p className="app-empty-state-title">
+        <div className="relative overflow-hidden rounded-[24px] border border-white/80 bg-white/60 px-6 py-12 text-center backdrop-blur-xl shadow-sm transition-all m-4">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-50 to-teal-50/50 shadow-inner mb-6"><BriefcaseBusiness size={32} className="text-emerald-400" /></div>
+          <p className="text-xl font-extrabold text-slate-900 mb-2">
             {summary?.totalDeals === 0 ? 'No deals yet' : 'No deals match your filters'}
           </p>
-          <p className="app-empty-state-text mt-1">
+          <p className="mx-auto max-w-sm text-sm font-medium text-slate-500 mb-8">
             {summary?.totalDeals === 0
               ? 'Click "New Deal" to create your first deal.'
               : 'Try adjusting your search or stage filter.'}
@@ -362,10 +362,10 @@ export default function DealsPage(): JSX.Element {
               const busy = busyDealIds.has(deal.id)
 
               return (
-                <div key={deal.id} className="app-panel rounded-[24px] p-4">
+                <div key={deal.id} className="group relative rounded-2xl border border-slate-200/60 bg-white/60 p-5 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <h2 className="text-base font-semibold text-gray-900">{deal.title}</h2>
+                      <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">{deal.title}</h2>
                       {deal.contact ? (
                         <button
                           type="button"
@@ -387,30 +387,30 @@ export default function DealsPage(): JSX.Element {
 
                   <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-gray-50/90 p-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Value
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                      <p className="mt-1 text-sm font-bold text-slate-900">
                         {formatCurrency(deal.value, deal.currency || 'USD')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Probability
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                      <p className="mt-1 text-sm font-bold text-slate-900">
                         {Math.round(normalizePercent(deal.probability))}%
                       </p>
                     </div>
                     <div className="col-span-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Close date
                       </p>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="mt-1 text-[13px] font-medium text-slate-500">
                         {deal.closeDate ? formatDate(deal.closeDate, userTz) : 'No close date'}
                       </p>
                       {deal.contact?.email && (
-                        <p className="mt-1 truncate text-sm text-gray-500">{deal.contact.email}</p>
+                        <p className="mt-1 truncate text-[13px] font-medium text-slate-500">{deal.contact.email}</p>
                       )}
                     </div>
                   </div>
@@ -422,7 +422,7 @@ export default function DealsPage(): JSX.Element {
                     onChange={(event) =>
                       void handleStageChange(deal, event.target.value as DealStage)
                     }
-                    className="mt-4 w-full rounded-xl px-3 py-2.5 pr-10 focus:border-indigo-500 focus:ring-indigo-100"
+                    className="mt-4 w-full rounded-xl border border-slate-200/60 bg-slate-50/50 py-2.5 pl-4 pr-10 text-sm font-medium text-slate-900 shadow-sm transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-indigo-500/20"
                   >
                     {DEAL_STAGES.map((option) => (
                       <option key={option} value={option}>
@@ -436,7 +436,7 @@ export default function DealsPage(): JSX.Element {
                       type="button"
                       disabled={busy}
                       onClick={() => setEditingDeal(deal)}
-                      className="app-touch-target inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      className="app-touch-target inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[13px] font-bold uppercase tracking-wider text-slate-600 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:pointer-events-none disabled:opacity-50"
                       aria-label={`Edit ${deal.title}`}
                     >
                       <Pencil className="h-4 w-4" />
@@ -446,7 +446,7 @@ export default function DealsPage(): JSX.Element {
                       type="button"
                       disabled={busy}
                       onClick={() => void handleDelete(deal.id)}
-                      className="app-touch-target inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      className="app-touch-target inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[13px] font-bold uppercase tracking-wider text-rose-600 shadow-sm ring-1 ring-inset ring-rose-200 transition-all hover:bg-rose-50 hover:shadow-md active:scale-95 disabled:pointer-events-none disabled:opacity-50"
                       aria-label={`Delete ${deal.title}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -464,23 +464,23 @@ export default function DealsPage(): JSX.Element {
               const stageItems = stageData.items
 
               return (
-                <div key={stage} className="app-panel flex w-80 shrink-0 flex-col rounded-[24px]">
+                <div key={stage} className="flex w-[340px] shrink-0 flex-col rounded-3xl border border-slate-200/60 bg-slate-50/50 backdrop-blur-xl">
                   <div
-                    className={`rounded-t-[24px] border-b px-4 py-3 ${STAGE_HEADER_COLORS[stage]}`}
+                    className={`flex items-center justify-between rounded-t-3xl border-b border-slate-200/60 bg-white/60 px-5 py-4 backdrop-blur-md`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <h2 className="text-sm font-semibold text-gray-800">
+                        <h2 className="text-[15px] font-bold tracking-tight text-slate-900">
                           {STAGE_LABELS[stage]}
                         </h2>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                           {stageData.total} deal{stageData.total === 1 ? '' : 's'}
                           {stageData.total > stageItems.length
                             ? ` · showing ${stageItems.length}`
                             : ''}
                         </p>
                       </div>
-                      <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-2 text-xs font-bold text-gray-600 shadow-sm">
+                      <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-white px-2 text-[11px] font-bold text-slate-600 shadow-sm ring-1 ring-inset ring-slate-200">
                         {stageData.total}
                       </span>
                     </div>
@@ -507,10 +507,10 @@ export default function DealsPage(): JSX.Element {
                         const busy = busyDealIds.has(deal.id)
 
                         return (
-                          <div key={deal.id} className="app-panel-subtle rounded-[22px] p-4">
+                          <div key={deal.id} className="group relative rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
-                                <h3 className="truncate text-sm font-semibold text-gray-900">
+                                <h3 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
                                   {deal.title}
                                 </h3>
                                 {deal.contact ? (
@@ -530,7 +530,7 @@ export default function DealsPage(): JSX.Element {
                                   type="button"
                                   disabled={busy}
                                   onClick={() => setEditingDeal(deal)}
-                                  className="rounded-lg border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                                  className="rounded-xl bg-slate-50 p-2 text-slate-400 opacity-0 transition-opacity ring-1 ring-inset ring-slate-200/60 hover:bg-white hover:text-slate-600 group-hover:opacity-100 disabled:opacity-50"
                                   aria-label={`Edit ${deal.title}`}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -539,7 +539,7 @@ export default function DealsPage(): JSX.Element {
                                   type="button"
                                   disabled={busy}
                                   onClick={() => void handleDelete(deal.id)}
-                                  className="rounded-lg border border-gray-300 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                  className="rounded-xl bg-slate-50 p-2 text-rose-400 opacity-0 transition-opacity ring-1 ring-inset ring-slate-200/60 hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 disabled:opacity-50"
                                   aria-label={`Delete ${deal.title}`}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -548,7 +548,7 @@ export default function DealsPage(): JSX.Element {
                             </div>
 
                             <div className="mt-3 flex items-center justify-between">
-                              <span className="text-lg font-bold text-gray-900">
+                              <span className="text-base font-extrabold tracking-tight text-emerald-600">
                                 {formatCurrency(deal.value, deal.currency || 'USD')}
                               </span>
                               <span
@@ -558,7 +558,7 @@ export default function DealsPage(): JSX.Element {
                               </span>
                             </div>
 
-                            <div className="mt-3 space-y-1 text-sm text-gray-500">
+                            <div className="mt-3 space-y-1 text-[13px] font-medium text-slate-500">
                               <p>
                                 Close date:{' '}
                                 {deal.closeDate

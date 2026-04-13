@@ -125,11 +125,10 @@ export default function PipelinesPage(): JSX.Element {
             <div className="mt-8 flex flex-wrap gap-3">
               <button
                 onClick={openCreate}
-                className="group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:scale-105 active:scale-95"
+                className="relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-sky-100 to-indigo-100 opacity-0 transition-opacity group-hover:opacity-100" />
-                <Plus className="relative z-10 h-4 w-4" />
-                <span className="relative z-10">New Pipeline</span>
+                <Plus className="h-4 w-4" />
+                <span>New Pipeline</span>
               </button>
             </div>
           </div>
@@ -159,16 +158,16 @@ export default function PipelinesPage(): JSX.Element {
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       {label}
                     </p>
-                    <p className="mt-1 text-lg font-extrabold text-white">{value}</p>
+                    <p className="mt-1 text-[22px] font-extrabold tracking-tight text-slate-900">{value}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="inline-flex max-w-full items-start gap-3 rounded-2xl bg-white/5 p-3 text-xs font-medium text-slate-500 border border-white/10 w-full">
+              <div className="inline-flex max-w-full items-start gap-3 rounded-2xl bg-sky-100/50 p-4 text-[13px] font-medium text-slate-600 border border-sky-200/60 w-full shadow-inner">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-sky-400">
                   <GitBranch className="h-3.5 w-3.5" />
                 </span>
-                <span className="leading-relaxed"><strong className="text-white block mb-0.5">Focus</strong>{focusMessage}</span>
+                <span className="leading-relaxed"><strong className="text-slate-900 block mb-0.5">Focus</strong>{focusMessage}</span>
               </div>
             </div>
           </div>
@@ -180,9 +179,9 @@ export default function PipelinesPage(): JSX.Element {
 
       {/* Loading */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-gray-400">Loading...</div>
+        <div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-indigo-600"></div></div>
       ) : pipelines.length === 0 ? (
-        <div className="relative overflow-hidden rounded-[24px] border border-white/80 bg-white/60 px-6 py-12 text-center backdrop-blur-xl shadow-sm transition-all m-4">
+        <div className="relative mx-auto mt-8 max-w-2xl overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-12 text-center shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sky-50 to-indigo-50/50 shadow-inner mb-6">
             <GitBranch size={32} className="text-sky-400" />
           </div>
@@ -194,7 +193,7 @@ export default function PipelinesPage(): JSX.Element {
       ) : (
         <div className="space-y-4">
           {pipelines.map((pipeline) => (
-            <div key={pipeline.id} className="group relative flex flex-col gap-4 rounded-[24px] border border-slate-200/60 bg-white/60 p-6 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)] hover:bg-white">
+            <div key={pipeline.id} className="group relative flex flex-col gap-4 rounded-[32px] border border-slate-200/60 bg-white/70 p-6 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:bg-white">
               {(() => {
                 const rowBusy = deletingId === pipeline.id || defaultingId === pipeline.id
                 return (
@@ -205,7 +204,7 @@ export default function PipelinesPage(): JSX.Element {
                           {pipeline.name}
                         </h2>
                         {pipeline.isDefault && (
-                          <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 ring-1 ring-inset ring-amber-500/20">
+                          <span className="flex items-center gap-1.5 rounded-full bg-amber-100/50 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-600 shadow-sm ring-1 ring-inset ring-amber-500/30 backdrop-blur-md">
                             <Star className="h-3 w-3" /> Default
                           </span>
                         )}
@@ -217,19 +216,19 @@ export default function PipelinesPage(): JSX.Element {
                           return (
                             <div key={stage} className="flex items-center gap-1">
                               <span
-                                className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+                                className="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm ring-1 ring-inset ring-white/20"
                                 style={{ backgroundColor: color }}
                               >
                                 {stage}
                               </span>
                               {idx < pipeline.stages.length - 1 && (
-                                <span className="text-xs text-gray-300">→</span>
+                                <span className="text-[13px] font-bold text-slate-300">→</span>
                               )}
                             </div>
                           )
                         })}
                       </div>
-                      <p className="mt-2 text-xs text-gray-400">
+                      <p className="mt-2 text-[13px] font-medium text-slate-400">
                         Created {formatDate(pipeline.createdAt, userTz)}
                       </p>
                     </div>

@@ -419,14 +419,15 @@ export default function SchedulingPage(): JSX.Element {
 
       <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
-        <div className="app-panel flex flex-col gap-5 rounded-[30px] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600">
+        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-6 sm:p-8 backdrop-blur-xl shadow-sm mb-6">
+          <div className="absolute left-1/2 top-1/2 h-full w-full -translate-x-1/2 -translate-y-1/2 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #94a3b8 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+          <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 sm:gap-5 text-center sm:text-left w-full sm:w-auto">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-sky-50 shadow-inner text-indigo-600 border border-indigo-100">
               <Calendar className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Scheduling</h1>
-              <p className="text-sm text-gray-500">Manage your booking pages and appointments</p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 sm:mb-2">Scheduling</h1>
+              <p className="text-sm sm:text-base font-medium text-slate-500 max-w-[280px] sm:max-w-none mx-auto sm:mx-0 leading-relaxed">Manage your booking pages and appointments</p>
             </div>
           </div>
           <button
@@ -434,7 +435,7 @@ export default function SchedulingPage(): JSX.Element {
               setEditingApt(null)
               setShowAptForm(true)
             }}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700"
+            className="relative z-10 flex w-full sm:w-auto items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
           >
             <Plus className="h-4 w-4" /> New Appointment Type
           </button>
@@ -442,12 +443,12 @@ export default function SchedulingPage(): JSX.Element {
 
         {/* Google Calendar connect section */}
         {googleStatus !== null && (
-          <div className="app-panel flex items-center gap-3 rounded-[24px] px-4 py-3">
-            <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 rounded-[24px] border border-sky-100 bg-sky-50/50 px-5 py-4 backdrop-blur-md shadow-inner">
+            <Link2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium text-gray-700">Google Calendar</span>
+              <span className="text-sm font-bold uppercase tracking-wider text-slate-600">Google Calendar</span>
               {googleStatus.state === 'connected' && googleStatus.googleEmail && (
-                <span className="ml-2 text-xs text-gray-400">{googleStatus.googleEmail}</span>
+                <span className="ml-2 text-sm font-medium text-slate-500">{googleStatus.googleEmail}</span>
               )}
               {googleStatus.state === 'unavailable' && (
                 <span className="ml-2 text-xs text-amber-600">Status unavailable</span>
@@ -457,21 +458,21 @@ export default function SchedulingPage(): JSX.Element {
               <button
                 onClick={() => setConfirmState({ type: 'google-disconnect' })}
                 disabled={googleLoading}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-rose-600 shadow-sm transition-all hover:bg-rose-50 hover:border-rose-200 active:scale-95 disabled:opacity-50"
               >
                 {googleLoading ? 'Disconnecting…' : 'Disconnect'}
               </button>
             ) : googleStatus.state === 'unavailable' ? (
               <button
                 onClick={() => void load()}
-                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-[13px] font-bold text-amber-700 shadow-sm transition-all hover:bg-amber-100 active:scale-95"
               >
                 Retry status
               </button>
             ) : (
               <a
                 href={`${API_URL}/scheduling/google/connect`}
-                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-[13px] font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
               >
                 <Settings2 className="inline h-3.5 w-3.5 mr-1" />
                 Connect Google Calendar
@@ -481,12 +482,12 @@ export default function SchedulingPage(): JSX.Element {
         )}
 
         {/* Tabs */}
-        <div className="app-panel-subtle flex w-fit gap-1 rounded-[20px] p-1.5">
+        <div className="flex w-fit gap-1 rounded-2xl bg-white/50 p-1.5 shadow-sm border border-slate-200/60 backdrop-blur-xl mb-6">
           {(['types', 'bookings'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors ${tab === t ? 'bg-white text-gray-900 shadow-sm ring-1 ring-white/80' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`relative rounded-[14px] px-6 py-2.5 text-sm font-bold transition-all ${tab === t ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'}`}
             >
               {t === 'types'
                 ? 'Appointment Types'
@@ -513,8 +514,8 @@ export default function SchedulingPage(): JSX.Element {
 
         {/* ── Card selector for booking links ───────────────────────────────── */}
         {allCards.length > 1 && !cardsError && (
-          <div className="app-panel flex flex-col gap-3 rounded-[24px] px-4 py-3 sm:flex-row sm:items-center">
-            <span className="text-sm font-medium text-gray-600">Booking links use card:</span>
+          <div className="flex flex-col gap-4 rounded-[24px] border border-slate-200/60 bg-white/60 p-5 backdrop-blur-xl sm:flex-row sm:items-center">
+            <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Booking links use card:</span>
             <SelectField
               value={cardHandle ?? ''}
               onChange={(e) => setCardHandle(e.target.value)}
@@ -533,10 +534,10 @@ export default function SchedulingPage(): JSX.Element {
         {!loading && !error && tab === 'types' && (
           <div className="space-y-4">
             {aptTypes.length === 0 ? (
-              <div className="app-empty-state">
-                <Calendar className="mb-4 h-12 w-12 text-slate-300" />
-                <p className="text-gray-600">No appointment types yet.</p>
-                <p className="mt-2 max-w-md text-sm text-gray-400">
+              <div className="relative mx-auto mt-8 max-w-2xl overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-12 text-center shadow-sm backdrop-blur-xl">
+                <Calendar className="mx-auto mb-6 h-20 w-20 text-sky-400 opacity-80 drop-shadow-sm" />
+                <p className="text-xl font-extrabold text-slate-900 mb-2">No appointment types yet.</p>
+                <p className="mx-auto max-w-sm text-sm font-medium text-slate-500 mb-8">
                   Create your first appointment type to start sharing booking links and collecting
                   meetings.
                 </p>
@@ -545,7 +546,7 @@ export default function SchedulingPage(): JSX.Element {
                     setEditingApt(null)
                     setShowAptForm(true)
                   }}
-                  className="mt-4 flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-sky-700"
+                  className="mt-6 flex flex-1 items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto mx-auto max-w-xs"
                 >
                   <Plus className="h-4 w-4" /> Create your first
                 </button>
@@ -555,7 +556,7 @@ export default function SchedulingPage(): JSX.Element {
                 const bookingUrl = cardHandle ? `${webUrl}/book/${cardHandle}/${apt.slug}` : null
                 const busy = deletingAppointmentTypeId === apt.id
                 return (
-                  <div key={apt.id} className="app-panel rounded-[28px] p-5 sm:p-6">
+                  <div key={apt.id} className="group relative flex flex-col gap-4 rounded-[32px] border border-slate-200/60 bg-white/70 p-6 backdrop-blur-2xl transition-all hover:-translate-y-1 hover:shadow-xl hover:bg-white">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4">
                         <div
@@ -564,17 +565,17 @@ export default function SchedulingPage(): JSX.Element {
                         />
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900">{apt.name}</h3>
+                            <h3 className="font-semibold text-slate-900">{apt.name}</h3>
                             {!apt.isActive && (
-                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
                                 Inactive
                               </span>
                             )}
                           </div>
                           {apt.description && (
-                            <p className="mt-0.5 text-sm text-gray-500">{apt.description}</p>
+                            <p className="mt-0.5 text-sm text-slate-500">{apt.description}</p>
                           )}
-                          <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-500">
+                          <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-500">
                             <span className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
                               {apt.durationMins} min
@@ -585,8 +586,8 @@ export default function SchedulingPage(): JSX.Element {
                                 {apt.location}
                               </span>
                             )}
-                            <span className="text-gray-400">{apt._count.bookings} bookings</span>
-                            <span className="text-gray-400">{apt.timezone}</span>
+                            <span className="text-slate-400">{apt._count.bookings} bookings</span>
+                            <span className="text-slate-400">{apt.timezone}</span>
                           </div>
                           {/* Availability summary */}
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -595,7 +596,7 @@ export default function SchedulingPage(): JSX.Element {
                               return (
                                 <span
                                   key={d}
-                                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${windows.length > 0 ? 'bg-sky-50 text-sky-700' : 'bg-gray-50 text-gray-300'}`}
+                                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${windows.length > 0 ? 'bg-sky-50 text-sky-700' : 'bg-slate-50 text-slate-300'}`}
                                 >
                                   {d}
                                   {windows.length > 0
@@ -618,7 +619,7 @@ export default function SchedulingPage(): JSX.Element {
                                 else showToast('Failed to copy link', false)
                               })
                             }}
-                            className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-sky-600"
+                            className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-sky-600"
                           >
                             <Copy className="h-4 w-4" />
                           </button>
@@ -646,7 +647,7 @@ export default function SchedulingPage(): JSX.Element {
                             setShowAptForm(true)
                           }}
                           disabled={busy || deletingAppointmentTypeId !== null}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-sky-600 disabled:opacity-50"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-sky-600 disabled:opacity-50"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
@@ -654,15 +655,15 @@ export default function SchedulingPage(): JSX.Element {
                           title="Delete"
                           onClick={() => setConfirmState({ type: 'appointment-type', id: apt.id })}
                           disabled={busy || deletingAppointmentTypeId !== null}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
                     {bookingUrl && (
-                      <div className="app-panel-subtle mt-3 flex items-center gap-2 rounded-[20px] px-3 py-2">
-                        <span className="truncate font-mono text-xs text-gray-500">
+                      <div className="mt-3 flex items-center gap-2 rounded-[20px] px-3 py-2">
+                        <span className="truncate font-mono text-xs text-slate-500">
                           {bookingUrl}
                         </span>
                         <button
@@ -689,7 +690,7 @@ export default function SchedulingPage(): JSX.Element {
         {!loading && !error && tab === 'bookings' && (
           <div>
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm font-medium text-slate-500 sm:text-base">
                 {showAllBookings ? 'All bookings' : 'Upcoming bookings'}
               </p>
               <button
@@ -702,8 +703,8 @@ export default function SchedulingPage(): JSX.Element {
             <div className="app-table-shell overflow-hidden">
               {bookings.length === 0 ? (
                 <div className="app-empty-state rounded-none border-0 shadow-none">
-                  <Calendar className="mb-4 h-12 w-12 text-slate-300" />
-                  <p className="text-gray-600">No upcoming bookings.</p>
+                  <Calendar className="mx-auto mb-6 h-20 w-20 text-sky-400 opacity-80 drop-shadow-sm" />
+                  <p className="text-xl font-extrabold text-slate-900 mb-2">No upcoming bookings.</p>
                 </div>
               ) : (
                 <table className="app-table">
@@ -722,8 +723,8 @@ export default function SchedulingPage(): JSX.Element {
                       return (
                         <tr key={b.id} className="transition hover:bg-white/65">
                           <td>
-                            <div className="font-medium text-gray-900">{b.guestName}</div>
-                            <div className="text-gray-400">{b.guestEmail}</div>
+                            <div className="font-medium text-slate-900">{b.guestName}</div>
+                            <div className="text-slate-400">{b.guestEmail}</div>
                           </td>
                           <td>
                             <div className="flex items-center gap-2">
@@ -734,7 +735,7 @@ export default function SchedulingPage(): JSX.Element {
                               {b.appointmentType.name}
                             </div>
                           </td>
-                          <td className="text-gray-600">{formatDateTimeFull(b.startAt, userTz)}</td>
+                          <td className="text-xl font-extrabold text-slate-900 mb-2">{formatDateTimeFull(b.startAt, userTz)}</td>
                           <td>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[b.status] ?? ''}`}

@@ -2,7 +2,7 @@ import { getPublicApiUrl } from '@/lib/public-env'
 import type { BookingQuestionType, DayOfWeek } from './types'
 
 export const SCHEDULING_CONTROL_CLASS =
-  'w-full rounded-[18px] border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] outline-none transition placeholder:text-gray-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100'
+  'w-full rounded-[18px] border border-slate-200/60 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100'
 
 export const ALL_DAYS: DayOfWeek[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
@@ -29,7 +29,7 @@ export const statusColors: Record<string, string> = {
   CONFIRMED: 'bg-green-100 text-green-800',
   PENDING: 'bg-yellow-100 text-yellow-800',
   CANCELLED: 'bg-red-100 text-red-800',
-  NO_SHOW: 'bg-gray-100 text-gray-700',
+  NO_SHOW: 'bg-slate-100 text-slate-700',
 }
 
 const PINNED_TIMEZONES = [

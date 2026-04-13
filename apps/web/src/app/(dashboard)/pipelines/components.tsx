@@ -112,7 +112,7 @@ export function PipelineFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-md transition-all sm:p-6">
       <div
         ref={dialogRef}
-        className="relative mx-auto w-full max-w-lg my-8 rounded-[24px] bg-white/95 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
+        className="relative mx-auto w-full max-w-lg my-8 rounded-[32px] bg-white/95 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pipeline-form-title"
@@ -183,7 +183,7 @@ export function PipelineFormModal({
                       type="button"
                       onClick={() => moveStage(index, -1)}
                       disabled={index === 0}
-                      className="app-touch-target rounded p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
                       title="Move up"
                     >
                       <ArrowUp className="h-4 w-4" />
@@ -192,7 +192,7 @@ export function PipelineFormModal({
                       type="button"
                       onClick={() => moveStage(index, 1)}
                       disabled={index === stageEntries.length - 1}
-                      className="app-touch-target rounded p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
                       title="Move down"
                     >
                       <ArrowDown className="h-4 w-4" />
@@ -201,7 +201,7 @@ export function PipelineFormModal({
                       type="button"
                       onClick={() => removeStage(index)}
                       disabled={stageEntries.length <= 1}
-                      className="app-touch-target rounded p-2 text-gray-400 hover:text-red-500 disabled:opacity-30"
+                      className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500 disabled:opacity-30"
                       title="Remove stage"
                     >
                       <X className="h-4 w-4" />
@@ -225,7 +225,7 @@ export function PipelineFormModal({
             {formError && <p className="text-xs text-red-600">{formError}</p>}
           </div>
         </div>
-        <div className="sticky bottom-0 mt-4 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/50 p-6 backdrop-blur-md rounded-b-[36px]">
+        <div className="sticky bottom-0 mt-4 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/50 p-6 backdrop-blur-md rounded-b-[32px]">
           <button
             onClick={onClose}
             disabled={saving}
@@ -275,9 +275,9 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="pipelines-confirm-dialog-title"
-        className="relative mx-auto w-full max-w-sm rounded-[24px] bg-white/95 p-6 sm:p-8 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
+        className="relative mx-auto w-full max-w-sm rounded-[32px] bg-white/95 p-6 sm:p-8 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
       >
-        <h3 id="pipelines-confirm-dialog-title" className="text-xl font-extrabold tracking-tight text-slate-900">
+        <h3 id="pipelines-confirm-dialog-title" className="text-2xl font-extrabold tracking-tight text-slate-900">
           {title}
         </h3>
         <p className="mt-2 text-sm font-medium text-slate-500">{message}</p>
@@ -286,7 +286,7 @@ export function ConfirmDialog({
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
-            className="app-touch-target rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900"
+            className="w-full rounded-2xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 sm:w-auto active:scale-95"
           >
             Cancel
           </button>

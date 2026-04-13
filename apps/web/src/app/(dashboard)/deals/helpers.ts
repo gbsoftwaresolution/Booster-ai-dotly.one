@@ -9,10 +9,10 @@ export const STAGE_LABELS: Record<DealStage, string> = {
 }
 
 export const STAGE_HEADER_COLORS: Record<DealStage, string> = {
-  PROSPECT: 'bg-blue-50 border-blue-200',
-  PROPOSAL: 'bg-yellow-50 border-yellow-200',
-  NEGOTIATION: 'bg-purple-50 border-purple-200',
-  CLOSED_WON: 'bg-green-50 border-green-200',
+  PROSPECT: 'bg-sky-50/50 border-sky-200/60',
+  PROPOSAL: 'bg-amber-50/50 border-amber-200/60',
+  NEGOTIATION: 'bg-indigo-50/50 border-indigo-200/60',
+  CLOSED_WON: 'bg-emerald-50/50 border-emerald-200/60',
   CLOSED_LOST: 'bg-gray-100 border-gray-200',
 }
 
@@ -20,11 +20,11 @@ export const DEAL_INPUT_CLASS =
   'w-full rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.22)] outline-none transition placeholder:text-gray-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
 
 export const STAGE_BADGES: Record<DealStage, string> = {
-  PROSPECT: 'bg-blue-100 text-blue-700',
-  PROPOSAL: 'bg-yellow-100 text-yellow-700',
-  NEGOTIATION: 'bg-purple-100 text-purple-700',
-  CLOSED_WON: 'bg-green-100 text-green-700',
-  CLOSED_LOST: 'bg-red-100 text-red-700',
+  PROSPECT: 'bg-sky-100/50 text-sky-700 ring-1 ring-inset ring-sky-500/20',
+  PROPOSAL: 'bg-amber-100/50 text-amber-700 ring-1 ring-inset ring-amber-500/20',
+  NEGOTIATION: 'bg-indigo-100/50 text-indigo-700 ring-1 ring-inset ring-indigo-500/20',
+  CLOSED_WON: 'bg-emerald-100/50 text-emerald-700 ring-1 ring-inset ring-emerald-500/20',
+  CLOSED_LOST: 'bg-rose-100/50 text-rose-700 ring-1 ring-inset ring-rose-500/20',
 }
 
 export function formatCurrency(value: number, currency: string): string {

@@ -92,7 +92,7 @@ export default function SchedulingDashboard(): JSX.Element {
       )}
 
       {/* Header */}
-      <div className="app-panel relative overflow-hidden rounded-[34px] px-6 py-6 sm:px-8 sm:py-7">
+      <div className="relative overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-6 sm:p-8 backdrop-blur-xl shadow-sm">
         <div
           className="absolute inset-0 opacity-90"
           aria-hidden="true"
@@ -101,16 +101,16 @@ export default function SchedulingDashboard(): JSX.Element {
               'radial-gradient(circle at top left, rgba(52,211,153,0.14), transparent 34%), radial-gradient(circle at right center, rgba(59,130,246,0.10), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.98))',
           }}
         />
-        <div className="relative grid gap-5 xl:grid-cols-[1.3fr_0.9fr] xl:items-start">
+        <div className="relative z-10 flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50/50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-600 shadow-inner backdrop-blur-sm">
               <CalendarCheck className="h-3.5 w-3.5" />
               Scheduling
             </div>
-            <h1 className="mt-3 text-2xl font-bold text-gray-900 sm:text-[2rem]">
+            <h1 className="mt-3 text-[28px] leading-[1.15] font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Manage appointments, availability and bookings
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
+            <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">
               Keep your booking flow clear, spot what is coming next, and move between appointment
               setup and upcoming sessions faster.
             </p>
@@ -131,12 +131,12 @@ export default function SchedulingDashboard(): JSX.Element {
               ].map(({ label, value }) => (
                 <div
                   key={label}
-                  className="rounded-[22px] border border-white/80 bg-white/85 px-3 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.2)]"
+                  className="flex flex-col justify-center rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-md transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     {label}
                   </p>
-                  <p className="mt-1 text-sm font-bold text-gray-900 sm:text-base">{value}</p>
+                  <p className="mt-1.5 text-xl font-extrabold text-slate-900">{value}</p>
                 </div>
               ))}
             </div>
@@ -144,40 +144,39 @@ export default function SchedulingDashboard(): JSX.Element {
             <div className="mt-4 flex flex-wrap gap-3">
               <Link
                 href="/apps/scheduling/appointment-types"
-                className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-28px_rgba(5,150,105,0.45)] transition-transform hover:-translate-y-0.5"
-                style={{ background: 'linear-gradient(135deg,#34d399,#059669)' }}
+                className="relative flex w-full sm:w-auto items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95"
               >
                 <Plus className="h-4 w-4" />
                 New Appointment Type
               </Link>
               <Link
                 href="/apps/scheduling/bookings"
-                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-slate-200/60 bg-white px-6 py-3.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95"
               >
                 <CalendarClock className="h-4 w-4 text-sky-500" />
                 View Bookings
               </Link>
             </div>
 
-            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <div className="mt-5 inline-flex max-w-full items-center gap-3 rounded-2xl bg-sky-50/60 p-3 text-[13px] font-medium text-slate-600 shadow-inner border border-sky-100 w-full sm:w-auto">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-sky-500 shadow-sm">
                 <Clock className="h-3.5 w-3.5" />
               </span>
               <span className="truncate">Focus: {focusMessage}</span>
             </div>
           </div>
 
-          <div className="app-panel-subtle rounded-[30px] p-4 sm:p-5">
+          <div className="w-full xl:w-80 shrink-0 overflow-hidden rounded-[24px] border border-sky-100 bg-sky-50/50 p-5 shadow-inner backdrop-blur-md">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Today At A Glance
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1.5 text-[15px] font-extrabold text-slate-900 leading-tight">
                   Your booking operations snapshot
                 </p>
               </div>
-              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 shadow-sm">
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-500 ring-1 ring-inset ring-emerald-500/20 shadow-sm">
                 Live
               </span>
             </div>
@@ -216,7 +215,7 @@ export default function SchedulingDashboard(): JSX.Element {
               ].map(({ label, value, detail, icon: Icon, tone }) => (
                 <div
                   key={label}
-                  className="flex items-center gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3"
+                  className="flex items-center gap-3 rounded-2xl border border-sky-100 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-xl"
                 >
                   <span
                     className={cn(
@@ -227,12 +226,12 @@ export default function SchedulingDashboard(): JSX.Element {
                     <Icon className="h-4.5 w-4.5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5 block">
                       {label}
                     </p>
-                    <p className="truncate text-sm text-gray-500">{detail}</p>
+                    <p className="truncate text-[13px] font-medium text-slate-400">{detail}</p>
                   </div>
-                  <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                  <span className="shrink-0 text-xl font-extrabold tabular-nums text-slate-900">
                     {value}
                   </span>
                 </div>

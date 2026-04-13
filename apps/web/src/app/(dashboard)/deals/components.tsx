@@ -126,16 +126,16 @@ export function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): J
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId)
 
   return (
-    <div className="app-dialog-shell">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-md transition-all sm:p-6">
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-deal-dialog-title"
-        className="app-dialog-panel max-w-lg"
+        className="relative mx-auto w-full max-w-lg my-8 rounded-[32px] bg-white/95 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
       >
-        <div className="app-modal-header">
-          <h2 id="create-deal-dialog-title" className="text-lg font-bold text-gray-900">
+        <div className="flex items-start justify-between border-b border-slate-100 px-8 py-6">
+          <h2 id="create-deal-dialog-title" className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[28px]">
             New Deal
           </h2>
           <button
@@ -143,12 +143,12 @@ export function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): J
             type="button"
             onClick={onClose}
             aria-label="Close create deal dialog"
-            className="app-touch-target rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="app-modal-body app-dialog-body-scroll space-y-4">
+        <div className="app-dialog-body-scroll px-8 py-6 custom-scrollbar max-h-[60vh] overflow-y-auto space-y-6">
           {error && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
@@ -157,12 +157,12 @@ export function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): J
           <div>
             <label
               htmlFor="create-deal-contact-search"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
             >
               Contact <span className="text-red-500">*</span>
             </label>
             {selectedContact ? (
-              <div className="flex items-center justify-between rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2">
+              <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/80 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-indigo-900">{selectedContact.name}</p>
                   {selectedContact.email && (
@@ -186,10 +186,10 @@ export function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): J
                   placeholder="Search contacts..."
                   value={contactSearch}
                   onChange={(e) => setContactSearch(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-2xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5 text-sm font-medium text-slate-900 transition-all placeholder:text-slate-400 hover:bg-white focus:border-indigo-500 focus:bg-white focus:ring-[3px] focus:ring-indigo-500/20"
                 />
                 {contacts.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                  <div className="max-h-40 overflow-y-auto rounded-2xl border border-slate-200/60 bg-white/90 shadow-md backdrop-blur-xl custom-scrollbar">
                     {contacts.map((contact) => (
                       <button
                         key={contact.id}
@@ -231,11 +231,11 @@ export function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): J
             setFieldErrors={setFieldErrors}
           />
         </div>
-        <div className="app-dialog-footer">
+        <div className="sticky bottom-0 mt-4 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/50 p-6 backdrop-blur-md rounded-b-[32px]">
           <button
             type="button"
             onClick={onClose}
-            className="app-touch-target w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+            className="w-full rounded-2xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 sm:w-auto active:scale-95"
           >
             Cancel
           </button>
@@ -243,7 +243,7 @@ export function CreateDealModal({ onClose, onCreated }: CreateDealModalProps): J
             type="button"
             onClick={() => void handleSubmit()}
             disabled={saving}
-            className="app-touch-target w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 sm:w-auto"
+            className="relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
           >
             {saving ? 'Creating...' : 'Create Deal'}
           </button>
@@ -321,16 +321,16 @@ export function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps):
   }
 
   return (
-    <div className="app-dialog-shell">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-md transition-all sm:p-6">
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-deal-dialog-title"
-        className="app-dialog-panel max-w-lg"
+        className="relative mx-auto w-full max-w-lg my-8 rounded-[32px] bg-white/95 leading-relaxed shadow-[0_24px_54px_-34px_rgba(15,23,42,0.3)] backdrop-blur-2xl ring-1 ring-white/60 sm:container"
       >
-        <div className="app-modal-header">
-          <h2 id="edit-deal-dialog-title" className="text-lg font-bold text-gray-900">
+        <div className="flex items-start justify-between border-b border-slate-100 px-8 py-6">
+          <h2 id="edit-deal-dialog-title" className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[28px]">
             Edit Deal
           </h2>
           <button
@@ -338,12 +338,12 @@ export function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps):
             type="button"
             onClick={onClose}
             aria-label="Close edit deal dialog"
-            className="app-touch-target rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="app-touch-target flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="app-modal-body app-dialog-body-scroll space-y-4">
+        <div className="app-dialog-body-scroll px-8 py-6 custom-scrollbar max-h-[60vh] overflow-y-auto space-y-6">
           {error && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
@@ -369,11 +369,11 @@ export function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps):
             setFieldErrors={setFieldErrors}
           />
         </div>
-        <div className="app-dialog-footer">
+        <div className="sticky bottom-0 mt-4 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/50 p-6 backdrop-blur-md rounded-b-[32px]">
           <button
             type="button"
             onClick={onClose}
-            className="app-touch-target w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+            className="w-full rounded-2xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 sm:w-auto active:scale-95"
           >
             Cancel
           </button>
@@ -381,7 +381,7 @@ export function EditDealModal({ deal, onClose, onUpdated }: EditDealModalProps):
             type="button"
             onClick={() => void handleSubmit()}
             disabled={saving}
-            className="app-touch-target w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 sm:w-auto"
+            className="relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
           >
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
@@ -439,7 +439,7 @@ function DealFormFields({
       <div>
         <label
           htmlFor={`${mode}-deal-title-input`}
-          className="mb-1 block text-sm font-medium text-gray-700"
+          className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
         >
           Deal title <span className="text-red-500">*</span>
         </label>
@@ -467,7 +467,7 @@ function DealFormFields({
         <div>
           <label
             htmlFor={`${mode}-deal-value-input`}
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
           >
             Value
           </label>
@@ -495,7 +495,7 @@ function DealFormFields({
         <div>
           <label
             htmlFor={`${mode}-deal-currency-input`}
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
           >
             Currency
           </label>
@@ -516,7 +516,7 @@ function DealFormFields({
       <div>
         <label
           htmlFor={`${mode}-deal-stage-input`}
-          className="mb-1 block text-sm font-medium text-gray-700"
+          className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
         >
           Stage
         </label>
@@ -537,7 +537,7 @@ function DealFormFields({
         <div>
           <label
             htmlFor={`${mode}-deal-probability-input`}
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
           >
             Probability (%)
           </label>
@@ -567,7 +567,7 @@ function DealFormFields({
         <div>
           <label
             htmlFor={`${mode}-deal-close-date-input`}
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
           >
             Close date
           </label>
@@ -603,7 +603,7 @@ function DealFormFields({
         <div>
           <label
             htmlFor="create-deal-notes-input"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500"
           >
             Notes
           </label>

@@ -150,10 +150,10 @@ export function AvailabilityEditor({
 
   return (
     <CenteredDialogShell className="max-w-lg" onClose={onClose}>
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 p-5">
-        <h3 className="text-lg font-semibold text-gray-900">Edit Availability</h3>
-        <button onClick={onClose} className="app-touch-target rounded-lg p-2 hover:bg-gray-100">
-          <X className="h-5 w-5 text-gray-500" />
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 p-5">
+        <h3 className="text-lg font-semibold text-slate-900">Edit Availability</h3>
+        <button onClick={onClose} className="app-touch-target rounded-lg p-2 hover:bg-slate-100">
+          <X className="h-5 w-5 text-slate-500" />
         </button>
       </div>
       <div className="app-dialog-body-scroll space-y-4 p-5">
@@ -164,10 +164,10 @@ export function AvailabilityEditor({
           const windows = dayWindows[day]
           const isActive = windows.length > 0
           return (
-            <div key={day} className="rounded-xl border border-gray-100 p-3">
+            <div key={day} className="rounded-xl border border-slate-100 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span
-                  className={`text-sm font-semibold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}
+                  className={`text-sm font-semibold ${isActive ? 'text-slate-900' : 'text-slate-400'}`}
                 >
                   {DAY_LABEL[day]}
                 </span>
@@ -180,7 +180,7 @@ export function AvailabilityEditor({
                 </button>
               </div>
               {windows.length === 0 ? (
-                <span className="text-xs text-gray-400">Unavailable</span>
+                <span className="text-xs text-slate-400">Unavailable</span>
               ) : (
                 <div className="space-y-2">
                   {windows.map((window, index) => (
@@ -189,19 +189,19 @@ export function AvailabilityEditor({
                         type="time"
                         value={window.startTime}
                         onChange={(e) => updateWindow(day, index, 'startTime', e.target.value)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+                        className="rounded-lg border border-slate-200/60 px-3 py-1.5 text-sm"
                       />
-                      <span className="text-gray-400">—</span>
+                      <span className="text-slate-400">—</span>
                       <input
                         type="time"
                         value={window.endTime}
                         onChange={(e) => updateWindow(day, index, 'endTime', e.target.value)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+                        className="rounded-lg border border-slate-200/60 px-3 py-1.5 text-sm"
                       />
                       <button
                         type="button"
                         onClick={() => removeWindow(day, index)}
-                        className="app-touch-target ml-auto rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        className="app-touch-target ml-auto rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -213,10 +213,10 @@ export function AvailabilityEditor({
           )
         })}
       </div>
-      <div className="app-dialog-footer">
+      <div className="sticky bottom-0 mt-4 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/50 p-6 backdrop-blur-md rounded-b-[32px]">
         <button
           onClick={onClose}
-          className="app-touch-target w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm hover:bg-gray-50 sm:w-auto"
+          className="app-touch-target w-full rounded-lg border border-slate-200/60 px-4 py-2.5 text-sm hover:bg-slate-50 sm:w-auto"
         >
           Cancel
         </button>
@@ -396,19 +396,19 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
         aria-labelledby="appointment-type-modal-title"
         className="flex max-h-[90vh] w-full flex-col rounded-[28px]"
       >
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 p-5">
-          <h3 id="appointment-type-modal-title" className="text-lg font-semibold text-gray-900">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 p-5">
+          <h3 id="appointment-type-modal-title" className="text-lg font-semibold text-slate-900">
             {initial?.id ? 'Edit Appointment Type' : 'New Appointment Type'}
           </h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
-            <X className="h-5 w-5 text-gray-500" />
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100">
+            <X className="h-5 w-5 text-slate-500" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {error && <StatusNotice message={error} />}
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Name</label>
               <input
                 required
                 minLength={2}
@@ -430,7 +430,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Slug (URL)</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Slug (URL)</label>
               <input
                 required
                 pattern="[a-z0-9-]+"
@@ -451,7 +451,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                 className={`${inputClass('slug')} font-mono`}
                 placeholder="30-min-call"
               />
-              <p id="apt-slug-help" className="mt-1 text-xs text-gray-400">
+              <p id="apt-slug-help" className="mt-1 text-xs text-slate-400">
                 Lowercase letters, numbers, and hyphens only.
               </p>
               {fieldErrors.slug && (
@@ -461,7 +461,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Description</label>
               <textarea
                 value={description}
                 maxLength={2000}
@@ -476,7 +476,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                 }
                 className={inputClass('description')}
               />
-              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-gray-400">
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-400">
                 <span id="apt-description-help">Optional summary shown on your booking page.</span>
                 <span>{description.length}/2000</span>
               </div>
@@ -488,7 +488,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
                   Duration (mins)
                 </label>
                 <input
@@ -512,17 +512,17 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
+                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Color</label>
                 <input
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-full cursor-pointer rounded-lg border border-gray-200"
+                  className="h-10 w-full cursor-pointer rounded-lg border border-slate-200/60"
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
                 Location / Meeting link
               </label>
               <input
@@ -544,7 +544,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Timezone</label>
               <SelectField
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
@@ -556,13 +556,13 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                   </option>
                 ))}
               </SelectField>
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-slate-400">
                 Availability windows are interpreted in this timezone.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
                   Booking window (days)
                 </label>
                 <input
@@ -578,7 +578,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                   aria-describedby={fieldErrors.bufferDays ? 'apt-buffer-days-error' : undefined}
                   className={inputClass('bufferDays')}
                 />
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-slate-400">
                   How far ahead guests can book. 0 = unlimited.
                 </p>
                 {fieldErrors.bufferDays && (
@@ -588,7 +588,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
                   Buffer after (mins)
                 </label>
                 <input
@@ -618,17 +618,17 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-slate-300"
               />
-              <span className="text-sm text-gray-700">Active (bookable by guests)</span>
+              <span className="text-sm text-slate-700">Active (bookable by guests)</span>
             </label>
           </div>
-          <div className="flex flex-shrink-0 justify-end gap-3 border-t border-gray-100 p-5">
+          <div className="flex flex-shrink-0 justify-end gap-3 border-t border-slate-100 p-5">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+              className="rounded-lg border border-slate-200/60 px-4 py-2 text-sm hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -765,33 +765,33 @@ export function QuestionsBuilder({
         aria-labelledby="booking-questions-modal-title"
         className="flex max-h-[90vh] w-full flex-col rounded-[28px]"
       >
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 p-5">
-          <h3 id="booking-questions-modal-title" className="text-lg font-semibold text-gray-900">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 p-5">
+          <h3 id="booking-questions-modal-title" className="text-lg font-semibold text-slate-900">
             Custom Booking Questions
           </h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100">
-            <X className="h-5 w-5 text-gray-500" />
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100">
+            <X className="h-5 w-5 text-slate-500" />
           </button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {questions.length === 0 && (
-            <p className="py-4 text-center text-sm text-gray-400">
+            <p className="py-4 text-center text-sm text-slate-400">
               No questions yet. Add one below to collect info from guests before they book.
             </p>
           )}
           {questions.map((question, index) => (
-            <div key={index} className="space-y-3 rounded-xl border border-gray-200 p-4">
+            <div key={index} className="space-y-3 rounded-xl border border-slate-200/60 p-4">
               <div className="flex items-center gap-2">
-                <span className="w-5 text-xs font-semibold text-gray-400">{index + 1}</span>
+                <span className="w-5 text-xs font-semibold text-slate-400">{index + 1}</span>
                 <input
                   value={question.label}
                   onChange={(e) => updateQuestion(index, { label: e.target.value })}
                   placeholder="Question label (e.g. What is your company?)"
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
+                  className="flex-1 rounded-lg border border-slate-200/60 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none"
                 />
                 <button
                   onClick={() => removeQuestion(index)}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -813,30 +813,30 @@ export function QuestionsBuilder({
                     </option>
                   ))}
                 </SelectField>
-                <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
+                <label className="flex cursor-pointer items-center gap-1.5 text-sm text-slate-600">
                   <input
                     type="checkbox"
                     checked={question.required}
                     onChange={(e) => updateQuestion(index, { required: e.target.checked })}
-                    className="rounded border-gray-300"
+                    className="rounded border-slate-300"
                   />
                   Required
                 </label>
               </div>
               {question.type === 'SELECT' && (
                 <div className="space-y-2 pl-7">
-                  <p className="text-xs font-medium text-gray-500">Options</p>
+                  <p className="text-xs font-medium text-slate-500">Options</p>
                   {question.options.map((option, optionIndex) => (
                     <div key={optionIndex} className="flex items-center gap-2">
                       <input
                         value={option}
                         onChange={(e) => updateSelectOption(index, optionIndex, e.target.value)}
                         placeholder={`Option ${optionIndex + 1}`}
-                        className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none"
+                        className="flex-1 rounded-lg border border-slate-200/60 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none"
                       />
                       <button
                         onClick={() => removeSelectOption(index, optionIndex)}
-                        className="rounded p-1 text-gray-400 hover:text-red-500"
+                        className="rounded p-1 text-slate-400 hover:text-red-500"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -854,16 +854,16 @@ export function QuestionsBuilder({
           ))}
           <button
             onClick={addQuestion}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-500 hover:border-sky-300 hover:text-sky-600"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200/60 py-3 text-sm font-medium text-slate-500 hover:border-sky-300 hover:text-sky-600"
           >
             <Plus className="h-4 w-4" /> Add question
           </button>
           {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
         </div>
-        <div className="flex flex-shrink-0 justify-end gap-3 border-t border-gray-100 p-5">
+        <div className="flex flex-shrink-0 justify-end gap-3 border-t border-slate-100 p-5">
           <button
             onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+            className="rounded-lg border border-slate-200/60 px-4 py-2 text-sm hover:bg-slate-50"
           >
             Cancel
           </button>
@@ -897,13 +897,13 @@ export function SchedulingConfirmDialog({
     <>
       <ModalBackdrop onClick={onCancel} tone="drawer" />
       <div className="app-modal fixed inset-x-4 top-1/2 z-50 max-w-sm -translate-y-1/2 p-6 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        <p className="mt-1 text-sm text-gray-600">{message}</p>
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <p className="mt-1 text-sm text-slate-600">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             Keep
           </button>
