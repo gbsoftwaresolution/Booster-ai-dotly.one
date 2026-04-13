@@ -121,6 +121,94 @@ Optional:
 
 - `DOTLY_OWNER_ADDRESS`
 
+## Backend Quote Generation Example
+
+Example using `ethers` v6 in a backend service:
+
+```ts
+import { Wallet } from 'ethers'
+
+const signer = new Wallet(process.env.DOTLY_PAYMENT_SIGNER_PRIVATE_KEY!)
+
+const domain = {
+  name: 'DotlyPaymentVault',
+  version: '1',
+  chainId: 42161,
+  verifyingContract: '0xYourVaultAddress',
+}
+
+const types = {
+  PaymentQuote: [
+    { name: 'payer', type: 'address' },
+    { name: 'userRef', type: 'bytes32' },
+    { name: 'amount', type: 'uint256' },
+    { name: 'planId', type: 'uint32' },
+    { name: 'duration', type: 'uint8' },
+    { name: 'paymentRef', type: 'bytes32' },
+    { name: 'deadline', type: 'uint64' },
+    { name: 'vault', type: 'address' },
+    { name: 'chainId', type: 'uint256' },
+    { name: 'token', type: 'address' },
+  ],
+}
+
+const value = {
+  payer: '0xPayerWallet',
+  userRef: '0xUserRefBytes32',
+  amount: 49_000_000n,
+  planId: 2,
+  duration: 1,
+  paymentRef: '0xPaymentRefBytes32',
+  deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
+  vault: '0xYourVaultAddress',
+  chainId: 42161,
+  token: '0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',
+}
+
+const signature = await signer.signTypedData(domain, types, value)
+```
+
+Backend rules:
+
+- generate a unique `paymentRef` for every checkout
+- convert your backend user id to a deterministic `bytes32 userRef`
+- never reuse a signed `paymentRef`
+- use a short `deadline`
+- sign with the dedicated payment signer, not the owner key
+
+## Arbitrum Deployment
+
+Recommended mainnet env vars:
+
+```bash
+export DEPLOYER_PRIVATE_KEY=0x...
+export ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
+export USDT_ADDRESS=0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9
+export DOTLY_TREASURY_ADDRESS=0x...
+export DOTLY_PAYMENT_SIGNER_ADDRESS=0x...
+export DOTLY_OWNER_ADDRESS=0x...
+```
+
+Deploy command:
+
+```bash
+cd contracts
+pnpm deploy:vault:arbitrum
+```
+
+The script writes deployment output to:
+
+```text
+contracts/deployments/payment-vault-arbitrum.json
+```
+
+Recommended post-deploy checks:
+
+- confirm owner, treasury, signer, and USDT addresses
+- verify the contract on your explorer
+- test one signed quote on a fork or staging path before live traffic
+- move ownership to multisig later if desired
+
 ## Operational Notes
 
 - Deploy first to Arbitrum
