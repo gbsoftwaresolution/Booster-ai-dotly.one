@@ -6,19 +6,11 @@ import type { JSX } from 'react'
 import type { BillingSummaryResponse } from '@dotly/types'
 
 import { StatusNotice } from '@/components/ui/StatusNotice'
-import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { getAccessToken } from '@/lib/supabase/client'
 
 import { COUNTRY_OPTIONS } from './helpers'
 import { TIMEZONE_OPTIONS } from './helpers'
-import type {
-  ComboboxProps,
-  NotifPrefs,
-  ProfileFieldErrors,
-  SubscriptionSummary,
-  Tab,
-} from './types'
+import type { ComboboxProps, NotifPrefs, ProfileFieldErrors, Tab } from './types'
 import { tabs } from './types'
 
 export function Combobox({
@@ -577,106 +569,6 @@ export function NotificationsTabContent({
       >
         {notifSaving ? 'Saving...' : 'Save preferences'}
       </button>
-    </div>
-  )
-}
-
-export function BecomeAPartnerCard(): JSX.Element {
-  const [partnerId, setPartnerId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const token = await getAccessToken()
-        if (!token) return
-        const subscription = await apiGet<SubscriptionSummary>('/billing', token)
-        setPartnerId(subscription?.boosterAiPartnerId ?? null)
-      } catch {
-        // Show the generic CTA when partner data is unavailable.
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    void load()
-  }, [])
-
-  const referralLink = partnerId
-    ? `https://boosterai.space/auth/signup?ref=p_${partnerId}`
-    : 'https://boosterai.space/auth/signup'
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(referralLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2500)
-    } catch {
-      // Ignore clipboard failures.
-    }
-  }
-
-  return (
-    <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Become a BoosterAI Partner</h2>
-          <p className="mt-1 max-w-prose text-sm text-gray-500">
-            Earn commissions by referring others to Dotly through BoosterAI&apos;s partner network.
-            {partnerId
-              ? ' Your referral link is pre-linked to your account — share it to get credit.'
-              : ' Sign up for the partner programme and your Dotly account can be linked automatically when you use the same email address.'}
-          </p>
-        </div>
-        <span className="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-          Affiliate programme
-        </span>
-      </div>
-
-      {loading ? (
-        <div className="mt-4 h-9 w-48 animate-pulse rounded-lg bg-gray-100" />
-      ) : partnerId ? (
-        <div className="mt-4 space-y-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Your referral link
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              readOnly
-              value={referralLink}
-              onFocus={(event) => event.target.select()}
-              className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-xs font-mono text-gray-700 focus:outline-none"
-              aria-label="Your BoosterAI referral link"
-            />
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
-              className="shrink-0 rounded-lg bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              {copied ? 'Copied!' : 'Copy link'}
-            </button>
-          </div>
-          <p className="text-xs text-gray-400">
-            Anyone who signs up via this link will be attributed to your partner account.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4 flex flex-wrap gap-3">
-          <a
-            href={referralLink}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          >
-            Sign up as a partner
-          </a>
-          <p className="self-center text-xs text-gray-400">
-            Joining the partner programme does not require a paid Dotly subscription.
-          </p>
-        </div>
-      )}
     </div>
   )
 }

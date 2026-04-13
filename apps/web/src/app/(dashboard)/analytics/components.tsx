@@ -43,6 +43,10 @@ function SkeletonCard(): JSX.Element {
   return <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
 }
 
+function formatImpactStat(value: number, singular: string, plural = `${singular}s`): string {
+  return value === 1 ? `1 ${singular}` : `${value} ${plural}`
+}
+
 function StatCard({
   label,
   value,
@@ -112,6 +116,26 @@ function AnalyticsHeroDesktop({
   onRefresh: () => void
   onExport: () => void
 }): JSX.Element {
+  const proofItems = [
+    {
+      label: 'Attention captured',
+      value: cardsLoading ? '—' : formatImpactStat(dashboardSummary?.totalViews ?? 0, 'view'),
+      detail: 'Profile views across your shared cards',
+    },
+    {
+      label: 'Intent generated',
+      value: cardsLoading ? '—' : formatImpactStat(dashboardSummary?.totalLeads ?? 0, 'lead'),
+      detail: 'Leads collected from card activity',
+    },
+    {
+      label: 'Cards working',
+      value: cardsLoading
+        ? '—'
+        : formatImpactStat(dashboardSummary?.activeCards ?? 0, 'active card'),
+      detail: 'Profiles currently helping you get discovered',
+    },
+  ]
+
   const metrics = [
     { label: 'Tracked Cards', value: cardsLoading ? '—' : cards.length },
     {
@@ -151,6 +175,21 @@ function AnalyticsHeroDesktop({
             Monitor traffic, spot engagement patterns, and compare how your shared cards convert
             views into clicks and leads.
           </p>
+
+          <div className="mt-4 grid gap-2 sm:max-w-3xl sm:grid-cols-3">
+            {proofItems.map(({ label, value, detail }) => (
+              <div
+                key={label}
+                className="rounded-[22px] border border-white/80 bg-white/80 px-4 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.16)]"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                  {label}
+                </p>
+                <p className="mt-1 text-sm font-bold text-gray-900">{value}</p>
+                <p className="mt-1 text-xs text-gray-500">{detail}</p>
+              </div>
+            ))}
+          </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
             {metrics.map(({ label, value }) => (
@@ -300,6 +339,13 @@ function AnalyticsHeroMobile({
   onRefresh: () => void
   onExport: () => void
 }): JSX.Element {
+  const attentionCaptured = cardsLoading
+    ? '—'
+    : formatImpactStat(dashboardSummary?.totalViews ?? 0, 'view')
+  const intentGenerated = cardsLoading
+    ? '—'
+    : formatImpactStat(dashboardSummary?.totalLeads ?? 0, 'lead')
+
   const metrics = [
     { label: 'Tracked', value: cardsLoading ? '—' : cards.length },
     { label: 'Active', value: cardsLoading ? '—' : (dashboardSummary?.activeCards ?? 0) },
@@ -325,6 +371,9 @@ function AnalyticsHeroMobile({
             performance.
           </span>
         </h1>
+        <p className="mt-3 max-w-sm text-sm leading-6 text-slate-500">
+          {attentionCaptured} captured and {intentGenerated} generated across your shared cards.
+        </p>
       </div>
 
       {/* Quick Metrics Grid */}
@@ -490,6 +539,9 @@ export function AnalyticsSummarySection({
 
   if (!analyticsData || renderedRequestKey !== activeRequestKey) return null
 
+  const savedLeads = analyticsData.summary.totalLeads
+  const followUpSignal = analyticsData.summary.totalClicks + analyticsData.summary.totalLeads
+
   if (
     analyticsData.summary.totalViews === 0 &&
     analyticsData.summary.totalClicks === 0 &&
@@ -507,37 +559,72 @@ export function AnalyticsSummarySection({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-5">
-      <StatCard
-        label="Total Views"
-        value={analyticsData.summary.totalViews}
-        icon={Eye}
-        color="bg-indigo-500"
-      />
-      <StatCard
-        label="Unique Visitors"
-        value={analyticsData.summary.uniqueVisitors}
-        icon={Users}
-        color="bg-cyan-500"
-      />
-      <StatCard
-        label="Total Clicks"
-        value={analyticsData.summary.totalClicks}
-        icon={MousePointerClick}
-        color="bg-amber-500"
-      />
-      <StatCard
-        label="Total Leads"
-        value={analyticsData.summary.totalLeads}
-        icon={TrendingUp}
-        color="bg-emerald-500"
-      />
-      <StatCard
-        label="Conversion Rate"
-        value={`${analyticsData.summary.conversionRate}%`}
-        icon={Percent}
-        color="bg-violet-500"
-      />
+    <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="app-panel rounded-[24px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            Proof of value
+          </p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{savedLeads} leads captured</p>
+          <p className="mt-2 text-sm text-gray-500">
+            People moved beyond viewing your profile and shared their details with you.
+          </p>
+        </div>
+        <div className="app-panel rounded-[24px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            Follow-up signal
+          </p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{followUpSignal} actions</p>
+          <p className="mt-2 text-sm text-gray-500">
+            Combined clicks and lead submissions show how much intent your cards are creating.
+          </p>
+        </div>
+        <div className="app-panel rounded-[24px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            Conversion quality
+          </p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">
+            {analyticsData.summary.conversionRate}% view-to-lead rate
+          </p>
+          <p className="mt-2 text-sm text-gray-500">
+            Use this to judge whether your profile and follow-up flow are turning attention into
+            real opportunities.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-5">
+        <StatCard
+          label="Total Views"
+          value={analyticsData.summary.totalViews}
+          icon={Eye}
+          color="bg-indigo-500"
+        />
+        <StatCard
+          label="Unique Visitors"
+          value={analyticsData.summary.uniqueVisitors}
+          icon={Users}
+          color="bg-cyan-500"
+        />
+        <StatCard
+          label="Total Clicks"
+          value={analyticsData.summary.totalClicks}
+          icon={MousePointerClick}
+          color="bg-amber-500"
+        />
+        <StatCard
+          label="Total Leads"
+          value={analyticsData.summary.totalLeads}
+          icon={TrendingUp}
+          color="bg-emerald-500"
+        />
+        <StatCard
+          label="Conversion Rate"
+          value={`${analyticsData.summary.conversionRate}%`}
+          icon={Percent}
+          color="bg-violet-500"
+        />
+      </div>
     </div>
   )
 }

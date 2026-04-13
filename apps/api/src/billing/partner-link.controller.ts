@@ -1,7 +1,8 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
-import { IsEmail, IsEthereumAddress, IsOptional } from 'class-validator'
+import { IsEmail, IsEthereumAddress, IsOptional, IsString, Matches } from 'class-validator'
 import { PrismaService } from '../prisma/prisma.service'
+import { BillingService } from './billing.service'
 import { BoosterAiPartnerGuard } from './boosterai-partner.guard'
 import { Public } from '../auth/decorators/public.decorator'
 
@@ -20,8 +21,16 @@ class PartnerEligibilityQuery {
   walletAddress?: string
 }
 
+class PartnerLinkQuery extends PartnerEligibilityQuery {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,120}$/, {
+    message: 'partnerId must be a valid partner identifier',
+  })
+  partnerId!: string
+}
+
 /**
- * Internal endpoint called by BoosterAI during partner registration.
+ * Internal endpoint called during partner registration and account linking.
  * Checks whether the applicant can be linked to a Dotly account.
  *
  * Protected by x-boosterai-api-key header (BoosterAiPartnerGuard).
@@ -34,10 +43,13 @@ class PartnerEligibilityQuery {
  */
 @ApiTags('internal')
 @Public()
-@Controller('v1/internal/boosterai')
+@Controller('v1/internal/partners')
 @UseGuards(BoosterAiPartnerGuard)
-export class BoosterAiPartnerEligibilityController {
-  constructor(private readonly prisma: PrismaService) {}
+export class PartnerLinkController {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billingService: BillingService,
+  ) {}
 
   @Get('partner-eligibility')
   async checkEligibility(@Query() query: PartnerEligibilityQuery) {
@@ -86,7 +98,50 @@ export class BoosterAiPartnerEligibilityController {
     return {
       eligible: true,
       plan: subscription?.plan ?? user.plan,
-      status: isActive && notExpired ? subscription?.status ?? 'ACTIVE' : 'NONE',
+      status: isActive && notExpired ? (subscription?.status ?? 'ACTIVE') : 'NONE',
     }
+  }
+
+  @Get('link')
+  async linkPartner(@Query() query: PartnerLinkQuery) {
+    const { email, walletAddress, partnerId } = query
+
+    if (!partnerId?.trim()) {
+      return { linked: false, reason: 'MISSING_PARTNER_ID' }
+    }
+
+    if (!email && !walletAddress) {
+      return { linked: false, reason: 'MISSING_IDENTIFIER' }
+    }
+
+    const normalizedEmail = email?.toLowerCase()
+    const normalizedWallet = walletAddress?.toLowerCase()
+
+    const [emailUser, walletUser] = await Promise.all([
+      normalizedEmail
+        ? this.prisma.user.findFirst({
+            where: { email: normalizedEmail },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      normalizedWallet
+        ? this.prisma.user.findFirst({
+            where: { walletAddress: normalizedWallet },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ])
+
+    if (emailUser && walletUser && emailUser.id !== walletUser.id) {
+      return { linked: false, reason: 'IDENTIFIER_MISMATCH' }
+    }
+
+    const user = emailUser ?? walletUser
+    if (!user) {
+      return { linked: false, reason: 'USER_NOT_FOUND' }
+    }
+
+    await this.billingService.linkPartnerIdentity(user.id, partnerId.trim())
+    return { linked: true, userId: user.id, partnerId: partnerId.trim() }
   }
 }

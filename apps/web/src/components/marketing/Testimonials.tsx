@@ -17,7 +17,7 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      'The USDT payment feature is a game-changer for international clients. Zero bank fees, instant settlement, no chargebacks.',
+      'The analytics and follow-up workflow changed how I handle events. I can see what resonated and reach out while the conversation is still fresh.',
     name: 'Priya L.',
     title: 'Digital Marketing Consultant',
     initials: 'PL',

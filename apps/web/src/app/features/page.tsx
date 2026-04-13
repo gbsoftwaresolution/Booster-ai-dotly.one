@@ -101,16 +101,16 @@ const SECTIONS = [
     reverse: false,
   },
   {
-    id: 'web3',
-    tag: 'Web3 payments',
-    title: 'Accept USDT — no bank required',
+    id: 'scheduling',
+    tag: 'Stay in motion',
+    title: 'Scheduling and follow-up that keep momentum alive',
     description:
-      'Wallet-connected USDT checkout is still being rolled out. Published plans today focus on cards, analytics, CRM, inbox, and scheduling rather than production payment acceptance.',
+      'Move from first tap to next conversation without losing context. Share booking links, keep outreach organized, and use Dotly as the system that turns introductions into ongoing relationships.',
     bullets: [
-      'Payment infrastructure is under active development',
-      'Published plan pages reflect the product surface available today',
-      'Do not rely on the marketing site as a promise of current payment availability',
-      'Contact the team before using Dotly for production payment collection',
+      'Booking links connect your card to the next action',
+      'Inbox, reminders, and templates keep follow-up organized',
+      'Scheduling helps remove friction after a strong first impression',
+      'Dotly keeps contact history and engagement in one workflow',
     ],
     icon: (
       <svg

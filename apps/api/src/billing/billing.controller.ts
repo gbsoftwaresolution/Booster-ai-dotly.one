@@ -52,11 +52,17 @@ class CreateBoosterAiOrderDto {
   /** Referral/partner code from ?ref=p_xxxxx */
   @IsOptional()
   @IsString()
+  @Matches(/^p_[A-Za-z0-9_-]{4,120}$/, {
+    message: 'ref must be a valid partner code in the format p_xxxxx',
+  })
   ref?: string
 
   /** ISO 3166-1 alpha-2 country code, e.g. "US". Defaults to BOOSTERAI_COUNTRY_CODE env var. */
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Z]{2}$/, {
+    message: 'countryCode must be a 2-letter uppercase ISO country code',
+  })
   countryCode?: string
 }
 
@@ -103,17 +109,17 @@ export class BillingController {
     return this.billingService.setWalletAddress(user.id, dto.walletAddress)
   }
 
-  // ─── BoosterAI affiliate billing ─────────────────────────────────────────
+  // ─── Subscription checkout ───────────────────────────────────────────────
 
   /**
-   * POST /billing/boosterai/order
-   * Creates a BoosterAI order and returns PaymentVault parameters.
-   * The frontend uses these to trigger the on-chain USDT payment.
+   * POST /billing/checkout/order
+   * Creates a checkout order and returns payment parameters.
+   * The frontend uses these to trigger the payment flow.
    */
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @Post('boosterai/order')
-  createBoosterAiOrder(@CurrentUser() user: AuthUser, @Body() dto: CreateBoosterAiOrderDto) {
+  @Post('checkout/order')
+  createCheckoutOrder(@CurrentUser() user: AuthUser, @Body() dto: CreateBoosterAiOrderDto) {
     const planMap: Record<string, Plan> = {
       STARTER: Plan.STARTER,
       PRO: Plan.PRO,
@@ -121,7 +127,7 @@ export class BillingController {
       AGENCY: Plan.AGENCY,
       ENTERPRISE: Plan.ENTERPRISE,
     }
-    return this.billingService.createBoosterAiOrder(user.id, {
+    return this.billingService.createCheckoutOrder(user.id, {
       plan: planMap[dto.plan]!,
       duration: dto.duration,
       walletAddress: dto.walletAddress,
@@ -131,14 +137,14 @@ export class BillingController {
   }
 
   /**
-   * POST /billing/boosterai/activate
-   * Polls BoosterAI for order finalization and activates the subscription.
+   * POST /billing/checkout/activate
+   * Polls the payment provider for order finalization and activates the subscription.
    * Idempotent — safe to call multiple times until { status: 'ACTIVE' }.
    */
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @Post('boosterai/activate')
-  activateBoosterAiOrder(@CurrentUser() user: AuthUser, @Body() dto: ActivateBoosterAiOrderDto) {
+  @Post('checkout/activate')
+  activateCheckoutOrder(@CurrentUser() user: AuthUser, @Body() dto: ActivateBoosterAiOrderDto) {
     return this.billingService.activateBoosterAiOrder(user.id, dto.orderId)
   }
 }

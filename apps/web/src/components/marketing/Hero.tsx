@@ -7,7 +7,7 @@ function HeroDesktop() {
       <div className="text-left">
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-white/85 px-4 py-2 text-xs font-semibold text-sky-700 shadow-[0_18px_40px_-24px_rgba(14,165,233,0.45)] backdrop-blur-sm">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
-          Now with Web3 USDT payments
+          Built for modern professionals
         </div>
 
         <h1 className="mx-0 max-w-4xl text-7xl xl:text-[5.3rem] font-extrabold tracking-[-0.04em] text-gray-950">

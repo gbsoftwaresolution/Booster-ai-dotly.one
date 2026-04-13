@@ -130,13 +130,13 @@ export default function BillingSettingsPage(): JSX.Element {
   const handleNoWalletSubscribe = async (walletAddr: string) => {
     setSubscribing(true)
     setError(null)
-    setSubscribeStep('Creating order…')
+    setSubscribeStep('Preparing crypto checkout…')
     try {
       const token = await getToken()
       if (!token) throw new Error('Not authenticated.')
       const ref = readRefCookie()
       const order = await apiPost<CreateOrderResponse>(
-        '/billing/boosterai/order',
+        '/billing/checkout/order',
         {
           plan: selectedPlan,
           duration: selectedDuration,
@@ -182,7 +182,7 @@ export default function BillingSettingsPage(): JSX.Element {
         await new Promise((r) => setTimeout(r, 2_000))
         try {
           const result = await apiPost<ActivateOrderResponse>(
-            '/billing/boosterai/activate',
+            '/billing/checkout/activate',
             { orderId: noWalletOrder.orderId },
             token,
           )
@@ -221,7 +221,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
     setSubscribing(true)
     setError(null)
-    setSubscribeStep('Creating order…')
+    setSubscribeStep('Preparing crypto checkout…')
 
     try {
       const token = await getToken()
@@ -230,7 +230,7 @@ export default function BillingSettingsPage(): JSX.Element {
       const ref = readRefCookie()
 
       const order = await apiPost<CreateOrderResponse>(
-        '/billing/boosterai/order',
+        '/billing/checkout/order',
         {
           plan: selectedPlan,
           duration: selectedDuration,
@@ -258,7 +258,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
       const usdtRaw = parseUsdtAmount(amountUsdt)
 
-      setSubscribeStep('Approving USDT transfer…')
+      setSubscribeStep('Approving crypto payment…')
 
       const approveData =
         ERC20_APPROVE_SELECTOR +
@@ -270,10 +270,10 @@ export default function BillingSettingsPage(): JSX.Element {
         params: [{ from: walletAddress, to: usdtTokenAddress, data: approveData }],
       })) as string
 
-      setSubscribeStep('Waiting for approval confirmation…')
+      setSubscribeStep('Waiting for wallet approval…')
       await waitForReceipt(approveTxHash)
 
-      setSubscribeStep('Confirming payment transaction…')
+      setSubscribeStep('Confirming payment…')
       const payData =
         '0x4d544a74' +
         (paymentRef.startsWith('0x') ? paymentRef.slice(2) : paymentRef).padStart(64, '0')
@@ -293,7 +293,7 @@ export default function BillingSettingsPage(): JSX.Element {
         await new Promise((r) => setTimeout(r, 2_000))
         try {
           const result = await apiPost<ActivateOrderResponse>(
-            '/billing/boosterai/activate',
+            '/billing/checkout/activate',
             { orderId: order.orderId },
             token,
           )
@@ -329,7 +329,7 @@ export default function BillingSettingsPage(): JSX.Element {
   }
 
   const currentPlan = (subscription?.plan as PlanId | undefined) ?? 'FREE'
-  const currentStatus = subscription?.status ?? 'TRIALING'
+  const currentStatus = subscription?.status ?? 'FREE'
   const expiryDate = formatExpiryDate(subscription?.currentPeriodEnd)
 
   const selectedPrice = PLAN_PRICES[selectedPlan]?.[selectedDuration]

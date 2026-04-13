@@ -6,7 +6,6 @@ import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch } from '@/lib/api'
 import type { BillingSummaryResponse, UserMeResponse } from '@dotly/types'
 import {
-  BecomeAPartnerCard,
   BillingTabContent,
   NotificationsTabContent,
   ProfileTabContent,
@@ -246,8 +245,6 @@ export default function SettingsPage(): JSX.Element {
           />
         )}
       </div>
-
-      <BecomeAPartnerCard />
     </div>
   )
 }

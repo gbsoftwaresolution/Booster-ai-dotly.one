@@ -95,8 +95,8 @@ const DURATION_SAVINGS: Record<Duration, string | null> = {
 
 const DURATION_NOTE: Record<Duration, string | null> = {
   MONTHLY: null,
-  SIX_MONTHS: 'Billed every 6 months in USDT',
-  ANNUAL: 'Billed annually in USDT',
+  SIX_MONTHS: 'Billed every 6 months in USD',
+  ANNUAL: 'Billed annually in USD',
 }
 
 function FeatureValue({ value }: { value: string | boolean }) {
@@ -125,9 +125,9 @@ function FeatureValue({ value }: { value: string | boolean }) {
 
 function formatPrice(plan: Plan, duration: Duration): { display: string; sub: string } {
   const total = plan.prices[duration]
-  if (duration === 'MONTHLY') return { display: `$${total}`, sub: 'USDT / month' }
-  if (duration === 'SIX_MONTHS') return { display: `$${total}`, sub: 'USDT / 6 months' }
-  return { display: `$${total}`, sub: 'USDT / year' }
+  if (duration === 'MONTHLY') return { display: `$${total}`, sub: 'per month' }
+  if (duration === 'SIX_MONTHS') return { display: `$${total}`, sub: 'every 6 months' }
+  return { display: `$${total}`, sub: 'per year' }
 }
 
 function getCheckoutHref(plan: 'STARTER' | 'PRO', duration: Duration): string {
@@ -146,15 +146,29 @@ export default function PricingPage() {
         <div className="mx-auto max-w-3xl">
           <div className="app-shell-surface inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-sky-700">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-            Paid in USDT
+            USD pricing
           </div>
           <h1 className="mt-6 text-4xl font-extrabold tracking-[-0.04em] text-gray-950 sm:text-5xl lg:text-6xl">
-            Simple pricing for how Dotly works today.
+            Simple pricing for professionals who want better follow-up.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-gray-600">
             Start free, then upgrade when you need richer sharing, stronger analytics, and a more
             complete CRM workflow.
           </p>
+          <p className="mt-3 text-sm text-gray-500">
+            All plans are priced in USD. Available payment methods are shown during checkout.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs text-gray-600">
+            <span className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5">
+              Start free
+            </span>
+            <span className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5">
+              7-day refund window on paid upgrades
+            </span>
+            <span className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5">
+              Cancel before renewal
+            </span>
+          </div>
           <p className="mt-3 text-sm font-medium text-brand-600">
             Business, Agency, and Enterprise plans will be published later.
           </p>
@@ -208,7 +222,7 @@ export default function PricingPage() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <div>
                   <span className="text-4xl font-bold tracking-tight text-gray-950">$0</span>
-                  <span className="ml-1 text-sm text-gray-500">USDT forever</span>
+                  <span className="ml-1 text-sm text-gray-500">forever</span>
                 </div>
                 <Link
                   href="/auth?next=%2Fdashboard"
@@ -263,6 +277,9 @@ export default function PricingPage() {
                       </span>
                     </div>
                     <p className="mt-2 text-sm font-medium text-gray-500">{sub}</p>
+                    <p className="mt-2 text-xs text-gray-500">
+                      Includes a 7-day refund window on first paid upgrade.
+                    </p>
                   </div>
 
                   <ul className="relative mt-6 space-y-3 text-sm text-gray-700">
@@ -342,11 +359,14 @@ export default function PricingPage() {
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
             <ShieldCheck className="h-6 w-6" />
           </span>
-          <h3 className="text-lg font-bold text-gray-950">Payment roadmap</h3>
+          <h3 className="text-lg font-bold text-gray-950">Billing clarity</h3>
           <p className="mt-3 text-sm leading-7 text-gray-500">
-            Dotly&apos;s published plans today focus on cards, analytics, CRM, inbox, and
-            scheduling. Wallet-based USDT payments are not part of the current self-serve pricing
-            surface.
+            Dotly is sold as a SaaS subscription. Pricing is listed in USD so teams and individual
+            professionals can compare plans clearly before they choose a payment method at checkout.
+          </p>
+          <p className="mt-2 text-sm leading-7 text-gray-500">
+            Start on the free plan, upgrade when you need more power, and use the 7-day refund
+            window on eligible paid upgrades if Dotly is not the right fit.
           </p>
         </div>
       </section>

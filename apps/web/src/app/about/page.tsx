@@ -7,14 +7,14 @@ import { Footer } from '@/components/marketing/Footer'
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'Dotly.one is built by BoosterAI to help professionals share smarter with digital business cards powered by NFC, analytics, and Web3 payments.',
+    'Dotly.one helps professionals share smarter with digital business cards powered by NFC, analytics, CRM, and scheduling.',
 }
 
 const VALUES = [
   {
     title: 'Privacy first',
     description:
-      'You own your data. We never sell contact information, and every payment goes directly on-chain — no intermediary holds your funds.',
+      'You own your data. We never sell contact information, and we design Dotly so professionals stay in control of what they share and track.',
   },
   {
     title: 'Radical simplicity',
@@ -22,9 +22,9 @@ const VALUES = [
       "A tap or a scan — that's the entire UX for the person receiving your card. Complex features should be invisible until you need them.",
   },
   {
-    title: 'Web3-native',
+    title: 'Results you can measure',
     description:
-      'USDT payments through a fully audited smart contract. No bank accounts, no geographic restrictions, no chargebacks.',
+      'A digital card should do more than look good. Dotly helps you measure engagement, capture leads, and turn introductions into follow-up opportunities.',
   },
   {
     title: 'Built for scale',
@@ -35,10 +35,10 @@ const VALUES = [
 
 const TEAM = [
   {
-    name: 'BoosterAI Engineering',
+    name: 'The Dotly Team',
     description:
-      'The team behind Dotly.one builds AI-powered growth tools at BoosterAI.pro. We dogfood Dotly.one at every conference and client meeting.',
-    initials: 'BA',
+      'We build Dotly for professionals who want a better way to share, capture intent, and follow up after real-world conversations.',
+    initials: 'DT',
   },
 ]
 
@@ -102,14 +102,6 @@ export default function AboutPage() {
               <p className="mt-2 max-w-md text-sm leading-relaxed text-gray-500">
                 {member.description}
               </p>
-              <a
-                href="https://boosterai.pro"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 text-sm font-medium text-brand-500 hover:underline"
-              >
-                boosterai.pro &rarr;
-              </a>
             </div>
           ))}
         </div>

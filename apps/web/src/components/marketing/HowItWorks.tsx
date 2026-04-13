@@ -15,7 +15,7 @@ const STEPS = [
     number: '03',
     title: 'Capture leads & close deals',
     description:
-      'Every scan creates a contact in your CRM. Follow up, track engagement in real time, and accept USDT payments on the spot.',
+      'Every scan creates a contact in your CRM. Follow up faster, track engagement in real time, and keep momentum after every introduction.',
   },
 ]
 

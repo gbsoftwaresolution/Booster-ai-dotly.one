@@ -75,13 +75,26 @@ export default function TermsPage() {
             <h2>6. Payments and subscriptions</h2>
             <ul>
               <li>
-                Published self-serve plans and payment methods may change over time. The checkout
-                flow presented in-product at purchase time controls the currency, network, renewal,
-                and billing method for your subscription.
+                Dotly.one may offer a free plan with limited usage. Feature limits and availability
+                are described in-product and may change over time.
               </li>
               <li>
-                All payments are final. We do not offer refunds except where required by applicable
-                law.
+                We may also offer limited trials, promotional access, or upgrade incentives for
+                certain plans or users. If a trial is available, its length, included features, and
+                conversion terms will be shown at signup or checkout.
+              </li>
+              <li>
+                Published self-serve plans and payment methods may change over time. The checkout
+                flow presented in-product at purchase time controls the price, billing cadence,
+                renewal, and payment method for your subscription.
+              </li>
+              <li>
+                Eligible paid subscriptions and upgrades include a 7-day refund window unless a
+                different period is shown at checkout or required by applicable law.
+              </li>
+              <li>
+                If a refund is issued during that refund window, paid access may be revoked and your
+                account may return to the Free plan or another applicable entitlement state.
               </li>
               <li>
                 Subscriptions automatically renew at the end of each billing period unless cancelled
@@ -97,30 +110,14 @@ export default function TermsPage() {
               </li>
             </ul>
 
-            <h2>7. Partner programme</h2>
-            <ul>
-              <li>
-                Dotly.one may offer access to an optional BoosterAI partner programme subject to
-                separate partner terms and compliance requirements.
-              </li>
-              <li>
-                Joining that partner programme does not require purchasing a paid Dotly.one
-                subscription.
-              </li>
-              <li>
-                Any commissions or other partner rewards, if offered, depend on actual product
-                sales, refund outcomes, and payout eligibility requirements.
-              </li>
-            </ul>
-
-            <h2>8. Service availability</h2>
+            <h2>7. Service availability</h2>
             <p>
               We work to keep the Service available and communicate major maintenance when
               practical, but we do not guarantee uninterrupted availability unless we explicitly
               agree to that in a separate written enterprise contract.
             </p>
 
-            <h2>9. Termination</h2>
+            <h2>8. Termination</h2>
             <p>
               We may suspend or terminate your account at our discretion if you violate these Terms
               or engage in activity harmful to other users or the Service. If the in-product delete
@@ -129,38 +126,36 @@ export default function TermsPage() {
               associated with that account may stop resolving.
             </p>
 
-            <h2>10. Disclaimers and limitation of liability</h2>
+            <h2>9. Disclaimers and limitation of liability</h2>
             <p>
               THE SERVICE IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND. TO THE
-              FULLEST EXTENT PERMITTED BY LAW, DOTLY.ONE AND BOOSTERAI SHALL NOT BE LIABLE FOR ANY
-              INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR
-              USE OF THE SERVICE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+              FULLEST EXTENT PERMITTED BY LAW, DOTLY.ONE SHALL NOT BE LIABLE FOR ANY INDIRECT,
+              INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE
+              SERVICE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
             </p>
             <p>
               Our aggregate liability to you for any claim arising out of these Terms shall not
               exceed the amount you paid us in the twelve months preceding the claim.
             </p>
 
-            <h2>11. Governing law</h2>
+            <h2>10. Governing law</h2>
             <p>
-              These Terms are governed by the laws of the jurisdiction in which BoosterAI is
-              incorporated, without regard to conflict-of-law principles. Any disputes shall be
-              resolved in the competent courts of that jurisdiction.
+              These Terms are governed by the laws of the jurisdiction in which Dotly.one is
+              operated, without regard to conflict-of-law principles. Any disputes shall be resolved
+              in the competent courts of that jurisdiction.
             </p>
 
-            <h2>12. Changes to these terms</h2>
+            <h2>11. Changes to these terms</h2>
             <p>
               We may update these Terms from time to time. Registered users will be notified of
               material changes via email at least 14 days before the effective date. Continued use
               after the effective date constitutes acceptance of the updated Terms.
             </p>
 
-            <h2>13. Contact</h2>
+            <h2>12. Contact</h2>
             <p>
               Questions about these Terms should be directed to:{' '}
               <a href="mailto:legal@dotly.one">legal@dotly.one</a>
-              <br />
-              BoosterAI / Dotly.one
             </p>
           </div>
         </div>

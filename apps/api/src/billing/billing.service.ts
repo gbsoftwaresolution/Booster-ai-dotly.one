@@ -52,6 +52,109 @@ export class BillingService {
     return walletAddress.toLowerCase()
   }
 
+  private async assertWalletAvailableForUser(userId: string, walletAddress: string): Promise<void> {
+    const normalizedWallet = this.normalizeWalletAddress(walletAddress)
+    const existingOwner = await this.prisma.user.findFirst({
+      where: {
+        walletAddress: normalizedWallet,
+        id: { not: userId },
+      },
+      select: { id: true },
+    })
+
+    if (existingOwner) {
+      throw new BadRequestException(
+        'This wallet is already linked to another Dotly account and cannot be reused for billing',
+      )
+    }
+  }
+
+  private async assertOrderCreationAllowed(userId: string): Promise<void> {
+    const existingSubscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: {
+        status: true,
+        boosterAiOrderId: true,
+        currentPeriodEnd: true,
+      },
+    })
+
+    if (existingSubscription?.boosterAiOrderId) {
+      throw new BadRequestException(
+        'You already have a pending checkout. Complete or wait for that checkout before starting another one',
+      )
+    }
+
+    const isActive = existingSubscription?.status === 'ACTIVE'
+    const stillValid =
+      !!existingSubscription?.currentPeriodEnd && existingSubscription.currentPeriodEnd > new Date()
+
+    if (isActive && stillValid) {
+      throw new BadRequestException(
+        'Your subscription is already active. Manage your current subscription before starting a new checkout',
+      )
+    }
+  }
+
+  private normalizePartnerCode(ref?: string): string | undefined {
+    if (!ref) return undefined
+    const trimmed = ref.trim()
+    return trimmed || undefined
+  }
+
+  private normalizePartnerIdentity(partnerId?: string | null): string | undefined {
+    if (!partnerId) return undefined
+    const trimmed = partnerId.trim()
+    if (!trimmed) return undefined
+    return trimmed.replace(/^p_/, '')
+  }
+
+  async linkPartnerIdentity(userId: string, partnerId: string) {
+    const normalizedPartnerId = this.normalizePartnerIdentity(partnerId)
+    if (!normalizedPartnerId) {
+      throw new BadRequestException('Partner identity is required')
+    }
+
+    const existingOwner = await this.prisma.user.findFirst({
+      where: {
+        boosterAiPartnerId: normalizedPartnerId,
+        id: { not: userId },
+      },
+      select: { id: true },
+    })
+
+    if (existingOwner) {
+      throw new BadRequestException(
+        'This partner identity is already linked to another Dotly account',
+      )
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { boosterAiPartnerId: normalizedPartnerId },
+      select: { id: true, boosterAiPartnerId: true },
+    })
+  }
+
+  private async assertNoSelfReferral(userId: string, partnerCode?: string): Promise<void> {
+    const normalizedPartnerCode = this.normalizePartnerIdentity(partnerCode)
+    if (!normalizedPartnerCode) return
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { boosterAiPartnerId: true },
+    })
+
+    if (
+      user?.boosterAiPartnerId &&
+      this.normalizePartnerIdentity(user.boosterAiPartnerId) === normalizedPartnerCode
+    ) {
+      throw new BadRequestException(
+        'You cannot use your own partner code when purchasing a subscription',
+      )
+    }
+  }
+
   /**
    * Verify on-chain subscription for a wallet address and sync to DB.
    * Called after user submits a transaction hash.
@@ -253,6 +356,7 @@ export class BillingService {
 
   async setWalletAddress(userId: string, walletAddress: string) {
     const normalizedWallet = this.normalizeWalletAddress(walletAddress)
+    await this.assertWalletAvailableForUser(userId, normalizedWallet)
     return this.prisma.user.update({
       where: { id: userId },
       data: { walletAddress: normalizedWallet },
@@ -265,7 +369,7 @@ export class BillingService {
    * Step 1 — Create a BoosterAI order and return PaymentVault params.
    * The frontend uses these to call paySubscription() on-chain.
    */
-  async createBoosterAiOrder(
+  async createCheckoutOrder(
     userId: string,
     params: {
       plan: Plan
@@ -279,13 +383,21 @@ export class BillingService {
       throw new BadRequestException('Cannot create a BoosterAI order for the FREE plan')
     }
 
+    await this.assertOrderCreationAllowed(userId)
+
+    const normalizedWallet = this.normalizeWalletAddress(params.walletAddress)
+    await this.assertWalletAvailableForUser(userId, normalizedWallet)
+
+    const partnerCode = this.normalizePartnerCode(params.ref)
+    await this.assertNoSelfReferral(userId, partnerCode)
+
     let orderRes: Awaited<ReturnType<BoosterAiClient['createOrder']>>
     try {
       orderRes = await this.boosterAi.createOrder({
         plan: params.plan,
         duration: params.duration,
-        walletAddress: params.walletAddress,
-        partnerCode: params.ref,
+        walletAddress: normalizedWallet,
+        partnerCode,
         countryCode: params.countryCode,
       })
     } catch (err) {
@@ -296,7 +408,6 @@ export class BillingService {
     }
 
     const amountUsdt = this.boosterAi.getAmountUsdt(params.plan, params.duration)
-    const normalizedWallet = this.normalizeWalletAddress(params.walletAddress)
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -411,9 +522,14 @@ export class BillingService {
       void this.audit
         .log({
           userId,
-          action: 'billing.boosterai.activated',
+          action: 'billing.checkout.activated',
           resourceType: 'subscription',
-          metadata: { orderId, plan, partnerId: status.partnerId },
+          metadata: {
+            orderId,
+            plan,
+            partnerId: status.partnerId,
+            refundUntil: status.refundUntil,
+          },
         })
         .catch(() => void 0)
 
@@ -435,7 +551,7 @@ export class BillingService {
       void this.audit
         .log({
           userId,
-          action: 'billing.boosterai.refunded',
+          action: 'billing.checkout.refunded',
           resourceType: 'subscription',
           metadata: { orderId },
         })

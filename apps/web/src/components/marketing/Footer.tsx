@@ -50,7 +50,6 @@ export function Footer() {
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
               Digital business cards with NFC, QR, analytics, CRM, and scheduling.
             </p>
-            <p className="mt-4 text-xs text-gray-400">Powered by BoosterAI PaymentVault</p>
           </div>
 
           {/* Link columns */}
@@ -78,17 +77,6 @@ export function Footer() {
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-gray-100 pt-8 sm:flex-row">
           <p className="text-xs text-gray-400">
             &copy; {new Date().getFullYear()} Dotly.one — All rights reserved.
-          </p>
-          <p className="text-xs text-gray-400">
-            Built by{' '}
-            <a
-              href="https://boosterai.pro"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-brand-500 hover:underline"
-            >
-              BoosterAI
-            </a>
           </p>
         </div>
       </div>

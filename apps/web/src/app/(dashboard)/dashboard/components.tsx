@@ -55,7 +55,12 @@ export function StatCard({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/60 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       <div className="relative flex items-start justify-between gap-3">
-        <div className={cn('flex h-12 w-12 items-center justify-center rounded-[20px] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-inner ring-1 ring-inset ring-gray-950/[0.04]', bg)}>
+        <div
+          className={cn(
+            'flex h-12 w-12 items-center justify-center rounded-[20px] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-inner ring-1 ring-inset ring-gray-950/[0.04]',
+            bg,
+          )}
+        >
           <Icon className={cn('h-5 w-5', color)} aria-hidden="true" />
         </div>
         <span className="rounded-full bg-gray-950/[0.03] px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-gray-500 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors shadow-sm">
@@ -63,8 +68,12 @@ export function StatCard({
         </span>
       </div>
       <div className="relative">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 group-hover:text-gray-500 transition-colors">{label}</p>
-        <p className="mt-1.5 text-3xl font-black tabular-nums tracking-tighter text-gray-950">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 group-hover:text-gray-500 transition-colors">
+          {label}
+        </p>
+        <p className="mt-1.5 text-3xl font-black tabular-nums tracking-tighter text-gray-950">
+          {value}
+        </p>
         {hint && <p className="mt-2 text-[12px] font-medium text-gray-400">{hint}</p>}
       </div>
     </Link>
@@ -95,7 +104,10 @@ export function SkeletonList({ rows = 3 }: { rows?: number }): JSX.Element {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="flex h-[72px] items-center justify-between rounded-[24px] bg-white ring-1 ring-gray-950/[0.03] px-4 shadow-[0_4px_12px_-8px_rgba(15,23,42,0.08)]">
+        <div
+          key={index}
+          className="flex h-[72px] items-center justify-between rounded-[24px] bg-white ring-1 ring-gray-950/[0.03] px-4 shadow-[0_4px_12px_-8px_rgba(15,23,42,0.08)]"
+        >
           <div className="flex flex-col gap-2">
             <div className="h-3.5 w-32 animate-pulse rounded-full bg-gray-200/60" />
             <div className="h-2.5 w-24 animate-pulse rounded-full bg-gray-100" />
@@ -171,6 +183,28 @@ export function DashboardHero({
   totalLeads: number
   userName: string
 }): JSX.Element {
+  const proofItems = [
+    {
+      label: 'Attention turned into leads',
+      value:
+        loading || sectionErrors.includes('dashboard summary') ? '—' : `${totalLeads} captured`,
+      detail: 'Contacts created from your shared cards',
+    },
+    {
+      label: 'Revenue in motion',
+      value:
+        loading || sectionErrors.includes('deals') || sectionErrors.includes('dashboard summary')
+          ? '—'
+          : formatCurrency(pipelineValue),
+      detail: 'Open deal value currently in your pipeline',
+    },
+    {
+      label: 'Sharing surface live',
+      value: loading || sectionErrors.includes('dashboard summary') ? '—' : `${activeCards} active`,
+      detail: 'Cards working for you right now',
+    },
+  ]
+
   const summaryStats = [
     {
       label: 'Live Cards',
@@ -197,9 +231,7 @@ export function DashboardHero({
     {
       label: 'Pipeline Value',
       value:
-        loading ||
-        sectionErrors.includes('deals') ||
-        sectionErrors.includes('dashboard summary')
+        loading || sectionErrors.includes('deals') || sectionErrors.includes('dashboard summary')
           ? '—'
           : formatCurrency(pipelineValue),
       note: 'Revenue in play',
@@ -219,9 +251,7 @@ export function DashboardHero({
     {
       label: 'Revenue pipeline',
       value:
-        loading ||
-        sectionErrors.includes('deals') ||
-        sectionErrors.includes('dashboard summary')
+        loading || sectionErrors.includes('deals') || sectionErrors.includes('dashboard summary')
           ? 'Unavailable'
           : formatCurrency(pipelineValue),
       detail: sectionErrors.includes('deals')
@@ -249,18 +279,18 @@ export function DashboardHero({
   return (
     <div className="relative overflow-hidden rounded-[34px] px-5 py-5 sm:px-6 sm:py-6 shadow-[0_24px_52px_-20px_rgba(15,23,42,0.12)] ring-1 ring-gray-950/[0.04] bg-white transition-all">
       {/* High-end unified mesh background effect */}
-      <div 
-        className="absolute inset-0 opacity-[0.65] saturate-[1.1] " 
+      <div
+        className="absolute inset-0 opacity-[0.65] saturate-[1.1] "
         style={{
           background: `
             radial-gradient(90% 90% at 10% 10%, rgba(56,189,248,0.12) 0%, transparent 100%),
             radial-gradient(100% 100% at 85% 20%, rgba(168,85,247,0.10) 0%, transparent 100%),
             radial-gradient(120% 120% at 50% 110%, rgba(16,185,129,0.08) 0%, transparent 100%)
-          `
-        }} 
+          `,
+        }}
       />
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay"></div>
-      
+
       <div className="relative space-y-6 lg:hidden">
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-3">
@@ -281,6 +311,21 @@ export function DashboardHero({
               <p className="max-w-[280px] text-[13px] leading-relaxed text-gray-500 font-medium">
                 Your business pulse at a glance.
               </p>
+
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                {proofItems.map(({ label, value, detail }) => (
+                  <div
+                    key={label}
+                    className="rounded-[20px] border border-gray-950/[0.04] bg-white/70 px-4 py-3 shadow-[0_4px_24px_-12px_rgba(15,23,42,0.08)]"
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-950">{value}</p>
+                    <p className="mt-1 text-[12px] text-gray-500">{detail}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -376,8 +421,23 @@ export function DashboardHero({
             </span>
           </div>
           <p className="mt-4 max-w-lg text-[15px] font-medium leading-[1.7] text-gray-500">
-            Welcome to your command center. Here&apos;s the live pulse of your operations today, highlighting momentum and areas that need attention.
+            Welcome to your command center. Here&apos;s the live pulse of your operations today,
+            highlighting momentum and areas that need attention.
           </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {proofItems.map(({ label, value, detail }) => (
+              <div
+                key={label}
+                className="rounded-[24px] border border-white/80 bg-white/80 px-4 py-3 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.14)]"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                  {label}
+                </p>
+                <p className="mt-1 text-sm font-bold text-gray-900">{value}</p>
+                <p className="mt-1 text-xs text-gray-500">{detail}</p>
+              </div>
+            ))}
+          </div>
           <div className="mt-8 flex flex-wrap items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-gray-400">
             <span className="rounded-full border border-gray-950/[0.04] bg-white/70 backdrop-blur-md px-4 py-2 opacity-80 shadow-[0_4px_24px_-12px_rgba(15,23,42,0.1)] hover:opacity-100 transition-opacity cursor-default">
               Live Workspace Pulse
@@ -395,8 +455,13 @@ export function DashboardHero({
               key={label}
               className="group relative flex flex-col justify-between overflow-hidden rounded-[30px] border border-gray-950/[0.04] bg-white/70 backdrop-blur-md p-6 transition-all duration-500 hover:bg-white hover:-translate-y-1 hover:shadow-[0_24px_52px_-20px_rgba(15,23,42,0.12)]"
             >
-              <div className={cn('absolute inset-x-0 -top-px h-[2px] w-1/2 opacity-0 bg-gradient-to-r transition-all duration-500 group-hover:w-full group-hover:opacity-100', accent)} />
-              
+              <div
+                className={cn(
+                  'absolute inset-x-0 -top-px h-[2px] w-1/2 opacity-0 bg-gradient-to-r transition-all duration-500 group-hover:w-full group-hover:opacity-100',
+                  accent,
+                )}
+              />
+
               <div>
                 <div className="flex items-start justify-between gap-2 mb-4">
                   <span className="rounded-full bg-gray-50/80 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-gray-400 group-hover:bg-gray-100 group-hover:text-gray-600 transition-colors">
@@ -406,7 +471,9 @@ export function DashboardHero({
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 group-hover:text-gray-500 transition-colors h-8">
                   {label}
                 </p>
-                <p className="mt-2 text-4xl font-black tabular-nums tracking-tighter text-gray-950">{value}</p>
+                <p className="mt-2 text-4xl font-black tabular-nums tracking-tighter text-gray-950">
+                  {value}
+                </p>
                 <p className="mt-2 text-[12px] font-medium text-gray-400">{note}</p>
               </div>
             </div>
@@ -479,9 +546,68 @@ export function DashboardContent({
   totalLeads: number
   totalViews: number
 }): JSX.Element {
+  const followUpActionCount = contacts.length + tasks.length + appointmentTypes.length
+  const momentumItems = [
+    {
+      label: 'Next actions ready',
+      value: loading ? '—' : `${followUpActionCount}`,
+      detail: 'Contacts, tasks, and booking types ready for follow-up',
+      tone: 'bg-sky-50 text-sky-700 ring-sky-100/80',
+    },
+    {
+      label: 'Immediate attention',
+      value: loading ? '—' : overdueTasksCount > 0 ? `${overdueTasksCount} overdue` : 'Clear',
+      detail:
+        overdueTasksCount > 0
+          ? 'Review overdue tasks to keep momentum alive'
+          : 'No urgent blockers right now',
+      tone:
+        overdueTasksCount > 0
+          ? 'bg-red-50 text-red-700 ring-red-100/80'
+          : 'bg-emerald-50 text-emerald-700 ring-emerald-100/80',
+    },
+    {
+      label: 'Pipeline progress',
+      value: loading ? '—' : openDeals.length > 0 ? `${openDeals.length} open` : 'Start pipeline',
+      detail:
+        openDeals.length > 0
+          ? `${formatCurrency(pipelineValue)} currently in motion`
+          : 'Create a deal when a lead becomes an opportunity',
+      tone: 'bg-violet-50 text-violet-700 ring-violet-100/80',
+    },
+  ]
+
   return (
     <>
       <AppLauncherGrid />
+      <div className="grid gap-3 lg:grid-cols-3">
+        {momentumItems.map(({ label, value, detail, tone }) => (
+          <div
+            key={label}
+            className={cn(
+              'rounded-[28px] border border-gray-950/[0.04] bg-white/80 px-5 py-4 shadow-[0_8px_28px_-16px_rgba(15,23,42,0.12)] backdrop-blur-xl',
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
+                  {label}
+                </p>
+                <p className="mt-2 text-2xl font-black tracking-tight text-gray-950">{value}</p>
+                <p className="mt-2 text-sm text-gray-500">{detail}</p>
+              </div>
+              <span
+                className={cn(
+                  'rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest ring-1',
+                  tone,
+                )}
+              >
+                Retention
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Card Views"
@@ -546,7 +672,9 @@ export function DashboardContent({
                   <AlertCircle className="h-5 w-5 text-amber-500" />
                 </div>
                 <p className="text-[13px] font-semibold text-amber-900">Leads unavailable</p>
-                <p className="mt-1 text-[12px] font-medium text-amber-700/80">Experiencing temporary delays.</p>
+                <p className="mt-1 text-[12px] font-medium text-amber-700/80">
+                  Experiencing temporary delays.
+                </p>
               </div>
             ) : leads.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-[32px] border border-gray-950/[0.04] bg-gray-50/50 py-10 text-center shadow-inner">
@@ -554,7 +682,9 @@ export function DashboardContent({
                   <TrendingUp className="h-5 w-5 text-gray-400" />
                 </div>
                 <p className="text-[13px] font-semibold text-gray-900">No leads captured</p>
-                <p className="mt-1 text-[12px] font-medium text-gray-500">Wait for visitors to submit info.</p>
+                <p className="mt-1 text-[12px] font-medium text-gray-500">
+                  Wait for visitors to submit info.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -566,13 +696,15 @@ export function DashboardContent({
                     'Unknown'
                   const email = lead.data['email'] ?? ''
                   return (
-                      <Link
+                    <Link
                       key={lead.id}
                       href="/leads"
                       className="group app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 bg-white ring-1 ring-gray-950/[0.04] transition-all duration-300 hover:bg-gray-50/[0.4] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-500/5 hover:ring-brand-500/20 active:scale-[0.98]"
                     >
                       <div className="min-w-0 transition-transform group-hover:translate-x-1 duration-300">
-                        <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">{name}</p>
+                        <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">
+                          {name}
+                        </p>
                         {email && <p className="truncate text-xs text-gray-400">{email}</p>}
                       </div>
                       <span className="ml-3 shrink-0 text-xs font-medium text-gray-400 group-hover:text-brand-400 transition-colors flex items-center gap-1">
@@ -595,7 +727,9 @@ export function DashboardContent({
                   <AlertCircle className="h-5 w-5 text-amber-500" />
                 </div>
                 <p className="text-[13px] font-semibold text-amber-900">Contacts unavailable</p>
-                <p className="mt-1 text-[12px] font-medium text-amber-700/80">Experiencing temporary delays.</p>
+                <p className="mt-1 text-[12px] font-medium text-amber-700/80">
+                  Experiencing temporary delays.
+                </p>
               </div>
             ) : contacts.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-[32px] border border-gray-950/[0.04] bg-gray-50/50 py-10 text-center shadow-inner">
@@ -604,10 +738,13 @@ export function DashboardContent({
                 </div>
                 <p className="text-[13px] font-semibold text-gray-900">No contacts yet</p>
                 <p className="mt-2 text-[12px] font-medium text-gray-500">
-                  <Link href="/contacts" className="text-brand-500 hover:text-brand-600 transition-colors">
+                  <Link
+                    href="/contacts"
+                    className="text-brand-500 hover:text-brand-600 transition-colors"
+                  >
                     Add someone manually
-                  </Link>
-                  {' '}to start.
+                  </Link>{' '}
+                  to start.
                 </p>
               </div>
             ) : (
@@ -619,24 +756,26 @@ export function DashboardContent({
                     className="group app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 bg-white ring-1 ring-gray-950/[0.04] transition-all duration-300 hover:bg-gray-50/[0.4] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-500/5 hover:ring-brand-500/20 active:scale-[0.98]"
                   >
                     <div className="min-w-0 transition-transform group-hover:translate-x-1 duration-300">
-                      <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">{contact.name}</p>
+                      <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">
+                        {contact.name}
+                      </p>
                       {contact.email && (
                         <p className="truncate text-xs text-gray-400">{contact.email}</p>
                       )}
                     </div>
                     <div className="ml-3 flex shrink-0 items-center justify-end gap-2">
-                       {contact.crmPipeline?.stage && (
-                         <span
-                           className={cn(
-                             'rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-                             STAGE_COLORS[contact.crmPipeline.stage] ?? 'bg-gray-100 text-gray-500',
-                           )}
-                         >
-                           {contact.crmPipeline.stage.replace('_', ' ')}
-                         </span>
-                       )}
-                       <ChevronRight className="h-3.5 w-3.5 text-brand-400 opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
-                     </div>
+                      {contact.crmPipeline?.stage && (
+                        <span
+                          className={cn(
+                            'rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                            STAGE_COLORS[contact.crmPipeline.stage] ?? 'bg-gray-100 text-gray-500',
+                          )}
+                        >
+                          {contact.crmPipeline.stage.replace('_', ' ')}
+                        </span>
+                      )}
+                      <ChevronRight className="h-3.5 w-3.5 text-brand-400 opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -668,7 +807,9 @@ export function DashboardContent({
                   <AlertCircle className="h-5 w-5 text-amber-500" />
                 </div>
                 <p className="text-[13px] font-semibold text-amber-900">Tasks unavailable</p>
-                <p className="mt-1 text-[12px] font-medium text-amber-700/80">Experiencing temporary delays.</p>
+                <p className="mt-1 text-[12px] font-medium text-amber-700/80">
+                  Experiencing temporary delays.
+                </p>
               </div>
             ) : tasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-[32px] border border-gray-950/[0.04] bg-gray-50/50 py-10 text-center shadow-inner">
@@ -676,7 +817,9 @@ export function DashboardContent({
                   <CheckSquare className="h-5 w-5 text-gray-400" />
                 </div>
                 <p className="text-[13px] font-semibold text-gray-900">All caught up</p>
-                <p className="mt-1 text-[12px] font-medium text-gray-500">No pending tasks on your plate.</p>
+                <p className="mt-1 text-[12px] font-medium text-gray-500">
+                  No pending tasks on your plate.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -689,7 +832,9 @@ export function DashboardContent({
                       className="group app-panel-subtle flex items-start justify-between rounded-[24px] px-4 py-3 bg-white ring-1 ring-gray-950/[0.04] transition-all duration-300 hover:bg-gray-50/[0.4] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-500/5 hover:ring-brand-500/20 active:scale-[0.98]"
                     >
                       <div className="min-w-0 transition-transform group-hover:translate-x-1 duration-300">
-                        <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">{task.title}</p>
+                        <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">
+                          {task.title}
+                        </p>
                         {task.contact && (
                           <p className="text-xs text-gray-400">
                             {task.contact.name ?? 'Unknown contact'}
@@ -727,7 +872,9 @@ export function DashboardContent({
                   <AlertCircle className="h-5 w-5 text-amber-500" />
                 </div>
                 <p className="text-[13px] font-semibold text-amber-900">Deals unavailable</p>
-                <p className="mt-1 text-[12px] font-medium text-amber-700/80">Experiencing temporary delays.</p>
+                <p className="mt-1 text-[12px] font-medium text-amber-700/80">
+                  Experiencing temporary delays.
+                </p>
               </div>
             ) : openDeals.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-[32px] border border-gray-950/[0.04] bg-gray-50/50 py-10 text-center shadow-inner">
@@ -736,10 +883,13 @@ export function DashboardContent({
                 </div>
                 <p className="text-[13px] font-semibold text-gray-900">No open deals</p>
                 <p className="mt-2 text-[12px] font-medium text-gray-500">
-                  <Link href="/deals" className="text-brand-500 hover:text-brand-600 transition-colors">
+                  <Link
+                    href="/deals"
+                    className="text-brand-500 hover:text-brand-600 transition-colors"
+                  >
                     Add a new deal
-                  </Link>
-                  {' '}to start.
+                  </Link>{' '}
+                  to start.
                 </p>
               </div>
             ) : (
@@ -747,7 +897,9 @@ export function DashboardContent({
                 <div className="flex items-center justify-between rounded-[20px] bg-gradient-to-r from-green-50 to-emerald-50 px-5 py-3 ring-1 ring-green-100/50">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-green-700">Pipeline value</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-green-700">
+                      Pipeline value
+                    </span>
                   </div>
                   <span className="text-base font-black tabular-nums tracking-tight text-green-700">
                     {formatCurrency(pipelineValue)}
@@ -760,7 +912,9 @@ export function DashboardContent({
                     className="group app-panel-subtle flex items-center justify-between rounded-[24px] px-4 py-3 bg-white ring-1 ring-gray-950/[0.04] transition-all duration-300 hover:bg-gray-50/[0.4] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-500/5 hover:ring-brand-500/20 active:scale-[0.98]"
                   >
                     <div className="min-w-0 transition-transform group-hover:translate-x-1 duration-300">
-                      <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">{deal.title}</p>
+                      <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">
+                        {deal.title}
+                      </p>
                       {deal.contact && (
                         <p className="text-xs text-gray-400">
                           {deal.contact.name ?? 'Unknown contact'}
@@ -807,7 +961,9 @@ export function DashboardContent({
                   {funnel.stages.map((stage) => (
                     <div key={stage.stage} className="group relative z-10">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 group-hover:text-gray-700 transition-colors">{stage.stage}</span>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 group-hover:text-gray-700 transition-colors">
+                          {stage.stage}
+                        </span>
                         <span className="rounded-full bg-gray-950/[0.03] px-2.5 py-0.5 text-[11px] font-black tabular-nums text-gray-900 shadow-sm transition-transform group-hover:scale-105">
                           {stage.count}
                         </span>
@@ -821,8 +977,12 @@ export function DashboardContent({
                     </div>
                   ))}
                   <div className="relative z-10 pt-4 border-t border-gray-950/[0.04] flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">Total Active</span>
-                    <span className="text-[15px] font-black tabular-nums text-gray-950">{funnel.totalActive} contacts</span>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">
+                      Total Active
+                    </span>
+                    <span className="text-[15px] font-black tabular-nums text-gray-950">
+                      {funnel.totalActive} contacts
+                    </span>
                   </div>
                 </div>
               ) : null}
@@ -907,14 +1067,21 @@ export function DashboardContent({
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay"></div>
           <div className="relative grid grid-cols-3 divide-x divide-gray-950/[0.04]">
             {[
-              { label: 'Total Views', value: totalViews, icon: Eye, color: 'text-blue-600', ring: 'ring-blue-100/50', bg: 'bg-blue-50/50' },
+              {
+                label: 'Total Views',
+                value: totalViews,
+                icon: Eye,
+                color: 'text-blue-600',
+                ring: 'ring-blue-100/50',
+                bg: 'bg-blue-50/50',
+              },
               {
                 label: 'Link Clicks',
                 value: totalClicks,
                 icon: MousePointerClick,
                 color: 'text-purple-600',
                 ring: 'ring-purple-100/50',
-                bg: 'bg-purple-50/50'
+                bg: 'bg-purple-50/50',
               },
               {
                 label: 'Leads Captured',
@@ -922,15 +1089,32 @@ export function DashboardContent({
                 icon: TrendingUp,
                 color: 'text-green-600',
                 ring: 'ring-green-100/50',
-                bg: 'bg-green-50/50'
+                bg: 'bg-green-50/50',
               },
             ].map(({ label, value, icon: Icon, color, ring, bg }) => (
-              <div key={label} className="group relative flex flex-col items-center justify-center p-8 transition-colors duration-500 hover:bg-white/60">
-                <div className={cn('mb-4 flex h-12 w-12 items-center justify-center rounded-[20px] shadow-inner ring-1 ring-inset transition-transform duration-500 group-hover:-translate-y-1 group-hover:scale-110 group-hover:rotate-3', ring, bg)}>
+              <div
+                key={label}
+                className="group relative flex flex-col items-center justify-center p-8 transition-colors duration-500 hover:bg-white/60"
+              >
+                <div
+                  className={cn(
+                    'mb-4 flex h-12 w-12 items-center justify-center rounded-[20px] shadow-inner ring-1 ring-inset transition-transform duration-500 group-hover:-translate-y-1 group-hover:scale-110 group-hover:rotate-3',
+                    ring,
+                    bg,
+                  )}
+                >
                   <Icon className={cn('h-5 w-5', color)} />
                 </div>
-                <p className={cn('text-3xl font-black tabular-nums tracking-tighter text-gray-950 transition-transform duration-500 group-hover:-translate-y-0.5')}>{value}</p>
-                <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:text-gray-500">{label}</p>
+                <p
+                  className={cn(
+                    'text-3xl font-black tabular-nums tracking-tighter text-gray-950 transition-transform duration-500 group-hover:-translate-y-0.5',
+                  )}
+                >
+                  {value}
+                </p>
+                <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:text-gray-500">
+                  {label}
+                </p>
               </div>
             ))}
           </div>
@@ -980,10 +1164,18 @@ export function DashboardContent({
             >
               <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay"></div>
               <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-              <div className={cn('relative flex h-14 w-14 items-center justify-center rounded-[22px] shadow-inner ring-1 ring-inset transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3', bg, ring)}>
+              <div
+                className={cn(
+                  'relative flex h-14 w-14 items-center justify-center rounded-[22px] shadow-inner ring-1 ring-inset transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3',
+                  bg,
+                  ring,
+                )}
+              >
                 <Icon className={cn('h-6 w-6', color)} />
               </div>
-              <span className="relative text-[13px] font-bold text-gray-900 transition-colors group-hover:text-brand-600">{label}</span>
+              <span className="relative text-[13px] font-bold text-gray-900 transition-colors group-hover:text-brand-600">
+                {label}
+              </span>
             </Link>
           ))}
         </div>

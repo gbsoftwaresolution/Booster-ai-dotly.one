@@ -44,8 +44,8 @@ export function BillingHero({
     { label: 'Plan', value: currentPlan },
     { label: 'Status', value: currentStatus },
     {
-      label: 'Wallet',
-      value: walletAddress ? 'Connected' : hasWallet === false ? 'External' : 'Missing',
+      label: 'Crypto Checkout',
+      value: walletAddress ? 'Ready' : hasWallet === false ? 'Manual' : 'Setup',
     },
     { label: 'Selected Price', value: selectedPrice ? `$${selectedPrice}` : '—' },
   ]
@@ -58,11 +58,11 @@ export function BillingHero({
       tone: 'bg-sky-50 text-sky-600',
     },
     {
-      label: 'Wallet readiness',
+      label: 'Checkout readiness',
       value: walletAddress ? 'Ready' : 'Needs setup',
       detail: walletAddress
         ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
-        : 'Connect a wallet to pay with USDT',
+        : 'Crypto checkout is available today',
       tone: walletAddress ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600',
     },
     {
@@ -95,9 +95,20 @@ export function BillingHero({
             Manage billing with clearer subscription context
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-gray-500 sm:text-[15px]">
-            Review your current plan, connect a wallet for USDT payments, and control upgrades with
-            more confidence.
+            Review your current plan, compare USD pricing, and use the available checkout method
+            with more confidence.
           </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
+            <span className="rounded-full border border-gray-200 bg-white/85 px-3 py-1.5">
+              Free plan available
+            </span>
+            <span className="rounded-full border border-gray-200 bg-white/85 px-3 py-1.5">
+              7-day refund window on paid upgrades
+            </span>
+            <span className="rounded-full border border-gray-200 bg-white/85 px-3 py-1.5">
+              Cancel before renewal
+            </span>
+          </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-4">
             {metrics.map(({ label, value }) => (
@@ -241,8 +252,10 @@ export function CurrentPlanCard({
       )}
       {subscription?.amountUsdt && (
         <p className="mt-1 text-sm text-gray-500">
-          Amount paid:{' '}
-          <span className="font-medium text-gray-700">${subscription.amountUsdt} USDT</span>
+          Amount charged:{' '}
+          <span className="font-medium text-gray-700">
+            ${subscription.amountUsdt} via crypto checkout
+          </span>
         </p>
       )}
       {subscription?.boosterAiOrderId && (
@@ -251,7 +264,11 @@ export function CurrentPlanCard({
         </p>
       )}
       {currentPlan === 'FREE' && (
-        <div className="mt-4">
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-gray-500">
+            Start on the free plan and upgrade only when you need deeper analytics, CRM, and
+            follow-up features.
+          </p>
           <a
             href="#upgrade"
             className="inline-block rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
@@ -279,10 +296,22 @@ export function WalletCard({
 }): JSX.Element {
   return (
     <div className="app-panel rounded-[28px] p-6 sm:p-7">
-      <h2 className="text-base font-semibold text-gray-900">Web3 Wallet</h2>
+      <h2 className="text-base font-semibold text-gray-900">Crypto Checkout</h2>
       <p className="mt-1 text-sm text-gray-500">
-        Connect your wallet to pay with USDT on Arbitrum via the BoosterAI PaymentVault.
+        Dotly plans are priced in USD. Crypto checkout is available today if you want to pay with a
+        supported wallet.
       </p>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
+        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5">
+          Card coming soon
+        </span>
+        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5">
+          Bank transfer coming soon
+        </span>
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">
+          Crypto available now
+        </span>
+      </div>
       <div className="mt-4">
         {walletAddress ? (
           <div className="flex items-center gap-3">
@@ -303,14 +332,13 @@ export function WalletCard({
         ) : hasWallet === false ? (
           <div className="space-y-3">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              No wallet detected in this browser. You can still subscribe using MetaMask Mobile —
-              enter your wallet address below to generate payment links, then open them in your
-              wallet app.
+              No wallet detected in this browser. You can still use crypto checkout from a wallet
+              app by entering your wallet address below and generating payment links.
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-0 flex-1">
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Your wallet address
+                  Your crypto wallet address
                 </label>
                 <input
                   type="text"
@@ -325,7 +353,7 @@ export function WalletCard({
                 rel="noreferrer"
                 className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
               >
-                Get MetaMask
+                Get wallet app
               </a>
             </div>
           </div>
@@ -341,7 +369,7 @@ export function WalletCard({
               ? 'Connecting…'
               : hasWallet === null
                 ? 'Detecting wallet…'
-                : 'Connect Wallet'}
+                : 'Connect wallet'}
           </button>
         )}
       </div>
@@ -388,8 +416,13 @@ export function UpgradePlanCard({
     <div id="upgrade" className="app-panel rounded-[28px] p-6 sm:p-7">
       <h2 className="text-base font-semibold text-gray-900">Upgrade Plan</h2>
       <p className="mt-1 text-sm text-gray-500">
-        Pay with USDT. Your wallet signs the transaction — your private key stays private.
+        Plans are priced in USD. Crypto checkout is available today, and additional payment methods
+        can be added here later.
       </p>
+      <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3 text-sm text-sky-900">
+        Paid upgrades include a 7-day refund window. If you are unsure, stay on the free plan first
+        and upgrade once you are ready.
+      </div>
 
       <div className="mt-5 space-y-5">
         <div>
@@ -439,10 +472,28 @@ export function UpgradePlanCard({
           </div>
         </div>
 
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">Payment method</label>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-400">
+              <p className="font-medium">Card</p>
+              <p className="mt-1 text-xs">Coming soon</p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-400">
+              <p className="font-medium">Bank transfer</p>
+              <p className="mt-1 text-xs">Coming soon</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <p className="font-medium">Crypto</p>
+              <p className="mt-1 text-xs">Available now</p>
+            </div>
+          </div>
+        </div>
+
         <div className="app-panel-subtle rounded-[24px] p-4 text-sm text-gray-600">
           <div className="flex items-center gap-2 text-gray-800">
             <ShieldCheck className="h-4 w-4 text-brand-500" />
-            <p className="font-medium">Transaction summary</p>
+            <p className="font-medium">Checkout summary</p>
           </div>
           <p className="mt-1">
             Plan:{' '}
@@ -453,12 +504,15 @@ export function UpgradePlanCard({
             <span className="font-semibold text-gray-900">{DURATION_LABEL[selectedDuration]}</span>
           </p>
           <p>
-            Amount:{' '}
-            <span className="font-semibold text-gray-900">${selectedPrice ?? '—'} USDT</span>
+            Amount: <span className="font-semibold text-gray-900">${selectedPrice ?? '—'} USD</span>
           </p>
           <p className="mt-2 text-xs text-gray-500">
-            Network: Arbitrum One (chain 42161). You will approve USDT spending, then confirm the
-            payment transaction in your wallet.
+            Crypto checkout settles on Arbitrum One. If you use crypto, your wallet will ask you to
+            approve the payment and then confirm the transaction.
+          </p>
+          <p className="mt-2 text-xs text-gray-500">
+            The refund window and renewal terms shown in Dotly apply to your subscription after
+            activation.
           </p>
         </div>
 
@@ -482,17 +536,16 @@ export function UpgradePlanCard({
         {noWalletOrder && (
           <div className="rounded-[24px] border border-blue-200/80 bg-blue-50/90 p-4 shadow-sm">
             <p className="text-sm font-semibold text-blue-900">
-              Two-step payment via MetaMask Mobile
+              Two-step crypto checkout via wallet app
             </p>
             <p className="text-xs text-blue-700">
-              Open each link in your MetaMask Mobile or Trust Wallet browser in order. Amount:{' '}
-              <strong>${noWalletOrder.amountUsdt} USDT</strong> on chain {noWalletOrder.chainId}.
+              Open each link in your wallet app browser in order. Amount:{' '}
+              <strong>${noWalletOrder.amountUsdt} USD equivalent</strong> on chain{' '}
+              {noWalletOrder.chainId}.
             </p>
             <div className="mt-4 space-y-2">
               <div>
-                <p className="mb-1 text-xs font-medium text-blue-800">
-                  Step 1 — Approve USDT spending
-                </p>
+                <p className="mb-1 text-xs font-medium text-blue-800">Step 1 — Approve payment</p>
                 <a
                   href={noWalletOrder.approveLink}
                   className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
@@ -519,9 +572,7 @@ export function UpgradePlanCard({
               disabled={noWalletActivating}
               className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {noWalletActivating
-                ? 'Checking…'
-                : "I've completed both transactions — activate my plan"}
+              {noWalletActivating ? 'Checking…' : "I've completed both steps — activate my plan"}
             </button>
           </div>
         )}
@@ -538,7 +589,7 @@ export function UpgradePlanCard({
                   'disabled:cursor-not-allowed disabled:opacity-50',
                 )}
               >
-                {subscribing ? 'Creating order…' : 'Generate payment links'}
+                {subscribing ? 'Preparing checkout…' : 'Generate crypto payment links'}
               </button>
             ) : (
               <button
@@ -550,14 +601,14 @@ export function UpgradePlanCard({
                   'disabled:cursor-not-allowed disabled:opacity-50',
                 )}
               >
-                {subscribing ? (subscribeStep ?? 'Processing…') : 'Subscribe with USDT'}
+                {subscribing ? (subscribeStep ?? 'Processing…') : 'Pay with crypto'}
               </button>
             )}
             {!walletAddress && (
               <p className="text-xs text-gray-400">
                 {hasWallet === false
-                  ? 'Enter your wallet address above to generate payment links.'
-                  : 'Connect your wallet above to subscribe.'}
+                  ? 'Enter your wallet address above to generate crypto payment links.'
+                  : 'Connect your wallet above to continue with crypto checkout.'}
               </p>
             )}
           </>
@@ -603,9 +654,7 @@ export function TransactionHistoryCard({
           </a>
         </div>
       ) : (
-        <p className="mt-2 text-sm text-gray-400">
-          No on-chain subscription transactions recorded yet.
-        </p>
+        <p className="mt-2 text-sm text-gray-400">No subscription payment activity recorded yet.</p>
       )}
     </div>
   )

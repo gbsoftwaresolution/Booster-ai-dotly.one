@@ -11,7 +11,7 @@ import { Footer } from '@/components/marketing/Footer'
 export const metadata: Metadata = {
   title: 'Dotly.one — Tap. Share. Convert.',
   description:
-    'Digital business cards with NFC tap, QR code, real-time analytics, built-in CRM, and Web3 USDT payments. Free forever plan available.',
+    'Digital business cards with NFC tap, QR code, real-time analytics, built-in CRM, and scheduling. Free forever plan available.',
 }
 
 export default function HomePage() {

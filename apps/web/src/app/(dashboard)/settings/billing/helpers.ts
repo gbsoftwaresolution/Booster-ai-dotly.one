@@ -35,6 +35,8 @@ export const PLAN_COLORS: Record<PlanId, string> = {
 export const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-green-100 text-green-700',
   TRIALING: 'bg-blue-100 text-blue-700',
+  FREE: 'bg-gray-100 text-gray-600',
+  PENDING: 'bg-amber-100 text-amber-700',
   PAST_DUE: 'bg-red-100 text-red-700',
   CANCELLED: 'bg-gray-100 text-gray-500',
 }
@@ -93,7 +95,7 @@ export async function waitForReceipt(txHash: string, maxWaitMs = 90_000): Promis
     })) as { status: string } | null
 
     if (receipt?.status === '0x1') return
-    if (receipt?.status === '0x0') throw new Error('Transaction was reverted on-chain.')
+    if (receipt?.status === '0x0') throw new Error('Payment transaction failed.')
   }
 
   throw new Error('Transaction receipt timeout — please check your wallet or try again.')
@@ -120,9 +122,9 @@ export function getFocusMessage({
   currentStatus: string
   expiryDate: string | null
 }): string {
-  if (loading) return 'Loading subscription and wallet details.'
+  if (loading) return 'Loading subscription and checkout details.'
   if (currentPlan === 'FREE') {
-    return 'Upgrade when you are ready to unlock paid features and on-chain billing.'
+    return 'Upgrade when you are ready to unlock paid features and choose a checkout method.'
   }
 
   return `${currentPlan} is currently ${currentStatus.toLowerCase()}${expiryDate ? ` until ${expiryDate}` : ''}.`

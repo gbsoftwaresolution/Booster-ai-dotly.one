@@ -95,9 +95,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'Web3 USDT payments',
+    title: 'Scheduling & follow-up',
     description:
-      'Wallet-based USDT payments are still being rolled out and are not part of the published self-serve plan surface today.',
+      'Turn interest into action with booking links, follow-up workflows, and the tools you need to stay top of mind after the first meeting.',
   },
   {
     icon: (

@@ -22,10 +22,11 @@ export default function PrivacyPage() {
           <div className="prose prose-gray mt-10 max-w-none">
             <h2>1. Introduction</h2>
             <p>
-              Dotly.one (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is operated by
-              BoosterAI (&quot;BoosterAI.pro&quot;). This Privacy Policy explains how we collect,
-              use, disclose, and safeguard information about you when you use our website at
-              dotly.one and related mobile applications (collectively, the &quot;Service&quot;).
+              Dotly.one (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides digital
+              business cards, analytics, CRM, scheduling, and related product experiences through
+              our website at dotly.one and related mobile applications (collectively, the
+              &quot;Service&quot;). This Privacy Policy explains how we collect, use, disclose, and
+              safeguard information about you when you use the Service.
             </p>
             <p>
               By accessing or using the Service, you agree to this Privacy Policy. If you do not
@@ -48,9 +49,9 @@ export default function PrivacyPage() {
                 tap or scan your card.
               </li>
               <li>
-                <strong>Payment information:</strong> wallet address used for Web3 USDT
-                transactions. We do not store credit card numbers — all on-chain payments are
-                processed by the BoosterAI PaymentVault smart contract.
+                <strong>Payment information:</strong> billing and payment details needed to manage
+                subscriptions and purchase flows. We do not store full credit card numbers on our
+                own systems.
               </li>
             </ul>
 
@@ -144,8 +145,6 @@ export default function PrivacyPage() {
             <p>
               Questions about this Privacy Policy should be directed to:{' '}
               <a href="mailto:privacy@dotly.one">privacy@dotly.one</a>
-              <br />
-              BoosterAI / Dotly.one
             </p>
           </div>
         </div>
