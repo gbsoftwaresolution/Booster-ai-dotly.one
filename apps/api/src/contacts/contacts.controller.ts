@@ -970,7 +970,10 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('lead-submissions')
   @ApiOperation({ summary: 'List lead form submissions for a card' })
-  getLeadSubmissions(@CurrentUser() user: { id: string }, @Query() query: LeadSubmissionsListQueryDto) {
+  getLeadSubmissions(
+    @CurrentUser() user: { id: string },
+    @Query() query: LeadSubmissionsListQueryDto,
+  ) {
     return this.contactsService.getLeadSubmissions(user.id, query.cardId, {
       page: query.page,
       limit: query.limit,

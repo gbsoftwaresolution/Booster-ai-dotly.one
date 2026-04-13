@@ -319,15 +319,13 @@ export function WalletCard({
             <span className="font-mono text-sm text-gray-700">
               {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
             </span>
-            {hasWallet !== false && (
-              <button
-                type="button"
-                onClick={onConnectWallet}
-                className="text-xs text-brand-500 hover:underline"
-              >
-                Change
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onConnectWallet}
+              className="text-xs text-brand-500 hover:underline"
+            >
+              {hasWallet === false ? 'Reconnect or edit' : 'Change'}
+            </button>
           </div>
         ) : hasWallet === false ? (
           <div className="space-y-3">
@@ -391,6 +389,7 @@ export function UpgradePlanCard({
   onSelectPlan,
   onSelectDuration,
   onActivateNoWallet,
+  onNoWalletTxHashChange,
   onGeneratePaymentLinks,
   onSubscribe,
 }: {
@@ -407,6 +406,7 @@ export function UpgradePlanCard({
   onSelectPlan: (plan: PlanId) => void
   onSelectDuration: (duration: Duration) => void
   onActivateNoWallet: () => void
+  onNoWalletTxHashChange: (value: string) => void
   onGeneratePaymentLinks: () => void
   onSubscribe: () => void
 }): JSX.Element | null {
@@ -559,13 +559,32 @@ export function UpgradePlanCard({
                   href={noWalletOrder.payLink}
                   className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
                 >
-                  {noWalletOrder.payLink}
+                  Open wallet app browser to confirm payment
                 </a>
+                <p className="mt-1 text-[11px] text-blue-700">
+                  Use the wallet app browser to open Dotly and trigger the payment confirmation
+                  step.
+                </p>
               </div>
             </div>
             <p className="text-xs text-blue-600">
               After completing both transactions, click below to activate your plan.
             </p>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-blue-800">
+                Payment transaction hash
+              </label>
+              <input
+                type="text"
+                value={noWalletOrder.txHash ?? ''}
+                onChange={(event) => onNoWalletTxHashChange(event.target.value)}
+                placeholder="0x..."
+                className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs text-blue-900 placeholder:text-blue-300 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-blue-700">
+                Dotly needs the final payment transaction hash to verify the on-chain payment.
+              </p>
+            </div>
             <button
               type="button"
               onClick={onActivateNoWallet}

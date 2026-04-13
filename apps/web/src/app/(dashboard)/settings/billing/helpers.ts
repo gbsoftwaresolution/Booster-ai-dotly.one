@@ -4,8 +4,8 @@ export const PAID_PLANS: PlanId[] = ['STARTER', 'PRO']
 
 export const PLAN_PRICES: Record<PlanId, Record<Duration, number> | null> = {
   FREE: null,
-  STARTER: { MONTHLY: 10, SIX_MONTHS: 50, ANNUAL: 99 },
-  PRO: { MONTHLY: 20, SIX_MONTHS: 99, ANNUAL: 199 },
+  STARTER: { MONTHLY: 10, SIX_MONTHS: 55, ANNUAL: 100 },
+  PRO: { MONTHLY: 20, SIX_MONTHS: 110, ANNUAL: 200 },
   BUSINESS: { MONTHLY: 50, SIX_MONTHS: 275, ANNUAL: 500 },
   AGENCY: { MONTHLY: 100, SIX_MONTHS: 550, ANNUAL: 1000 },
   ENTERPRISE: { MONTHLY: 199, SIX_MONTHS: 1095, ANNUAL: 1990 },
@@ -60,15 +60,9 @@ export function buildApproveDeepLink(params: {
   )
 }
 
-export function buildPayDeepLink(params: {
-  paymentVaultAddress: string
-  paymentRef: string
-  chainId: number
-}): string {
-  const { paymentVaultAddress, paymentRef, chainId } = params
-  const ref = paymentRef.startsWith('0x') ? paymentRef : `0x${paymentRef}`
-
-  return `ethereum:${paymentVaultAddress}@${chainId}/paySubscription?bytes32=${ref}`
+export function buildPayDeepLink(params: { paymentVaultAddress: string; chainId: number }): string {
+  const { paymentVaultAddress, chainId } = params
+  return `ethereum:${paymentVaultAddress}@${chainId}`
 }
 
 export function readRefCookie(): string | undefined {

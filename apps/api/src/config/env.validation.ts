@@ -76,9 +76,21 @@ class EnvironmentVariables {
   })
   DOTLY_CONTRACT_ADDRESS!: string
 
-  @IsUrl({}, { message: 'POLYGON_RPC_URL must be a valid HTTPS URL' })
-  POLYGON_RPC_URL!: string
+  @IsString()
+  @Matches(/^0x[0-9a-fA-F]{40}$/, {
+    message: 'DOTLY_USDT_ADDRESS must be a valid EVM address (0x + 40 hex chars)',
+  })
+  DOTLY_USDT_ADDRESS!: string
 
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  DOTLY_PAYMENT_SIGNER_PRIVATE_KEY?: string
+
+  @IsUrl({}, { message: 'ARBITRUM_RPC_URL must be a valid HTTPS URL' })
+  ARBITRUM_RPC_URL!: string
+
+  @IsOptional() @IsUrl() POLYGON_RPC_URL?: string
   @IsOptional() @IsUrl() BASE_RPC_URL?: string
 
   // F-25: SWAGGER_ENABLED controls Swagger UI mount in production.

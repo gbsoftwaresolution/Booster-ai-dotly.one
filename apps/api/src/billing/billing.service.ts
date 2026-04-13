@@ -1,37 +1,50 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { Plan, BillingDuration } from '@dotly/types'
+import { Plan as SharedPlan, BillingDuration } from '@dotly/types'
 import { AuditService } from '../audit/audit.service'
 import { createPublicClient, http, type Address } from 'viem'
-import { polygon, base } from 'viem/chains'
-import { BoosterAiClient, DURATION_DAYS } from './boosterai.client'
+import { arbitrum } from 'viem/chains'
+import { DURATION_DAYS } from './boosterai.client'
 import type { BillingSummaryResponse } from '@dotly/types'
+import { DURATION_IDS, PaymentVaultQuotes, PLAN_IDS } from './payment-vault-quotes'
 
-// Minimal ABI — only the read function we need
-const DOTLY_ABI = [
+const DOTLY_PAYMENT_VAULT_ABI = [
   {
-    name: 'getSubscription',
+    type: 'event',
+    name: 'PaymentRecorded',
+    inputs: [
+      { name: 'paymentId', type: 'bytes32', indexed: true },
+      { name: 'userRef', type: 'bytes32', indexed: true },
+      { name: 'payer', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+      { name: 'planId', type: 'uint32', indexed: false },
+      { name: 'duration', type: 'uint8', indexed: false },
+      { name: 'paymentRef', type: 'bytes32', indexed: false },
+      { name: 'paidAt', type: 'uint64', indexed: false },
+      { name: 'refundUntil', type: 'uint64', indexed: false },
+    ],
+  },
+  {
+    name: 'getPayment',
     type: 'function',
     stateMutability: 'view',
-    inputs: [{ name: 'user', type: 'address' }],
+    inputs: [{ name: 'paymentId', type: 'bytes32' }],
     outputs: [
-      { name: 'plan', type: 'uint8' },
-      { name: 'expiresAt', type: 'uint256' },
-      { name: 'active', type: 'bool' },
+      { name: 'payer', type: 'address' },
+      { name: 'userRef', type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'planId', type: 'uint32' },
+      { name: 'duration', type: 'uint8' },
+      { name: 'paymentRef', type: 'bytes32' },
+      { name: 'paidAt', type: 'uint64' },
+      { name: 'refundUntil', type: 'uint64' },
+      { name: 'status', type: 'uint8' },
     ],
   },
 ] as const
 
-// Map Solidity enum indices → app Plan values.
-// The deployed DotlySubscription.sol defines:
-//   enum Plan { FREE, PRO, BUSINESS, ENTERPRISE }  (indices 0-3)
-// STARTER and AGENCY are app-only plans with no on-chain counterpart.
-// Any index outside 0-3 is treated as FREE to avoid silent privilege escalation.
-const PLAN_INDEX_MAP: Plan[] = [Plan.FREE, Plan.PRO, Plan.BUSINESS, Plan.ENTERPRISE]
-
-const FINALIZED_BOOSTERAI_STATUSES = new Set(['FINALIZED_ONCHAIN'])
-const REFUNDED_BOOSTERAI_STATUSES = new Set(['REFUNDED_ONCHAIN'])
+const CHAIN_ID = 42161
 
 @Injectable()
 export class BillingService {
@@ -41,7 +54,7 @@ export class BillingService {
     private prisma: PrismaService,
     private audit: AuditService,
     private config: ConfigService,
-    private boosterAi: BoosterAiClient,
+    private paymentVaultQuotes: PaymentVaultQuotes,
   ) {}
 
   private formatError(error: unknown): string {
@@ -76,18 +89,46 @@ export class BillingService {
         status: true,
         boosterAiOrderId: true,
         currentPeriodEnd: true,
+        updatedAt: true,
       },
     })
 
     if (existingSubscription?.boosterAiOrderId) {
-      throw new BadRequestException(
-        'You already have a pending checkout. Complete or wait for that checkout before starting another one',
-      )
+      const stalePendingThresholdMs = 2 * 60 * 60 * 1000
+      const isStalePending =
+        existingSubscription.updatedAt.getTime() < Date.now() - stalePendingThresholdMs
+
+      if (isStalePending) {
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            boosterAiOrderId: null,
+            status: 'CANCELLED',
+            plan: SharedPlan.FREE,
+            cancelAtPeriodEnd: false,
+          },
+        })
+      } else {
+        throw new BadRequestException(
+          'You already have a pending checkout. Complete or wait for that checkout before starting another one',
+        )
+      }
     }
 
-    const isActive = existingSubscription?.status === 'ACTIVE'
+    const refreshedSubscription = existingSubscription?.boosterAiOrderId
+      ? await this.prisma.subscription.findUnique({
+          where: { userId },
+          select: {
+            status: true,
+            currentPeriodEnd: true,
+          },
+        })
+      : existingSubscription
+
+    const isActive = refreshedSubscription?.status === 'ACTIVE'
     const stillValid =
-      !!existingSubscription?.currentPeriodEnd && existingSubscription.currentPeriodEnd > new Date()
+      !!refreshedSubscription?.currentPeriodEnd &&
+      refreshedSubscription.currentPeriodEnd > new Date()
 
     if (isActive && stillValid) {
       throw new BadRequestException(
@@ -155,95 +196,14 @@ export class BillingService {
     }
   }
 
-  /**
-   * Verify on-chain subscription for a wallet address and sync to DB.
-   * Called after user submits a transaction hash.
-   * The server NEVER signs transactions — it only reads chain state.
-   */
-  async verifyAndSyncSubscription(
-    userId: string,
-    walletAddress: string,
-    txHash: string,
-    chainId: number,
-  ) {
-    const normalizedWallet = this.normalizeWalletAddress(walletAddress)
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { walletAddress: true },
-    })
-    if (!user?.walletAddress || user.walletAddress.toLowerCase() !== normalizedWallet) {
-      throw new BadRequestException(
-        'Provided wallet address does not match the wallet on your account',
-      )
-    }
-
-    // F-10: Verify that the transaction was sent FROM the claimed walletAddress.
-    // Without this check, any user could submit a tx hash from another wallet,
-    // claim that wallet's on-chain plan, and upgrade their account for free.
-    // We read the transaction from the chain and assert tx.from === walletAddress.
-    await this.assertTxOrigin(normalizedWallet, txHash, chainId)
-
-    const { plan, expiresAt } = await this.getOnChainPlan(normalizedWallet, chainId)
-
-    await this.prisma.subscription.upsert({
-      where: { userId },
-      create: {
-        userId,
-        plan,
-        status: 'ACTIVE',
-        contractSubscriptionId: normalizedWallet,
-        txHash,
-        chainId,
-        currentPeriodEnd: expiresAt,
-      },
-      update: {
-        plan,
-        status: 'ACTIVE',
-        txHash,
-        currentPeriodEnd: expiresAt,
-      },
-    })
-
-    await this.prisma.user.update({ where: { id: userId }, data: { plan } })
-
-    void this.audit
-      .log({
-        userId,
-        action: 'billing.subscribed',
-        resourceType: 'subscription',
-        metadata: { plan, txHash, chainId, walletAddress: normalizedWallet },
-      })
-      .catch(() => void 0)
-
-    return { plan, status: 'ACTIVE' }
-  }
-
-  /**
-   * F-10: Assert that a transaction hash was sent FROM a specific wallet.
-   * Fetches the transaction from the chain using viem and compares `tx.from`
-   * (lowercased) to the claimed wallet address (lowercased).
-   * Throws BadRequestException if the sender does not match.
-   */
-  private async assertTxOrigin(
-    walletAddress: string,
-    txHash: string,
-    chainId: number,
-  ): Promise<void> {
+  private async assertTxOrigin(walletAddress: string, txHash: string): Promise<void> {
     try {
-      const polygonRpc = this.config.get<string>('POLYGON_RPC_URL')
-      const baseRpc = this.config.get<string>('BASE_RPC_URL')
-      const chain = chainId === 137 ? polygon : base
-      const rpcUrl = chainId === 137 ? polygonRpc : baseRpc
+      const rpcUrl = this.config.get<string>('ARBITRUM_RPC_URL')
       if (!rpcUrl) {
-        // HIGH-01: Reject the upgrade request rather than silently bypassing the
-        // tx-origin check.  If an attacker triggers a missing-RPC condition they
-        // would previously have been able to claim any on-chain plan without a
-        // valid transaction.  Throwing BadRequestException aborts the subscription
-        // update and surfaces a clear error to the caller.
-        throw new BadRequestException(`Chain ${chainId} is not supported — RPC URL not configured`)
+        throw new BadRequestException('Arbitrum RPC URL is not configured')
       }
 
-      const client = createPublicClient({ chain, transport: http(rpcUrl) })
+      const client = createPublicClient({ chain: arbitrum, transport: http(rpcUrl) })
       const tx = await client.getTransaction({ hash: txHash as `0x${string}` })
 
       if (!tx) {
@@ -259,12 +219,6 @@ export class BillingService {
       }
     } catch (err) {
       if (err instanceof BadRequestException) throw err
-      // HIGH-01: Do NOT swallow RPC errors silently.  The previous code logged
-      // and continued, meaning an attacker who triggers a transient RPC error
-      // (e.g. by submitting an invalid txHash) bypasses the tx-origin check
-      // entirely and can claim any on-chain plan without a valid transaction.
-      // Re-throwing as BadRequestException ensures the subscription update is
-      // aborted when we cannot verify the transaction.
       this.logger.error(`assertTxOrigin: failed to fetch transaction: ${this.formatError(err)}`)
       throw new BadRequestException(
         'Could not verify transaction on chain — please try again in a moment',
@@ -272,68 +226,42 @@ export class BillingService {
     }
   }
 
-  /**
-   * Read on-chain subscription plan for a wallet.
-   * Uses viem in read-only mode — no private key needed.
-   */
-  private async getOnChainPlan(
-    walletAddress: string,
-    chainId: number,
-  ): Promise<{ plan: Plan; expiresAt: Date }> {
+  private getPlanById(planId: number): SharedPlan {
+    const match = Object.entries(PLAN_IDS).find(([, value]) => value === planId)
+    if (!match) {
+      throw new BadRequestException(`Unknown plan id: ${planId}`)
+    }
+    return match[0] as SharedPlan
+  }
+
+  private async readRecordedPayment(paymentId: string) {
     try {
       const contractAddress = this.config.get<string>('DOTLY_CONTRACT_ADDRESS') as
         | Address
         | undefined
       if (!contractAddress) {
-        throw new BadRequestException('Billing contract is not configured')
+        throw new BadRequestException('Payment vault is not configured')
       }
 
-      const polygonRpc = this.config.get<string>('POLYGON_RPC_URL')
-      const baseRpc = this.config.get<string>('BASE_RPC_URL')
-
-      const chain = chainId === 137 ? polygon : base
-      const rpcUrl = chainId === 137 ? polygonRpc : baseRpc
+      const rpcUrl = this.config.get<string>('ARBITRUM_RPC_URL')
       if (!rpcUrl) {
-        throw new BadRequestException(`No RPC URL configured for chainId ${chainId}`)
+        throw new BadRequestException('Arbitrum RPC URL is not configured')
       }
 
-      const client = createPublicClient({ chain, transport: http(rpcUrl) })
-      const [planIndex, expiresAtRaw, active] = await client.readContract({
+      const client = createPublicClient({ chain: arbitrum, transport: http(rpcUrl) })
+      const payment = await client.readContract({
         address: contractAddress,
-        abi: DOTLY_ABI,
-        functionName: 'getSubscription',
-        args: [walletAddress as Address],
+        abi: DOTLY_PAYMENT_VAULT_ABI,
+        functionName: 'getPayment',
+        args: [paymentId as `0x${string}`],
       })
 
-      if (!active || expiresAtRaw <= BigInt(Math.floor(Date.now() / 1000))) {
-        return {
-          plan: Plan.FREE,
-          expiresAt: new Date(Number(expiresAtRaw) * 1000),
-        }
-      }
-
-      return {
-        plan: PLAN_INDEX_MAP[planIndex] ?? Plan.FREE,
-        expiresAt: new Date(Number(expiresAtRaw) * 1000),
-      }
+      return payment
     } catch (err) {
       if (err instanceof BadRequestException) throw err
-      this.logger.error(`Failed to read on-chain subscription: ${this.formatError(err)}`)
-      throw new BadRequestException('Could not verify on-chain subscription state')
+      this.logger.error(`Failed to read vault payment: ${this.formatError(err)}`)
+      throw new BadRequestException('Could not verify payment state on chain')
     }
-  }
-
-  private getPlanForBoosterPlanId(planId: number): Plan {
-    const planMap = new Map<number, Plan>([
-      [this.boosterAi.getPlanId(Plan.STARTER), Plan.STARTER],
-      [this.boosterAi.getPlanId(Plan.PRO), Plan.PRO],
-      [this.boosterAi.getPlanId(Plan.BUSINESS), Plan.BUSINESS],
-      [this.boosterAi.getPlanId(Plan.AGENCY), Plan.AGENCY],
-      [this.boosterAi.getPlanId(Plan.ENTERPRISE), Plan.ENTERPRISE],
-    ])
-    const plan = planMap.get(planId)
-    if (!plan) throw new BadRequestException(`Unknown BoosterAI planId: ${planId}`)
-    return plan
   }
 
   async getUserSubscription(userId: string): Promise<BillingSummaryResponse> {
@@ -342,7 +270,7 @@ export class BillingService {
       include: { user: { select: { plan: true, walletAddress: true } } },
     })
     return {
-      plan: subscription?.user?.plan ?? Plan.FREE,
+      plan: subscription?.user?.plan ?? SharedPlan.FREE,
       status: subscription?.status ?? null,
       currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
       walletAddress: subscription?.user?.walletAddress ?? null,
@@ -363,24 +291,18 @@ export class BillingService {
     })
   }
 
-  // ─── BoosterAI affiliate billing ───────────────────────────────────────────
-
-  /**
-   * Step 1 — Create a BoosterAI order and return PaymentVault params.
-   * The frontend uses these to call paySubscription() on-chain.
-   */
   async createCheckoutOrder(
     userId: string,
     params: {
-      plan: Plan
+      plan: SharedPlan
       duration: BillingDuration
       walletAddress: string
       ref?: string
       countryCode?: string
     },
   ) {
-    if (params.plan === Plan.FREE) {
-      throw new BadRequestException('Cannot create a BoosterAI order for the FREE plan')
+    if (params.plan === SharedPlan.FREE) {
+      throw new BadRequestException('Cannot create a checkout quote for the FREE plan')
     }
 
     await this.assertOrderCreationAllowed(userId)
@@ -391,38 +313,42 @@ export class BillingService {
     const partnerCode = this.normalizePartnerCode(params.ref)
     await this.assertNoSelfReferral(userId, partnerCode)
 
-    let orderRes: Awaited<ReturnType<BoosterAiClient['createOrder']>>
-    try {
-      orderRes = await this.boosterAi.createOrder({
-        plan: params.plan,
-        duration: params.duration,
-        walletAddress: normalizedWallet,
-        partnerCode,
-        countryCode: params.countryCode,
-      })
-    } catch (err) {
-      this.logger.error(`BoosterAI createOrder failed: ${this.formatError(err)}`)
-      throw new BadRequestException(
-        (err as Error).message ?? 'Failed to create order with BoosterAI — please try again',
-      )
-    }
-
-    const amountUsdt = this.boosterAi.getAmountUsdt(params.plan, params.duration)
+    const amountUsdt = this.paymentVaultQuotes.getAmountUsdt(params.plan, params.duration)
+    const amountRaw = this.paymentVaultQuotes.parseAmountRaw(amountUsdt)
+    const userRef = this.paymentVaultQuotes.makeUserRef(userId)
+    const paymentRef = this.paymentVaultQuotes.makePaymentRef({
+      userId,
+      plan: params.plan,
+      duration: params.duration,
+      walletAddress: normalizedWallet,
+      nonce: crypto.randomUUID(),
+    })
+    const paymentId = this.paymentVaultQuotes.paymentIdFor(paymentRef)
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
+    const planId = PLAN_IDS[params.plan]
+    const durationId = DURATION_IDS[params.duration]
+    const signature = await this.paymentVaultQuotes.signQuote({
+      payer: normalizedWallet,
+      userRef,
+      amountRaw,
+      planId,
+      durationId,
+      paymentRef,
+      deadline,
+    })
 
     await this.prisma.user.update({
       where: { id: userId },
       data: { walletAddress: normalizedWallet },
     })
 
-    // Persist the pending order on the Subscription record so we can resume
-    // polling even if the user closes the tab.
     await this.prisma.subscription.upsert({
       where: { userId },
       create: {
         userId,
         plan: params.plan,
         status: 'TRIALING',
-        boosterAiOrderId: orderRes.orderId,
+        boosterAiOrderId: paymentId,
         boosterAiPartnerId: null,
         billingDuration: params.duration,
         amountUsdt,
@@ -430,7 +356,7 @@ export class BillingService {
       },
       update: {
         plan: params.plan,
-        boosterAiOrderId: orderRes.orderId,
+        boosterAiOrderId: paymentId,
         billingDuration: params.duration,
         amountUsdt,
         contractSubscriptionId: normalizedWallet,
@@ -440,21 +366,26 @@ export class BillingService {
     })
 
     return {
-      orderId: orderRes.orderId,
-      paymentVaultAddress: orderRes.paymentVaultAddress,
-      usdtTokenAddress: orderRes.usdtTokenAddress,
-      amountUsdt: orderRes.amountUsdt,
-      paymentRef: orderRes.paymentRef,
-      chainId: orderRes.chainId,
+      amountUsdt,
+      amountRaw: amountRaw.toString(),
+      paymentVaultAddress: this.paymentVaultQuotes.getVaultAddress(),
+      usdtTokenAddress: this.paymentVaultQuotes.getUsdtAddress(),
+      paymentRef,
+      paymentId,
+      userRef,
+      planId,
+      durationId,
+      deadline: deadline.toString(),
+      signature,
+      chainId: this.paymentVaultQuotes.getChainId(),
     }
   }
 
-  /**
-   * Step 2 — Poll BoosterAI for order finalization and activate the
-   * subscription in Dotly's database.
-   * Returns { status: 'ACTIVE' | 'PENDING' | 'CANCELLED' }.
-   */
-  async activateBoosterAiOrder(userId: string, orderId: string) {
+  async activateCheckoutOrder(userId: string, paymentId: string, txHash: string, chainId: number) {
+    if (chainId !== CHAIN_ID) {
+      throw new BadRequestException('Only Arbitrum payments are supported')
+    }
+
     const sub = await this.prisma.subscription.findUnique({
       where: { userId },
       select: {
@@ -462,111 +393,99 @@ export class BillingService {
         boosterAiOrderId: true,
         billingDuration: true,
         amountUsdt: true,
+        contractSubscriptionId: true,
       },
     })
 
-    if (!sub?.boosterAiOrderId || sub.boosterAiOrderId !== orderId) {
+    if (!sub?.boosterAiOrderId || sub.boosterAiOrderId !== paymentId) {
+      throw new BadRequestException('Payment does not match the pending checkout for this account')
+    }
+
+    const walletAddress = sub.contractSubscriptionId
+    if (!walletAddress) {
+      throw new BadRequestException('No wallet is associated with the pending checkout')
+    }
+
+    await this.assertTxOrigin(walletAddress, txHash)
+
+    const payment = await this.readRecordedPayment(paymentId)
+    const expectedPlan = sub.plan as SharedPlan
+    const expectedDuration = (sub.billingDuration ?? BillingDuration.MONTHLY) as BillingDuration
+    const expectedAmount = this.paymentVaultQuotes.getAmountUsdt(expectedPlan, expectedDuration)
+
+    const payer = payment[0]
+    const planId = payment[3]
+    const duration = payment[4]
+    const paidAt = payment[6]
+    const refundUntil = payment[7]
+    const amount = payment[2]
+    const status = payment[8]
+
+    if (Number(status) !== 1) {
+      throw new BadRequestException('Recorded payment is no longer in escrow and cannot activate')
+    }
+
+    if (payer.toLowerCase() !== walletAddress.toLowerCase()) {
+      throw new BadRequestException('Recorded payment payer does not match the account wallet')
+    }
+    if (this.getPlanById(Number(planId)) !== expectedPlan) {
+      throw new BadRequestException('Recorded payment plan does not match the pending subscription')
+    }
+    if (Number(duration) !== DURATION_IDS[expectedDuration]) {
       throw new BadRequestException(
-        'Order does not match the pending BoosterAI order for this account',
+        'Recorded payment duration does not match the pending subscription',
+      )
+    }
+    if (sub.amountUsdt !== expectedAmount) {
+      throw new BadRequestException('Pending subscription amount does not match configured pricing')
+    }
+
+    const paymentAmountUsdt = (Number(amount) / 1_000_000).toFixed(2)
+    if (paymentAmountUsdt !== expectedAmount) {
+      throw new BadRequestException(
+        'Recorded payment amount does not match the pending subscription',
       )
     }
 
-    let status: Awaited<ReturnType<BoosterAiClient['getOrderStatus']>>
-    try {
-      status = await this.boosterAi.getOrderStatus(orderId)
-    } catch (err) {
-      this.logger.error(
-        `BoosterAI getOrderStatus failed for orderId=${orderId}: ${this.formatError(err)}`,
-      )
-      throw new BadRequestException(
-        (err as Error).message ?? 'Could not retrieve order status — please try again',
-      )
-    }
+    const paidAtDate = new Date(Number(paidAt) * 1000)
+    const days = DURATION_DAYS[expectedDuration] ?? 30
+    const periodEnd = new Date(paidAtDate.getTime() + days * 24 * 60 * 60 * 1000)
 
-    if (FINALIZED_BOOSTERAI_STATUSES.has(status.orderStatus)) {
-      const expectedPlan = this.getPlanForBoosterPlanId(status.planId)
-      const duration = (sub.billingDuration ?? BillingDuration.MONTHLY) as BillingDuration
-      const expectedAmount = this.boosterAi.getAmountUsdt(expectedPlan, duration)
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        plan: expectedPlan,
+        status: 'ACTIVE',
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        boosterAiOrderId: null,
+        txHash,
+        chainId,
+      },
+    })
 
-      if (sub.plan !== expectedPlan) {
-        throw new BadRequestException(
-          'BoosterAI order plan does not match the pending subscription plan',
-        )
-      }
-      if (sub.amountUsdt !== expectedAmount || status.amountUsdt !== expectedAmount) {
-        throw new BadRequestException(
-          'BoosterAI order amount does not match the pending subscription',
-        )
-      }
+    await this.prisma.user.update({ where: { id: userId }, data: { plan: expectedPlan } })
 
-      const paidAt = status.paidAt ? new Date(status.paidAt) : new Date()
-      const dur = duration as BillingDuration
-      const days = DURATION_DAYS[dur] ?? 30
-      const periodEnd = new Date(paidAt.getTime() + days * 24 * 60 * 60 * 1000)
-      const plan = expectedPlan
-
-      await this.prisma.subscription.update({
-        where: { userId },
-        data: {
-          plan,
-          status: 'ACTIVE',
-          boosterAiPartnerId: status.partnerId ?? undefined,
-          currentPeriodEnd: periodEnd,
-          cancelAtPeriodEnd: false,
-          boosterAiOrderId: null,
+    void this.audit
+      .log({
+        userId,
+        action: 'billing.checkout.activated',
+        resourceType: 'subscription',
+        metadata: {
+          paymentId,
+          plan: expectedPlan,
+          txHash,
+          refundUntil: Number(refundUntil),
         },
       })
+      .catch(() => void 0)
 
-      await this.prisma.user.update({ where: { id: userId }, data: { plan } })
-
-      void this.audit
-        .log({
-          userId,
-          action: 'billing.checkout.activated',
-          resourceType: 'subscription',
-          metadata: {
-            orderId,
-            plan,
-            partnerId: status.partnerId,
-            refundUntil: status.refundUntil,
-          },
-        })
-        .catch(() => void 0)
-
-      return { status: 'ACTIVE', plan, currentPeriodEnd: periodEnd }
-    }
-
-    if (REFUNDED_BOOSTERAI_STATUSES.has(status.orderStatus)) {
-      await this.prisma.subscription.update({
-        where: { userId },
-        data: {
-          status: 'CANCELLED',
-          plan: Plan.FREE,
-          cancelAtPeriodEnd: false,
-          boosterAiOrderId: null,
-        },
-      })
-      await this.prisma.user.update({ where: { id: userId }, data: { plan: Plan.FREE } })
-
-      void this.audit
-        .log({
-          userId,
-          action: 'billing.checkout.refunded',
-          resourceType: 'subscription',
-          metadata: { orderId },
-        })
-        .catch(() => void 0)
-
-      return { status: 'CANCELLED' }
-    }
-
-    // Order exists but not yet finalized on-chain
-    return { status: 'PENDING', orderStatus: status.orderStatus }
+    return { status: 'ACTIVE', plan: expectedPlan, currentPeriodEnd: periodEnd.toISOString() }
   }
 
-  getPlanLimits(plan: Plan) {
+  getPlanLimits(plan: SharedPlan) {
     const limits: Record<
-      Plan,
+      SharedPlan,
       {
         cards: number
         analyticsDays: number
@@ -576,7 +495,7 @@ export class BillingService {
         teamMembers: number
       }
     > = {
-      [Plan.FREE]: {
+      [SharedPlan.FREE]: {
         cards: 1,
         analyticsDays: 7,
         csvExport: false,
@@ -584,7 +503,7 @@ export class BillingService {
         customDomain: false,
         teamMembers: 0,
       },
-      [Plan.STARTER]: {
+      [SharedPlan.STARTER]: {
         cards: 1,
         analyticsDays: 30,
         csvExport: false,
@@ -592,7 +511,7 @@ export class BillingService {
         customDomain: false,
         teamMembers: 0,
       },
-      [Plan.PRO]: {
+      [SharedPlan.PRO]: {
         cards: 3,
         analyticsDays: 90,
         csvExport: true,
@@ -600,7 +519,7 @@ export class BillingService {
         customDomain: true,
         teamMembers: 0,
       },
-      [Plan.BUSINESS]: {
+      [SharedPlan.BUSINESS]: {
         cards: 10,
         analyticsDays: 365,
         csvExport: true,
@@ -608,7 +527,7 @@ export class BillingService {
         customDomain: true,
         teamMembers: 10,
       },
-      [Plan.AGENCY]: {
+      [SharedPlan.AGENCY]: {
         cards: 50,
         analyticsDays: 365,
         csvExport: true,
@@ -616,7 +535,7 @@ export class BillingService {
         customDomain: true,
         teamMembers: 50,
       },
-      [Plan.ENTERPRISE]: {
+      [SharedPlan.ENTERPRISE]: {
         cards: -1,
         analyticsDays: -1,
         csvExport: true,
@@ -625,6 +544,6 @@ export class BillingService {
         teamMembers: -1,
       },
     }
-    return limits[plan]
+    return limits[plan] ?? limits[SharedPlan.FREE]
   }
 }

@@ -18,22 +18,6 @@ interface AuthUser {
   id: string
 }
 
-class VerifySubscriptionDto {
-  @IsEthereumAddress()
-  walletAddress!: string
-
-  @IsString()
-  @Matches(/^0x[a-fA-F0-9]{64}$/, {
-    message: 'txHash must be a valid 32-byte hex transaction hash prefixed with 0x',
-  })
-  txHash!: string
-
-  /** chainId: 137 = Polygon, 8453 = Base. Only these two chains are supported. */
-  @IsInt()
-  @IsIn([137, 8453], { message: 'chainId must be 137 (Polygon) or 8453 (Base)' })
-  chainId!: number
-}
-
 class SetWalletDto {
   @IsEthereumAddress()
   walletAddress!: string
@@ -68,10 +52,20 @@ class CreateBoosterAiOrderDto {
 
 class ActivateBoosterAiOrderDto {
   @IsString()
-  @Matches(/^[A-Za-z0-9_-]{8,128}$/, {
-    message: 'orderId must be 8-128 URL-safe characters',
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'paymentId must be a valid 32-byte hex string prefixed with 0x',
   })
-  orderId!: string
+  paymentId!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'txHash must be a valid 32-byte hex transaction hash prefixed with 0x',
+  })
+  txHash!: string
+
+  @IsInt()
+  @IsIn([42161], { message: 'chainId must be 42161 (Arbitrum)' })
+  chainId!: number
 }
 
 @ApiTags('billing')
@@ -83,22 +77,6 @@ export class BillingController {
   @Get()
   getSubscription(@CurrentUser() user: AuthUser) {
     return this.billingService.getUserSubscription(user.id)
-  }
-
-  // F-16: Rate-limit POST /billing/verify to 5 per minute per user.
-  // Without this, an attacker can rapidly cycle through wallet addresses /
-  // txHashes trying to find one that maps to a paid plan, or abuse the RPC
-  // call quota for on-chain reads.
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @Post('verify')
-  verify(@CurrentUser() user: AuthUser, @Body() dto: VerifySubscriptionDto) {
-    return this.billingService.verifyAndSyncSubscription(
-      user.id,
-      dto.walletAddress,
-      dto.txHash,
-      dto.chainId,
-    )
   }
 
   // MED-09: Rate-limit PATCH /billing/wallet to 10 per minute per user.
@@ -113,8 +91,7 @@ export class BillingController {
 
   /**
    * POST /billing/checkout/order
-   * Creates a checkout order and returns payment parameters.
-   * The frontend uses these to trigger the payment flow.
+   * Creates a signed checkout quote for DotlyPaymentVault.
    */
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
@@ -138,13 +115,17 @@ export class BillingController {
 
   /**
    * POST /billing/checkout/activate
-   * Polls the payment provider for order finalization and activates the subscription.
-   * Idempotent — safe to call multiple times until { status: 'ACTIVE' }.
+   * Verifies the payment transaction and activates the subscription.
    */
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('checkout/activate')
   activateCheckoutOrder(@CurrentUser() user: AuthUser, @Body() dto: ActivateBoosterAiOrderDto) {
-    return this.billingService.activateBoosterAiOrder(user.id, dto.orderId)
+    return this.billingService.activateCheckoutOrder(
+      user.id,
+      dto.paymentId,
+      dto.txHash,
+      dto.chainId,
+    )
   }
 }

@@ -81,3 +81,22 @@ describe('wallet normalization (pure logic)', () => {
     )
   })
 })
+
+describe('stale pending checkout cleanup (pure logic)', () => {
+  function isStalePending(updatedAt: Date, now: Date): boolean {
+    const stalePendingThresholdMs = 2 * 60 * 60 * 1000
+    return updatedAt.getTime() < now.getTime() - stalePendingThresholdMs
+  }
+
+  it('treats pending checkout as stale after the configured threshold', () => {
+    const now = new Date('2026-04-14T12:00:00.000Z')
+    const stale = new Date('2026-04-14T09:59:59.000Z')
+    expect(isStalePending(stale, now)).toBe(true)
+  })
+
+  it('does not treat recent pending checkout as stale', () => {
+    const now = new Date('2026-04-14T12:00:00.000Z')
+    const fresh = new Date('2026-04-14T10:30:00.000Z')
+    expect(isStalePending(fresh, now)).toBe(false)
+  })
+})

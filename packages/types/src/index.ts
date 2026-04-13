@@ -282,6 +282,33 @@ export interface BillingSummaryResponse {
   amountUsdt: string | null
 }
 
+export interface BillingCheckoutQuoteResponse {
+  amountUsdt: string
+  amountRaw: string
+  paymentVaultAddress: string
+  usdtTokenAddress: string
+  paymentRef: string
+  paymentId: string
+  userRef: string
+  planId: number
+  durationId: number
+  deadline: string
+  signature: string
+  chainId: number
+}
+
+export interface BillingActivateCheckoutDto {
+  paymentId: string
+  txHash: string
+  chainId: number
+}
+
+export interface BillingActivateCheckoutResponse {
+  status: 'ACTIVE' | 'PENDING' | 'CANCELLED'
+  plan: string
+  currentPeriodEnd: string | null
+}
+
 export type CardFieldKey = keyof CardFields
 
 export type PartialCardFields = Partial<CardFields>

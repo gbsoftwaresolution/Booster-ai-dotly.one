@@ -1,31 +1,25 @@
-import type { BillingSummaryResponse } from '@dotly/types'
+import type {
+  BillingActivateCheckoutResponse,
+  BillingCheckoutQuoteResponse,
+  BillingSummaryResponse,
+} from '@dotly/types'
 
 export type PlanId = 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'AGENCY' | 'ENTERPRISE'
 export type Duration = 'MONTHLY' | 'SIX_MONTHS' | 'ANNUAL'
 
 export type SubscriptionData = BillingSummaryResponse
 
-export interface CreateOrderResponse {
-  orderId: string
-  paymentVaultAddress: string
-  usdtTokenAddress: string
-  amountUsdt: string
-  paymentRef: string
-  chainId: number
-}
+export type CreateOrderResponse = BillingCheckoutQuoteResponse
 
-export interface ActivateOrderResponse {
-  status: 'ACTIVE' | 'PENDING' | string
-  plan: PlanId
-  currentPeriodEnd: string | null
-}
+export type ActivateOrderResponse = BillingActivateCheckoutResponse
 
 export interface NoWalletOrder {
   approveLink: string
   payLink: string
   amountUsdt: string
-  orderId: string
+  paymentId: string
   chainId: number
+  txHash: string | null
 }
 
 declare global {

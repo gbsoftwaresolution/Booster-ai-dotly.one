@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
+import { Interface } from 'ethers'
 import { useSearchParams } from 'next/navigation'
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
@@ -20,7 +21,6 @@ import {
   ERC20_APPROVE_SELECTOR,
   formatExpiryDate,
   getFocusMessage,
-  parseUsdtAmount,
   PLAN_PRICES,
   readRefCookie,
   waitForReceipt,
@@ -145,22 +145,21 @@ export default function BillingSettingsPage(): JSX.Element {
         },
         token,
       )
-      const amountRaw = parseUsdtAmount(order.amountUsdt)
       setNoWalletOrder({
         approveLink: buildApproveDeepLink({
           usdtTokenAddress: order.usdtTokenAddress,
           paymentVaultAddress: order.paymentVaultAddress,
-          amountRaw,
+          amountRaw: BigInt(order.amountRaw),
           chainId: order.chainId,
         }),
         payLink: buildPayDeepLink({
           paymentVaultAddress: order.paymentVaultAddress,
-          paymentRef: order.paymentRef,
           chainId: order.chainId,
         }),
         amountUsdt: order.amountUsdt,
-        orderId: order.orderId,
+        paymentId: order.paymentId,
         chainId: order.chainId,
+        txHash: null,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create order.')
@@ -177,13 +176,20 @@ export default function BillingSettingsPage(): JSX.Element {
     try {
       const token = await getToken()
       if (!token) throw new Error('Not authenticated.')
+      if (!noWalletOrder.txHash) {
+        throw new Error('Paste the payment transaction hash from your wallet app first.')
+      }
       let activated = false
       for (let i = 0; i < 5; i++) {
         await new Promise((r) => setTimeout(r, 2_000))
         try {
           const result = await apiPost<ActivateOrderResponse>(
             '/billing/checkout/activate',
-            { orderId: noWalletOrder.orderId },
+            {
+              paymentId: noWalletOrder.paymentId,
+              txHash: noWalletOrder.txHash,
+              chainId: noWalletOrder.chainId,
+            },
             token,
           )
           if (result.status === 'ACTIVE') {
@@ -244,7 +250,14 @@ export default function BillingSettingsPage(): JSX.Element {
         paymentVaultAddress,
         usdtTokenAddress,
         amountUsdt,
+        amountRaw,
+        userRef,
+        planId,
+        durationId,
         paymentRef,
+        paymentId,
+        deadline,
+        signature,
         chainId: requiredChainId,
       } = order
 
@@ -256,14 +269,12 @@ export default function BillingSettingsPage(): JSX.Element {
         )
       }
 
-      const usdtRaw = parseUsdtAmount(amountUsdt)
-
       setSubscribeStep('Approving crypto payment…')
 
       const approveData =
         ERC20_APPROVE_SELECTOR +
         paymentVaultAddress.slice(2).padStart(64, '0') +
-        usdtRaw.toString(16).padStart(64, '0')
+        BigInt(amountRaw).toString(16).padStart(64, '0')
 
       const approveTxHash = (await window.ethereum.request({
         method: 'eth_sendTransaction',
@@ -274,9 +285,18 @@ export default function BillingSettingsPage(): JSX.Element {
       await waitForReceipt(approveTxHash)
 
       setSubscribeStep('Confirming payment…')
-      const payData =
-        '0x4d544a74' +
-        (paymentRef.startsWith('0x') ? paymentRef.slice(2) : paymentRef).padStart(64, '0')
+      const iface = new Interface([
+        'function paySubscription(bytes32 userRef,uint256 amount,uint32 planId,uint8 duration,bytes32 paymentRef,uint64 deadline,bytes signature)',
+      ])
+      const payData = iface.encodeFunctionData('paySubscription', [
+        userRef,
+        BigInt(amountRaw),
+        planId,
+        durationId,
+        paymentRef,
+        BigInt(deadline),
+        signature,
+      ])
 
       const payTxHash = (await window.ethereum.request({
         method: 'eth_sendTransaction',
@@ -294,7 +314,7 @@ export default function BillingSettingsPage(): JSX.Element {
         try {
           const result = await apiPost<ActivateOrderResponse>(
             '/billing/checkout/activate',
-            { orderId: order.orderId },
+            { paymentId, txHash: payTxHash, chainId: requiredChainId },
             token,
           )
           if (result.status === 'ACTIVE') {
@@ -385,6 +405,11 @@ export default function BillingSettingsPage(): JSX.Element {
             onSelectPlan={setSelectedPlan}
             onSelectDuration={setSelectedDuration}
             onActivateNoWallet={() => void handleNoWalletActivate()}
+            onNoWalletTxHashChange={(value) =>
+              setNoWalletOrder((current) =>
+                current ? { ...current, txHash: value.trim() || null } : current,
+              )
+            }
             onGeneratePaymentLinks={() => {
               if (!walletAddress) return
               void handleNoWalletSubscribe(walletAddress)

@@ -209,6 +209,29 @@ Recommended post-deploy checks:
 - test one signed quote on a fork or staging path before live traffic
 - move ownership to multisig later if desired
 
+Arbiscan verification example:
+
+```bash
+cd contracts
+pnpm hardhat verify --network arbitrum \
+  <DEPLOYED_VAULT_ADDRESS> \
+  <OWNER_ADDRESS> \
+  <TREASURY_ADDRESS> \
+  <PAYMENT_SIGNER_ADDRESS> \
+  0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9
+```
+
+Constructor args are verified in this order:
+
+```text
+1. initialOwner
+2. initialTreasury
+3. initialPaymentSigner
+4. usdtToken
+```
+
+You will need an Arbiscan API key configured for Hardhat verification locally.
+
 ## Operational Notes
 
 - Deploy first to Arbitrum
