@@ -2,7 +2,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import {
   Calendar,
@@ -36,6 +36,7 @@ import type { AppointmentType, Booking, ConfirmState, DayOfWeek, GoogleStatusSta
 
 export default function SchedulingPage(): JSX.Element {
   const userTz = useUserTimezone()
+  const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
   const loadRequestIdRef = useRef(0)
@@ -71,6 +72,15 @@ export default function SchedulingPage(): JSX.Element {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const getToken = useCallback(async () => (await getAccessToken()) ?? undefined, [])
+  const routeTab =
+    pathname === '/apps/scheduling/bookings' || pathname === '/scheduling/bookings'
+      ? 'bookings'
+      : pathname === '/apps/scheduling/appointment-types' ||
+          pathname === '/scheduling/appointment-types' ||
+          pathname === '/apps/scheduling/availability' ||
+          pathname === '/scheduling/availability'
+        ? 'types'
+        : null
 
   function showToast(msg: string, ok = true) {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
@@ -187,13 +197,20 @@ export default function SchedulingPage(): JSX.Element {
   }, [getToken])
 
   useEffect(() => {
+    if (routeTab) {
+      setTab(routeTab)
+      return
+    }
+
     const requestedTab = searchParams.get('tab')
     if (requestedTab === 'types' || requestedTab === 'bookings') {
       setTab(requestedTab)
     }
-  }, [searchParams])
+  }, [routeTab, searchParams])
 
   useEffect(() => {
+    if (routeTab) return
+
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
     const nextUrl = `${window.location.pathname}?${params.toString()}`
@@ -201,7 +218,7 @@ export default function SchedulingPage(): JSX.Element {
     if (nextUrl !== currentUrl) {
       router.replace(nextUrl, { scroll: false })
     }
-  }, [router, searchParams, tab])
+  }, [routeTab, router, searchParams, tab])
 
   useEffect(() => {
     if (searchParams.get('google') === 'connected') return
@@ -557,17 +574,17 @@ export default function SchedulingPage(): JSX.Element {
                 const busy = deletingAppointmentTypeId === apt.id
                 return (
                   <div key={apt.id} className="group relative flex flex-col gap-4 rounded-[32px] border border-slate-200/60 bg-white/70 p-6 backdrop-blur-2xl transition-all hover:-translate-y-1 hover:shadow-xl hover:bg-white">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
+                    <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                      <div className="flex w-full min-w-0 items-start gap-4 sm:w-auto sm:flex-1">
                         <div
                           className="mt-0.5 h-10 w-10 flex-shrink-0 rounded-xl"
                           style={{ background: apt.color }}
                         />
                         <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-slate-900">{apt.name}</h3>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            <h3 className="truncate text-[17px] font-extrabold text-slate-900">{apt.name}</h3>
                             {!apt.isActive && (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                              <span className="flex items-center gap-1.5 rounded-full bg-slate-100/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 ring-1 ring-inset ring-slate-500/20">
                                 Inactive
                               </span>
                             )}
@@ -596,7 +613,7 @@ export default function SchedulingPage(): JSX.Element {
                               return (
                                 <span
                                   key={d}
-                                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${windows.length > 0 ? 'bg-sky-50 text-sky-700' : 'bg-slate-50 text-slate-300'}`}
+                                  className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider transition-colors ${windows.length > 0 ? 'bg-sky-100/50 text-sky-600 ring-1 ring-inset ring-sky-500/20' : 'bg-slate-50 text-slate-400'}`}
                                 >
                                   {d}
                                   {windows.length > 0
@@ -609,7 +626,7 @@ export default function SchedulingPage(): JSX.Element {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {bookingUrl && (
                           <button
                             title="Copy booking link"
@@ -619,7 +636,7 @@ export default function SchedulingPage(): JSX.Element {
                                 else showToast('Failed to copy link', false)
                               })
                             }}
-                            className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-sky-600"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600 active:scale-95"
                           >
                             <Copy className="h-4 w-4" />
                           </button>
@@ -628,7 +645,7 @@ export default function SchedulingPage(): JSX.Element {
                           title="Edit questions"
                           onClick={() => setQuestionsEditorFor(apt)}
                           disabled={busy || deletingAppointmentTypeId !== null}
-                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 disabled:opacity-50"
+                          className="flex h-9 items-center justify-center rounded-xl bg-slate-50 px-3 text-[13px] font-bold text-slate-500 transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 disabled:opacity-50"
                         >
                           Questions{apt.questions.length > 0 ? ` (${apt.questions.length})` : ''}
                         </button>
@@ -636,7 +653,7 @@ export default function SchedulingPage(): JSX.Element {
                           title="Edit availability"
                           onClick={() => setAvailEditorFor(apt)}
                           disabled={busy || deletingAppointmentTypeId !== null}
-                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50 disabled:opacity-50"
+                          className="flex h-9 items-center justify-center rounded-xl bg-slate-50 px-3 text-[13px] font-bold text-slate-500 transition-all hover:bg-sky-50 hover:text-sky-600 active:scale-95 disabled:opacity-50"
                         >
                           Availability
                         </button>
@@ -647,7 +664,7 @@ export default function SchedulingPage(): JSX.Element {
                             setShowAptForm(true)
                           }}
                           disabled={busy || deletingAppointmentTypeId !== null}
-                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-sky-600 disabled:opacity-50"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600 active:scale-95 disabled:opacity-50"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
@@ -655,14 +672,14 @@ export default function SchedulingPage(): JSX.Element {
                           title="Delete"
                           onClick={() => setConfirmState({ type: 'appointment-type', id: apt.id })}
                           disabled={busy || deletingAppointmentTypeId !== null}
-                          className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
                     {bookingUrl && (
-                      <div className="mt-3 flex items-center gap-2 rounded-[20px] px-3 py-2">
+                      <div className="mt-3 flex items-center justify-between gap-2 overflow-hidden rounded-[20px] bg-slate-50 shadow-inner px-4 py-2 border border-slate-100">
                         <span className="truncate font-mono text-xs text-slate-500">
                           {bookingUrl}
                         </span>
@@ -673,7 +690,7 @@ export default function SchedulingPage(): JSX.Element {
                               else showToast('Failed to copy link', false)
                             })
                           }}
-                          className="flex-shrink-0 text-sky-600 hover:text-sky-700"
+                          className="flex shrink-0 h-6 w-6 items-center justify-center rounded-md bg-white text-slate-400 shadow-sm hover:text-sky-600 transition-colors active:scale-95"
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </button>
@@ -727,7 +744,7 @@ export default function SchedulingPage(): JSX.Element {
                             <div className="text-slate-400">{b.guestEmail}</div>
                           </td>
                           <td>
-                            <div className="flex items-center gap-2">
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
                               <div
                                 className="h-2.5 w-2.5 rounded-full flex-shrink-0"
                                 style={{ background: b.appointmentType.color }}

@@ -1,4 +1,1 @@
-import { redirect } from 'next/navigation'
-export default function Page() {
-  redirect('/apps/scheduling?tab=bookings')
-}
+export { default } from '../../../../(dashboard)/scheduling/page'
