@@ -34,7 +34,6 @@ export const PLAN_COLORS: Record<PlanId, string> = {
 
 export const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-green-100 text-green-700',
-  TRIALING: 'bg-blue-100 text-blue-700',
   FREE: 'bg-gray-100 text-gray-600',
   PENDING: 'bg-amber-100 text-amber-700',
   PAST_DUE: 'bg-red-100 text-red-700',

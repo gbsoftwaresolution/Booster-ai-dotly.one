@@ -370,7 +370,7 @@ export class BillingService {
       create: {
         userId,
         plan: params.plan,
-        status: 'TRIALING',
+        status: 'PENDING',
         boosterAiOrderId: paymentId,
         boosterAiPartnerId: null,
         billingDuration: params.duration,
@@ -383,7 +383,7 @@ export class BillingService {
         billingDuration: params.duration,
         amountUsdt,
         contractSubscriptionId: normalizedWallet,
-        status: 'TRIALING',
+        status: 'PENDING',
         boosterAiPartnerId: null,
       },
     })

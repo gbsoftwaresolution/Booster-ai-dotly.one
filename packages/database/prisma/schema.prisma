@@ -87,7 +87,7 @@ enum SubscriptionStatus {
   ACTIVE
   CANCELLED
   PAST_DUE
-  TRIALING
+  PENDING
 }
 
 enum DomainStatus {
@@ -344,7 +344,7 @@ model Subscription {
   id                     String             @id @default(cuid())
   userId                 String             @unique
   plan                   Plan               @default(FREE)
-  status                 SubscriptionStatus @default(TRIALING)
+  status                 SubscriptionStatus @default(PENDING)
   contractSubscriptionId String? // on-chain subscription ID
   txHash                 String? // on-chain activation transaction hash
   chainId                Int? // 137 = Polygon, 8453 = Base
