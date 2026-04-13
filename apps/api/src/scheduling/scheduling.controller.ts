@@ -161,6 +161,16 @@ export class SchedulingController {
    * Redirects the user to the Google OAuth2 authorization page.
    */
   @ApiBearerAuth()
+  @Get('google/connect-url')
+  getGoogleConnectUrl(@CurrentUser() user: { id: string }) {
+    return { url: this.googleCalendar.getAuthUrl(user.id) }
+  }
+
+  /**
+   * GET /scheduling/google/connect
+   * Redirects the user to the Google OAuth2 authorization page.
+   */
+  @ApiBearerAuth()
   @Get('google/connect')
   async connectGoogle(@CurrentUser() user: { id: string }, @Res() res: Response) {
     const url = this.googleCalendar.getAuthUrl(user.id)
@@ -181,9 +191,9 @@ export class SchedulingController {
       const tokens = await this.googleCalendar.exchangeCode(query.code)
       const googleEmail = await this.googleCalendar.getGoogleEmail(tokens.access_token)
       await this.googleCalendar.saveConnection(userId, tokens, googleEmail)
-      res.redirect(`${webUrl}/scheduling?google=connected`)
+      res.redirect(`${webUrl}/apps/scheduling?google=connected`)
     } catch {
-      res.redirect(`${webUrl}/scheduling?google=error`)
+      res.redirect(`${webUrl}/apps/scheduling?google=error`)
     }
   }
 

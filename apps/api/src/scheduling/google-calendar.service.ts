@@ -42,10 +42,25 @@ export class GoogleCalendarService {
     this.stateSecret = this.config.get<string>('GOOGLE_OAUTH_STATE_SECRET') ?? null
   }
 
-  private getStateSecret(): string {
-    if (!this.stateSecret) {
-      throw new BadRequestException('Google Calendar integration is not configured on this server')
+  private ensureConfigured(): void {
+    const missingKeys = [
+      !this.stateSecret ? 'GOOGLE_OAUTH_STATE_SECRET' : null,
+      !this.config.get<string>('GOOGLE_OAUTH_CLIENT_ID') ? 'GOOGLE_OAUTH_CLIENT_ID' : null,
+      !this.config.get<string>('GOOGLE_OAUTH_CLIENT_SECRET')
+        ? 'GOOGLE_OAUTH_CLIENT_SECRET'
+        : null,
+      !this.config.get<string>('API_URL') ? 'API_URL' : null,
+    ].filter((key): key is string => key !== null)
+
+    if (missingKeys.length > 0) {
+      throw new BadRequestException(
+        `Google Calendar integration is not configured on this server. Missing: ${missingKeys.join(', ')}`,
+      )
     }
+  }
+
+  private getStateSecret(): string {
+    this.ensureConfigured()
     return this.stateSecret
   }
 
@@ -211,6 +226,7 @@ export class GoogleCalendarService {
 
   /** Get connection status for a user (no tokens exposed) */
   async getConnectionStatus(userId: string): Promise<{ connected: boolean; googleEmail?: string }> {
+    this.ensureConfigured()
     const conn = await this.prisma.googleCalendarConnection.findUnique({
       where: { userId },
       select: { googleEmail: true },

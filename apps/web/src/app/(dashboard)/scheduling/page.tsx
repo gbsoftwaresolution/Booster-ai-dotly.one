@@ -2,6 +2,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import {
@@ -40,6 +41,7 @@ export default function SchedulingPage(): JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
   const loadRequestIdRef = useRef(0)
+  const autoOpenedAvailabilityRef = useRef(false)
   const [aptTypes, setAptTypes] = useState<AppointmentType[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,15 +74,39 @@ export default function SchedulingPage(): JSX.Element {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const getToken = useCallback(async () => (await getAccessToken()) ?? undefined, [])
-  const routeTab =
-    pathname === '/apps/scheduling/bookings' || pathname === '/scheduling/bookings'
-      ? 'bookings'
-      : pathname === '/apps/scheduling/appointment-types' ||
-          pathname === '/scheduling/appointment-types' ||
-          pathname === '/apps/scheduling/availability' ||
-          pathname === '/scheduling/availability'
-        ? 'types'
-        : null
+  const schedulingBasePath = pathname.startsWith('/scheduling') ? '/scheduling' : '/apps/scheduling'
+  const routeView =
+    pathname === '/apps/scheduling/appointment-types' || pathname === '/scheduling/appointment-types'
+      ? 'appointment-types'
+      : pathname === '/apps/scheduling/availability' || pathname === '/scheduling/availability'
+        ? 'availability'
+        : pathname === '/apps/scheduling/bookings' || pathname === '/scheduling/bookings'
+          ? 'bookings'
+          : null
+  const isAvailabilityRoute = routeView === 'availability'
+  const routeTab = routeView === 'bookings' ? 'bookings' : routeView ? 'types' : null
+  const pageTitle =
+    routeView === 'appointment-types'
+      ? 'Appointment Types'
+      : routeView === 'availability'
+        ? 'Availability'
+        : routeView === 'bookings'
+          ? 'Bookings'
+          : 'Scheduling'
+  const pageDescription =
+    routeView === 'appointment-types'
+      ? 'Create, manage, and share your bookable appointment types.'
+      : routeView === 'availability'
+        ? 'Choose when each appointment type can be booked and adjust weekly hours.'
+        : routeView === 'bookings'
+          ? 'Review and manage your upcoming booking schedule.'
+          : 'Manage your booking pages and appointments'
+  const selectedAvailabilityTypeId = searchParams.get('typeId')
+  const googleStatusConfigError =
+    googleStatus?.state === 'unavailable' &&
+    googleStatus.message.toLowerCase().includes('not configured')
+      ? googleStatus.message
+      : null
 
   function showToast(msg: string, ok = true) {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
@@ -93,6 +119,68 @@ export default function SchedulingPage(): JSX.Element {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isAvailabilityRoute) {
+      autoOpenedAvailabilityRef.current = false
+      return
+    }
+
+    if (loading || availEditorFor || autoOpenedAvailabilityRef.current) {
+      return
+    }
+
+    if (selectedAvailabilityTypeId) {
+      const matchingType = aptTypes.find((apt) => apt.id === selectedAvailabilityTypeId)
+      if (matchingType) {
+        autoOpenedAvailabilityRef.current = true
+        setAvailEditorFor(matchingType)
+      }
+      return
+    }
+
+    if (aptTypes.length !== 1) {
+      return
+    }
+
+    autoOpenedAvailabilityRef.current = true
+    setAvailEditorFor(aptTypes[0] ?? null)
+  }, [aptTypes, availEditorFor, isAvailabilityRoute, loading, selectedAvailabilityTypeId])
+
+  function updateAvailabilitySelection(typeId: string | null) {
+    if (!isAvailabilityRoute) return
+
+    const params = new URLSearchParams(searchParams.toString())
+    if (typeId) {
+      params.set('typeId', typeId)
+    } else {
+      params.delete('typeId')
+    }
+    const nextQuery = params.toString()
+    router.replace(
+      nextQuery ? `${schedulingBasePath}/availability?${nextQuery}` : `${schedulingBasePath}/availability`,
+      { scroll: false },
+    )
+  }
+
+  function openAvailabilityFor(apt: AppointmentType) {
+    if (isAvailabilityRoute) {
+      updateAvailabilitySelection(apt.id)
+      setAvailEditorFor(apt)
+      autoOpenedAvailabilityRef.current = true
+      return
+    }
+
+    router.push(`${schedulingBasePath}/availability?typeId=${apt.id}`)
+  }
+
+  function closeAvailabilityEditor() {
+    setAvailEditorFor(null)
+    if (isAvailabilityRoute && selectedAvailabilityTypeId) {
+      updateAvailabilitySelection(null)
+      autoOpenedAvailabilityRef.current = false
+    }
+  }
 
   const load = useCallback(async () => {
     const requestId = ++loadRequestIdRef.current
@@ -347,10 +435,25 @@ export default function SchedulingPage(): JSX.Element {
     }
   }
 
+  async function handleGoogleConnect() {
+    setGoogleLoading(true)
+    try {
+      const token = await getToken()
+      const response = await apiGet<{ url: string }>('/scheduling/google/connect-url', token)
+      if (!response.url) {
+        throw new Error('Google Calendar authorization URL is unavailable.')
+      }
+      window.location.assign(response.url)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to start Google Calendar connection', false)
+      setGoogleLoading(false)
+    }
+  }
+
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL || ''
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
+    <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-out fill-mode-both">
       {/* Toast */}
       {toast && (
         <div
@@ -366,7 +469,7 @@ export default function SchedulingPage(): JSX.Element {
         <AvailabilityEditor
           initial={availEditorFor.availabilityRules}
           onSave={(rules) => void handleSaveAvailability(availEditorFor, rules)}
-          onClose={() => setAvailEditorFor(null)}
+          onClose={closeAvailabilityEditor}
         />
       )}
 
@@ -434,17 +537,17 @@ export default function SchedulingPage(): JSX.Element {
         />
       )}
 
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto w-full max-w-[1400px] space-y-8">
         {/* Header */}
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-6 sm:p-8 backdrop-blur-xl shadow-sm mb-6">
-          <div className="absolute left-1/2 top-1/2 h-full w-full -translate-x-1/2 -translate-y-1/2 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #94a3b8 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        <div className="group relative flex flex-col gap-6 overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] hover:bg-white/50 ring-1 ring-black/5 mb-8">
+          <div className="absolute inset-0 transition-opacity duration-1000 opacity-20 group-hover:opacity-40 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at center, #94a3b8 1.5px, transparent 1.5px)", backgroundSize: "32px 32px" }} /><div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/10 pointer-events-none" />
           <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 sm:gap-5 text-center sm:text-left w-full sm:w-auto">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-sky-50 shadow-inner text-indigo-600 border border-indigo-100">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-indigo-50 to-sky-50 shadow-[inset_0_2px_4px_rgba(255,255,255,0.8),0_8px_16px_-6px_rgba(79,70,229,0.2)] text-indigo-600 border border-white ring-1 ring-indigo-100 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
               <Calendar className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 sm:mb-2">Scheduling</h1>
-              <p className="text-sm sm:text-base font-medium text-slate-500 max-w-[280px] sm:max-w-none mx-auto sm:mx-0 leading-relaxed">Manage your booking pages and appointments</p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 sm:mb-2">{pageTitle}</h1>
+              <p className="text-sm sm:text-base font-medium text-slate-500 max-w-[280px] sm:max-w-none mx-auto sm:mx-0 leading-relaxed">{pageDescription}</p>
             </div>
           </div>
           <button
@@ -452,9 +555,9 @@ export default function SchedulingPage(): JSX.Element {
               setEditingApt(null)
               setShowAptForm(true)
             }}
-            className="relative z-10 flex w-full sm:w-auto items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
+            className="group/btn relative z-10 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-extrabold text-white shadow-[0_0_20px_-5px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_0_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 sm:w-auto ring-1 ring-indigo-500/50"
           >
-            <Plus className="h-4 w-4" /> New Appointment Type
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" /><Plus className="h-4 w-4 relative z-10" /> <span className="relative z-10">New Appointment Type</span>
           </button>
         </div>
 
@@ -468,7 +571,17 @@ export default function SchedulingPage(): JSX.Element {
                 <span className="ml-2 text-sm font-medium text-slate-500">{googleStatus.googleEmail}</span>
               )}
               {googleStatus.state === 'unavailable' && (
-                <span className="ml-2 text-xs text-amber-600">Status unavailable</span>
+                <span className="ml-2 text-xs text-amber-600">
+                  {googleStatusConfigError ? 'Configuration required' : 'Status unavailable'}
+                </span>
+              )}
+              {googleStatus.state === 'unavailable' && (
+                <p className="mt-1 text-xs leading-relaxed text-amber-700">
+                  {googleStatusConfigError ?? googleStatus.message}
+                  {googleStatusConfigError
+                    ? ' Add API_URL, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_STATE_SECRET to apps/api/.env and restart the API.'
+                    : ''}
+                </p>
               )}
             </div>
             {googleStatus.state === 'connected' ? (
@@ -487,31 +600,64 @@ export default function SchedulingPage(): JSX.Element {
                 Retry status
               </button>
             ) : (
-              <a
-                href={`${API_URL}/scheduling/google/connect`}
+              <button
+                type="button"
+                onClick={() => void handleGoogleConnect()}
+                disabled={googleLoading}
                 className="rounded-xl bg-indigo-600 px-4 py-2 text-[13px] font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
               >
                 <Settings2 className="inline h-3.5 w-3.5 mr-1" />
-                Connect Google Calendar
-              </a>
+                {googleLoading ? 'Connecting…' : 'Connect Google Calendar'}
+              </button>
             )}
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex w-fit gap-1 rounded-2xl bg-white/50 p-1.5 shadow-sm border border-slate-200/60 backdrop-blur-xl mb-6">
-          {(['types', 'bookings'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`relative rounded-[14px] px-6 py-2.5 text-sm font-bold transition-all ${tab === t ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'}`}
-            >
-              {t === 'types'
-                ? 'Appointment Types'
-                : `Upcoming Bookings${bookings.length > 0 ? ` (${bookings.length})` : ''}`}
-            </button>
-          ))}
-        </div>
+        {routeView ? (
+          <div className="flex flex-wrap gap-2 rounded-[24px] bg-white/40 p-2 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_2px_10px_-2px_rgba(0,0,0,0.05)] border border-white/60 backdrop-blur-2xl mb-8 relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-white/60 before:via-white/20 before:to-white/60 before:pointer-events-none before:rounded-[24px]">
+            {[
+              { href: schedulingBasePath, label: 'Overview', active: false },
+              {
+                href: `${schedulingBasePath}/appointment-types`,
+                label: 'Appointment Types',
+                active: routeView === 'appointment-types',
+              },
+              {
+                href: `${schedulingBasePath}/availability`,
+                label: 'Availability',
+                active: routeView === 'availability',
+              },
+              {
+                href: `${schedulingBasePath}/bookings`,
+                label: `Bookings${bookings.length > 0 ? ` (${bookings.length})` : ''}`,
+                active: routeView === 'bookings',
+              },
+            ].map(({ href, label, active }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`relative rounded-[14px] px-6 py-2.5 text-sm font-bold transition-all ${active ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex w-fit gap-1 rounded-2xl bg-white/50 p-1.5 shadow-sm border border-slate-200/60 backdrop-blur-xl mb-6">
+            {(['types', 'bookings'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`relative rounded-[18px] px-6 py-3 text-sm font-extrabold transition-all duration-500 ${tab === t ? "bg-white text-indigo-600 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] ring-1 ring-black/5 scale-[1.02]" : "text-slate-500 hover:text-slate-800 hover:bg-white/60 hover:shadow-sm"}`}
+              >
+                {t === 'types'
+                  ? 'Appointment Types'
+                  : `Upcoming Bookings${bookings.length > 0 ? ` (${bookings.length})` : ''}`}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-center py-16">
@@ -550,13 +696,23 @@ export default function SchedulingPage(): JSX.Element {
         {/* ── Appointment Types Tab ─────────────────────────────────────────── */}
         {!loading && !error && tab === 'types' && (
           <div className="space-y-4">
+            {isAvailabilityRoute && aptTypes.length > 0 && (
+              <div className="rounded-[24px] border border-sky-100 bg-sky-50/60 px-5 py-4 text-sm text-slate-600 shadow-inner backdrop-blur-md">
+                <p className="font-bold uppercase tracking-wider text-sky-700">Availability Setup</p>
+                <p className="mt-1">
+                  Availability is managed per appointment type. Choose a type below to edit its
+                  weekly hours and booking windows.
+                </p>
+              </div>
+            )}
             {aptTypes.length === 0 ? (
               <div className="relative mx-auto mt-8 max-w-2xl overflow-hidden rounded-[32px] border border-slate-200/60 bg-white/60 p-12 text-center shadow-sm backdrop-blur-xl">
                 <Calendar className="mx-auto mb-6 h-20 w-20 text-sky-400 opacity-80 drop-shadow-sm" />
                 <p className="text-xl font-extrabold text-slate-900 mb-2">No appointment types yet.</p>
                 <p className="mx-auto max-w-sm text-sm font-medium text-slate-500 mb-8">
-                  Create your first appointment type to start sharing booking links and collecting
-                  meetings.
+                  {isAvailabilityRoute
+                    ? 'Create an appointment type before setting availability windows.'
+                    : 'Create your first appointment type to start sharing booking links and collecting meetings.'}
                 </p>
                 <button
                   onClick={() => {
@@ -651,7 +807,7 @@ export default function SchedulingPage(): JSX.Element {
                         </button>
                         <button
                           title="Edit availability"
-                          onClick={() => setAvailEditorFor(apt)}
+                          onClick={() => openAvailabilityFor(apt)}
                           disabled={busy || deletingAppointmentTypeId !== null}
                           className="flex h-9 items-center justify-center rounded-xl bg-slate-50 px-3 text-[13px] font-bold text-slate-500 transition-all hover:bg-sky-50 hover:text-sky-600 active:scale-95 disabled:opacity-50"
                         >
