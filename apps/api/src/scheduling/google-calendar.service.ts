@@ -61,7 +61,7 @@ export class GoogleCalendarService {
 
   private getStateSecret(): string {
     this.ensureConfigured()
-    return this.stateSecret
+    return this.stateSecret!
   }
 
   private async fetchWithTimeout(

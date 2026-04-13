@@ -118,6 +118,7 @@ export interface CardFields {
   mapUrl: string
   avatarUrl: string
   logoUrl: string
+  bookingAppointmentSlug?: string
 }
 
 export type ButtonStyle = 'icon' | 'filled-icon' | 'icon-text' | 'filled-icon-text'

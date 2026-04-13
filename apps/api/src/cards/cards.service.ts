@@ -140,6 +140,17 @@ export class CardsService {
     if (typeof avatarUrl === 'string' && avatarUrl.trim() && !this.isTrustedAssetUrl(avatarUrl)) {
       record['avatarUrl'] = ''
     }
+    const bookingAppointmentSlug = record['bookingAppointmentSlug']
+    if (typeof bookingAppointmentSlug !== 'string') {
+      delete record['bookingAppointmentSlug']
+    } else {
+      const normalizedBookingSlug = bookingAppointmentSlug.trim()
+      if (!normalizedBookingSlug) {
+        delete record['bookingAppointmentSlug']
+      } else {
+        record['bookingAppointmentSlug'] = normalizedBookingSlug
+      }
+    }
     return record as Prisma.InputJsonValue
   }
 
@@ -619,19 +630,29 @@ export class CardsService {
     })
     if (!card) throw new NotFoundException('Card not found')
 
-    const bookableAppointment = await this.prisma.appointmentType.findFirst({
-      where: {
-        ownerUserId: card.userId,
-        isActive: true,
-        deletedAt: null,
-      },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: {
-        slug: true,
-        name: true,
-        durationMins: true,
-      },
-    })
+    const cardFields = (card.fields ?? {}) as Record<string, unknown>
+    const selectedBookingSlug =
+      typeof cardFields['bookingAppointmentSlug'] === 'string'
+        ? cardFields['bookingAppointmentSlug'].trim()
+        : ''
+
+    const bookableAppointment = selectedBookingSlug
+      ? await this.prisma.appointmentType.findUnique({
+          where: {
+            ownerUserId_slug: {
+              ownerUserId: card.userId,
+              slug: selectedBookingSlug,
+            },
+          },
+          select: {
+            slug: true,
+            name: true,
+            durationMins: true,
+            isActive: true,
+            deletedAt: true,
+          },
+        })
+      : null
 
     // Extract team brand from first team membership
     const firstMembership = card.user?.teamMemberships?.[0]
@@ -667,7 +688,16 @@ export class CardsService {
       ...publicCard,
       fields: this.sanitizeCardFields(publicCard.fields),
       teamBrand,
-      bookableAppointment,
+      bookableAppointment:
+        bookableAppointment &&
+        bookableAppointment.isActive &&
+        bookableAppointment.deletedAt === null
+          ? {
+              slug: bookableAppointment.slug,
+              name: bookableAppointment.name,
+              durationMins: bookableAppointment.durationMins,
+            }
+          : null,
     }
   }
 

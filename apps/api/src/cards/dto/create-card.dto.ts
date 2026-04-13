@@ -72,6 +72,11 @@ export class CardFieldsDto {
   @IsString()
   @MaxLength(500)
   avatarUrl?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  bookingAppointmentSlug?: string
 }
 
 export class CreateCardDto {
