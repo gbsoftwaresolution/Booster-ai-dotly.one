@@ -176,22 +176,22 @@ export default function PricingPage() {
             Business, Agency, and Enterprise plans will be published later.
           </p>
 
-          <div className="mt-12 inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/40 p-1.5 shadow-sm backdrop-blur-xl ring-1 ring-black/5">
+          <div className="relative mt-12 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/50 p-2 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] backdrop-blur-2xl ring-1 ring-black/5">
             {(['MONTHLY', 'SIX_MONTHS', 'ANNUAL'] as Duration[]).map((d) => (
               <button
                 key={d}
                 type="button"
                 onClick={() => setDuration(d)}
                 className={cn(
-                  'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                  'relative flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-500',
                   duration === d
-                    ? 'bg-gray-950 text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-800',
+                    ? 'bg-gradient-to-b from-gray-800 to-gray-950 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.1)_inset] scale-[1.02]'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-sm active:scale-[0.98]'
                 )}
               >
                 {DURATION_LABELS[d]}
                 {DURATION_SAVINGS[d] && (
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                  <span className="rounded-full border border-emerald-200/60 bg-gradient-to-br from-emerald-100 to-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em] text-emerald-600 shadow-[0_2px_4px_rgba(16,185,129,0.1)]">
                     {DURATION_SAVINGS[d]}
                   </span>
                 )}
