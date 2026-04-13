@@ -18,6 +18,9 @@ dist
 out
 build
 .next
+contracts/artifacts
+contracts/cache
+contracts/typechain-types
 
 # Expo / React Native
 .expo

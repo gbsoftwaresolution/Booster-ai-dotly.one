@@ -7,7 +7,9 @@
     "test": "hardhat test",
     "test:coverage": "hardhat coverage",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network polygon_amoy",
-    "deploy:mainnet": "hardhat run scripts/deploy.ts --network polygon"
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network polygon",
+    "deploy:vault:testnet": "hardhat run scripts/deploy-payment-vault.ts --network polygon_amoy",
+    "deploy:vault:arbitrum": "hardhat run scripts/deploy-payment-vault.ts --network arbitrum"
   },
   "devDependencies": {
     "hardhat": "^2.22.4",
