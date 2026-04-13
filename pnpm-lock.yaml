@@ -328,6 +328,9 @@ importers:
       dompurify:
         specifier: ^3.3.3
         version: 3.3.3
+      ethers:
+        specifier: ^6.16.0
+        version: 6.16.0
       jsqr:
         specifier: ^1.4.0
         version: 1.4.0
@@ -413,6 +416,9 @@ importers:
       '@types/node':
         specifier: ^20.14.2
         version: 20.19.39
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       hardhat:
         specifier: ^2.22.4
         version: 2.28.6(ts-node@10.9.2(@types/node@20.19.39)(typescript@5.9.3))(typescript@5.9.3)
@@ -5497,6 +5503,10 @@ packages:
 
   dotenv@16.4.7:
     resolution: {integrity: sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ==}
+    engines: {node: '>=12'}
+
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -16949,6 +16959,8 @@ snapshots:
   dotenv@16.4.5: {}
 
   dotenv@16.4.7: {}
+
+  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:
