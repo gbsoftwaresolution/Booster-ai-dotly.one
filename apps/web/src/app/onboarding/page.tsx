@@ -179,13 +179,15 @@ export default function OnboardingPage(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.12),transparent_28%),linear-gradient(180deg,#f8fbff_0%,#ffffff_48%,#f8fafc_100%)] px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl space-y-8">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50 via-white to-sky-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-indigo-400/20 blur-[100px]" />
+      <div className="absolute right-0 top-1/4 h-96 w-96 rounded-full bg-sky-400/20 blur-[100px]" />
+      <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-out fill-mode-both relative z-10 mx-auto max-w-4xl space-y-10">
         <div className="text-center">
-          <div className="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">
+          <div className="inline-flex items-center rounded-full bg-indigo-50/80 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.25em] text-indigo-600 ring-1 ring-inset ring-indigo-500/20 backdrop-blur-sm">
             Onboarding
           </div>
-          <h1 className="mt-4 text-4xl font-extrabold tracking-[-0.04em] text-gray-950">
+          <h1 className="mt-4 text-4xl font-extrabold tracking-tight text-gray-950 lg:text-5xl">
             Set up Dotly before you enter the workspace.
           </h1>
           <p className="mt-3 text-sm text-gray-500 sm:text-base">
@@ -203,11 +205,13 @@ export default function OnboardingPage(): JSX.Element {
               <div
                 key={item.key}
                 className={cn(
-                  'rounded-[24px] border px-4 py-4 text-left',
-                  isActive ? 'border-sky-200 bg-sky-50/70' : 'border-gray-200 bg-white',
+                  'rounded-[32px] border px-8 py-6 text-left transition-all duration-500',
+                  isActive
+                    ? 'border-indigo-200 bg-white/80 shadow-[0_12px_40px_-12px_rgba(79,70,229,0.15)] ring-1 ring-indigo-500/10 backdrop-blur-xl scale-[1.02]'
+                    : 'border-white/60 bg-white/40 shadow-sm backdrop-blur-md opacity-70',
                 )}
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-400">
                   Step {index + 1}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-gray-900">{item.title}</p>
@@ -223,9 +227,10 @@ export default function OnboardingPage(): JSX.Element {
         )}
 
         {step === 'profile' ? (
-          <div className="app-shell-surface rounded-[32px] p-6 sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="space-y-5">
+          <div className="group relative overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 sm:p-12 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-white/20 pointer-events-none" />
+            <div className="relative z-10 grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Complete your profile</h2>
                   <p className="mt-2 text-sm text-gray-500">
@@ -234,17 +239,17 @@ export default function OnboardingPage(): JSX.Element {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <label className="block text-sm font-semibold text-gray-700">Email</label>
                   <input
                     type="email"
                     value={email}
                     disabled
-                    className="mt-1 block w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500"
+                    className="mt-2 block w-full rounded-2xl border border-white/60 bg-white/40 px-5 py-4 text-sm text-gray-500 backdrop-blur-sm shadow-inner"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <label className="block text-sm font-semibold text-gray-700">Name</label>
                   <input
                     type="text"
                     value={name}
@@ -253,7 +258,7 @@ export default function OnboardingPage(): JSX.Element {
                       setProfileErrors((current) => ({ ...current, name: '' }))
                     }}
                     placeholder="Your full name"
-                    className="mt-1 block w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="mt-2 block w-full rounded-2xl border border-white/80 bg-white/80 px-5 py-4 text-sm text-gray-900 backdrop-blur-md shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all hover:bg-white"
                   />
                   {profileErrors.name && (
                     <p className="mt-1 text-xs text-red-600">{profileErrors.name}</p>
@@ -296,36 +301,41 @@ export default function OnboardingPage(): JSX.Element {
                   type="button"
                   onClick={() => void handleProfileContinue()}
                   disabled={profileSaving}
-                  className="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                  className="group/btn relative overflow-hidden rounded-[20px] bg-indigo-600 px-8 py-4.5 text-sm font-extrabold text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_12px_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 ring-1 ring-indigo-500/50 disabled:opacity-50 disabled:hover:scale-100"
                 >
-                  {profileSaving ? 'Saving profile...' : 'Continue to first card'}
+                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" />
+                  <span className="relative z-10">{profileSaving ? 'Saving profile...' : 'Continue to first card'}</span>
                 </button>
               </div>
 
-              <div className="rounded-[28px] border border-sky-100 bg-sky-50/70 p-5 text-sm text-sky-900">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">
-                  Why country matters
-                </p>
-                <p className="mt-3 leading-7">
-                  Your country helps Dotly show the right billing options and keeps product access
-                  aligned with regional availability.
-                </p>
-                <p className="mt-4 font-medium">Detected country</p>
-                <p className="mt-1 text-sky-700">{selectedCountryLabel}</p>
+              <div className="relative overflow-hidden h-fit rounded-[32px] border border-indigo-100/50 bg-gradient-to-br from-indigo-50/60 to-sky-50/60 p-8 text-sm text-indigo-950 shadow-inner backdrop-blur-md">
+                <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/40 blur-3xl" />
+                <div className="relative z-10">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-indigo-600">
+                    Why country matters
+                  </p>
+                  <p className="mt-4 leading-8">
+                    Your country helps Dotly show the right billing options and keeps product access
+                    aligned with regional availability.
+                  </p>
+                  <p className="mt-8 font-semibold uppercase tracking-wider text-[10px] text-indigo-400">Detected country</p>
+                  <p className="mt-1 text-lg font-bold text-indigo-900">{selectedCountryLabel}</p>
+                </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="app-shell-surface rounded-[32px] p-6 sm:p-8">
-            <div className="flex flex-col gap-3 text-center">
-              <h2 className="text-2xl font-bold text-gray-900">Create your first card</h2>
-              <p className="text-sm text-gray-500">
+          <div className="group relative overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 sm:p-12 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-white/20 pointer-events-none" />
+            <div className="relative z-10 flex flex-col gap-4 text-center">
+              <h2 className="text-3xl font-extrabold tracking-tight text-gray-950">Create your first card</h2>
+              <p className="mx-auto max-w-lg text-base font-medium text-gray-500">
                 Pick a template to create your first Dotly card. You can customize it after
                 onboarding.
               </p>
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <div className="relative z-10 mt-10 grid gap-4 sm:grid-cols-2">
               {TEMPLATES.map((template) => {
                 const active = selectedTemplate === template.id
                 return (
@@ -334,29 +344,28 @@ export default function OnboardingPage(): JSX.Element {
                     type="button"
                     onClick={() => setSelectedTemplate(template.id)}
                     className={cn(
-                      'rounded-[24px] border px-5 py-5 text-left transition',
+                      'group/card relative overflow-hidden rounded-[32px] border px-6 py-6 text-left transition-all duration-500',
                       active
-                        ? 'border-sky-300 bg-sky-50 shadow-sm'
-                        : 'border-gray-200 bg-white hover:border-gray-300',
+                        ? 'border-indigo-400 bg-white/80 shadow-[0_12px_40px_-12px_rgba(79,70,229,0.2)] ring-1 ring-indigo-500/20 scale-[1.02] backdrop-blur-xl'
+                        : 'border-white/60 bg-white/40 shadow-sm backdrop-blur-md opacity-70 hover:opacity-100 hover:bg-white/60 hover:-translate-y-1 hover:shadow-lg',
                     )}
                   >
-                    <p className="text-lg font-semibold text-gray-900">{template.label}</p>
-                    <p className="mt-2 text-sm text-gray-500">{template.description}</p>
+                    <p className="text-lg font-bold text-gray-900">{template.label}</p>
+                    <p className="mt-2 text-sm font-medium text-gray-500">{template.description}</p>
                   </button>
                 )
               })}
             </div>
 
-            <div className="mt-8 flex justify-center">
+            <div className="relative z-10 mt-10 flex justify-center">
               <button
                 type="button"
                 onClick={() => void handleCreateCard()}
                 disabled={cardSaving}
-                className="rounded-2xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                className="group/btn relative overflow-hidden rounded-[20px] bg-indigo-600 px-8 py-4.5 text-sm font-extrabold text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.4)] transition-all duration-500 hover:scale-105 hover:bg-indigo-500 hover:shadow-[0_12px_40px_-10px_rgba(79,70,229,0.7)] active:scale-95 ring-1 ring-indigo-500/50 disabled:opacity-50 disabled:hover:scale-100"
               >
-                {cardSaving
-                  ? 'Creating your first card...'
-                  : 'Create first card and enter dashboard'}
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-[200%]" />
+                <span className="relative z-10">{cardSaving ? 'Creating your first card...' : 'Create first card and enter dashboard'}</span>
               </button>
             </div>
           </div>
