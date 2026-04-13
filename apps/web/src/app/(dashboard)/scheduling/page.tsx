@@ -573,11 +573,11 @@ export default function SchedulingPage(): JSX.Element {
                 const bookingUrl = cardHandle ? `${webUrl}/book/${cardHandle}/${apt.slug}` : null
                 const busy = deletingAppointmentTypeId === apt.id
                 return (
-                  <div key={apt.id} className="group relative flex flex-col gap-4 rounded-[32px] border border-slate-200/60 bg-white/70 p-6 backdrop-blur-2xl transition-all hover:-translate-y-1 hover:shadow-xl hover:bg-white">
+                  <div key={apt.id} className="group relative flex flex-col gap-4 rounded-[32px] border border-white/40 bg-white/40 p-6 backdrop-blur-3xl transition-all duration-500 hover:-translate-y-2 hover:scale-[1.02] hover:bg-white/60 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:border-white/80 ring-1 ring-black/5 hover:ring-black/10">
                     <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                       <div className="flex w-full min-w-0 items-start gap-4 sm:w-auto sm:flex-1">
                         <div
-                          className="mt-0.5 h-10 w-10 flex-shrink-0 rounded-xl"
+                          className="mt-0.5 h-12 w-12 flex-shrink-0 rounded-[18px] shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_8px_16px_-6px_rgba(0,0,0,0.15)] ring-1 ring-black/5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
                           style={{ background: apt.color }}
                         />
                         <div>
