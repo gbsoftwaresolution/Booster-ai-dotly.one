@@ -22,6 +22,14 @@ const LEGACY_USER_SELECT = {
 
 type LegacyUserRecord = Prisma.UserGetPayload<{ select: typeof LEGACY_USER_SELECT }>
 
+const LEGACY_USER_PROFILE_COLUMNS = new Set([
+  'users.country',
+  'users.timezone',
+  'users.notifLeadCaptured',
+  'users.notifWeeklyDigest',
+  'users.notifProductUpdates',
+])
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name)
@@ -117,7 +125,7 @@ export class UsersService {
         ? String(error.meta.column)
         : ''
 
-    return column === 'users.country' || column === 'users.timezone'
+    return LEGACY_USER_PROFILE_COLUMNS.has(column)
   }
 
   private withMissingProfileColumns(user: LegacyUserRecord | null): User | null {
@@ -126,6 +134,9 @@ export class UsersService {
       ...user,
       country: null,
       timezone: null,
+      notifLeadCaptured: true,
+      notifWeeklyDigest: true,
+      notifProductUpdates: false,
     } as User
   }
 
