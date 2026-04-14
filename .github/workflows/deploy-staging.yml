@@ -38,18 +38,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     outputs:
-      preview-url: ${{ steps.deploy-web.outputs.preview-url }}
+      preview-url: ${{ steps.web-url.outputs.preview-url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy web to Vercel (staging/preview)
-        id: deploy-web
-        uses: amondnet/vercel-action@v25
+      - name: Deploy web to Railway (staging)
+        uses: bervProject/railway-deploy@main
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '' # No --prod flag → creates a preview deployment
-          working-directory: apps/web
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: dotly-web-staging
+      - name: Resolve staging web URL
+        id: web-url
+        run: echo "preview-url=${{ secrets.STAGING_WEB_URL }}" >> "$GITHUB_OUTPUT"
 
   smoke-test-staging:
     needs: [deploy-api-staging, deploy-web-staging]
@@ -73,7 +72,7 @@ jobs:
       - name: Validate staging web deployment URL
         run: |
           if [ -z "$STAGING_WEB_URL" ]; then
-            echo "Missing Vercel preview URL from deploy-web-staging"
+            echo "Missing STAGING_WEB_URL for deploy-web-staging"
             exit 1
           fi
           echo "Testing staging web at $STAGING_WEB_URL"

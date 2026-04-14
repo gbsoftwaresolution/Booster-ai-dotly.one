@@ -21,7 +21,7 @@
 | Sentry (API errors)   | https://sentry.io/organizations/dotly                                                          |
 | PostHog (Analytics)   | https://app.posthog.com                                                                        |
 | Railway (API hosting) | https://railway.app/project/dotly-api                                                          |
-| Vercel (Web hosting)  | https://vercel.com/dotly/web                                                                   |
+| Railway (Web hosting) | https://railway.app                                                                            |
 | Supabase (Auth/DB)    | https://app.supabase.com/project/dotly                                                         |
 | Redis Cloud           | https://app.redislabs.com                                                                      |
 | Mailgun               | https://app.mailgun.com                                                                        |
@@ -117,7 +117,7 @@
 
 ## Deployment
 
-### Web (Vercel)
+### Web (Railway)
 
 Deployments are triggered automatically on push to `main`.
 
@@ -128,11 +128,11 @@ pnpm --filter @dotly/web run verify
 ```
 
 ```bash
-# Manual deploy via Vercel CLI
-vercel --prod
+# Manual deploy via Railway CLI
+railway up --service dotly-web
 ```
 
-Vercel preview URLs are typically generated for Vercel-managed preview deployments; verify in the Vercel dashboard for the specific change.
+Use the configured staging web URL for preview validation, or verify the active deployment in the Railway dashboard.
 
 ### API (Railway)
 
@@ -155,11 +155,11 @@ Monitor deploy progress in Railway dashboard → Deployments.
 
 ## Rollback Procedure
 
-### Web (Vercel)
+### Web (Railway)
 
-1. Go to Vercel dashboard → Project → Deployments
+1. Go to Railway dashboard → dotly-web service → Deployments
 2. Find the last known-good deployment
-3. Click "..." → "Promote to Production"
+3. Trigger a rollback or redeploy that version
 4. Verify the health endpoint and smoke-test critical flows
 
 ### API (Railway)

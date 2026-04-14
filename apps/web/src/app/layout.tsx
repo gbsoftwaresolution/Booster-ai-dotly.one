@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import type { JSX } from 'react'
 import { AuthBoundary } from '@/components/AuthBoundary'
+import { PwaInstallPrompt } from '@/components/PwaInstallPrompt'
+import { PwaProvider } from '@/components/PwaProvider'
+import { PwaUpdatePrompt } from '@/components/PwaUpdatePrompt'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import {
   SITE_DESCRIPTION,
@@ -23,9 +26,17 @@ export const metadata: Metadata = {
   },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
+  manifest: '/manifest.webmanifest',
   metadataBase: getMetadataBase(),
   keywords: SITE_KEYWORDS,
   referrer: 'origin-when-cross-origin',
+  icons: {
+    icon: [
+      { url: '/api/pwa-icon?size=192', sizes: '192x192', type: 'image/png' },
+      { url: '/api/pwa-icon?size=512', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-icon', sizes: '180x180', type: 'image/png' }],
+  },
   alternates: {
     canonical: '/',
   },
@@ -89,13 +100,21 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: '#0ea5e9',
+  colorScheme: 'light',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <html lang="en" dir="ltr" className={`${inter.variable} ${plusJakartaSans.variable}`}>
       <body className="min-h-screen bg-background font-sans antialiased text-gray-950">
-        <PostHogProvider>{children}</PostHogProvider>
+        <PostHogProvider>
+          <PwaProvider>
+            {children}
+            <PwaUpdatePrompt />
+            <PwaInstallPrompt />
+          </PwaProvider>
+        </PostHogProvider>
         <AuthBoundary />
       </body>
     </html>

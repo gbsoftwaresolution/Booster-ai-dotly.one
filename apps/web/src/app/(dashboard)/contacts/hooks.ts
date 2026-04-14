@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { ItemsResponse } from '@dotly/types'
 import { apiDelete, apiDeleteWithBody, apiGet, apiPatch, ApiError, isApiError } from '@/lib/api'
+import { readCachedData, saveCachedData } from '@/lib/pwa/cache'
+import { incrementPwaMetric } from '@/lib/pwa/metrics'
+import { enqueueContactBulkStageMutation } from '@/lib/pwa/queue'
 import { getAccessToken } from '@/lib/supabase/client'
 import type {
   CardSummary,
@@ -28,12 +31,20 @@ export function useContactsMetadata() {
         if (!active) return
         setCards(cardsData.items)
         setAllTags(tagsData)
+        saveCachedData('contacts:metadata', { cards: cardsData.items, allTags: tagsData })
         setMetadataError(null)
       } catch (err) {
         if (!active) return
-        setMetadataError(
-          err instanceof Error ? err.message : 'Could not load filters and source cards.',
-        )
+        const cached = readCachedData<{ cards: CardSummary[]; allTags: string[] }>('contacts:metadata')
+        if (cached) {
+          setCards(cached.data.cards)
+          setAllTags(cached.data.allTags)
+          setMetadataError('Showing last synced filters while offline.')
+        } else {
+          setMetadataError(
+            err instanceof Error ? err.message : 'Could not load filters and source cards.',
+          )
+        }
       }
     })()
     return () => {
@@ -47,6 +58,7 @@ export function useContactsMetadata() {
 export function useBulkContactActions({
   selectedIds,
   setSelectedIds,
+  setContacts,
   loadContacts,
   page,
   setError,
@@ -54,6 +66,7 @@ export function useBulkContactActions({
 }: {
   selectedIds: Set<string>
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>
+  setContacts: React.Dispatch<React.SetStateAction<ContactRow[]>>
   loadContacts: (
     p?: number,
     s?: string,
@@ -78,11 +91,30 @@ export function useBulkContactActions({
       setSelectedIds(new Set())
       setBulkStage('')
       void loadContacts(page)
-    } catch {
+    } catch (err) {
+      if (!navigator.onLine || (isApiError(err) && err.statusCode === 0)) {
+        const queuedCount = enqueueContactBulkStageMutation({
+          ids: [...selectedIds],
+          stage: bulkStage,
+        })
+        setContacts((prev) =>
+          prev.map((contact) =>
+            selectedIds.has(contact.id)
+              ? { ...contact, crmPipeline: { stage: bulkStage } }
+              : contact,
+          ),
+        )
+        setSelectedIds(new Set())
+        setBulkStage('')
+        setError(
+          `You are offline. Stage change queued for sync. ${queuedCount} queued change${queuedCount === 1 ? '' : 's'} waiting.`,
+        )
+        return
+      }
+
       setError('Failed to update stage for selected contacts. Please try again.')
     }
-  }, [bulkStage, loadContacts, page, selectedIds, setError, setSelectedIds])
-
+  }, [bulkStage, loadContacts, page, selectedIds, setContacts, setError, setSelectedIds])
   const handleBulkDelete = useCallback(() => {
     setConfirmDialog({
       message: `Delete ${selectedIds.size} contact${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`,
@@ -245,12 +277,29 @@ export function useContactsLoader({
         const data = await apiGet<ContactsResponse>(`/contacts?${params.toString()}`, token)
         if (contactsRequestIdRef.current !== requestId) return
         setContacts(data.items)
+        saveCachedData(`contacts:list:${params.toString()}`, data)
         pruneSelection(data.items.map((contact) => contact.id))
         setTotal(data.total)
         setPage(data.page)
         setHasLoadedOnce(true)
       } catch (err) {
         if (contactsRequestIdRef.current !== requestId) return
+        const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) })
+        if (s) params.set('search', s)
+        if (stage !== 'ALL') params.set('stage', stage)
+        if (tag) params.set('tag', tag)
+        if (sort !== 'date') params.set('sortBy', sort)
+        const cached = readCachedData<ContactsResponse>(`contacts:list:${params.toString()}`)
+        if (cached && (!navigator.onLine || (isApiError(err) && err.statusCode === 0))) {
+          setContacts(cached.data.items)
+          pruneSelection(cached.data.items.map((contact) => contact.id))
+          setTotal(cached.data.total)
+          setPage(cached.data.page)
+          setHasLoadedOnce(true)
+          setError('Showing last synced contacts while offline.')
+          incrementPwaMetric('pwa_offline_contacts_fallback')
+          return
+        }
         if (isApiError(err) && (err.statusCode === 403 || err.statusCode === 401)) {
           setPermissionDenied(true)
           setError('You do not have permission to view contacts.')

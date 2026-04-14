@@ -23,8 +23,8 @@ function applyNoStoreHeaders<T extends Response>(request: NextRequest, response:
 
 function isPlatformHost(hostname: string): boolean {
   if (PLATFORM_HOSTNAMES.includes(hostname)) return true
-  // Allow all *.vercel.app subdomains
-  if (hostname.endsWith('.vercel.app')) return true
+  // Allow Railway-generated preview/custom subdomains for the platform app.
+  if (hostname.endsWith('.up.railway.app')) return true
   // Allow localhost with any port (e.g. localhost:3000)
   if (hostname.startsWith('localhost:')) return true
   return false
@@ -79,7 +79,10 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  let response = applyNoStoreHeaders(request, NextResponse.next({ request: { headers: request.headers } }))
+  let response = applyNoStoreHeaders(
+    request,
+    NextResponse.next({ request: { headers: request.headers } }),
+  )
 
   // ─── Referral cookie: ?ref=p_XXXXX ──────────────────────────────────────
   const refParam = request.nextUrl.searchParams.get('ref')
@@ -99,12 +102,18 @@ export async function middleware(request: NextRequest) {
       },
       set(name: string, value: string, options: CookieOptions) {
         request.cookies.set({ name, value, ...options })
-        response = applyNoStoreHeaders(request, NextResponse.next({ request: { headers: request.headers } }))
+        response = applyNoStoreHeaders(
+          request,
+          NextResponse.next({ request: { headers: request.headers } }),
+        )
         response.cookies.set({ name, value, ...options })
       },
       remove(name: string, options: CookieOptions) {
         request.cookies.set({ name, value: '', ...options })
-        response = applyNoStoreHeaders(request, NextResponse.next({ request: { headers: request.headers } }))
+        response = applyNoStoreHeaders(
+          request,
+          NextResponse.next({ request: { headers: request.headers } }),
+        )
         response.cookies.set({ name, value: '', ...options })
       },
     },

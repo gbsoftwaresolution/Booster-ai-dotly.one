@@ -116,7 +116,8 @@ export class AnalyticsController {
   ) {}
 
   private extractClientIp(req: Request): string | undefined {
-    const trustedProxyHint = req.headers['x-vercel-ip-country'] || req.headers['x-real-ip']
+    const trustedProxyHint =
+      req.headers['x-real-ip'] || req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country']
     if (trustedProxyHint) {
       const forwarded = req.headers['x-forwarded-for']
       const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded
@@ -144,7 +145,9 @@ export class AnalyticsController {
     }
 
     const ip = this.extractClientIp(req)
-    const country = req.headers['x-vercel-ip-country'] as string | undefined
+    const country =
+      (req.headers['cf-ipcountry'] as string | undefined) ??
+      (req.headers['x-vercel-ip-country'] as string | undefined)
     const ua = req.headers['user-agent'] ?? ''
     // Order matters: check tablet before mobile — many tablet UAs also contain
     // 'mobile' (e.g. "iPad; CPU OS … Mobile Safari"). A tablet match wins.

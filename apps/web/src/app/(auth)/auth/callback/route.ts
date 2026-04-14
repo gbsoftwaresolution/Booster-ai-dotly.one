@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getAppUrl, sanitizeNextPath } from '@/lib/app-url'
+import { sanitizeNextPath } from '@/lib/app-url'
 import { NextRequest, NextResponse } from 'next/server'
 
 // LOW-07: Allowlist regex for the Supabase PKCE authorization code.
@@ -16,12 +16,28 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const next = sanitizeNextPath(searchParams.get('next'), '/onboarding')
 
-  // F-01: Pin the origin to NEXT_PUBLIC_APP_URL rather than deriving it from
-  // `request.url`. The Host header can be spoofed by a reverse proxy or a
-  // malicious request, turning `new URL(request.url).origin` into an open
-  // redirect gadget. NEXT_PUBLIC_APP_URL is set at build time and is not
-  // attacker-controlled.
-  const origin = getAppUrl()
+  const configuredOrigin = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_WEB_URL)?.replace(
+    /\/$/,
+    '',
+  )
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const host = request.headers.get('host')
+  const externalHost = (forwardedHost ?? host)?.split(',')[0]?.trim()
+  const externalProto = forwardedProto?.split(',')[0]?.trim() || request.nextUrl.protocol.replace(/:$/, '')
+  const requestOrigin = externalHost
+    ? `${externalProto}://${externalHost}`.replace(/\/$/, '')
+    : request.nextUrl.origin.replace(/\/$/, '')
+  const configuredHostname = configuredOrigin ? new URL(configuredOrigin).hostname : null
+  const requestHostname = externalHost?.split(':')[0] ?? request.nextUrl.hostname
+  const shouldPreferRequestOrigin =
+    !configuredOrigin ||
+    configuredHostname === 'localhost' ||
+    configuredHostname === '127.0.0.1' ||
+    requestHostname.endsWith('.up.railway.app') ||
+    requestHostname === 'localhost' ||
+    requestHostname === '127.0.0.1'
+  const origin = shouldPreferRequestOrigin ? requestOrigin : configuredOrigin
   const failureRedirectUrl = new URL('/auth', origin)
   if (next !== '/dashboard') {
     failureRedirectUrl.searchParams.set('next', next)

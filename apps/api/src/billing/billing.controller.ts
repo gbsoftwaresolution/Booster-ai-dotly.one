@@ -79,6 +79,14 @@ class BillingSummaryQueryDto {
   countryCode?: string
 }
 
+class HostedCheckoutQuoteQueryDto {
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'paymentId must be a valid 32-byte hex string prefixed with 0x',
+  })
+  paymentId!: string
+}
+
 class AdminRefundDto {
   @IsString()
   @Matches(/^0x[a-fA-F0-9]{64}$/, {
@@ -146,6 +154,34 @@ export class BillingController {
       dto.txHash,
       dto.chainId,
     )
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('checkout/hosted/activate')
+  activateHostedCheckoutOrder(@Body() dto: ActivateBoosterAiOrderDto) {
+    return this.billingService.activateCheckoutOrderForPendingSubscription(
+      dto.paymentId,
+      dto.txHash,
+      dto.chainId,
+    )
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Get('checkout/hosted')
+  getHostedCheckoutQuote(@Query() query: HostedCheckoutQuoteQueryDto) {
+    return this.billingService.getHostedCheckoutQuote(query.paymentId)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Get('checkout/hosted/status')
+  getHostedCheckoutStatus(@Query() query: HostedCheckoutQuoteQueryDto) {
+    return this.billingService.getHostedCheckoutStatus(query.paymentId)
   }
 
   @UseGuards(ThrottlerGuard)

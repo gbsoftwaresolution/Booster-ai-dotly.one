@@ -18,6 +18,7 @@ import {
   Users,
   UsersRound,
   Webhook,
+  Smartphone,
 } from 'lucide-react'
 
 export interface DashboardNavItem {
@@ -82,6 +83,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
     section: 'Administration',
     minPlan: 'BUSINESS',
   },
+  { href: '/settings/pwa', label: 'PWA Insights', icon: Smartphone, section: 'Administration' },
   {
     href: '/settings/webhooks',
     label: 'Webhooks',

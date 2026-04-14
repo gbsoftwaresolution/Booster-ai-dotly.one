@@ -1,5 +1,6 @@
-import type { Duration, PlanId } from './types'
+import type { CreateOrderResponse, Duration, PlanId } from './types'
 import { BILLING_PLAN_PRICES } from '@/lib/billing-plans'
+import { getAppUrl } from '@/lib/app-url'
 
 export const PAID_PLANS: PlanId[] = ['STARTER', 'PRO']
 
@@ -60,6 +61,12 @@ export function buildPayDeepLink(params: { paymentVaultAddress: string; chainId:
   return `ethereum:${paymentVaultAddress}@${chainId}`
 }
 
+export function buildHostedCheckoutUrl(params: { order: CreateOrderResponse }): string {
+  const searchParams = new URLSearchParams({ paymentId: params.order.paymentId })
+
+  return `${getAppUrl()}/pay/crypto?${searchParams.toString()}`
+}
+
 export function readRefCookie(): string | undefined {
   if (typeof document === 'undefined') return undefined
 
@@ -112,7 +119,9 @@ async function getWalletChainId(): Promise<number> {
   const chainId = parseWalletChainId(await window.ethereum.request({ method: 'eth_chainId' }))
   if (chainId !== null) return chainId
 
-  const fallbackChainId = parseWalletChainId(await window.ethereum.request({ method: 'net_version' }))
+  const fallbackChainId = parseWalletChainId(
+    await window.ethereum.request({ method: 'net_version' }),
+  )
   if (fallbackChainId !== null) return fallbackChainId
 
   throw new Error('Could not determine the connected wallet network.')
@@ -133,7 +142,9 @@ export async function ensureWalletChain(requiredChainId: number): Promise<number
       throw new Error('Wallet network switch was cancelled.')
     }
     if (code === 4902) {
-      throw new Error('Arbitrum One is not available in this wallet. Add the network and try again.')
+      throw new Error(
+        'Arbitrum One is not available in this wallet. Add the network and try again.',
+      )
     }
   }
 

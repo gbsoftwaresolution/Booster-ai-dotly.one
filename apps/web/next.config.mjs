@@ -91,6 +91,19 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../..'),
   allowedDevOrigins: collectAllowedDevOrigins(),
   transpilePackages: ['@dotly/ui', '@dotly/types'],
+  async headers() {
+    return [
+      {
+        source: '/service-worker.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+    ]
+  },
   images: {
     remotePatterns: [
       // Only allow the explicitly configured R2 hostname — never a wildcard.

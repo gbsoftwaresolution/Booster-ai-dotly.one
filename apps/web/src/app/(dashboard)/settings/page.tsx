@@ -5,6 +5,7 @@ import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch } from '@/lib/api'
+import { enqueueNotificationPrefsMutation } from '@/lib/pwa/queue'
 import type { BillingSummaryResponse, UserMeResponse } from '@dotly/types'
 import {
   BillingTabContent,
@@ -45,6 +46,7 @@ export default function SettingsPage(): JSX.Element {
   const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(getInitialNotifPrefs)
   const [notifSaving, setNotifSaving] = useState(false)
   const [notifSaved, setNotifSaved] = useState(false)
+  const [notifSavedMessage, setNotifSavedMessage] = useState('Preferences saved.')
   const [notifError, setNotifError] = useState<string | null>(null)
 
   const [billing, setBilling] = useState<BillingSummaryResponse | null>(null)
@@ -157,14 +159,31 @@ export default function SettingsPage(): JSX.Element {
     setNotifSaving(true)
     setNotifError(null)
     try {
+      const payload = {
+        notifLeadCaptured: notifPrefs.leadCaptured,
+        notifWeeklyDigest: notifPrefs.weeklyDigest,
+        notifProductUpdates: notifPrefs.productUpdates,
+      }
+
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        const queuedCount = enqueueNotificationPrefsMutation(payload)
+        try {
+          localStorage.setItem('dotly:notification_prefs', JSON.stringify(notifPrefs))
+        } catch {
+          /* ignore */
+        }
+        setNotifSavedMessage(
+          `Preferences saved offline. ${queuedCount} queued change${queuedCount === 1 ? '' : 's'} will sync when you reconnect.`,
+        )
+        setNotifSaved(true)
+        setTimeout(() => setNotifSaved(false), 4000)
+        return
+      }
+
       const token = await getToken()
       await apiPatch(
         '/users/me',
-        {
-          notifLeadCaptured: notifPrefs.leadCaptured,
-          notifWeeklyDigest: notifPrefs.weeklyDigest,
-          notifProductUpdates: notifPrefs.productUpdates,
-        },
+        payload,
         token,
       )
 
@@ -173,10 +192,26 @@ export default function SettingsPage(): JSX.Element {
       } catch {
         /* ignore */
       }
+      setNotifSavedMessage('Preferences saved.')
       setNotifSaved(true)
       setTimeout(() => setNotifSaved(false), 3000)
     } catch {
-      setNotifError('Could not save notification preferences. Please retry.')
+      const queuedCount = enqueueNotificationPrefsMutation({
+        notifLeadCaptured: notifPrefs.leadCaptured,
+        notifWeeklyDigest: notifPrefs.weeklyDigest,
+        notifProductUpdates: notifPrefs.productUpdates,
+      })
+      try {
+        localStorage.setItem('dotly:notification_prefs', JSON.stringify(notifPrefs))
+      } catch {
+        /* ignore */
+      }
+      setNotifSavedMessage(
+        `Saved locally while offline. ${queuedCount} queued change${queuedCount === 1 ? '' : 's'} will retry automatically.`,
+      )
+      setNotifSaved(true)
+      setTimeout(() => setNotifSaved(false), 4000)
+      setNotifError(null)
     } finally {
       setNotifSaving(false)
     }
@@ -244,6 +279,7 @@ export default function SettingsPage(): JSX.Element {
           <NotificationsTabContent
             notifPrefs={notifPrefs}
             notifSaved={notifSaved}
+            notifSavedMessage={notifSavedMessage}
             notifError={notifError}
             notifSaving={notifSaving}
             onChange={setNotifPrefs}

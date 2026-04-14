@@ -313,6 +313,12 @@ export interface BillingCheckoutQuoteResponse {
   chainId: number
 }
 
+export interface BillingHostedCheckoutQuoteResponse extends BillingCheckoutQuoteResponse {
+  plan: string
+  duration: string
+  walletAddress: string
+}
+
 export interface BillingActivateCheckoutDto {
   paymentId: string
   txHash: string
@@ -322,6 +328,21 @@ export interface BillingActivateCheckoutDto {
 export interface BillingActivateCheckoutResponse {
   status: 'ACTIVE' | 'PENDING' | 'CANCELLED'
   plan: string
+  currentPeriodEnd: string | null
+}
+
+export interface BillingActivateHostedCheckoutDto {
+  paymentId: string
+  txHash: string
+  chainId: number
+}
+
+export interface BillingHostedCheckoutStatusResponse {
+  paymentId: string
+  status: 'PENDING' | 'PAID' | 'ACTIVE' | 'REFUNDED' | 'EXPIRED'
+  paid: boolean
+  activated: boolean
+  txHash: string | null
   currentPeriodEnd: string | null
 }
 

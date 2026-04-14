@@ -1,6 +1,7 @@
 import type {
   BillingActivateCheckoutResponse,
   BillingCheckoutQuoteResponse,
+  BillingHostedCheckoutStatusResponse,
   BillingRefundRequestResponse,
   BillingSummaryResponse,
 } from '@dotly/types'
@@ -14,15 +15,19 @@ export type CreateOrderResponse = BillingCheckoutQuoteResponse
 
 export type ActivateOrderResponse = BillingActivateCheckoutResponse
 
+export type HostedCheckoutStatusResponse = BillingHostedCheckoutStatusResponse
+
 export type RefundRequestResponse = BillingRefundRequestResponse
 
 export interface NoWalletOrder {
-  approveLink: string
-  payLink: string
+  checkoutUrl: string
   amountUsdt: string
   paymentId: string
   chainId: number
   txHash: string | null
+  createdAtMs: number
+  expiresAtMs: number
+  lastStatus: HostedCheckoutStatusResponse['status']
 }
 
 declare global {

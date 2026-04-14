@@ -18,8 +18,7 @@ import {
 } from '../components'
 import {
   ensureWalletChain,
-  buildApproveDeepLink,
-  buildPayDeepLink,
+  buildHostedCheckoutUrl,
   ERC20_APPROVE_SELECTOR,
   formatExpiryDate,
   getFocusMessage,
@@ -32,11 +31,15 @@ import type {
   ActivateOrderResponse,
   CreateOrderResponse,
   Duration,
+  HostedCheckoutStatusResponse,
   NoWalletOrder,
   PlanId,
   RefundRequestResponse,
   SubscriptionData,
 } from '../types'
+
+const HOSTED_LINK_TTL_MS = 5 * 60 * 1000
+const HOSTED_LINK_POLL_MS = 10 * 1000
 
 export default function BillingSettingsPage(): JSX.Element {
   const searchParams = useSearchParams()
@@ -55,6 +58,7 @@ export default function BillingSettingsPage(): JSX.Element {
   const [requestingManualRefund, setRequestingManualRefund] = useState(false)
   const [subscribeStep, setSubscribeStep] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   const [noWalletOrder, setNoWalletOrder] = useState<NoWalletOrder | null>(null)
   const [noWalletActivating, setNoWalletActivating] = useState(false)
@@ -64,6 +68,18 @@ export default function BillingSettingsPage(): JSX.Element {
     setHasWallet(Boolean(window.ethereum && typeof window.ethereum.request === 'function'))
     setDetectedCountry(detectBrowserCountry())
   }, [])
+
+  useEffect(() => {
+    if (!noWalletOrder) return
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [noWalletOrder])
 
   useEffect(() => {
     const planParam = searchParams.get('plan')
@@ -111,6 +127,85 @@ export default function BillingSettingsPage(): JSX.Element {
     void fetchSubscription()
   }, [fetchSubscription])
 
+  useEffect(() => {
+    if (!noWalletOrder) return
+
+    let cancelled = false
+
+    const checkStatus = async () => {
+      try {
+        const status = await apiGet<HostedCheckoutStatusResponse>(
+          `/billing/checkout/hosted/status?paymentId=${encodeURIComponent(noWalletOrder.paymentId)}`,
+        )
+
+        if (cancelled) return
+
+        setNoWalletOrder((current) =>
+          current && current.paymentId === noWalletOrder.paymentId
+            ? { ...current, lastStatus: status.status, txHash: current.txHash ?? status.txHash }
+            : current,
+        )
+
+        if (status.activated || status.status === 'ACTIVE') {
+          setSuccessMsg('Crypto payment confirmed and your plan is active.')
+          setTimeout(() => setSuccessMsg(null), 6_000)
+          setNoWalletOrder(null)
+          void fetchSubscription()
+          return
+        }
+
+        if (status.paid && status.txHash) {
+          const token = await getToken()
+          if (!token || cancelled) return
+
+          try {
+            const activated = await apiPost<ActivateOrderResponse>(
+              '/billing/checkout/activate',
+              {
+                paymentId: noWalletOrder.paymentId,
+                txHash: status.txHash,
+                chainId: noWalletOrder.chainId,
+              },
+              token,
+            )
+
+            if (cancelled) return
+
+            if (activated.status === 'ACTIVE') {
+              setSuccessMsg('Crypto payment confirmed and your plan is active.')
+              setTimeout(() => setSuccessMsg(null), 6_000)
+              setNoWalletOrder(null)
+              void fetchSubscription()
+              return
+            }
+          } catch {
+            // Keep polling until activation becomes available.
+          }
+        }
+
+        if (Date.now() >= noWalletOrder.expiresAtMs && status.status === 'PENDING') {
+          setNoWalletOrder((current) =>
+            current && current.paymentId === noWalletOrder.paymentId
+              ? { ...current, lastStatus: 'EXPIRED' }
+              : current,
+          )
+        }
+      } catch {
+        // Keep the manual fallback available on transient failures.
+      }
+    }
+
+    void checkStatus()
+    const intervalId = window.setInterval(() => {
+      void checkStatus()
+    }, HOSTED_LINK_POLL_MS)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [fetchSubscription, getToken, noWalletOrder])
+
   const connectWallet = async () => {
     if (!window.ethereum) {
       setError('No wallet detected. Install MetaMask or use the mobile deep-link flow below.')
@@ -156,20 +251,14 @@ export default function BillingSettingsPage(): JSX.Element {
         token,
       )
       setNoWalletOrder({
-        approveLink: buildApproveDeepLink({
-          usdtTokenAddress: order.usdtTokenAddress,
-          paymentVaultAddress: order.paymentVaultAddress,
-          amountRaw: BigInt(order.amountRaw),
-          chainId: order.chainId,
-        }),
-        payLink: buildPayDeepLink({
-          paymentVaultAddress: order.paymentVaultAddress,
-          chainId: order.chainId,
-        }),
+        checkoutUrl: buildHostedCheckoutUrl({ order }),
         amountUsdt: order.amountUsdt,
         paymentId: order.paymentId,
         chainId: order.chainId,
         txHash: null,
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + HOSTED_LINK_TTL_MS,
+        lastStatus: 'PENDING',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create order.')
@@ -478,6 +567,7 @@ export default function BillingSettingsPage(): JSX.Element {
             selectedPrice={selectedPrice}
             subscribeStep={subscribeStep}
             noWalletOrder={noWalletOrder}
+            nowMs={nowMs}
             noWalletActivating={noWalletActivating}
             walletAddress={walletAddress}
             hasWallet={hasWallet}

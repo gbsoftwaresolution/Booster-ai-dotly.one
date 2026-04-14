@@ -19,8 +19,7 @@ import {
 } from './components'
 import {
   ensureWalletChain,
-  buildApproveDeepLink,
-  buildPayDeepLink,
+  buildHostedCheckoutUrl,
   ERC20_APPROVE_SELECTOR,
   formatExpiryDate,
   getFocusMessage,
@@ -33,11 +32,15 @@ import type {
   ActivateOrderResponse,
   CreateOrderResponse,
   Duration,
+  HostedCheckoutStatusResponse,
   NoWalletOrder,
   PlanId,
   RefundRequestResponse,
   SubscriptionData,
 } from './types'
+
+const HOSTED_LINK_TTL_MS = 5 * 60 * 1000
+const HOSTED_LINK_POLL_MS = 10 * 1000
 
 export default function BillingSettingsPage(): JSX.Element {
   const router = useRouter()
@@ -57,6 +60,7 @@ export default function BillingSettingsPage(): JSX.Element {
   const [requestingManualRefund, setRequestingManualRefund] = useState(false)
   const [subscribeStep, setSubscribeStep] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   const [noWalletOrder, setNoWalletOrder] = useState<NoWalletOrder | null>(null)
   const [noWalletActivating, setNoWalletActivating] = useState(false)
@@ -66,6 +70,18 @@ export default function BillingSettingsPage(): JSX.Element {
     setHasWallet(Boolean(window.ethereum && typeof window.ethereum.request === 'function'))
     setDetectedCountry(detectBrowserCountry())
   }, [])
+
+  useEffect(() => {
+    if (!noWalletOrder) return
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [noWalletOrder])
 
   useEffect(() => {
     const planParam = searchParams.get('plan')
@@ -102,8 +118,10 @@ export default function BillingSettingsPage(): JSX.Element {
       const data = await apiGet<SubscriptionData>(`/billing${query}`, token)
       setSubscription(data)
       setWalletAddress(data?.walletAddress ?? null)
+      return data
     } catch {
       setError('Failed to load subscription data.')
+      return null
     } finally {
       setLoading(false)
     }
@@ -112,6 +130,127 @@ export default function BillingSettingsPage(): JSX.Element {
   useEffect(() => {
     void fetchSubscription()
   }, [fetchSubscription])
+
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment')
+    const paymentId = searchParams.get('paymentId')
+
+    if (paymentStatus !== 'success' || !paymentId) {
+      return
+    }
+
+    let cancelled = false
+
+    const refreshAfterHostedCheckout = async () => {
+      try {
+        const refreshed = await fetchSubscription()
+        if (cancelled) return
+
+        setSuccessMsg(
+          refreshed?.boosterAiOrderId === paymentId && refreshed?.status === 'ACTIVE'
+            ? 'Crypto payment confirmed and your plan is active.'
+            : 'Crypto payment submitted. Billing has been refreshed.',
+        )
+        setTimeout(() => setSuccessMsg(null), 6_000)
+      } catch {
+        if (!cancelled) {
+          setSuccessMsg(
+            'Returned from wallet checkout. Refresh billing status in a moment if needed.',
+          )
+          setTimeout(() => setSuccessMsg(null), 6_000)
+        }
+      } finally {
+        if (!cancelled) {
+          router.replace('/settings/billing')
+        }
+      }
+    }
+
+    void refreshAfterHostedCheckout()
+
+    return () => {
+      cancelled = true
+    }
+  }, [fetchSubscription, router, searchParams])
+
+  useEffect(() => {
+    if (!noWalletOrder) return
+
+    let cancelled = false
+
+    const checkStatus = async () => {
+      try {
+        const status = await apiGet<HostedCheckoutStatusResponse>(
+          `/billing/checkout/hosted/status?paymentId=${encodeURIComponent(noWalletOrder.paymentId)}`,
+        )
+
+        if (cancelled) return
+
+        setNoWalletOrder((current) =>
+          current && current.paymentId === noWalletOrder.paymentId
+            ? { ...current, lastStatus: status.status, txHash: current.txHash ?? status.txHash }
+            : current,
+        )
+
+        if (status.activated || status.status === 'ACTIVE') {
+          setSuccessMsg('Crypto payment confirmed and your plan is active.')
+          setTimeout(() => setSuccessMsg(null), 6_000)
+          setNoWalletOrder(null)
+          void fetchSubscription()
+          return
+        }
+
+        if (status.paid && status.txHash) {
+          const token = await getToken()
+          if (!token || cancelled) return
+
+          try {
+            const activated = await apiPost<ActivateOrderResponse>(
+              '/billing/checkout/activate',
+              {
+                paymentId: noWalletOrder.paymentId,
+                txHash: status.txHash,
+                chainId: noWalletOrder.chainId,
+              },
+              token,
+            )
+
+            if (cancelled) return
+
+            if (activated.status === 'ACTIVE') {
+              setSuccessMsg('Crypto payment confirmed and your plan is active.')
+              setTimeout(() => setSuccessMsg(null), 6_000)
+              setNoWalletOrder(null)
+              void fetchSubscription()
+              return
+            }
+          } catch {
+            // Keep polling until activation becomes available.
+          }
+        }
+
+        if (Date.now() >= noWalletOrder.expiresAtMs && status.status === 'PENDING') {
+          setNoWalletOrder((current) =>
+            current && current.paymentId === noWalletOrder.paymentId
+              ? { ...current, lastStatus: 'EXPIRED' }
+              : current,
+          )
+        }
+      } catch {
+        // Keep the manual fallback available on transient failures.
+      }
+    }
+
+    void checkStatus()
+    const intervalId = window.setInterval(() => {
+      void checkStatus()
+    }, HOSTED_LINK_POLL_MS)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [fetchSubscription, getToken, noWalletOrder])
 
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -158,20 +297,14 @@ export default function BillingSettingsPage(): JSX.Element {
         token,
       )
       setNoWalletOrder({
-        approveLink: buildApproveDeepLink({
-          usdtTokenAddress: order.usdtTokenAddress,
-          paymentVaultAddress: order.paymentVaultAddress,
-          amountRaw: BigInt(order.amountRaw),
-          chainId: order.chainId,
-        }),
-        payLink: buildPayDeepLink({
-          paymentVaultAddress: order.paymentVaultAddress,
-          chainId: order.chainId,
-        }),
+        checkoutUrl: buildHostedCheckoutUrl({ order }),
         amountUsdt: order.amountUsdt,
         paymentId: order.paymentId,
         chainId: order.chainId,
         txHash: null,
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + HOSTED_LINK_TTL_MS,
+        lastStatus: 'PENDING',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create order.')
@@ -457,16 +590,22 @@ export default function BillingSettingsPage(): JSX.Element {
       ) : (
         <div className="flex flex-col xl:flex-row items-start gap-8 xl:gap-12 w-full mt-4 xl:mt-8">
           <div className="flex min-w-0 w-full flex-1 flex-col gap-8 sm:gap-12">
-          <CurrentPlanCard
-            currentPlan={currentPlan}
-            currentStatus={currentStatus}
-            subscription={subscription}
-            expiryDate={expiryDate}
-          />
+            <CurrentPlanCard
+              currentPlan={currentPlan}
+              currentStatus={currentStatus}
+              subscription={subscription}
+              expiryDate={expiryDate}
+            />
 
-            
-
-            
+            <WalletCard
+              walletAddress={walletAddress}
+              hasWallet={hasWallet}
+              connectingWallet={connectingWallet}
+              onConnectWallet={() => void connectWallet()}
+              onManualWalletChange={(value) => setWalletAddress(value.trim() || null)}
+              cryptoBlocked={cryptoBlocked}
+              billingCountry={billingCountry}
+            />
 
             <RefundCard
               subscription={subscription}
@@ -489,38 +628,44 @@ export default function BillingSettingsPage(): JSX.Element {
           </div>
           <div className="w-full xl:w-[460px] 2xl:w-[500px] shrink-0 xl:sticky xl:top-24 min-w-0">
             <UpgradePlanCard
-            currentPlan={currentPlan}
-            selectedPlan={selectedPlan}
-            selectedDuration={selectedDuration}
-            selectedPrice={selectedPrice}
-            subscribeStep={subscribeStep}
-            noWalletOrder={noWalletOrder}
-            noWalletActivating={noWalletActivating}
-            walletAddress={walletAddress}
-            hasWallet={hasWallet}
-            subscribing={subscribing}
-            onConnectWallet={() => void connectWallet()}
-            onSelectPlan={setSelectedPlan}
-            onSelectDuration={setSelectedDuration}
-            onActivateNoWallet={() => void handleNoWalletActivate()}
-            onNoWalletTxHashChange={(value) =>
-              setNoWalletOrder((current) =>
-                current ? { ...current, txHash: value.trim() || null } : current,
-              )
-            }
-            onGeneratePaymentLinks={() => {
-              if (!walletAddress) return
-              void handleNoWalletSubscribe(walletAddress)
-            }}
-            onSubscribe={() => void handleSubscribe()}
-            onOpenCheckout={() => {
-              router.push(
-                `/settings/billing/checkout?plan=${selectedPlan}&duration=${selectedDuration}`,
-              )
-            }}
-            cryptoBlocked={cryptoBlocked}
-            billingCountry={billingCountry}
-          />
+              currentPlan={currentPlan}
+              selectedPlan={selectedPlan}
+              selectedDuration={selectedDuration}
+              selectedPrice={selectedPrice}
+              subscribeStep={subscribeStep}
+              noWalletOrder={noWalletOrder}
+              nowMs={nowMs}
+              noWalletActivating={noWalletActivating}
+              walletAddress={walletAddress}
+              hasWallet={hasWallet}
+              subscribing={subscribing}
+              onConnectWallet={() => void connectWallet()}
+              onSelectPlan={setSelectedPlan}
+              onSelectDuration={setSelectedDuration}
+              onActivateNoWallet={() => void handleNoWalletActivate()}
+              onNoWalletTxHashChange={(value) =>
+                setNoWalletOrder((current) =>
+                  current ? { ...current, txHash: value.trim() || null } : current,
+                )
+              }
+              onGeneratePaymentLinks={() => {
+                if (!walletAddress) {
+                  router.push(
+                    `/settings/billing/checkout?plan=${selectedPlan}&duration=${selectedDuration}`,
+                  )
+                  return
+                }
+                void handleNoWalletSubscribe(walletAddress)
+              }}
+              onSubscribe={() => void handleSubscribe()}
+              onOpenCheckout={() => {
+                router.push(
+                  `/settings/billing/checkout?plan=${selectedPlan}&duration=${selectedDuration}`,
+                )
+              }}
+              cryptoBlocked={cryptoBlocked}
+              billingCountry={billingCountry}
+            />
           </div>
         </div>
       )}

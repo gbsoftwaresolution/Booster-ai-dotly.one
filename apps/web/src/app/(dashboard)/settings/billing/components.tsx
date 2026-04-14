@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { JSX } from 'react'
 import {
   ExternalLink,
@@ -105,7 +106,9 @@ export function BillingHero({
   return (
     <div className="group relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <div
-        className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-sky-500/5 pointer-events-none" aria-hidden="true" />
+        className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-sky-500/5 pointer-events-none"
+        aria-hidden="true"
+      />
       <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none" />
       <div className="absolute right-0 top-1/4 h-96 w-96 rounded-full bg-sky-400/10 blur-[100px] pointer-events-none" />
       <div className="relative z-10 flex flex-col gap-8 xl:grid xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
@@ -165,7 +168,8 @@ export function BillingHero({
                 Subscription health at a glance
               </p>
             </div>
-            <span className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 shadow-sm border border-indigo-100"><span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 shadow-sm border border-indigo-100">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
               {loading ? 'Syncing' : 'Live'}
             </span>
           </div>
@@ -249,7 +253,7 @@ export function CurrentPlanCard({
   return (
     <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <h2 className="text-xl font-bold tracking-tight text-gray-950">Current Plan</h2>
-      
+
       <div className="mt-8 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5 overflow-x-auto w-full">
         <table className="w-full min-w-[320px] sm:min-w-full text-left text-sm whitespace-nowrap">
           <thead>
@@ -260,11 +264,21 @@ export function CurrentPlanCard({
           </thead>
           <tbody className="divide-y divide-gray-100/60">
             {FEATURES.map((row, i) => (
-              <tr key={row.label} className={i % 2 === 0 ? "bg-white/40" : "bg-transparent"}>
+              <tr key={row.label} className={i % 2 === 0 ? 'bg-white/40' : 'bg-transparent'}>
                 <td className="px-5 py-3 font-medium text-gray-600">{row.label}</td>
                 <td className="px-4 py-3 text-center">
                   {row.current === true ? (
-                    <svg className="mx-auto h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                    <svg
+                      className="mx-auto h-5 w-5 text-indigo-500"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   ) : row.current === false ? (
                     <span className="text-gray-300 mx-auto block w-5 text-center">-</span>
                   ) : (
@@ -314,7 +328,13 @@ export function CurrentPlanCard({
       )}
       {subscription?.boosterAiOrderId && (
         <p className="mt-1 font-mono text-xs text-gray-400">
-          Order: <span className="inline-block align-bottom max-w-[100px] sm:max-w-none truncate" title={subscription.boosterAiOrderId}>{subscription.boosterAiOrderId}</span>
+          Order:{' '}
+          <span
+            className="inline-block align-bottom max-w-[100px] sm:max-w-none truncate"
+            title={subscription.boosterAiOrderId}
+          >
+            {subscription.boosterAiOrderId}
+          </span>
         </p>
       )}
       {currentPlan === 'FREE' && (
@@ -458,6 +478,7 @@ export function UpgradePlanCard({
   selectedPrice,
   subscribeStep,
   noWalletOrder,
+  nowMs,
   noWalletActivating,
   walletAddress,
   hasWallet,
@@ -479,6 +500,7 @@ export function UpgradePlanCard({
   selectedPrice: number | undefined
   subscribeStep: string | null
   noWalletOrder: NoWalletOrder | null
+  nowMs: number
   noWalletActivating: boolean
   walletAddress: string | null
   hasWallet: boolean | null
@@ -494,7 +516,26 @@ export function UpgradePlanCard({
   cryptoBlocked: boolean
   billingCountry: string | null
 }): JSX.Element | null {
+  const [copiedCheckoutLink, setCopiedCheckoutLink] = useState(false)
+
   if (currentPlan === 'ENTERPRISE') return null
+
+  const remainingMs = noWalletOrder ? Math.max(0, noWalletOrder.expiresAtMs - nowMs) : 0
+  const remainingMinutes = Math.floor(remainingMs / 60_000)
+  const remainingSeconds = Math.floor((remainingMs % 60_000) / 1000)
+  const hostedLinkExpired = noWalletOrder ? remainingMs === 0 : false
+
+  const handleCopyCheckoutLink = async () => {
+    if (!noWalletOrder) return
+
+    try {
+      await navigator.clipboard.writeText(noWalletOrder.checkoutUrl)
+      setCopiedCheckoutLink(true)
+      window.setTimeout(() => setCopiedCheckoutLink(false), 2000)
+    } catch {
+      setCopiedCheckoutLink(false)
+    }
+  }
 
   const FEATURES = BILLING_FEATURE_MATRIX.map((row) => ({
     label: row.label,
@@ -502,7 +543,10 @@ export function UpgradePlanCard({
   }))
 
   return (
-    <div id="upgrade" className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
+    <div
+      id="upgrade"
+      className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0"
+    >
       <h2 className="text-xl font-bold tracking-tight text-indigo-950">Upgrade Plan</h2>
       <p className="mt-2 text-sm sm:text-base font-medium leading-relaxed text-gray-500">
         Upgrade to unlock powerful follow-up tools and deeper analytics.
@@ -514,9 +558,10 @@ export function UpgradePlanCard({
 
       <div className="mt-5 space-y-5">
         <div>
-          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">1. Choose your plan</label>
+          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">
+            1. Choose your plan
+          </label>
           <div className="flex flex-wrap gap-3">
-          
             {PAID_PLANS.map((plan) => (
               <button
                 key={plan}
@@ -526,7 +571,7 @@ export function UpgradePlanCard({
                   'flex-1 sm:flex-none relative flex items-center justify-center rounded-[14px] sm:rounded-[18px] border px-3 sm:px-6 py-3 sm:py-3.5 text-xs sm:text-sm font-bold transition-all duration-300 min-w-0 sm:min-w-[120px]',
                   selectedPlan === plan
                     ? 'border-indigo-500/20 bg-gradient-to-b from-indigo-50 to-indigo-100/50 text-indigo-700 shadow-[0_4px_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/30 scale-[1.02]'
-                    : 'border-white/60 bg-white/40 text-gray-600 hover:bg-white/80 hover:text-gray-900 shadow-sm active:scale-[0.98]'
+                    : 'border-white/60 bg-white/40 text-gray-600 hover:bg-white/80 hover:text-gray-900 shadow-sm active:scale-[0.98]',
                 )}
               >
                 {formatPlanLabel(plan)}
@@ -545,7 +590,16 @@ export function UpgradePlanCard({
                       <div className="text-base">{formatPlanLabel(selectedPlan)}</div>
                       {selectedPrice ? (
                         <div className="mt-0.5 text-xs font-medium text-indigo-600/80">
-                          ${(selectedPrice / (selectedDuration === 'ANNUAL' ? 12 : selectedDuration === 'SIX_MONTHS' ? 6 : 1)).toLocaleString('en-US', { maximumFractionDigits: 2 })} / mo
+                          $
+                          {(
+                            selectedPrice /
+                            (selectedDuration === 'ANNUAL'
+                              ? 12
+                              : selectedDuration === 'SIX_MONTHS'
+                                ? 6
+                                : 1)
+                          ).toLocaleString('en-US', { maximumFractionDigits: 2 })}{' '}
+                          / mo
                         </div>
                       ) : null}
                     </th>
@@ -553,11 +607,28 @@ export function UpgradePlanCard({
                 </thead>
                 <tbody className="divide-y divide-gray-100/60">
                   {FEATURES.map((row, i) => (
-                    <tr key={row.label} className={i % 2 === 0 ? "bg-white/60 transition-colors hover:bg-white/80" : "bg-transparent transition-colors hover:bg-white/40"}>
+                    <tr
+                      key={row.label}
+                      className={
+                        i % 2 === 0
+                          ? 'bg-white/60 transition-colors hover:bg-white/80'
+                          : 'bg-transparent transition-colors hover:bg-white/40'
+                      }
+                    >
                       <td className="px-5 py-3.5 font-medium text-gray-600">{row.label}</td>
                       <td className="bg-indigo-50/20 px-4 py-3.5 text-center">
                         {row.current === true ? (
-                          <svg className="mx-auto h-5 w-5 text-indigo-500 backdrop-blur-sm" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                          <svg
+                            className="mx-auto h-5 w-5 text-indigo-500 backdrop-blur-sm"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
                         ) : row.current === false ? (
                           <span className="text-gray-300 mx-auto block w-5 text-center">-</span>
                         ) : (
@@ -573,12 +644,18 @@ export function UpgradePlanCard({
         </div>
 
         <div className="pt-6 border-t border-indigo-100/50">
-          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">2. Choose billing period</label>
+          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">
+            2. Choose billing period
+          </label>
           <div className="flex flex-col gap-3">
             {BILLING_DURATIONS.map((duration) => {
               const price = PLAN_PRICES[selectedPlan]?.[duration]
-              const moPrice = price ? (price / (duration === 'ANNUAL' ? 12 : duration === 'SIX_MONTHS' ? 6 : 1)).toFixed(2).replace(/\.00$/, '') : null
-              
+              const moPrice = price
+                ? (price / (duration === 'ANNUAL' ? 12 : duration === 'SIX_MONTHS' ? 6 : 1))
+                    .toFixed(2)
+                    .replace(/\.00$/, '')
+                : null
+
               return (
                 <button
                   key={duration}
@@ -588,33 +665,46 @@ export function UpgradePlanCard({
                     'group relative flex w-full items-center justify-between rounded-[24px] border p-5 text-left transition-all duration-300',
                     selectedDuration === duration
                       ? 'border-indigo-500/30 bg-gradient-to-b from-indigo-50/50 to-indigo-100/50 shadow-[0_8px_24px_rgba(99,102,241,0.15)] ring-1 ring-indigo-400/20 scale-[1.02]'
-                      : 'border-white/60 bg-white/40 hover:bg-white/80 hover:shadow-sm active:scale-[0.99] text-gray-600 hover:text-gray-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]'
+                      : 'border-white/60 bg-white/40 hover:bg-white/80 hover:shadow-sm active:scale-[0.99] text-gray-600 hover:text-gray-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]',
                   )}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all duration-300 shadow-sm",
-                      selectedDuration === duration 
-                        ? "border-indigo-600 bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.5)]" 
-                        : "border-gray-300 bg-white/80 group-hover:border-indigo-300"
-                    )}>
-                      <div className={cn(
-                        "h-2 w-2 rounded-full bg-white transition-all duration-300",
-                        selectedDuration === duration ? "scale-100 opacity-100" : "scale-0 opacity-0"
-                      )} />
+                    <div
+                      className={cn(
+                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all duration-300 shadow-sm',
+                        selectedDuration === duration
+                          ? 'border-indigo-600 bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.5)]'
+                          : 'border-gray-300 bg-white/80 group-hover:border-indigo-300',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'h-2 w-2 rounded-full bg-white transition-all duration-300',
+                          selectedDuration === duration
+                            ? 'scale-100 opacity-100'
+                            : 'scale-0 opacity-0',
+                        )}
+                      />
                     </div>
                     <div>
-                      <div className={cn("text-[15px] font-extrabold tracking-wide", selectedDuration === duration ? "text-indigo-950" : "text-gray-800")}>
+                      <div
+                        className={cn(
+                          'text-[15px] font-extrabold tracking-wide',
+                          selectedDuration === duration ? 'text-indigo-950' : 'text-gray-800',
+                        )}
+                      >
                         {DURATION_LABEL[duration]}
                       </div>
                       {DURATION_SAVINGS[duration] && (
                         <div className="mt-1.5 flex items-center gap-2 text-xs font-bold text-emerald-600">
-                          <span className={cn(
-                            "rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.05em] shadow-[0_2px_4px_rgba(16,185,129,0.1)] transition-colors",
-                            selectedDuration === duration 
-                              ? "border-emerald-300 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700" 
-                              : "border-emerald-200/60 bg-emerald-50/50 group-hover:bg-emerald-100/50"
-                          )}>
+                          <span
+                            className={cn(
+                              'rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.05em] shadow-[0_2px_4px_rgba(16,185,129,0.1)] transition-colors',
+                              selectedDuration === duration
+                                ? 'border-emerald-300 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700'
+                                : 'border-emerald-200/60 bg-emerald-50/50 group-hover:bg-emerald-100/50',
+                            )}
+                          >
                             {DURATION_SAVINGS[duration]}
                           </span>
                         </div>
@@ -624,10 +714,24 @@ export function UpgradePlanCard({
                   <div className="text-right">
                     {price ? (
                       <>
-                        <div className={cn("text-xl font-black tracking-tight", selectedDuration === duration ? "text-indigo-600" : "text-gray-900 group-hover:text-indigo-500 transition-colors")}>
+                        <div
+                          className={cn(
+                            'text-xl font-black tracking-tight',
+                            selectedDuration === duration
+                              ? 'text-indigo-600'
+                              : 'text-gray-900 group-hover:text-indigo-500 transition-colors',
+                          )}
+                        >
                           ${price}
                         </div>
-                        <div className={cn("mt-1 text-xs font-bold uppercase tracking-wider", selectedDuration === duration ? "text-indigo-500/80" : "text-gray-400 group-hover:text-gray-500 transition-colors")}>
+                        <div
+                          className={cn(
+                            'mt-1 text-xs font-bold uppercase tracking-wider',
+                            selectedDuration === duration
+                              ? 'text-indigo-500/80'
+                              : 'text-gray-400 group-hover:text-gray-500 transition-colors',
+                          )}
+                        >
                           ${moPrice} / mo
                         </div>
                       </>
@@ -642,9 +746,10 @@ export function UpgradePlanCard({
         </div>
 
         <div className="pt-6 border-t border-indigo-100/50">
-          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">3. Payment method</label>
+          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">
+            3. Payment method
+          </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            
             {/* Card (Coming Soon) */}
             <div className="group relative flex flex-col justify-between rounded-[20px] border border-white/60 bg-white/40 p-4 text-left transition-all duration-300 opacity-60 grayscale-[100%] cursor-not-allowed shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
               <div className="flex items-center gap-3">
@@ -672,35 +777,58 @@ export function UpgradePlanCard({
             </div>
 
             {/* Crypto */}
-            <div className={cn(
-              "group relative flex flex-col justify-between rounded-[20px] border p-4 text-left transition-all duration-300",
-              cryptoBlocked
-                ? "border-red-200/60 bg-red-50/50 shadow-sm opacity-70 cursor-not-allowed"
-                : "border-indigo-500/30 bg-gradient-to-b from-indigo-50/50 to-indigo-100/50 shadow-[0_8px_24px_rgba(99,102,241,0.15)] ring-1 ring-indigo-400/20 scale-[1.02] z-10"
-            )}>
+            <div
+              className={cn(
+                'group relative flex flex-col justify-between rounded-[20px] border p-4 text-left transition-all duration-300',
+                cryptoBlocked
+                  ? 'border-red-200/60 bg-red-50/50 shadow-sm opacity-70 cursor-not-allowed'
+                  : 'border-indigo-500/30 bg-gradient-to-b from-indigo-50/50 to-indigo-100/50 shadow-[0_8px_24px_rgba(99,102,241,0.15)] ring-1 ring-indigo-400/20 scale-[1.02] z-10',
+              )}
+            >
               <div className="flex items-center gap-3">
-                <div className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-all duration-300",
-                  cryptoBlocked
-                    ? "border-red-200 bg-white text-red-500"
-                    : "border-indigo-600 bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]"
-                )}>
+                <div
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-all duration-300',
+                    cryptoBlocked
+                      ? 'border-red-200 bg-white text-red-500'
+                      : 'border-indigo-600 bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]',
+                  )}
+                >
                   {cryptoBlocked ? <Ban className="h-4 w-4" /> : <Coins className="h-4 w-4" />}
                 </div>
-                <div className={cn("font-bold text-[15px] tracking-wide", cryptoBlocked ? "text-red-900" : "text-indigo-950")}>Crypto</div>
+                <div
+                  className={cn(
+                    'font-bold text-[15px] tracking-wide',
+                    cryptoBlocked ? 'text-red-900' : 'text-indigo-950',
+                  )}
+                >
+                  Crypto
+                </div>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <div className={cn("text-[10px] font-extrabold uppercase tracking-wider", cryptoBlocked ? "text-red-500" : "text-indigo-600")}>
-                  {cryptoBlocked ? `Unavailable${billingCountry ? ` in ${billingCountry}` : ''}` : 'Selected'}
+                <div
+                  className={cn(
+                    'text-[10px] font-extrabold uppercase tracking-wider',
+                    cryptoBlocked ? 'text-red-500' : 'text-indigo-600',
+                  )}
+                >
+                  {cryptoBlocked
+                    ? `Unavailable${billingCountry ? ` in ${billingCountry}` : ''}`
+                    : 'Selected'}
                 </div>
                 {!cryptoBlocked && (
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm border border-indigo-400">
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   </div>
                 )}
               </div>
             </div>
-
           </div>
         </div>
 
@@ -749,44 +877,86 @@ export function UpgradePlanCard({
 
         {!cryptoBlocked && noWalletOrder && (
           <div className="rounded-[24px] border border-blue-200/80 bg-blue-50/90 p-4 shadow-sm">
-            <p className="text-sm font-semibold text-blue-900">
-              Two-step crypto checkout via wallet app
-            </p>
+            <p className="text-sm font-semibold text-blue-900">Wallet app crypto checkout</p>
             <p className="text-xs text-blue-700">
-              Open each link in your wallet app browser in order. Amount:{' '}
-              <strong>${noWalletOrder.amountUsdt} USD equivalent</strong> on chain{' '}
-              {noWalletOrder.chainId}.
+              Copy this checkout link into your wallet app browser. Dotly will guide approval and
+              payment there. Amount: <strong>${noWalletOrder.amountUsdt} USD equivalent</strong> on
+              chain {noWalletOrder.chainId}.
             </p>
-            <div className="mt-4 space-y-2">
-              <div>
-                <p className="mb-1 text-xs font-medium text-blue-800">Step 1 — Approve payment</p>
-                <a
-                  href={noWalletOrder.approveLink}
-                  className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
-                >
-                  {noWalletOrder.approveLink}
-                </a>
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-medium text-blue-800">Step 2 — Confirm payment</p>
-                <a
-                  href={noWalletOrder.payLink}
-                  className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
-                >
-                  Open wallet app browser to confirm payment
-                </a>
-                <p className="mt-1 text-[11px] text-blue-700">
-                  Use the wallet app browser to open Dotly and trigger the payment confirmation
-                  step.
-                </p>
-              </div>
+            <div className="mt-3 rounded-xl border border-blue-200 bg-white/80 px-3 py-2 text-xs text-blue-800">
+              <p>
+                Link status:{' '}
+                <span className="font-semibold">
+                  {noWalletOrder.lastStatus === 'ACTIVE'
+                    ? 'Activated'
+                    : noWalletOrder.lastStatus === 'PAID'
+                      ? 'Payment detected'
+                      : noWalletOrder.lastStatus === 'REFUNDED'
+                        ? 'Refunded'
+                        : hostedLinkExpired || noWalletOrder.lastStatus === 'EXPIRED'
+                          ? 'Expired'
+                          : 'Waiting for payment'}
+                </span>
+              </p>
+              <p className="mt-1">
+                {hostedLinkExpired || noWalletOrder.lastStatus === 'EXPIRED'
+                  ? 'This hosted checkout link has expired after 5 minutes. If you already paid, Dotly can still confirm it below.'
+                  : `Link expires in ${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}. Dotly checks payment status automatically every 10 seconds.`}
+              </p>
             </div>
-            <p className="text-xs text-blue-600">
-              After completing both transactions, click below to activate your plan.
-            </p>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <button
+                  type="button"
+                  onClick={() => void handleCopyCheckoutLink()}
+                  className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+                >
+                  {copiedCheckoutLink ? 'Copied' : 'Copy link'}
+                </button>
+                {!hostedLinkExpired && noWalletOrder.lastStatus !== 'EXPIRED' && (
+                  <a
+                    href={noWalletOrder.checkoutUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+                  >
+                    Open link
+                  </a>
+                )}
+              </div>
+              {hostedLinkExpired || noWalletOrder.lastStatus === 'EXPIRED' ? (
+                <div className="block break-all rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-mono text-amber-700">
+                  {noWalletOrder.checkoutUrl}
+                </div>
+              ) : (
+                <a
+                  href={noWalletOrder.checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block break-all rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-mono text-blue-700 hover:bg-blue-50"
+                >
+                  {noWalletOrder.checkoutUrl}
+                </a>
+              )}
+              <p className="text-[11px] text-blue-700">
+                Open this inside MetaMask, Trust Wallet, or another web3 browser. The hosted
+                checkout will ask for approval first, then payment, and will try to activate your
+                plan automatically.
+              </p>
+              {(hostedLinkExpired || noWalletOrder.lastStatus === 'EXPIRED') && (
+                <button
+                  type="button"
+                  onClick={onGeneratePaymentLinks}
+                  disabled={subscribing}
+                  className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 disabled:opacity-50"
+                >
+                  {subscribing ? 'Generating…' : 'Generate new 5-minute link'}
+                </button>
+              )}
+            </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-blue-800">
-                Payment transaction hash
+                Fallback: payment transaction hash
               </label>
               <input
                 type="text"
@@ -796,7 +966,8 @@ export function UpgradePlanCard({
                 className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs text-blue-900 placeholder:text-blue-300 focus:outline-none"
               />
               <p className="mt-1 text-[11px] text-blue-700">
-                Dotly needs the final payment transaction hash to verify the on-chain payment.
+                Usually the hosted checkout activates automatically. Use this only if the wallet app
+                finishes payment but cannot return to Dotly.
               </p>
             </div>
             <button
@@ -805,7 +976,7 @@ export function UpgradePlanCard({
               disabled={noWalletActivating}
               className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {noWalletActivating ? 'Checking…' : "I've completed both steps — activate my plan"}
+              {noWalletActivating ? 'Checking…' : 'I already paid in my wallet app — confirm'}
             </button>
           </div>
         )}
@@ -847,12 +1018,12 @@ export function UpgradePlanCard({
                 {subscribing
                   ? (subscribeStep ?? 'Processing…')
                   : hasWallet === false
-                      ? 'Pay with crypto — generate payment links'
-                      : !walletAddress
-                        ? 'Connect wallet to pay with crypto'
-                        : onOpenCheckout
-                          ? 'Continue to crypto checkout'
-                          : 'Pay with crypto'}
+                    ? 'Pay with crypto — generate payment links'
+                    : !walletAddress
+                      ? 'Connect wallet to pay with crypto'
+                      : onOpenCheckout
+                        ? 'Continue to crypto checkout'
+                        : 'Pay with crypto'}
               </button>
             </>
           )
@@ -886,7 +1057,9 @@ export function TransactionHistoryCard({
               Renews / expires: <span className="font-semibold">{expiryDate}</span>
             </p>
           )}
-          <p className="mt-2 font-mono text-xs text-gray-500 truncate" title={subscription.txHash}>{subscription.txHash}</p>
+          <p className="mt-2 font-mono text-xs text-gray-500 truncate" title={subscription.txHash}>
+            {subscription.txHash}
+          </p>
           <a
             href={`https://arbiscan.io/tx/${subscription.txHash}`}
             target="_blank"
@@ -904,7 +1077,9 @@ export function TransactionHistoryCard({
   )
 }
 
-function formatRefundStatusLabel(status: NonNullable<SubscriptionData['refund']>['status']): string {
+function formatRefundStatusLabel(
+  status: NonNullable<SubscriptionData['refund']>['status'],
+): string {
   switch (status) {
     case 'PAID_ESCROW':
       return 'Refund window open'
@@ -1010,7 +1185,12 @@ export function RefundCard({
         <div className="space-y-2 text-sm text-gray-700">
           <p>
             Payment ID:{' '}
-            <span className="font-mono text-xs text-gray-500 max-w-[120px] sm:max-w-none inline-block align-bottom truncate" title={refund.paymentId ?? undefined}>{refund.paymentId ?? '—'}</span>
+            <span
+              className="font-mono text-xs text-gray-500 max-w-[120px] sm:max-w-none inline-block align-bottom truncate"
+              title={refund.paymentId ?? undefined}
+            >
+              {refund.paymentId ?? '—'}
+            </span>
           </p>
           <p>
             Refund deadline: <span className="font-medium">{refundUntilLabel ?? '—'}</span>
@@ -1019,7 +1199,8 @@ export function RefundCard({
             Claim window: <span className="font-medium">{refundTimeRemaining ?? 'Closed'}</span>
           </p>
           <p>
-            Manual review: <span className="font-medium">{supportRequestedLabel ?? 'Not requested'}</span>
+            Manual review:{' '}
+            <span className="font-medium">{supportRequestedLabel ?? 'Not requested'}</span>
           </p>
         </div>
       </div>
@@ -1058,7 +1239,9 @@ export function RefundCard({
         <button
           type="button"
           onClick={onRequestManualReview}
-          disabled={!refund.canRequestManualReview || requestingManualReview || !!refund.supportRequestedAt}
+          disabled={
+            !refund.canRequestManualReview || requestingManualReview || !!refund.supportRequestedAt
+          }
           className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {requestingManualReview

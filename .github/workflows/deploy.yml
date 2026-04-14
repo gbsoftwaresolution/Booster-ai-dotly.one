@@ -44,14 +44,11 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
+      - name: Deploy web to Railway
+        uses: bervProject/railway-deploy@main
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
-          working-directory: apps/web
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: dotly-web
 
   smoke-test:
     needs: [deploy-api, deploy-web]
@@ -107,6 +104,6 @@ jobs:
             -d '{"query":"mutation { deploymentRestart(id: \"${{ secrets.RAILWAY_PREV_DEPLOYMENT_ID }}\") { id } }"}' \
             || true
           echo "IMPORTANT: Verify rollback manually in Railway dashboard if this step failed."
-          echo "Also revert the Vercel deployment via: vercel rollback --token=\$VERCEL_TOKEN"
+          echo "Also roll back the dotly-web Railway service from the Railway dashboard if needed."
       - name: Notify rollback triggered
-        run: echo "::warning::Smoke tests failed. Rollback initiated. Check Railway and Vercel dashboards."
+        run: echo "::warning::Smoke tests failed. Rollback initiated. Check Railway dashboards."

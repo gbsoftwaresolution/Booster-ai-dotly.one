@@ -115,6 +115,7 @@ export default function ContactsPage(): JSX.Element {
   const bulkState = useBulkContactActions({
     selectedIds: selectionState.selectedIds,
     setSelectedIds: selectionState.setSelectedIds,
+    setContacts,
     loadContacts,
     page,
     setError,
@@ -135,7 +136,7 @@ export default function ContactsPage(): JSX.Element {
     setTagFilter(nextTag)
     setSortBy(nextSort)
     void loadContacts(nextPage, nextSearch, nextStage, nextTag, nextSort)
-  }, [loadContacts, searchParams])
+  }, [loadContacts, searchParams, setSearch, setSortBy, setStageFilter, setTagFilter])
 
   const handleSearchChange = useCallback(
     (value: string) => {
@@ -145,7 +146,7 @@ export default function ContactsPage(): JSX.Element {
         syncQuery({ page: 1, search: value })
       }, 300)
     },
-    [syncQuery],
+    [setSearch, syncQuery],
   )
 
   const handleStageFilter = useCallback(
@@ -153,7 +154,7 @@ export default function ContactsPage(): JSX.Element {
       setStageFilter(stage)
       syncQuery({ page: 1, stage })
     },
-    [syncQuery],
+    [setStageFilter, syncQuery],
   )
 
   const handleTagFilter = useCallback(
@@ -161,7 +162,7 @@ export default function ContactsPage(): JSX.Element {
       setTagFilter(tag)
       syncQuery({ page: 1, tag })
     },
-    [syncQuery],
+    [setTagFilter, syncQuery],
   )
 
   const { handleDelete, handleExportCSV, refreshDrawerContact } = useContactsPageActions({

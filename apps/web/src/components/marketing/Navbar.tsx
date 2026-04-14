@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
+import { PwaInstallButton } from '@/components/PwaInstallButton'
 
 const NAV_LINKS = [
   { label: 'Features', href: '/features' },
@@ -55,6 +56,10 @@ export function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden items-center gap-3 md:flex">
+          <PwaInstallButton
+            className="inline-flex items-center gap-2 rounded-2xl border border-sky-200/80 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 shadow-[0_16px_32px_-24px_rgba(14,165,233,0.35)] transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
+            label="Install app"
+          />
           <Link href="/auth" className="text-sm font-medium text-gray-600 hover:text-gray-900">
             Sign in
           </Link>
@@ -107,6 +112,10 @@ export function Navbar() {
             ))}
           </nav>
           <div className="flex flex-col gap-2">
+            <PwaInstallButton
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-center text-sm font-semibold text-sky-700 hover:bg-sky-100"
+              label="Install app"
+            />
             <Link
               href="/auth"
               className="rounded-lg border border-gray-300 px-4 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"

@@ -522,6 +522,7 @@ export function BillingTabContent({
 export function NotificationsTabContent({
   notifPrefs,
   notifSaved,
+  notifSavedMessage,
   notifError,
   notifSaving,
   onChange,
@@ -529,6 +530,7 @@ export function NotificationsTabContent({
 }: {
   notifPrefs: NotifPrefs
   notifSaved: boolean
+  notifSavedMessage: string
   notifError: string | null
   notifSaving: boolean
   onChange: (prefs: NotifPrefs) => void
@@ -567,7 +569,7 @@ export function NotificationsTabContent({
         </label>
       </div>
 
-      {notifSaved && <p className="text-sm text-green-600">Preferences saved.</p>}
+      {notifSaved && <p className="text-sm text-green-600">{notifSavedMessage}</p>}
       {notifError && <p className="text-sm text-red-600">{notifError}</p>}
 
       <button

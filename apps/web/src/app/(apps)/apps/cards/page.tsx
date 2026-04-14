@@ -25,6 +25,8 @@ import {
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiDelete } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { readCachedData, saveCachedData } from '@/lib/pwa/cache'
+import { incrementPwaMetric } from '@/lib/pwa/metrics'
 import type { ItemsResponse } from '@dotly/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -428,6 +430,7 @@ export default function CardsDashboard(): JSX.Element {
   const [deleteTarget, setDeleteTarget] = useState<CardSummary | null>(null)
   const [lastFocusedRef] = useState<{ el: HTMLElement | null }>({ el: null })
   const [deleting, setDeleting] = useState(false)
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null)
 
   // Fix #13: cache the token for the lifetime of the page render cycle
   const tokenRef = useRef<string | undefined>(undefined)
@@ -449,6 +452,7 @@ export default function CardsDashboard(): JSX.Element {
     setLoading(true)
     setFetchFailed(false)
     setError(null)
+    setOfflineNotice(null)
     setSummary(null) // clear stale stats so skeleton shows during refresh
     // Reset token cache so a fresh token is fetched on each explicit reload
     tokenRef.current = undefined
@@ -465,6 +469,7 @@ export default function CardsDashboard(): JSX.Element {
 
       if (cardsResult.status === 'fulfilled') {
         setCards(cardsResult.value.items)
+        saveCachedData('cards:list', cardsResult.value.items)
       } else {
         setFetchFailed(true)
         setError(
@@ -474,12 +479,27 @@ export default function CardsDashboard(): JSX.Element {
 
       if (summaryResult.status === 'fulfilled') {
         setSummary(summaryResult.value)
+        saveCachedData('cards:summary', summaryResult.value)
       }
       // Summary failure is non-fatal: stats show "--" and the card list still renders
     } catch (err) {
       if (controller.signal.aborted) return
-      setFetchFailed(true)
-      setError(err instanceof Error ? err.message : 'Failed to load cards')
+      const cachedCards = readCachedData<CardSummary[]>('cards:list')
+      const cachedSummary = readCachedData<DashboardSummary>('cards:summary')
+
+      if (cachedCards || cachedSummary) {
+        if (cachedCards) {
+          setCards(cachedCards.data)
+        }
+        if (cachedSummary) {
+          setSummary(cachedSummary.data)
+        }
+        setOfflineNotice('Showing last synced cards while offline.')
+        incrementPwaMetric('pwa_offline_cards_fallback')
+      } else {
+        setFetchFailed(true)
+        setError(err instanceof Error ? err.message : 'Failed to load cards')
+      }
     } finally {
       if (!controller.signal.aborted) setLoading(false)
     }
@@ -576,6 +596,12 @@ export default function CardsDashboard(): JSX.Element {
             onDismiss={() => setError(null)}
             onRetry={fetchFailed ? () => void fetchData() : undefined}
           />
+        )}
+
+        {offlineNotice && (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+            {offlineNotice}
+          </div>
         )}
 
         {/* Stats — hidden on failed load to avoid misleading zeros (Fix #2) */}

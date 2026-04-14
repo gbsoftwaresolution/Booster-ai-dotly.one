@@ -240,6 +240,7 @@ export default function CardAnalyticsPage(): JSX.Element {
   const [refreshing, setRefreshing] = useState(false)
   // Ref to cancel in-flight requests when range changes or component unmounts
   const abortRef = useRef<AbortController | null>(null)
+  const hasLoadedCardInfoRef = useRef(false)
 
   const load = useCallback(
     async (silent = false) => {
@@ -261,12 +262,25 @@ export default function CardAnalyticsPage(): JSX.Element {
             token,
             controller.signal,
           ),
-          cardInfo ? Promise.resolve(null) : apiGet<any>(`/cards/${id}`, token, controller.signal).catch(() => null)
+          hasLoadedCardInfoRef.current
+            ? Promise.resolve(null)
+            : apiGet<any>(`/cards/${id}`, token, controller.signal).catch(() => null),
         ])
         // Only update state if this request wasn't superseded
         if (!controller.signal.aborted) {
           setData(result)
-          if (cardData) { const fields = cardData.fields || {}; setCardInfo({ name: fields.name || fields.fullName || cardData.handle || 'Untitled Card', title: fields.title || '', company: fields.company || '', handle: cardData.handle || id, avatarUrl: fields.avatarUrl || '', isActive: cardData.isActive ?? false }); }
+          if (cardData) {
+            const fields = cardData.fields || {}
+            hasLoadedCardInfoRef.current = true
+            setCardInfo({
+              name: fields.name || fields.fullName || cardData.handle || 'Untitled Card',
+              title: fields.title || '',
+              company: fields.company || '',
+              handle: cardData.handle || id,
+              avatarUrl: fields.avatarUrl || '',
+              isActive: cardData.isActive ?? false,
+            })
+          }
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return
@@ -380,10 +394,16 @@ export default function CardAnalyticsPage(): JSX.Element {
       {cardInfo && (
         <div className="app-panel group relative flex items-center gap-4 rounded-[26px] p-4 transition-all duration-200">
           {cardInfo.avatarUrl ? (
-            <img
-              src={cardInfo.avatarUrl}
-              alt={cardInfo.name}
+            <div
+              role="img"
+              aria-label={cardInfo.name}
               className="h-[52px] w-[52px] shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+              style={{
+                backgroundImage: `url(${cardInfo.avatarUrl})`,
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: 'cover',
+              }}
             />
           ) : (
             <div

@@ -5,6 +5,8 @@ import {
   Plan as SharedPlan,
   BillingDuration,
   type BillingAdminRefundResponse,
+  type BillingHostedCheckoutQuoteResponse,
+  type BillingHostedCheckoutStatusResponse,
   type BillingRefundRequestResponse,
   type BillingRefundReviewItem,
   type BillingRefundReviewListResponse,
@@ -213,7 +215,161 @@ export class BillingService {
       : {}
   }
 
-  private asRecordedPaymentState(paymentId: string, payment: readonly unknown[]): RecordedPaymentState {
+  private asHostedQuoteResponse(metadata: unknown): BillingHostedCheckoutQuoteResponse | null {
+    const record = this.getAuditMetadataRecord(metadata)
+    const amountUsdt = typeof record.amountUsdt === 'string' ? record.amountUsdt : null
+    const amountRaw = typeof record.amountRaw === 'string' ? record.amountRaw : null
+    const paymentVaultAddress =
+      typeof record.paymentVaultAddress === 'string' ? record.paymentVaultAddress : null
+    const usdtTokenAddress =
+      typeof record.usdtTokenAddress === 'string' ? record.usdtTokenAddress : null
+    const paymentRef = typeof record.paymentRef === 'string' ? record.paymentRef : null
+    const paymentId = typeof record.paymentId === 'string' ? record.paymentId : null
+    const userRef = typeof record.userRef === 'string' ? record.userRef : null
+    const planId = typeof record.planId === 'number' ? record.planId : null
+    const durationId = typeof record.durationId === 'number' ? record.durationId : null
+    const deadline = typeof record.deadline === 'string' ? record.deadline : null
+    const signature = typeof record.signature === 'string' ? record.signature : null
+    const chainId = typeof record.chainId === 'number' ? record.chainId : null
+    const plan = typeof record.plan === 'string' ? record.plan : null
+    const duration = typeof record.duration === 'string' ? record.duration : null
+    const walletAddress = typeof record.walletAddress === 'string' ? record.walletAddress : null
+
+    if (
+      !amountUsdt ||
+      !amountRaw ||
+      !paymentVaultAddress ||
+      !usdtTokenAddress ||
+      !paymentRef ||
+      !paymentId ||
+      !userRef ||
+      planId === null ||
+      durationId === null ||
+      !deadline ||
+      !signature ||
+      chainId === null ||
+      !plan ||
+      !duration ||
+      !walletAddress
+    ) {
+      return null
+    }
+
+    return {
+      amountUsdt,
+      amountRaw,
+      paymentVaultAddress,
+      usdtTokenAddress,
+      paymentRef,
+      paymentId,
+      userRef,
+      planId,
+      durationId,
+      deadline,
+      signature,
+      chainId,
+      plan,
+      duration,
+      walletAddress,
+    }
+  }
+
+  async getHostedCheckoutQuote(paymentId: string): Promise<BillingHostedCheckoutQuoteResponse> {
+    const entry = await this.prisma.auditLog.findFirst({
+      where: {
+        action: 'billing.checkout.hosted_quote_created',
+        resourceId: paymentId,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { metadata: true, createdAt: true },
+    })
+
+    if (!entry) {
+      throw new BadRequestException('Hosted checkout quote was not found')
+    }
+
+    const ageMs = Date.now() - entry.createdAt.getTime()
+    if (ageMs > 60 * 60 * 1000) {
+      throw new BadRequestException(
+        'Hosted checkout quote has expired. Generate a new payment link.',
+      )
+    }
+
+    const quote = this.asHostedQuoteResponse(entry.metadata)
+    if (!quote) {
+      throw new BadRequestException('Hosted checkout quote is invalid')
+    }
+
+    return quote
+  }
+
+  async getHostedCheckoutStatus(paymentId: string): Promise<BillingHostedCheckoutStatusResponse> {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { boosterAiOrderId: paymentId },
+      select: {
+        status: true,
+        txHash: true,
+        currentPeriodEnd: true,
+      },
+    })
+
+    if (!sub) {
+      throw new BadRequestException('Hosted checkout was not found')
+    }
+
+    const quoteEntry = await this.prisma.auditLog.findFirst({
+      where: {
+        action: 'billing.checkout.hosted_quote_created',
+        resourceId: paymentId,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    })
+
+    const isExpired = quoteEntry
+      ? Date.now() - quoteEntry.createdAt.getTime() > 5 * 60 * 1000
+      : false
+
+    if (sub.status === 'ACTIVE') {
+      return {
+        paymentId,
+        status: 'ACTIVE',
+        paid: true,
+        activated: true,
+        txHash: sub.txHash ?? null,
+        currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+      }
+    }
+
+    try {
+      const payment = await this.readRecordedPayment(paymentId)
+      const paid = payment.status === 1 || payment.status === 2 || payment.status === 3
+
+      return {
+        paymentId,
+        status:
+          payment.status === 2 ? 'REFUNDED' : paid ? 'PAID' : isExpired ? 'EXPIRED' : 'PENDING',
+        paid,
+        activated: false,
+        txHash: sub.txHash ?? null,
+        currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+      }
+    } catch {
+      return {
+        paymentId,
+        status: isExpired ? 'EXPIRED' : 'PENDING',
+        paid: false,
+        activated: false,
+        txHash: sub.txHash ?? null,
+        currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+      }
+    }
+  }
+
+  private asRecordedPaymentState(
+    paymentId: string,
+    payment: readonly unknown[],
+  ): RecordedPaymentState {
     return {
       paymentId,
       payer: String(payment[0]),
@@ -242,7 +398,8 @@ export class BillingService {
       paymentId: payment.paymentId,
       paymentVaultAddress: this.getVaultAddress(),
       status: refundStatus,
-      refundUntil: refundUntilSeconds > 0 ? new Date(refundUntilSeconds * 1000).toISOString() : null,
+      refundUntil:
+        refundUntilSeconds > 0 ? new Date(refundUntilSeconds * 1000).toISOString() : null,
       eligible,
       canSelfRefund: eligible,
       canRequestManualReview: eligible,
@@ -309,7 +466,9 @@ export class BillingService {
       return null
     } catch (err) {
       if (err instanceof BadRequestException) throw err
-      this.logger.warn(`Failed to resolve payment id from tx hash ${txHash}: ${this.formatError(err)}`)
+      this.logger.warn(
+        `Failed to resolve payment id from tx hash ${txHash}: ${this.formatError(err)}`,
+      )
       return null
     }
   }
@@ -338,7 +497,9 @@ export class BillingService {
         refundUntil: params.refundUntil,
       })
     } catch (err) {
-      this.logger.warn(`Failed to notify support about refund review request: ${this.formatError(err)}`)
+      this.logger.warn(
+        `Failed to notify support about refund review request: ${this.formatError(err)}`,
+      )
     }
   }
 
@@ -488,16 +649,18 @@ export class BillingService {
             payment.status === 2 &&
             (subscription.status !== 'CANCELLED' || subscription.user.plan !== SharedPlan.FREE)
           ) {
-            await this.applyRefundCancellation(userId, subscription.user.plan as SharedPlan, subscription.txHash)
+            await this.applyRefundCancellation(
+              userId,
+              subscription.user.plan as SharedPlan,
+              subscription.txHash,
+            )
             resolvedPlan = SharedPlan.FREE
             resolvedStatus = 'CANCELLED'
             resolvedCurrentPeriodEnd = null
           }
         }
       } catch (err) {
-        this.logger.warn(
-          `Failed to load refund state for user ${userId}: ${this.formatError(err)}`,
-        )
+        this.logger.warn(`Failed to load refund state for user ${userId}: ${this.formatError(err)}`)
       }
     }
 
@@ -691,6 +854,32 @@ export class BillingService {
       },
     })
 
+    void this.audit
+      .log({
+        userId,
+        action: 'billing.checkout.hosted_quote_created',
+        resourceType: 'subscription',
+        resourceId: paymentId,
+        metadata: {
+          plan: params.plan,
+          duration: params.duration,
+          walletAddress: normalizedWallet,
+          amountUsdt,
+          amountRaw: amountRaw.toString(),
+          paymentVaultAddress: this.paymentVaultQuotes.getVaultAddress(),
+          usdtTokenAddress: this.paymentVaultQuotes.getUsdtAddress(),
+          paymentRef,
+          paymentId,
+          userRef,
+          planId,
+          durationId,
+          deadline: deadline.toString(),
+          signature,
+          chainId: this.paymentVaultQuotes.getChainId(),
+        },
+      })
+      .catch(() => void 0)
+
     return {
       amountUsdt,
       amountRaw: amountRaw.toString(),
@@ -708,13 +897,31 @@ export class BillingService {
   }
 
   async activateCheckoutOrder(userId: string, paymentId: string, txHash: string, chainId: number) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { id: true },
+    })
+
+    if (!subscription) {
+      throw new BadRequestException('No pending checkout was found for this account')
+    }
+
+    return this.activateCheckoutOrderForPendingSubscription(paymentId, txHash, chainId)
+  }
+
+  async activateCheckoutOrderForPendingSubscription(
+    paymentId: string,
+    txHash: string,
+    chainId: number,
+  ) {
     if (chainId !== CHAIN_ID) {
       throw new BadRequestException('Only Arbitrum payments are supported')
     }
 
     const sub = await this.prisma.subscription.findUnique({
-      where: { userId },
+      where: { boosterAiOrderId: paymentId },
       select: {
+        userId: true,
         plan: true,
         boosterAiOrderId: true,
         billingDuration: true,
@@ -724,8 +931,10 @@ export class BillingService {
     })
 
     if (!sub?.boosterAiOrderId || sub.boosterAiOrderId !== paymentId) {
-      throw new BadRequestException('Payment does not match the pending checkout for this account')
+      throw new BadRequestException('Payment does not match a pending checkout')
     }
+
+    const userId = sub.userId
 
     const walletAddress = sub.contractSubscriptionId
     if (!walletAddress) {
@@ -942,7 +1151,11 @@ export class BillingService {
     })
 
     if (subscription && subscription.status !== 'CANCELLED') {
-      await this.applyRefundCancellation(subscription.userId, subscription.plan as SharedPlan, refundTxHash)
+      await this.applyRefundCancellation(
+        subscription.userId,
+        subscription.plan as SharedPlan,
+        refundTxHash,
+      )
     }
 
     if (subscription?.userId) {

@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
+import { PwaInstallButton } from '@/components/PwaInstallButton'
 import {
   getVisibleDashboardBottomTabs,
   getVisibleDashboardMoreSections,
@@ -88,6 +89,13 @@ function DesktopSidebar(): JSX.Element {
               </ul>
             </div>
           ))}
+        </div>
+
+        <div className="border-t border-gray-100 pt-3">
+          <PwaInstallButton
+            className="app-touch-target flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-medium text-gray-500 transition-all hover:bg-sky-50 hover:text-sky-700"
+            label="Install app"
+          />
         </div>
 
         {/* Sign out */}
@@ -257,6 +265,12 @@ function MobileBottomNav(): JSX.Element {
                   </ul>
                 </div>
               ))}
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <PwaInstallButton
+                  className="app-touch-target flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-gray-600 hover:bg-sky-50 hover:text-sky-700"
+                  label="Install app"
+                />
+              </div>
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <button
                   type="button"
