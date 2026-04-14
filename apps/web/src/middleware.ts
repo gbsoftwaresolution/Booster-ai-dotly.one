@@ -6,6 +6,21 @@ const PLATFORM_HOSTNAMES = ['localhost', 'dotly.one', 'www.dotly.one']
 const LOCAL_APP_FALLBACK = 'http://localhost:3000'
 const PRODUCTION_APP_FALLBACK = 'https://dotly.one'
 
+function shouldDisableEdgeCache(request: NextRequest): boolean {
+  return !request.nextUrl.pathname.startsWith('/api/')
+}
+
+function applyNoStoreHeaders<T extends Response>(request: NextRequest, response: T): T {
+  if (!shouldDisableEdgeCache(request)) {
+    return response
+  }
+
+  response.headers.set('Cache-Control', 'private, no-store, no-cache, max-age=0, must-revalidate')
+  response.headers.set('CDN-Cache-Control', 'no-store')
+  response.headers.set('Surrogate-Control', 'no-store')
+  return response
+}
+
 function isPlatformHost(hostname: string): boolean {
   if (PLATFORM_HOSTNAMES.includes(hostname)) return true
   // Allow all *.vercel.app subdomains
@@ -55,13 +70,16 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
-    return new Response(
-      'Server misconfiguration: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.',
-      { status: 500 },
+    return applyNoStoreHeaders(
+      request,
+      new Response(
+        'Server misconfiguration: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.',
+        { status: 500 },
+      ),
     )
   }
 
-  let response = NextResponse.next({ request: { headers: request.headers } })
+  let response = applyNoStoreHeaders(request, NextResponse.next({ request: { headers: request.headers } }))
 
   // ─── Referral cookie: ?ref=p_XXXXX ──────────────────────────────────────
   const refParam = request.nextUrl.searchParams.get('ref')
@@ -81,12 +99,12 @@ export async function middleware(request: NextRequest) {
       },
       set(name: string, value: string, options: CookieOptions) {
         request.cookies.set({ name, value, ...options })
-        response = NextResponse.next({ request: { headers: request.headers } })
+        response = applyNoStoreHeaders(request, NextResponse.next({ request: { headers: request.headers } }))
         response.cookies.set({ name, value, ...options })
       },
       remove(name: string, options: CookieOptions) {
         request.cookies.set({ name, value: '', ...options })
-        response = NextResponse.next({ request: { headers: request.headers } })
+        response = applyNoStoreHeaders(request, NextResponse.next({ request: { headers: request.headers } }))
         response.cookies.set({ name, value: '', ...options })
       },
     },
@@ -124,14 +142,14 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/auth'
     url.search = ''
     url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`)
-    return NextResponse.redirect(url)
+    return applyNoStoreHeaders(request, NextResponse.redirect(url))
   }
 
   if (user && request.nextUrl.pathname === '/auth') {
     const url = request.nextUrl.clone()
     url.pathname = '/onboarding'
     url.search = ''
-    return NextResponse.redirect(url)
+    return applyNoStoreHeaders(request, NextResponse.redirect(url))
   }
 
   // ─── Legacy flat-URL → /apps/* permanent redirects (308) ─────────────────
@@ -142,14 +160,14 @@ export async function middleware(request: NextRequest) {
       if (pathname === pattern || pathname.startsWith(pattern + '/')) {
         const url = request.nextUrl.clone()
         url.pathname = target as string
-        return NextResponse.redirect(url, 308)
+        return applyNoStoreHeaders(request, NextResponse.redirect(url, 308))
       }
     } else {
       const m = pathname.match(pattern as RegExp)
       if (m) {
         const url = request.nextUrl.clone()
         url.pathname = (target as (m: RegExpMatchArray) => string)(m)
-        return NextResponse.redirect(url, 308)
+        return applyNoStoreHeaders(request, NextResponse.redirect(url, 308))
       }
     }
   }
@@ -182,7 +200,7 @@ export async function middleware(request: NextRequest) {
           }
           const rewriteUrl = request.nextUrl.clone()
           rewriteUrl.pathname = `/card/${data.handle}`
-          return NextResponse.rewrite(rewriteUrl)
+          return applyNoStoreHeaders(request, NextResponse.rewrite(rewriteUrl))
         }
       }
     } catch {
@@ -190,7 +208,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return response
+  return applyNoStoreHeaders(request, response)
 }
 
 export const config = {
