@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
 # Install ALL dependencies (including devDependencies needed to build).
-FROM node:20-alpine AS deps
+FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
 # Install pnpm
@@ -17,8 +17,12 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 # ─── Stage 2: builder ─────────────────────────────────────────────────────────
 # Generate Prisma client and compile TypeScript.
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates openssl \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
@@ -39,12 +43,16 @@ RUN pnpm turbo build --filter=@dotly/api
 
 # ─── Stage 3: runner ──────────────────────────────────────────────────────────
 # Minimal runtime image — non-root user, no build tools.
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates openssl \
+ && rm -rf /var/lib/apt/lists/*
+
 # Create a dedicated non-root user and group
-RUN addgroup --system --gid 1001 nodejs \
- && adduser  --system --uid 1001 nestjs
+RUN groupadd --system --gid 1001 nodejs \
+ && useradd --system --uid 1001 --gid 1001 nestjs
 
 # Copy only the built output and production node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./apps/api/dist
@@ -62,6 +70,6 @@ EXPOSE 3001
 USER nestjs
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3001/health/live || exit 1
+  CMD node -e "require('http').get('http://127.0.0.1:3001/health/live', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["node", "apps/api/dist/src/main"]
