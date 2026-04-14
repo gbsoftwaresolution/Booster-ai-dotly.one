@@ -38,7 +38,7 @@ RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholde
 RUN pnpm turbo build --filter=@dotly/api
 
 # Prune dev dependencies so only production deps remain
-RUN pnpm prune --prod --no-optional
+RUN CI=true pnpm prune --prod --no-optional
 
 # ─── Stage 3: runner ──────────────────────────────────────────────────────────
 # Minimal runtime image — non-root user, no build tools.
