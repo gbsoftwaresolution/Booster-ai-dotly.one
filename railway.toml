@@ -3,11 +3,14 @@ builder = "DOCKERFILE"
 dockerfilePath = "apps/api/Dockerfile"
 watchPatterns = [
   "apps/api/**",
+  "apps/api/railway.toml",
+  "apps/api/railway.json",
   "packages/database/**",
   "packages/types/**",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
+  "railway.toml",
   "turbo.json",
 ]
 
