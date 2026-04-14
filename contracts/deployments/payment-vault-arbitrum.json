@@ -1,11 +1,11 @@
 {
   "network": "arbitrum",
   "chainId": 42161,
-  "contractAddress": "0x14634f7cf724ae94d8C913401bb8e0C1Cc43D3Fc",
-  "owner": "0x00bd577a0eF3042C5296D383713c212ab27aBeD2",
-  "treasury": "0x7341d10E5f50241637C2EFf31730178158b8174d",
-  "paymentSigner": "0xBEA77Ae04478E9471A455C5B6e122c44E032e252",
+  "contractAddress": "0xe854A730B2E62e5C23cb7b3e28475D3C1Ba7BDF6",
+  "owner": "0x93C12489ef44aA4D7A6970D85d6B3C69387e0A42",
+  "treasury": "0xec114DC827475F139f9fEa8f657dDe5F8AA8479b",
+  "paymentSigner": "0x035C13262eDC249504BD90556b6cB1E047F7f58B",
   "usdtAddress": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
-  "deployedAt": "2026-04-13T21:52:56.285Z",
-  "deployer": "0x00bd577a0eF3042C5296D383713c212ab27aBeD2"
+  "deployedAt": "2026-04-14T12:32:10.328Z",
+  "deployer": "0x9DE6DDaa7577C3d9C5f3D9dD7d4BeaAbfD6f8806"
 }

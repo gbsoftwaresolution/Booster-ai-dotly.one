@@ -455,7 +455,8 @@ export default function BillingSettingsPage(): JSX.Element {
       {loading ? (
         <BillingLoadingState />
       ) : (
-        <>
+        <div className="flex flex-col xl:flex-row items-start gap-8 xl:gap-12 w-full mt-4 xl:mt-8">
+          <div className="flex min-w-0 w-full flex-1 flex-col gap-8 sm:gap-12">
           <CurrentPlanCard
             currentPlan={currentPlan}
             currentStatus={currentStatus}
@@ -463,9 +464,31 @@ export default function BillingSettingsPage(): JSX.Element {
             expiryDate={expiryDate}
           />
 
-          
+            
 
-          <UpgradePlanCard
+            
+
+            <RefundCard
+              subscription={subscription}
+              refunding={refunding}
+              requestingManualReview={requestingManualRefund}
+              onRequestRefund={() => void handleRequestRefund()}
+              onRequestManualReview={() => void handleRequestManualRefund()}
+            />
+
+            {/* Transaction History Link instead of card */}
+            <div className="mt-8 flex justify-end">
+              <Link
+                href="/settings/billing/history"
+                className="inline-flex items-center gap-2 rounded-xl bg-white/60 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300/50 hover:bg-gray-50/80 transition-all hover:ring-gray-300"
+              >
+                <Activity className="h-4 w-4 text-brand-500" />
+                View Transaction History
+              </Link>
+            </div>
+          </div>
+          <div className="w-full xl:w-[460px] 2xl:w-[500px] shrink-0 xl:sticky xl:top-24 min-w-0">
+            <UpgradePlanCard
             currentPlan={currentPlan}
             selectedPlan={selectedPlan}
             selectedDuration={selectedDuration}
@@ -498,28 +521,8 @@ export default function BillingSettingsPage(): JSX.Element {
             cryptoBlocked={cryptoBlocked}
             billingCountry={billingCountry}
           />
-
-          <RefundCard
-            subscription={subscription}
-            refunding={refunding}
-            requestingManualReview={requestingManualRefund}
-            onRequestRefund={() => void handleRequestRefund()}
-            onRequestManualReview={() => void handleRequestManualRefund()}
-          />
-
-          
-        {/* Transaction History Link instead of card */}
-        <div className="mt-8 flex justify-end">
-          <Link
-             href="/settings/billing/history"
-             className="inline-flex items-center gap-2 rounded-xl bg-white/60 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300/50 hover:bg-gray-50/80 transition-all hover:ring-gray-300"
-          >
-            <Activity className="h-4 w-4 text-brand-500" />
-             View Transaction History
-          </Link>
+          </div>
         </div>
-
-        </>
       )}
     </div>
   )

@@ -130,7 +130,7 @@ export default function TransactionHistoryPage() {
                 </div>
                 <div className="space-y-1 mt-4">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Transaction Hash</p>
-                  <p className="text-xs font-mono text-gray-600 break-all bg-gray-100/50 p-2 rounded-lg border border-gray-200/50 mt-1">
+                  <p className="text-xs font-mono text-gray-600 truncate bg-gray-100/50 p-2 rounded-lg border border-gray-200/50 mt-1" title={subscription.txHash}>
                     {subscription.txHash}
                   </p>
                 </div>
@@ -149,7 +149,7 @@ export default function TransactionHistoryPage() {
             {subscription?.boosterAiOrderId && (
               <div className="flex border-t border-gray-200/50 pt-5 justify-between flex-wrap gap-4 items-center">
                 <p className="text-xs font-medium text-gray-500">
-                  Order ID: <span className="font-mono text-gray-800 bg-white px-2 py-1 rounded-md border border-gray-100 shadow-sm">{subscription.boosterAiOrderId}</span>
+                  Order ID: <span className="font-mono text-gray-800 bg-white px-2 py-1 rounded-md border border-gray-100 shadow-sm max-w-[120px] sm:max-w-none inline-block align-bottom truncate" title={subscription.boosterAiOrderId}>{subscription.boosterAiOrderId}</span>
                 </p>
                 <div className="text-xs text-gray-400">
                   Processed securely via Web3 smart contracts

@@ -4,7 +4,7 @@ import { Plan, BillingDuration } from '@dotly/types'
 
 // ─── Pricing table (USDT, exact amounts) ─────────────────────────────────────
 // Tier        | Monthly | 6 Months | Annual
-// STARTER     |   0.10  |   0.55   |   1.00
+// STARTER     |  10.00  |  50.00   |  99.00
 // PRO         |  20.00  | 110.00   | 200.00
 // BUSINESS    |  50.00  | 275.00   | 500.00
 // AGENCY      | 100.00  | 550.00   | 1000.00
@@ -12,9 +12,9 @@ import { Plan, BillingDuration } from '@dotly/types'
 
 export const PLAN_PRICING: Record<string, Record<BillingDuration, string>> = {
   [Plan.STARTER]: {
-    [BillingDuration.MONTHLY]: '0.10',
-    [BillingDuration.SIX_MONTHS]: '0.55',
-    [BillingDuration.ANNUAL]: '1.00',
+    [BillingDuration.MONTHLY]: '10.00',
+    [BillingDuration.SIX_MONTHS]: '50.00',
+    [BillingDuration.ANNUAL]: '99.00',
   },
   [Plan.PRO]: {
     [BillingDuration.MONTHLY]: '20.00',

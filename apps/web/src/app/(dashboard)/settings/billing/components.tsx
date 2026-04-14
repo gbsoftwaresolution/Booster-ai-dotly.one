@@ -103,7 +103,7 @@ export function BillingHero({
   ]
 
   return (
-    <div className="group relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 px-5 py-8 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+    <div className="group relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <div
         className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-sky-500/5 pointer-events-none" aria-hidden="true" />
       <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none" />
@@ -133,7 +133,7 @@ export function BillingHero({
             </span>
           </div>
 
-          <div className="mt-8 grid w-full max-w-sm sm:max-w-xl grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4">
             {metrics.map(({ label, value }) => (
               <div
                 key={label}
@@ -156,7 +156,7 @@ export function BillingHero({
         </div>
 
         <div className="relative overflow-hidden rounded-[32px] border border-indigo-100/50 bg-gradient-to-br from-indigo-50/60 to-sky-50/60 p-6 sm:p-8 shadow-inner backdrop-blur-md">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-600">
                 Billing Snapshot
@@ -247,11 +247,11 @@ export function CurrentPlanCard({
     current: getPlanFeatureValue(row, currentPlan),
   }))
   return (
-    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <h2 className="text-xl font-bold tracking-tight text-gray-950">Current Plan</h2>
       
-      <div className="mt-8 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5">
-        <table className="w-full text-left text-sm">
+      <div className="mt-8 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5 overflow-x-auto w-full">
+        <table className="w-full min-w-[320px] sm:min-w-full text-left text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm">
               <th className="px-5 py-4 font-bold text-gray-700">Feature overview</th>
@@ -314,7 +314,7 @@ export function CurrentPlanCard({
       )}
       {subscription?.boosterAiOrderId && (
         <p className="mt-1 font-mono text-xs text-gray-400">
-          Order: {subscription.boosterAiOrderId}
+          Order: <span className="inline-block align-bottom max-w-[100px] sm:max-w-none truncate" title={subscription.boosterAiOrderId}>{subscription.boosterAiOrderId}</span>
         </p>
       )}
       {currentPlan === 'FREE' && (
@@ -353,7 +353,7 @@ export function WalletCard({
   billingCountry: string | null
 }): JSX.Element {
   return (
-    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <h2 className="text-base font-semibold text-gray-900">Crypto Checkout</h2>
       <p className="mt-1 text-sm text-gray-500">
         Dotly plans are priced in USD. Crypto checkout is available today if you want to pay with a
@@ -502,7 +502,7 @@ export function UpgradePlanCard({
   }))
 
   return (
-    <div id="upgrade" className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+    <div id="upgrade" className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <h2 className="text-xl font-bold tracking-tight text-indigo-950">Upgrade Plan</h2>
       <p className="mt-2 text-sm sm:text-base font-medium leading-relaxed text-gray-500">
         Upgrade to unlock powerful follow-up tools and deeper analytics.
@@ -523,7 +523,7 @@ export function UpgradePlanCard({
                 type="button"
                 onClick={() => onSelectPlan(plan)}
                 className={cn(
-                  'relative flex items-center justify-center rounded-[18px] border px-6 py-3.5 text-sm font-bold transition-all duration-300 min-w-[120px]',
+                  'flex-1 sm:flex-none relative flex items-center justify-center rounded-[14px] sm:rounded-[18px] border px-3 sm:px-6 py-3 sm:py-3.5 text-xs sm:text-sm font-bold transition-all duration-300 min-w-0 sm:min-w-[120px]',
                   selectedPlan === plan
                     ? 'border-indigo-500/20 bg-gradient-to-b from-indigo-50 to-indigo-100/50 text-indigo-700 shadow-[0_4px_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/30 scale-[1.02]'
                     : 'border-white/60 bg-white/40 text-gray-600 hover:bg-white/80 hover:text-gray-900 shadow-sm active:scale-[0.98]'
@@ -536,8 +536,8 @@ export function UpgradePlanCard({
 
           {/* Dynamic Upgrade Features */}
           <div className="mt-8 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5 overflow-hidden">
-            <div className="rounded-[18px] bg-white/40 shadow-inner overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="w-full overflow-x-auto rounded-[18px] bg-white/40 shadow-inner">
+              <table className="w-full min-w-[320px] sm:min-w-full text-left text-sm whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm">
                     <th className="px-5 py-4 font-bold text-gray-700">Premium feature</th>
@@ -643,7 +643,7 @@ export function UpgradePlanCard({
 
         <div className="pt-6 border-t border-indigo-100/50">
           <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">3. Payment method</label>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             
             {/* Card (Coming Soon) */}
             <div className="group relative flex flex-col justify-between rounded-[20px] border border-white/60 bg-white/40 p-4 text-left transition-all duration-300 opacity-60 grayscale-[100%] cursor-not-allowed shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
@@ -870,7 +870,7 @@ export function TransactionHistoryCard({
   expiryDate: string | null
 }): JSX.Element {
   return (
-    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
       <h2 className="text-base font-semibold text-gray-900">Transaction History</h2>
       {subscription?.txHash ? (
         <div className="app-panel-subtle mt-3 rounded-[24px] p-4 text-sm text-gray-700">
@@ -886,7 +886,7 @@ export function TransactionHistoryCard({
               Renews / expires: <span className="font-semibold">{expiryDate}</span>
             </p>
           )}
-          <p className="mt-2 break-all font-mono text-xs text-gray-500">{subscription.txHash}</p>
+          <p className="mt-2 font-mono text-xs text-gray-500 truncate" title={subscription.txHash}>{subscription.txHash}</p>
           <a
             href={`https://arbiscan.io/tx/${subscription.txHash}`}
             target="_blank"
@@ -966,7 +966,7 @@ export function RefundCard({
 
   if (!refund) {
     return (
-      <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5">
+      <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5 w-full min-w-0">
         <h2 className="text-base font-semibold text-gray-900">Refund Status</h2>
         <p className="mt-2 text-sm text-gray-500">
           Refund details appear here after a paid crypto subscription has been activated.
@@ -981,7 +981,7 @@ export function RefundCard({
     refund.status === 'PAID_ESCROW' ? formatRefundTimeRemaining(refund.refundUntil) : null
 
   return (
-    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5 w-full min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-gray-900">Refund Status</h2>
@@ -1006,11 +1006,11 @@ export function RefundCard({
         </span>
       </div>
 
-      <div className="mt-4 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5">
+      <div className="mt-4 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5 w-full min-w-0">
         <div className="space-y-2 text-sm text-gray-700">
           <p>
             Payment ID:{' '}
-            <span className="font-mono text-xs text-gray-500">{refund.paymentId ?? '—'}</span>
+            <span className="font-mono text-xs text-gray-500 max-w-[120px] sm:max-w-none inline-block align-bottom truncate" title={refund.paymentId ?? undefined}>{refund.paymentId ?? '—'}</span>
           </p>
           <p>
             Refund deadline: <span className="font-medium">{refundUntilLabel ?? '—'}</span>

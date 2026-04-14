@@ -12,8 +12,6 @@ const FOOTER_LINKS = {
     { label: 'Terms of Service', href: '/terms' },
   ],
   Connect: [
-    { label: 'Twitter / X', href: 'https://twitter.com/dotlyone' },
-    { label: 'LinkedIn', href: 'https://linkedin.com/company/dotlyone' },
     { label: 'Contact', href: 'mailto:hello@dotly.one' },
   ],
 }

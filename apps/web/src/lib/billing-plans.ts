@@ -18,7 +18,7 @@ const PLAN_ORDER: BillingPlan[] = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'AGENCY
 
 export const BILLING_PLAN_PRICES: Record<BillingPlan, Record<BillingDuration, number> | null> = {
   FREE: null,
-  STARTER: { MONTHLY: 0.1, SIX_MONTHS: 0.55, ANNUAL: 1 },
+  STARTER: { MONTHLY: 10, SIX_MONTHS: 50, ANNUAL: 99 },
   PRO: { MONTHLY: 20, SIX_MONTHS: 110, ANNUAL: 200 },
   BUSINESS: { MONTHLY: 50, SIX_MONTHS: 275, ANNUAL: 500 },
   AGENCY: { MONTHLY: 100, SIX_MONTHS: 550, ANNUAL: 1000 },
