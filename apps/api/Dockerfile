@@ -13,7 +13,7 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/database/package.json ./packages/database/
 COPY packages/types/package.json ./packages/types/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --prod=false
 
 # ─── Stage 2: builder ─────────────────────────────────────────────────────────
 # Generate Prisma client and compile TypeScript.
