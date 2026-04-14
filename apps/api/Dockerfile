@@ -50,8 +50,9 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/node_modules ./apps/api/node_modules
-# Prisma client lives inside the database package
+# Shared workspace packages are symlink targets from apps/api/node_modules.
 COPY --from=builder --chown=nestjs:nodejs /app/packages/database ./packages/database
+COPY --from=builder --chown=nestjs:nodejs /app/packages/types ./packages/types
 
 # Metadata
 ENV NODE_ENV=production
