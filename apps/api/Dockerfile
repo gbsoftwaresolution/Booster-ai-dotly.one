@@ -27,6 +27,9 @@ COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 
 COPY . .
 
+# Re-link workspace package bins after the full monorepo is present.
+RUN pnpm install --frozen-lockfile --prod=false --offline
+
 # Generate Prisma client (requires DATABASE_URL only at generate time, not a real DB)
 RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
   pnpm --filter @dotly/database run db:generate
