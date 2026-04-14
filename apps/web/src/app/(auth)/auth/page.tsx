@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { getAuthCallbackUrl, sanitizeNextPath } from '@/lib/app-url'
@@ -192,7 +193,9 @@ function AuthPageContent(): JSX.Element {
               <Sparkles className="h-3.5 w-3.5 text-sky-500" />
               Polished workspace access
             </div>
-            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Dotly.one</h2>
+            <div className="flex justify-center lg:justify-start">
+              <BrandLogo priority iconClassName="rounded-[18px]" textClassName="text-3xl" />
+            </div>
             <p className="mt-2 text-sm text-gray-500">
               {mode === 'signin'
                 ? 'Sign in to your account'

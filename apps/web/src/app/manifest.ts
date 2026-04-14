@@ -19,20 +19,14 @@ export default function manifest(): MetadataRoute.Manifest {
     prefer_related_applications: false,
     icons: [
       {
-        src: '/api/pwa-icon?size=192',
-        sizes: '192x192',
+        src: '/icons/196.png',
+        sizes: '196x196',
         type: 'image/png',
       },
       {
-        src: '/api/pwa-icon?size=512',
+        src: '/icons/512.png',
         sizes: '512x512',
         type: 'image/png',
-      },
-      {
-        src: '/api/pwa-icon?size=512&maskable=true',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
       },
     ],
   }

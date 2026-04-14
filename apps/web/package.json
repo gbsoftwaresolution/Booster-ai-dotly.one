@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start",
+    "build": "next build && node ./scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/apps/web/server.js",
     "lint": "next lint",
     "typecheck": "next typegen && tsc --noEmit",
     "analyze": "ANALYZE=true next build",

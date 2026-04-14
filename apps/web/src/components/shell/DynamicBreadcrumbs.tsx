@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { JSX } from 'react'
+import { BrandLogo } from '@/components/BrandLogo'
 
 function formatPart(part: string): string {
   if (part.toLowerCase() === 'email-templates') return 'Email Templates'
@@ -28,25 +29,15 @@ export function DynamicBreadcrumbs(): JSX.Element | null {
   // If we're under '/apps', the first real section is 'cards' or something else
   const pathParts = isAppRoute ? parts.slice(1) : parts
 
-  const LogoIcon = () => (
-    <div
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] shadow-[0_2px_8px_-2px_rgba(14,165,233,0.5)] ring-1 ring-inset ring-white/20 sm:hidden"
-      style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <circle cx="8" cy="8" r="3.5" fill="white" />
-        <circle cx="8" cy="8" r="6.5" stroke="white" strokeWidth="1.5" strokeDasharray="3 2" />
-      </svg>
-    </div>
-  )
-
   if (pathParts.length === 0) {
     return (
       <div className="flex items-center gap-3">
-        <LogoIcon />
-        <span className="text-base font-bold text-gray-900">
-          Dotly<span className="text-sky-500">.one</span>
-        </span>
+        <BrandLogo
+          size={32}
+          className="sm:hidden"
+          iconClassName="rounded-[10px] shadow-[0_2px_8px_-2px_rgba(14,165,233,0.35)]"
+          textClassName="text-base"
+        />
       </div>
     )
   }
@@ -55,7 +46,12 @@ export function DynamicBreadcrumbs(): JSX.Element | null {
   if (pathParts.length === 1 && pathParts[0]) {
     return (
       <div className="flex items-center gap-3">
-        <LogoIcon />
+        <BrandLogo
+          size={32}
+          showText={false}
+          className="sm:hidden"
+          iconClassName="rounded-[10px] shadow-[0_2px_8px_-2px_rgba(14,165,233,0.35)]"
+        />
         <h1 className="text-base font-bold tracking-tight text-gray-900 uppercase">
           {formatPart(pathParts[0])}
         </h1>

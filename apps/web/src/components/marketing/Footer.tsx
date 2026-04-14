@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { BrandLogo } from '@/components/BrandLogo'
 
 const FOOTER_LINKS = {
   Product: [
@@ -27,23 +28,9 @@ export function Footer() {
               href="/"
               className="flex items-center gap-3 text-xl font-extrabold tracking-tight text-gray-900"
             >
-              <span
-                className="flex h-10 w-10 items-center justify-center rounded-[18px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.7)]"
-                style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
-              >
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <circle cx="8" cy="8" r="3.5" fill="white" />
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6.5"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 2"
-                  />
-                </svg>
-              </span>
-              Dotly<span className="text-brand-500">.one</span>
+              <BrandLogo
+                iconClassName="rounded-[18px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.35)]"
+              />
             </Link>
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
               Digital business cards with NFC, QR, analytics, CRM, and scheduling.

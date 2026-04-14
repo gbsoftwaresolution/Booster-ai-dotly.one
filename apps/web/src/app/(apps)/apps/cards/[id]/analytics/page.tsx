@@ -240,7 +240,6 @@ export default function CardAnalyticsPage(): JSX.Element {
   const [refreshing, setRefreshing] = useState(false)
   // Ref to cancel in-flight requests when range changes or component unmounts
   const abortRef = useRef<AbortController | null>(null)
-  const hasLoadedCardInfoRef = useRef(false)
 
   const load = useCallback(
     async (silent = false) => {
@@ -262,7 +261,7 @@ export default function CardAnalyticsPage(): JSX.Element {
             token,
             controller.signal,
           ),
-          hasLoadedCardInfoRef.current
+          cardInfo
             ? Promise.resolve(null)
             : apiGet<any>(`/cards/${id}`, token, controller.signal).catch(() => null),
         ])
@@ -271,7 +270,6 @@ export default function CardAnalyticsPage(): JSX.Element {
           setData(result)
           if (cardData) {
             const fields = cardData.fields || {}
-            hasLoadedCardInfoRef.current = true
             setCardInfo({
               name: fields.name || fields.fullName || cardData.handle || 'Untitled Card',
               title: fields.title || '',
@@ -292,7 +290,7 @@ export default function CardAnalyticsPage(): JSX.Element {
         }
       }
     },
-    [id, range],
+    [cardInfo, id, range],
   )
 
   useEffect(() => {

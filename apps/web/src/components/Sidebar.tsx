@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { JSX } from 'react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { cn } from '@/lib/cn'
 import { LogOut } from 'lucide-react'
 import { useState } from 'react'
@@ -28,26 +29,7 @@ function DesktopSidebar(): JSX.Element {
       <nav className="flex h-full flex-col px-3 py-5" aria-label="Main navigation">
         {/* Wordmark */}
         <div className="app-panel-subtle mb-7 flex items-center gap-3 rounded-[24px] px-3 py-3.5">
-          {/* Dot icon mark */}
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="3.5" fill="white" />
-              <circle
-                cx="8"
-                cy="8"
-                r="6.5"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeDasharray="3 2"
-              />
-            </svg>
-          </div>
-          <span className="text-[17px] font-extrabold tracking-tight text-gray-900">
-            Dotly<span className="text-brand-500">.one</span>
-          </span>
+          <BrandLogo size={32} iconClassName="rounded-xl" textClassName="text-[17px]" />
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1">

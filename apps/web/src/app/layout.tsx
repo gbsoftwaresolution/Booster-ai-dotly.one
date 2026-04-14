@@ -32,10 +32,10 @@ export const metadata: Metadata = {
   referrer: 'origin-when-cross-origin',
   icons: {
     icon: [
-      { url: '/api/pwa-icon?size=192', sizes: '192x192', type: 'image/png' },
-      { url: '/api/pwa-icon?size=512', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/196.png', sizes: '196x196', type: 'image/png' },
+      { url: '/icons/512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: [{ url: '/apple-icon', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: '/icons/180.png', sizes: '180x180', type: 'image/png' }],
   },
   alternates: {
     canonical: '/',

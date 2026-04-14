@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { JSX } from 'react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { cn } from '@/lib/cn'
 import { Home, Settings } from 'lucide-react'
 import { APPS } from '@/components/navigation/apps-nav'
@@ -81,17 +82,17 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
         background: '#040b16',
       }}
     >
-      {/* Wordmark dot */}
       <Link
         href="/dashboard"
         aria-label="Dotly home"
-        className="mb-6 flex h-14 w-14 items-center justify-center rounded-[20px] shadow-[0_0_24px_-8px_rgba(14,165,233,0.5)] transition-all duration-500 hover:scale-[1.05] hover:shadow-[0_0_32px_-12px_rgba(14,165,233,0.8)]"
-        style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
+        className="mb-6 flex items-center justify-center transition-all duration-500 hover:scale-[1.05]"
       >
-        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <circle cx="8" cy="8" r="3.5" fill="white" />
-          <circle cx="8" cy="8" r="6.5" stroke="white" strokeWidth="1.5" strokeDasharray="3 2" />
-        </svg>
+        <BrandLogo
+          size={56}
+          showText={false}
+          priority
+          iconClassName="rounded-[20px] shadow-[0_0_24px_-8px_rgba(14,165,233,0.5)]"
+        />
       </Link>
 
       {/* Divider */}
