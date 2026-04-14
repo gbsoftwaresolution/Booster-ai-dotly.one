@@ -47,7 +47,7 @@ RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nestjs
 
 # Copy only the built output and production node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/node_modules ./apps/api/node_modules
 # Prisma client lives inside the database package
@@ -63,4 +63,4 @@ USER nestjs
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3001/health/live || exit 1
 
-CMD ["node", "dist/src/main"]
+CMD ["node", "apps/api/dist/src/main"]

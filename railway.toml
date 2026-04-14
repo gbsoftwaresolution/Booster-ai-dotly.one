@@ -15,7 +15,7 @@ watchPatterns = [
 ]
 
 [deploy]
-startCommand = "node dist/src/main"
+startCommand = "node apps/api/dist/src/main"
 healthcheckPath = "/health/live"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
