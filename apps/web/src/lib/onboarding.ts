@@ -11,10 +11,15 @@ export interface MinimalCardSummary {
 }
 
 export async function getOnboardingState(token: string): Promise<OnboardingState> {
-  const [user, cards] = await Promise.all([
-    apiGet<UserMeResponse>('/users/me', token),
-    apiGet<ItemsResponse<MinimalCardSummary>>('/cards', token),
-  ])
+  const user = await apiGet<UserMeResponse | null>('/users/me', token)
+  if (!user) {
+    return {
+      profileComplete: false,
+      hasCard: false,
+    }
+  }
+
+  const cards = await apiGet<ItemsResponse<MinimalCardSummary>>('/cards', token)
 
   const profileComplete = Boolean(user.name?.trim()) && Boolean(user.country?.trim())
   const hasCard = (cards.items?.length ?? 0) > 0

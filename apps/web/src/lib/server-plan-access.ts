@@ -3,29 +3,14 @@ import type { BillingSummaryResponse } from '@dotly/types'
 import type { BillingPlan } from '@/lib/billing-plans'
 import { hasPlanAccess, normalizePlan } from '@/lib/billing-plans'
 import { getServerApiUrl } from '@/lib/server-api'
-import { createClient } from '@/lib/supabase/server'
+import { getServerSessionAccessTokenOrRedirect } from '@/lib/server-auth'
 
 async function getBillingPlan(): Promise<BillingPlan> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/auth')
-  }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect('/auth')
-  }
+  const accessToken = await getServerSessionAccessTokenOrRedirect('/auth')
 
   try {
     const response = await fetch(`${getServerApiUrl()}/billing`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
       cache: 'no-store',
     })
 

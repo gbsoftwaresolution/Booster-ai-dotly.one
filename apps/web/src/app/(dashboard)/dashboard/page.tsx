@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
 import { apiGet } from '@/lib/api'
+import { getServerUserAndTokenOrRedirect } from '@/lib/server-auth'
 import type { ItemsResponse, PaginatedResponse } from '@dotly/types'
 import { DashboardContent, DashboardHero, SkeletonList } from './components'
 import { isTaskOverdue } from './helpers'
@@ -17,18 +17,6 @@ import type {
 } from './types'
 
 // ─── Data Fetching Functions ───────────────────────────────────────────────────
-
-// Retrieve token early at the server layer to avoid waterfall
-async function getServerAuth() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getUser()
-  const { data: sessionData } = await supabase.auth.getSession()
-  
-  return { 
-    user: data?.user, 
-    token: sessionData?.session?.access_token ?? '' 
-  }
-}
 
 // Data loaders for Suspense Boundaries
 async function fetchSummaryData(token: string) {
@@ -117,7 +105,7 @@ function DashboardContentSkeleton() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage(): Promise<JSX.Element> {
-  const { user, token } = await getServerAuth()
+  const { user, token } = await getServerUserAndTokenOrRedirect('/auth')
   
   const userName =
     (user?.user_metadata?.full_name as string | undefined) ??

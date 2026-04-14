@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getServerUserOrRedirect } from '@/lib/server-auth'
 import { redirect } from 'next/navigation'
 import type { JSX } from 'react'
 import { BillingPlanProvider } from '@/components/billing/BillingPlanProvider'
@@ -13,14 +13,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }): Promise<JSX.Element> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/auth')
-  }
+  const user = await getServerUserOrRedirect('/auth')
 
   const displayName =
     (user.user_metadata?.['full_name'] as string | undefined) ??

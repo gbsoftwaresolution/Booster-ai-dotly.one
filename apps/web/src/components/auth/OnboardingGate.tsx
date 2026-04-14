@@ -14,11 +14,16 @@ export async function OnboardingGate({ children }: { children: ReactNode }): Pro
     redirect('/auth')
   }
 
-  const state = await getOnboardingState(token)
-  const nextStep = getOnboardingNextStep(state)
+  try {
+    const state = await getOnboardingState(token)
+    const nextStep = getOnboardingNextStep(state)
 
-  if (nextStep) {
-    redirect('/onboarding')
+    if (nextStep) {
+      redirect('/onboarding')
+    }
+  } catch {
+    // Avoid tripping the global error boundary during first-login / first-card
+    // races where onboarding state is briefly unavailable on the server.
   }
 
   return <>{children}</>

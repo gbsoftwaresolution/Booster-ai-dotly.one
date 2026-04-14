@@ -84,19 +84,19 @@ export default function OnboardingPage(): JSX.Element {
       }
 
       const [user, cards] = await Promise.all([
-        apiGet<UserMeResponse>('/users/me', token),
+        apiGet<UserMeResponse | null>('/users/me', token),
         apiGet<{ items?: Array<{ id: string }> }>('/cards', token),
       ])
 
       const fallbackCountry = detectBrowserCountry()
-      setName(user.name ?? '')
-      setEmail(user.email ?? '')
-      setCountry(user.country ?? fallbackCountry)
-      setTimezone(user.timezone ?? detectBrowserTimezone())
+      setName(user?.name ?? '')
+      setEmail(user?.email ?? '')
+      setCountry(user?.country ?? fallbackCountry)
+      setTimezone(user?.timezone ?? detectBrowserTimezone())
 
       const nextStep = getOnboardingNextStep({
         profileComplete:
-          Boolean(user.name?.trim()) && Boolean((user.country ?? fallbackCountry).trim()),
+          Boolean(user?.name?.trim()) && Boolean((user?.country ?? fallbackCountry).trim()),
         hasCard: (cards.items?.length ?? 0) > 0,
       })
 

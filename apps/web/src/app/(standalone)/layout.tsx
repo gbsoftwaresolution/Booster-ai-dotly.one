@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getServerUserOrRedirect } from '@/lib/server-auth'
 import { redirect } from 'next/navigation'
 import type { JSX } from 'react'
 
@@ -7,14 +7,7 @@ export default async function StandaloneLayout({
 }: {
   children: React.ReactNode
 }): Promise<JSX.Element> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/auth')
-  }
+  await getServerUserOrRedirect('/auth')
 
   return <>{children}</>
 }
