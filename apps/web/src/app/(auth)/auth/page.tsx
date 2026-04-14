@@ -194,7 +194,12 @@ function AuthPageContent(): JSX.Element {
               Polished workspace access
             </div>
             <div className="flex justify-center lg:justify-start">
-              <BrandLogo priority iconClassName="rounded-[18px]" textClassName="text-3xl" />
+              <BrandLogo
+                priority
+                className="gap-2 sm:gap-3"
+                iconClassName="h-8 w-8 rounded-[14px] sm:h-10 sm:w-10 sm:rounded-[18px]"
+                textClassName="text-2xl sm:text-3xl"
+              />
             </div>
             <p className="mt-2 text-sm text-gray-500">
               {mode === 'signin'

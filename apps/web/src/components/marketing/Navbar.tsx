@@ -25,7 +25,9 @@ export function Navbar() {
         >
           <BrandLogo
             priority
-            iconClassName="rounded-[18px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.35)]"
+            className="gap-2 sm:gap-3"
+            iconClassName="h-8 w-8 rounded-[14px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.35)] sm:h-10 sm:w-10 sm:rounded-[18px]"
+            textClassName="text-lg sm:text-xl"
           />
         </Link>
 

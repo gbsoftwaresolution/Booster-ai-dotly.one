@@ -29,7 +29,9 @@ export function Footer() {
               className="flex items-center gap-3 text-xl font-extrabold tracking-tight text-gray-900"
             >
               <BrandLogo
-                iconClassName="rounded-[18px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.35)]"
+                className="gap-2 sm:gap-3"
+                iconClassName="h-8 w-8 rounded-[14px] shadow-[0_18px_40px_-24px_rgba(14,165,233,0.35)] sm:h-10 sm:w-10 sm:rounded-[18px]"
+                textClassName="text-lg sm:text-xl"
               />
             </Link>
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
