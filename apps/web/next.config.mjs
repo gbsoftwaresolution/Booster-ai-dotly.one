@@ -1,5 +1,9 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import bundleAnalyzer from '@next/bundle-analyzer'
 import { withSentryConfig } from '@sentry/nextjs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
@@ -83,6 +87,8 @@ if (!r2Hostname && process.env.NODE_ENV === 'production') {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   allowedDevOrigins: collectAllowedDevOrigins(),
   transpilePackages: ['@dotly/ui', '@dotly/types'],
   images: {

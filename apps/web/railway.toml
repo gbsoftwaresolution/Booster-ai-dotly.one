@@ -1,0 +1,19 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/web/Dockerfile"
+watchPatterns = [
+  "apps/web/**",
+  "packages/ui/**",
+  "packages/types/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "turbo.json",
+  "tsconfig.base.json",
+]
+
+[deploy]
+healthcheckPath = "/api/health/live"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
