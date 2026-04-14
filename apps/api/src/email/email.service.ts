@@ -299,6 +299,53 @@ export class EmailService {
     })
   }
 
+  async sendRefundReviewRequestNotification(params: {
+    to: string
+    userId: string
+    userEmail: string
+    userName: string | null
+    plan: string
+    paymentId: string
+    txHash: string
+    refundUntil: string | null
+  }): Promise<boolean> {
+    const safeName = this.escHtml(params.userName || 'Unknown')
+    const safeEmail = this.escHtml(params.userEmail)
+    const safePlan = this.escHtml(params.plan)
+    const safePaymentId = this.escHtml(params.paymentId)
+    const safeTxHash = this.escHtml(params.txHash)
+    const safeRefundUntil = this.escHtml(params.refundUntil || 'Unknown')
+    const safeUserId = this.escHtml(params.userId)
+    const internalUrl = `${this.webUrl}/internal/support/refunds`
+
+    return this.send({
+      to: params.to,
+      subject: this.stripCrLf(`Refund review requested for ${params.userEmail}`),
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:680px;margin:0 auto;padding:24px">
+          <h2 style="margin:0 0 16px;color:#111827">Refund review requested</h2>
+          <p style="margin:0 0 16px;color:#374151">
+            A manual refund review was requested for a paid Dotly subscription.
+          </p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#f9fafb;border-radius:12px;overflow:hidden">
+            <tr><td style="padding:10px 14px;font-weight:600">User</td><td style="padding:10px 14px">${safeName}</td></tr>
+            <tr><td style="padding:10px 14px;font-weight:600">Email</td><td style="padding:10px 14px">${safeEmail}</td></tr>
+            <tr><td style="padding:10px 14px;font-weight:600">User ID</td><td style="padding:10px 14px">${safeUserId}</td></tr>
+            <tr><td style="padding:10px 14px;font-weight:600">Plan</td><td style="padding:10px 14px">${safePlan}</td></tr>
+            <tr><td style="padding:10px 14px;font-weight:600">Payment ID</td><td style="padding:10px 14px">${safePaymentId}</td></tr>
+            <tr><td style="padding:10px 14px;font-weight:600">Tx Hash</td><td style="padding:10px 14px">${safeTxHash}</td></tr>
+            <tr><td style="padding:10px 14px;font-weight:600">Refund window</td><td style="padding:10px 14px">${safeRefundUntil}</td></tr>
+          </table>
+          <p style="margin:20px 0 0">
+            <a href="${this.escHtml(internalUrl)}" style="display:inline-block;padding:12px 20px;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px">
+              Open support refund queue
+            </a>
+          </p>
+        </div>
+      `,
+    })
+  }
+
   async sendTeamInvite(
     to: string,
     teamName: string,

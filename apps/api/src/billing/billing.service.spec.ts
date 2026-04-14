@@ -5,7 +5,47 @@
  * without hitting a real blockchain or database.
  */
 import { BadRequestException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { Plan } from '@dotly/types'
+import { BillingService } from './billing.service'
+
+function makeBillingService() {
+  const prisma = {
+    subscription: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    user: {
+      update: jest.fn(),
+    },
+    auditLog: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+    },
+  }
+  const audit = { log: jest.fn().mockResolvedValue(undefined) }
+  const config = {
+    get: jest.fn((key: string) => {
+      switch (key) {
+        case 'DOTLY_CONTRACT_ADDRESS':
+          return '0x0000000000000000000000000000000000000001'
+        case 'ARBITRUM_RPC_URL':
+          return 'https://arb.example'
+        default:
+          return undefined
+      }
+    }),
+  } as unknown as ConfigService
+  const paymentVaultQuotes = {} as never
+  const email = { sendRefundReviewRequestNotification: jest.fn().mockResolvedValue(true) } as never
+
+  return {
+    prisma,
+    audit,
+    service: new BillingService(prisma as never, audit as never, config, paymentVaultQuotes, email),
+  }
+}
 
 // ── PLAN_INDEX_MAP sanity tests ───────────────────────────────────────────────
 // We re-derive the map here to ensure it stays in sync with the contract.
@@ -98,5 +138,56 @@ describe('stale pending checkout cleanup (pure logic)', () => {
     const now = new Date('2026-04-14T12:00:00.000Z')
     const fresh = new Date('2026-04-14T10:30:00.000Z')
     expect(isStalePending(fresh, now)).toBe(false)
+  })
+})
+
+describe('refund downgrade flow', () => {
+  it('downgrades an active subscription when the recorded payment has been refunded', async () => {
+    const { prisma, audit, service } = makeBillingService()
+
+    prisma.subscription.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      currentPeriodEnd: new Date('2026-06-01T00:00:00.000Z'),
+      txHash: '0xabc',
+      user: {
+        plan: Plan.PRO,
+        walletAddress: '0xwallet',
+        country: 'US',
+      },
+    })
+    prisma.auditLog.findFirst.mockResolvedValue(null)
+
+    jest.spyOn(service as any, 'readRecordedPaymentByTxHash').mockResolvedValue({
+      paymentId: '0x' + '1'.repeat(64),
+      payer: '0xwallet',
+      userRef: '0x' + '2'.repeat(64),
+      amount: 100000n,
+      planId: 2,
+      duration: 0,
+      paymentRef: '0x' + '3'.repeat(64),
+      paidAt: 1710000000n,
+      refundUntil: 1710600000n,
+      status: 2,
+    } as any)
+
+    const summary = await service.getUserSubscription('user_1', 'US')
+
+    expect(prisma.subscription.update).toHaveBeenCalledWith({
+      where: { userId: 'user_1' },
+      data: {
+        status: 'CANCELLED',
+        plan: Plan.FREE,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+      },
+    })
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user_1' },
+      data: { plan: Plan.FREE },
+    })
+    expect(summary.plan).toBe(Plan.FREE)
+    expect(summary.status).toBe('CANCELLED')
+    expect(summary.refund?.status).toBe('REFUNDED')
+    expect(audit.log).toHaveBeenCalled()
   })
 })

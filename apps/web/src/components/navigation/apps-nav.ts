@@ -76,8 +76,18 @@ export const APPS: AppDefinition[] = [
       {
         title: 'Tools',
         items: [
-          { href: '/apps/cards/email-templates', label: 'Email Templates', icon: Mail },
-          { href: '/apps/cards/email-signature', label: 'Email Signature', icon: FileSignature },
+          {
+            href: '/apps/cards/email-templates',
+            label: 'Email Templates',
+            icon: Mail,
+            minPlan: 'STARTER',
+          },
+          {
+            href: '/apps/cards/email-signature',
+            label: 'Email Signature',
+            icon: FileSignature,
+            minPlan: 'STARTER',
+          },
         ],
       },
     ],
@@ -102,24 +112,29 @@ export const APPS: AppDefinition[] = [
         title: 'People',
         items: [
           { href: '/apps/crm', label: 'Overview', icon: LayoutDashboard },
-          { href: '/apps/crm/contacts', label: 'Contacts', icon: Users },
+          { href: '/apps/crm/contacts', label: 'Contacts', icon: Users, minPlan: 'STARTER' },
           { href: '/apps/crm/leads', label: 'Lead Submissions', icon: Inbox },
         ],
       },
       {
         title: 'Sales',
         items: [
-          { href: '/apps/crm/deals', label: 'Deals', icon: DollarSign },
-          { href: '/apps/crm/tasks', label: 'Tasks', icon: CheckSquare },
-          { href: '/apps/crm/pipeline', label: 'Pipeline', icon: Kanban },
-          { href: '/apps/crm/pipelines', label: 'Pipelines', icon: GitBranch },
+          { href: '/apps/crm/deals', label: 'Deals', icon: DollarSign, minPlan: 'PRO' },
+          { href: '/apps/crm/tasks', label: 'Tasks', icon: CheckSquare, minPlan: 'PRO' },
+          { href: '/apps/crm/pipeline', label: 'Pipeline', icon: Kanban, minPlan: 'PRO' },
+          { href: '/apps/crm/pipelines', label: 'Pipelines', icon: GitBranch, minPlan: 'PRO' },
         ],
       },
       {
         title: 'Settings',
         items: [
-          { href: '/apps/crm/custom-fields', label: 'Custom Fields', icon: SlidersHorizontal },
-          { href: '/apps/crm/analytics', label: 'Analytics', icon: TrendingUp },
+          {
+            href: '/apps/crm/custom-fields',
+            label: 'Custom Fields',
+            icon: SlidersHorizontal,
+            minPlan: 'PRO',
+          },
+          { href: '/apps/crm/analytics', label: 'Analytics', icon: TrendingUp, minPlan: 'PRO' },
         ],
       },
     ],
@@ -142,14 +157,15 @@ export const APPS: AppDefinition[] = [
       {
         title: 'Scheduling',
         items: [
-          { href: '/apps/scheduling', label: 'Overview', icon: LayoutDashboard },
+          { href: '/apps/scheduling', label: 'Overview', icon: LayoutDashboard, minPlan: 'STARTER' },
           {
             href: '/apps/scheduling/appointment-types',
             label: 'Appointment Types',
             icon: CalendarCheck,
+            minPlan: 'STARTER',
           },
-          { href: '/apps/scheduling/availability', label: 'Availability', icon: Clock },
-          { href: '/apps/scheduling/bookings', label: 'Bookings', icon: CalendarClock },
+          { href: '/apps/scheduling/availability', label: 'Availability', icon: Clock, minPlan: 'STARTER' },
+          { href: '/apps/scheduling/bookings', label: 'Bookings', icon: CalendarClock, minPlan: 'STARTER' },
         ],
       },
     ],

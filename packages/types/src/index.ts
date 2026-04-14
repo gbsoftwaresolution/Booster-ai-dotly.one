@@ -282,6 +282,20 @@ export interface BillingSummaryResponse {
   amountUsdt: string | null
   cryptoBlocked: boolean
   billingCountry: string | null
+  refund: BillingRefundSummary | null
+}
+
+export type BillingRefundStatus = 'NONE' | 'PAID_ESCROW' | 'REFUNDED' | 'FINALIZED'
+
+export interface BillingRefundSummary {
+  paymentId: string | null
+  paymentVaultAddress: string | null
+  status: BillingRefundStatus
+  refundUntil: string | null
+  eligible: boolean
+  canSelfRefund: boolean
+  canRequestManualReview: boolean
+  supportRequestedAt: string | null
 }
 
 export interface BillingCheckoutQuoteResponse {
@@ -309,6 +323,40 @@ export interface BillingActivateCheckoutResponse {
   status: 'ACTIVE' | 'PENDING' | 'CANCELLED'
   plan: string
   currentPeriodEnd: string | null
+}
+
+export interface BillingRefundRequestResponse {
+  status: 'REQUESTED'
+  paymentId: string
+  requestedAt: string
+  alreadyRequested: boolean
+}
+
+export interface BillingRefundReviewItem {
+  requestId: string
+  userId: string | null
+  userEmail: string | null
+  userName: string | null
+  requestedAt: string
+  paymentId: string | null
+  txHash: string | null
+  plan: string
+  subscriptionStatus: string | null
+  currentPeriodEnd: string | null
+  refund: BillingRefundSummary | null
+  canAdminRefund: boolean
+  adminRefundTxHash: string | null
+}
+
+export interface BillingRefundReviewListResponse {
+  items: BillingRefundReviewItem[]
+  adminRefundEnabled: boolean
+}
+
+export interface BillingAdminRefundResponse {
+  status: 'REFUNDED'
+  paymentId: string
+  txHash: string
 }
 
 export type CardFieldKey = keyof CardFields

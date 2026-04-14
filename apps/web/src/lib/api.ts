@@ -1,7 +1,25 @@
 import { getPublicApiUrl } from './public-env'
 
-const API_URL = getPublicApiUrl()
 const API_TIMEOUT_MS = 15_000
+
+function getApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    return getPublicApiUrl()
+  }
+
+  const serverApiUrl = process.env.API_URL ?? process.env.INTERNAL_API_URL
+  if (serverApiUrl) {
+    return serverApiUrl.replace(/\/$/, '')
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:3001'
+  }
+
+  throw new Error(
+    'Neither API_URL nor INTERNAL_API_URL is set. Set API_URL to the private/internal address of the NestJS API service.',
+  )
+}
 
 export class ApiError extends Error {
   statusCode: number
@@ -124,7 +142,7 @@ async function parseApiSuccess<T>(res: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: 'no-store',
     signal,
@@ -139,7 +157,7 @@ export async function apiPost<T>(
   token?: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -153,7 +171,7 @@ export async function apiPost<T>(
 }
 
 export async function apiPut<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -166,7 +184,7 @@ export async function apiPut<T>(path: string, body: unknown, token?: string): Pr
 }
 
 export async function apiPatch<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -183,7 +201,7 @@ export async function apiDelete<T = void>(
   token?: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
     method: 'DELETE',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal,
@@ -198,7 +216,7 @@ export async function apiDeleteWithBody<T = void>(
   token?: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',

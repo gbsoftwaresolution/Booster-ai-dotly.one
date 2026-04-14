@@ -1,14 +1,17 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import { StructuredData } from '@/components/seo/StructuredData'
 import { Navbar } from '@/components/marketing/Navbar'
 import { CtaBanner } from '@/components/marketing/CtaBanner'
 import { Footer } from '@/components/marketing/Footer'
+import { SITE_DESCRIPTION, SITE_NAME, absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createMarketingMetadata({
   title: 'About',
   description:
-    'Dotly.one helps professionals share smarter with digital business cards powered by NFC, analytics, CRM, and scheduling.',
-}
+    'Learn about Dotly.one, the team behind its digital business cards, and the product principles shaping NFC sharing, analytics, CRM, and scheduling.',
+  path: '/about',
+  keywords: ['about dotly', 'digital business card company', 'networking platform'],
+})
 
 const VALUES = [
   {
@@ -42,9 +45,29 @@ const TEAM = [
   },
 ]
 
+const aboutStructuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    name: 'About Dotly.one',
+    url: absoluteUrl('/about'),
+    description:
+      'Learn about the mission and product philosophy behind Dotly.one digital business cards.',
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: SITE_NAME,
+    url: absoluteUrl('/'),
+    description: SITE_DESCRIPTION,
+    email: 'hello@dotly.one',
+  },
+]
+
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
+      <StructuredData id="about-structured-data" data={aboutStructuredData} />
       <Navbar />
 
       {/* Mission section */}

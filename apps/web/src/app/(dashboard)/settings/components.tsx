@@ -187,7 +187,9 @@ export function SettingsHero({
   return (
     <div className="group relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 px-5 py-8 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-700 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
       <div
-        className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-sky-500/5 pointer-events-none" aria-hidden="true" />
+        className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-sky-500/5 pointer-events-none"
+        aria-hidden="true"
+      />
       <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none" />
       <div className="absolute right-0 top-1/4 h-96 w-96 rounded-full bg-sky-400/10 blur-[100px] pointer-events-none" />
       <div className="relative z-10 flex flex-col gap-8 xl:grid xl:grid-cols-[1.35fr_0.92fr] xl:items-start">
@@ -231,9 +233,12 @@ export function SettingsHero({
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-600">
                 Account Snapshot
               </p>
-              <p className="mt-1.5 text-base font-extrabold text-indigo-950">Control center overview</p>
+              <p className="mt-1.5 text-base font-extrabold text-indigo-950">
+                Control center overview
+              </p>
             </div>
-            <span className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 shadow-sm border border-indigo-100"><span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 shadow-sm border border-indigo-100">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
               Live
             </span>
           </div>
@@ -270,9 +275,11 @@ export function SettingsHero({
 export function SettingsTabs({
   activeTab,
   onChange,
+  onOpenBilling,
 }: {
   activeTab: Tab
   onChange: (tab: Tab) => void
+  onOpenBilling: () => void
 }): JSX.Element {
   return (
     <div className="app-panel-subtle rounded-[24px] p-2">
@@ -281,7 +288,13 @@ export function SettingsTabs({
           <button
             key={tab}
             type="button"
-            onClick={() => onChange(tab)}
+            onClick={() => {
+              if (tab === 'Billing') {
+                onOpenBilling()
+                return
+              }
+              onChange(tab)
+            }}
             className={cn(
               'whitespace-nowrap rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors',
               activeTab === tab
@@ -495,7 +508,7 @@ export function BillingTabContent({
           </div>
 
           <a
-            href="/pricing"
+            href="/settings/billing"
             className="inline-block rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
           >
             {billing?.status === 'ACTIVE' ? 'Manage billing' : 'Upgrade plan'}

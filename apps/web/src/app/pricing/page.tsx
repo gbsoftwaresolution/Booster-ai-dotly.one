@@ -2,12 +2,59 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Script from 'next/script'
 import { Check, ShieldCheck, Sparkles, X as XIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import {
+  BILLING_FEATURE_MATRIX,
+  BILLING_PLAN_PRICES,
+  type BillingDuration,
+  getPlanFeatureValue,
+} from '@/lib/billing-plans'
 import { Navbar } from '@/components/marketing/Navbar'
 import { Footer } from '@/components/marketing/Footer'
 
-type Duration = 'MONTHLY' | 'SIX_MONTHS' | 'ANNUAL'
+type Duration = BillingDuration
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_WEB_URL ?? 'https://dotly.one'
+
+const pricingStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Dotly.one',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web, iOS, Android',
+  url: `${SITE_URL}/pricing`,
+  offers: [
+    {
+      '@type': 'Offer',
+      name: 'Dotly.one Free',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+      url: `${SITE_URL}/pricing`,
+    },
+    {
+      '@type': 'Offer',
+      name: 'Dotly.one Starter',
+      price: String(BILLING_PLAN_PRICES.STARTER?.ANNUAL ?? 1),
+      priceCurrency: 'USD',
+      category: 'subscription',
+      availability: 'https://schema.org/InStock',
+      url: `${SITE_URL}/pricing`,
+    },
+    {
+      '@type': 'Offer',
+      name: 'Dotly.one Pro',
+      price: String(BILLING_PLAN_PRICES.PRO?.ANNUAL ?? 200),
+      priceCurrency: 'USD',
+      category: 'subscription',
+      availability: 'https://schema.org/InStock',
+      url: `${SITE_URL}/pricing`,
+    },
+  ],
+}
 
 interface Plan {
   id: 'STARTER' | 'PRO'
@@ -31,7 +78,7 @@ const PLANS: Plan[] = [
     id: 'STARTER',
     name: 'Starter',
     tagline: 'For individuals, freelancers, and solo professionals.',
-    prices: { MONTHLY: 10, SIX_MONTHS: 50, ANNUAL: 99 },
+    prices: BILLING_PLAN_PRICES.STARTER!,
     features: [
       '1 premium card',
       '30-day analytics',
@@ -47,13 +94,13 @@ const PLANS: Plan[] = [
     id: 'PRO',
     name: 'Pro',
     tagline: 'For power users running their full follow-up workflow.',
-    prices: { MONTHLY: 20, SIX_MONTHS: 99, ANNUAL: 199 },
+    prices: BILLING_PLAN_PRICES.PRO!,
     highlight: true,
     features: [
       'Up to 3 cards',
-      'Advanced analytics',
+      '90-day analytics',
       'Full CRM',
-      'Inbox + scheduling',
+      'Full scheduling',
       'CSV export',
       'Custom domain',
       'Webhooks',
@@ -62,24 +109,12 @@ const PLANS: Plan[] = [
   },
 ]
 
-const FEATURES: FeatureRow[] = [
-  { label: 'Digital cards', free: '1', starter: '1 premium card', pro: '3 cards' },
-  { label: 'Analytics history', free: '7 days', starter: '30 days', pro: 'Advanced analytics' },
-  {
-    label: 'Social links',
-    free: 'Up to 3',
-    starter: 'More social links',
-    pro: 'More social links',
-  },
-  { label: 'Lead capture', free: 'Basic', starter: true, pro: true },
-  { label: 'CRM', free: false, starter: 'Basic CRM', pro: 'Full CRM' },
-  { label: 'Email signature', free: false, starter: true, pro: true },
-  { label: 'Email templates', free: false, starter: true, pro: true },
-  { label: 'Scheduling', free: false, starter: 'Basic', pro: 'Full' },
-  { label: 'CSV export', free: false, starter: false, pro: true },
-  { label: 'Custom domain', free: false, starter: false, pro: true },
-  { label: 'Webhooks', free: false, starter: false, pro: true },
-]
+const FEATURES: FeatureRow[] = BILLING_FEATURE_MATRIX.map((row) => ({
+  label: row.label,
+  free: getPlanFeatureValue(row, 'FREE'),
+  starter: getPlanFeatureValue(row, 'STARTER'),
+  pro: getPlanFeatureValue(row, 'PRO'),
+}))
 
 const DURATION_LABELS: Record<Duration, string> = {
   MONTHLY: 'Monthly',
@@ -130,6 +165,11 @@ function formatPrice(plan: Plan, duration: Duration): { display: string; sub: st
   return { display: `$${total}`, sub: 'per year' }
 }
 
+function formatMonthlyEquivalent(price: number, duration: Duration): string {
+  const divisor = duration === 'ANNUAL' ? 12 : duration === 'SIX_MONTHS' ? 6 : 1
+  return (price / divisor).toFixed(2).replace(/\.00$/, '')
+}
+
 function getCheckoutHref(plan: 'STARTER' | 'PRO', duration: Duration): string {
   const next = encodeURIComponent(`/settings/billing?plan=${plan}&duration=${duration}`)
   return `/auth?next=${next}`
@@ -140,6 +180,11 @@ export default function PricingPage() {
 
   return (
     <div className="marketing-shell relative min-h-screen overflow-hidden bg-slate-50/50">
+      <Script
+        id="pricing-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingStructuredData) }}
+      />
       <div className="absolute left-1/2 top-0 -translate-x-1/2 -top-40 h-[600px] w-[800px] rounded-full bg-gradient-to-br from-indigo-400/20 to-sky-300/20 blur-[120px] pointer-events-none" />
       <div className="absolute right-0 top-1/3 h-[500px] w-[500px] rounded-full bg-sky-400/10 blur-[100px] pointer-events-none" />
       <div className="absolute left-0 bottom-1/4 h-[600px] w-[600px] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
@@ -327,10 +372,21 @@ export default function PricingPage() {
               <thead>
                 <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm px-4">
                   <th className="px-5 py-4 font-semibold text-gray-700">Feature</th>
-                  <th className="px-4 py-4 text-center font-semibold text-gray-500">Free</th>
-                  <th className="px-4 py-4 text-center font-semibold text-gray-700">Starter</th>
+                  <th className="px-4 py-4 text-center font-semibold text-gray-500">
+                    <div>Free</div>
+                    <div className="font-normal text-xs text-gray-400 mt-0.5">$0 / mo</div>
+                  </th>
+                  <th className="px-4 py-4 text-center font-semibold text-gray-700">
+                    <div>Starter</div>
+                    <div className="font-normal text-xs text-gray-500 mt-0.5">
+                      ${formatMonthlyEquivalent(BILLING_PLAN_PRICES.STARTER?.[duration] ?? 0, duration)} / mo
+                    </div>
+                  </th>
                   <th className="bg-brand-50/40 px-4 py-4 text-center font-semibold text-brand-700">
-                    Pro
+                    <div>Pro</div>
+                    <div className="font-normal text-xs text-brand-600/80 mt-0.5">
+                      ${formatMonthlyEquivalent(BILLING_PLAN_PRICES.PRO?.[duration] ?? 0, duration)} / mo
+                    </div>
                   </th>
                 </tr>
               </thead>

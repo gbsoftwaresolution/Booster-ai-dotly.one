@@ -1,17 +1,32 @@
 import type { Metadata } from 'next'
+import { StructuredData } from '@/components/seo/StructuredData'
 import { Navbar } from '@/components/marketing/Navbar'
 import { Footer } from '@/components/marketing/Footer'
+import { absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createMarketingMetadata({
   title: 'Privacy Policy',
-  description: 'Dotly.one privacy policy — how we collect, use, and protect your data.',
-}
+  description: 'Read the Dotly.one privacy policy and learn how data is collected, used, retained, and protected across the platform.',
+  path: '/privacy',
+  keywords: ['privacy policy', 'data protection', 'personal data'],
+})
 
 const LAST_UPDATED = 'April 8, 2026'
+
+const privacyStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Dotly.one Privacy Policy',
+  url: absoluteUrl('/privacy'),
+  dateModified: '2026-04-08',
+  description:
+    'Dotly.one privacy policy covering data collection, usage, retention, and user rights.',
+}
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-white">
+      <StructuredData id="privacy-structured-data" data={privacyStructuredData} />
       <Navbar />
 
       <main className="px-6 py-16">

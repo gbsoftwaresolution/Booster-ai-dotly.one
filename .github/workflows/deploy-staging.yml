@@ -13,8 +13,6 @@ concurrency:
 jobs:
   ci-gate:
     uses: ./.github/workflows/ci.yml
-    with:
-      run-security-gates: false
 
   deploy-api-staging:
     needs: ci-gate

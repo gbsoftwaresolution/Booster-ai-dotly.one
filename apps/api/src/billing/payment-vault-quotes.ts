@@ -23,6 +23,23 @@ export const PLAN_IDS: Record<Plan, number> = {
 export class PaymentVaultQuotes {
   constructor(private readonly config: ConfigService) {}
 
+  private parseNonce(nonce: string | bigint): bigint {
+    if (typeof nonce === 'bigint') {
+      return nonce
+    }
+
+    const trimmed = nonce.trim()
+    if (!trimmed) {
+      throw new BadRequestException('Payment nonce is required')
+    }
+
+    if (/^0x[0-9a-fA-F]+$/.test(trimmed) || /^\d+$/.test(trimmed)) {
+      return BigInt(trimmed)
+    }
+
+    throw new BadRequestException('Payment nonce must be a decimal or hex uint256 value')
+  }
+
   getChainId(): number {
     return 42161
   }
@@ -65,7 +82,7 @@ export class PaymentVaultQuotes {
     plan: Plan
     duration: BillingDuration
     walletAddress: string
-    nonce: string
+    nonce: string | bigint
   }) {
     return TypedDataEncoder.hashStruct(
       'PaymentRef',
@@ -83,7 +100,7 @@ export class PaymentVaultQuotes {
         plan: input.plan,
         duration: input.duration,
         walletAddress: input.walletAddress,
-        nonce: BigInt(input.nonce),
+        nonce: this.parseNonce(input.nonce),
       },
     )
   }

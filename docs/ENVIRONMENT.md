@@ -26,8 +26,11 @@ Copy the relevant `.env.example` to `.env` in each app directory, fill in the va
 | `R2_SECRET_ACCESS_KEY`   | R2 API token secret                                           | Yes                         | Cloudflare R2 → Manage API tokens   |
 | `R2_BUCKET`              | R2 bucket name for file uploads                               | Yes                         | Cloudflare R2 (create manually)     |
 | `R2_PUBLIC_URL`          | Public base URL for R2-served assets                          | Yes                         | Cloudflare R2 bucket settings       |
-| `POLYGON_RPC_URL`        | RPC endpoint for the billing smart contract chain             | Yes                         | Chain provider (e.g. Polygon RPC)   |
-| `DOTLY_CONTRACT_ADDRESS` | Deployed billing smart contract address                       | Yes                         | Deployment output                   |
+| `POLYGON_RPC_URL`        | RPC endpoint for the legacy billing smart contract chain      | No                          | Chain provider (e.g. Polygon RPC)   |
+| `ARBITRUM_RPC_URL`       | RPC endpoint for DotlyPaymentVault on Arbitrum                | Yes                         | Chain provider (e.g. Alchemy)       |
+| `DOTLY_CONTRACT_ADDRESS` | Deployed DotlyPaymentVault contract address                   | Yes                         | Deployment output                   |
+| `DOTLY_USDT_ADDRESS`     | USDT token address used by DotlyPaymentVault                  | Yes                         | Arbitrum USDT deployment            |
+| `DOTLY_PAYMENT_SIGNER_PRIVATE_KEY` | Private key for the dedicated backend quote signer | Yes for crypto checkout     | Secure secrets manager / signer wallet |
 | `PORT`                   | Port the API server listens on                                | No (default: `3001`)        | —                                   |
 | `NODE_ENV`               | Node environment (`development` / `production`)               | No (default: `development`) | —                                   |
 | `WEB_URL`                | Base URL of the web app (used for CORS and email links)       | Yes                         | `http://localhost:3000` locally     |
@@ -68,3 +71,7 @@ Copy the relevant `.env.example` to `.env` in each app directory, fill in the va
 - Server-only secrets (`SUPABASE_JWT_SECRET`, `MAILGUN_API_KEY`, AWS keys, R2 keys, `POLYGON_RPC_URL`) must **never** appear in `apps/web` or `apps/mobile` env files.
 - `apps/web` currently requires both `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_WEB_URL`; keep them in sync unless and until the runtime usage is consolidated in code.
 - `.env` files are git-ignored. Only `.env.example` files are committed. Copy `.env.example` → `.env` and fill in real values locally.
+- Production web/API deploys now reuse the main CI workflow with security gates enabled. A deploy will be blocked if TruffleHog finds verified secrets, if runtime dependency audit reports high/critical issues, or if a real `.env` file is tracked in git.
+- Mobile EAS build/submit workflows now run a release preflight that fails when `apps/mobile/eas.json` still contains `TODO_REPLACE` store-submission placeholders.
+- For GitHub Actions production deploys, confirm these secrets exist before launch: `DATABASE_URL`, `RAILWAY_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and `EXPO_TOKEN` if mobile builds are part of the release.
+- For production source-map upload and Sentry release creation, set `SENTRY_AUTH_TOKEN` in the build environment; Turbo now passes it through to package builds.

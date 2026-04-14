@@ -1,15 +1,9 @@
 import type { Duration, PlanId } from './types'
+import { BILLING_PLAN_PRICES } from '@/lib/billing-plans'
 
 export const PAID_PLANS: PlanId[] = ['STARTER', 'PRO']
 
-export const PLAN_PRICES: Record<PlanId, Record<Duration, number> | null> = {
-  FREE: null,
-  STARTER: { MONTHLY: 10, SIX_MONTHS: 55, ANNUAL: 100 },
-  PRO: { MONTHLY: 20, SIX_MONTHS: 110, ANNUAL: 200 },
-  BUSINESS: { MONTHLY: 50, SIX_MONTHS: 275, ANNUAL: 500 },
-  AGENCY: { MONTHLY: 100, SIX_MONTHS: 550, ANNUAL: 1000 },
-  ENTERPRISE: { MONTHLY: 199, SIX_MONTHS: 1095, ANNUAL: 1990 },
-}
+export const PLAN_PRICES: Record<PlanId, Record<Duration, number> | null> = BILLING_PLAN_PRICES
 
 export const DURATION_LABEL: Record<Duration, string> = {
   MONTHLY: 'Monthly',
@@ -41,6 +35,8 @@ export const STATUS_COLORS: Record<string, string> = {
 }
 
 export const ERC20_APPROVE_SELECTOR = '0x095ea7b3'
+export const ARBITRUM_CHAIN_ID = 42161
+const ARBITRUM_CHAIN_ID_HEX = '0xa4b1'
 
 export const BILLING_DURATIONS: Duration[] = ['MONTHLY', 'SIX_MONTHS', 'ANNUAL']
 
@@ -92,6 +88,63 @@ export async function waitForReceipt(txHash: string, maxWaitMs = 90_000): Promis
   }
 
   throw new Error('Transaction receipt timeout — please check your wallet or try again.')
+}
+
+function parseWalletChainId(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isInteger(value)) return value
+  if (typeof value === 'bigint') return Number(value)
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    if (/^0x[0-9a-fA-F]+$/.test(trimmed)) return parseInt(trimmed, 16)
+    if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10)
+  }
+
+  return null
+}
+
+async function getWalletChainId(): Promise<number> {
+  if (!window.ethereum) {
+    throw new Error('MetaMask is not installed.')
+  }
+
+  const chainId = parseWalletChainId(await window.ethereum.request({ method: 'eth_chainId' }))
+  if (chainId !== null) return chainId
+
+  const fallbackChainId = parseWalletChainId(await window.ethereum.request({ method: 'net_version' }))
+  if (fallbackChainId !== null) return fallbackChainId
+
+  throw new Error('Could not determine the connected wallet network.')
+}
+
+export async function ensureWalletChain(requiredChainId: number): Promise<number> {
+  let currentChainId = await getWalletChainId()
+  if (currentChainId === requiredChainId) return currentChainId
+
+  try {
+    await window.ethereum?.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: ARBITRUM_CHAIN_ID_HEX }],
+    })
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null
+    if (code === 4001) {
+      throw new Error('Wallet network switch was cancelled.')
+    }
+    if (code === 4902) {
+      throw new Error('Arbitrum One is not available in this wallet. Add the network and try again.')
+    }
+  }
+
+  currentChainId = await getWalletChainId()
+  if (currentChainId !== requiredChainId) {
+    throw new Error(
+      `Please switch your wallet to chain ${requiredChainId} (Arbitrum One). Currently on ${currentChainId}.`,
+    )
+  }
+
+  return currentChainId
 }
 
 export function formatExpiryDate(date: string | null | undefined): string | null {

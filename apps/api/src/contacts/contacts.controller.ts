@@ -11,6 +11,7 @@ import {
   UseGuards,
   Res,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common'
 import type { Response } from 'express'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
@@ -763,17 +764,45 @@ export class ContactsController {
     private prisma: PrismaService,
   ) {}
 
-  private async assertCsvExportAccess(rawUserId: string): Promise<void> {
+  private async getPlanLimits(rawUserId: string) {
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ id: rawUserId }, { supabaseId: rawUserId }] },
       select: { plan: true },
     })
 
     const plan = (user?.plan as Plan | undefined) ?? Plan.FREE
-    const limits = this.billingService.getPlanLimits(plan)
+    return this.billingService.getPlanLimits(plan)
+  }
+
+  private async assertCsvExportAccess(rawUserId: string): Promise<void> {
+    const limits = await this.getPlanLimits(rawUserId)
 
     if (!limits.csvExport) {
       throw new BadRequestException('CSV export is available on Pro.')
+    }
+  }
+
+  private async assertBasicCrmAccess(rawUserId: string): Promise<void> {
+    const limits = await this.getPlanLimits(rawUserId)
+
+    if (limits.crmLevel === 'none') {
+      throw new ForbiddenException('CRM access requires Starter or higher')
+    }
+  }
+
+  private async assertFullCrmAccess(rawUserId: string): Promise<void> {
+    const limits = await this.getPlanLimits(rawUserId)
+
+    if (limits.crmLevel !== 'full') {
+      throw new ForbiddenException('This CRM feature requires Pro or higher')
+    }
+  }
+
+  private async assertEmailTemplateAccess(rawUserId: string): Promise<void> {
+    const limits = await this.getPlanLimits(rawUserId)
+
+    if (!limits.emailTemplates) {
+      throw new ForbiddenException('Email templates require Starter or higher')
     }
   }
 
@@ -789,14 +818,16 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('contacts')
   @ApiOperation({ summary: 'Create a contact manually' })
-  create(@CurrentUser() user: { id: string }, @Body() dto: CreateContactDto) {
+  async create(@CurrentUser() user: { id: string }, @Body() dto: CreateContactDto) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.create(user.id, dto)
   }
 
   @ApiBearerAuth()
   @Get('contacts')
   @ApiOperation({ summary: 'List all contacts for the authenticated user (paginated)' })
-  findAll(@CurrentUser() user: { id: string }, @Query() query: PaginationQuery) {
+  async findAll(@CurrentUser() user: { id: string }, @Query() query: PaginationQuery) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.findAll(user.id, {
       stage: query.stage,
       search: query.search,
@@ -814,7 +845,8 @@ export class ContactsController {
   @ApiOperation({
     summary: 'Get all distinct tags used across contacts for the authenticated user',
   })
-  getContactTags(@CurrentUser() user: { id: string }) {
+  async getContactTags(@CurrentUser() user: { id: string }) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.getAllTags(user.id)
   }
 
@@ -874,50 +906,56 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('contacts/:id')
   @ApiOperation({ summary: 'Get a single contact' })
-  findOne(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.findOne(id, user.id)
   }
 
   @ApiBearerAuth()
   @Put('contacts/:id')
   @ApiOperation({ summary: 'Update a contact' })
-  update(
+  async update(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateContactDto,
   ) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.update(id, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Delete('contacts/bulk')
   @ApiOperation({ summary: 'Delete multiple contacts at once' })
-  bulkDelete(@CurrentUser() user: { id: string }, @Body() dto: BulkDeleteDto) {
+  async bulkDelete(@CurrentUser() user: { id: string }, @Body() dto: BulkDeleteDto) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.bulkDelete(user.id, dto.ids)
   }
 
   @ApiBearerAuth()
   @Delete('contacts/:id')
   @ApiOperation({ summary: 'Delete a contact' })
-  remove(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async remove(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.remove(id, user.id)
   }
 
   @ApiBearerAuth()
   @Patch('contacts/:id/stage')
   @ApiOperation({ summary: 'Update CRM stage for a contact' })
-  updateStage(
+  async updateStage(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateStageDto,
   ) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.updateStage(id, user.id, dto.stage)
   }
 
   @ApiBearerAuth()
   @Get('contacts/:id/timeline')
   @ApiOperation({ summary: 'Get timeline events for a contact' })
-  getTimeline(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async getTimeline(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.getTimeline(id, user.id)
   }
 
@@ -930,11 +968,12 @@ export class ContactsController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('contacts/:id/send-email')
   @ApiOperation({ summary: 'Send a direct email to a contact from CRM' })
-  sendEmail(
+  async sendEmail(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: SendEmailDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.sendEmailToContact(user.id, id, dto.subject, dto.body)
   }
 
@@ -953,7 +992,8 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('crm/pipeline')
   @ApiOperation({ summary: 'Get CRM pipeline grouped by stage' })
-  getPipeline(@CurrentUser() user: { id: string }, @Query() query: PipelineQuery) {
+  async getPipeline(@CurrentUser() user: { id: string }, @Query() query: PipelineQuery) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getPipeline(user.id, { search: query.search })
   }
 
@@ -961,7 +1001,8 @@ export class ContactsController {
   @ApiBearerAuth()
   @Patch('contacts/bulk-stage')
   @ApiOperation({ summary: 'Update CRM stage for multiple contacts at once' })
-  bulkUpdateStage(@CurrentUser() user: { id: string }, @Body() dto: BulkStageDto) {
+  async bulkUpdateStage(@CurrentUser() user: { id: string }, @Body() dto: BulkStageDto) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.bulkUpdateStage(user.id, dto.ids, dto.stage)
   }
 
@@ -995,36 +1036,40 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('contacts/:id/notes')
   @ApiOperation({ summary: 'Create a threaded note on a contact' })
-  createNote(
+  async createNote(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: CreateNoteDto,
   ) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.createNote(id, user.id, dto.content)
   }
 
   @ApiBearerAuth()
   @Get('contacts/:id/notes')
   @ApiOperation({ summary: 'List all notes on a contact' })
-  getNotes(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async getNotes(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.getNotes(id, user.id)
   }
 
   @ApiBearerAuth()
   @Patch('contacts/:contactId/notes/:noteId')
   @ApiOperation({ summary: 'Update a note' })
-  updateNote(
+  async updateNote(
     @Param('noteId') noteId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateNoteDto,
   ) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.updateNote(noteId, user.id, dto.content)
   }
 
   @ApiBearerAuth()
   @Delete('contacts/:contactId/notes/:noteId')
   @ApiOperation({ summary: 'Delete a note' })
-  deleteNote(@Param('noteId') noteId: string, @CurrentUser() user: { id: string }) {
+  async deleteNote(@Param('noteId') noteId: string, @CurrentUser() user: { id: string }) {
+    await this.assertBasicCrmAccess(user.id)
     return this.contactsService.deleteNote(noteId, user.id)
   }
 
@@ -1033,44 +1078,49 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('crm/custom-fields')
   @ApiOperation({ summary: 'List custom field definitions for the user' })
-  getCustomFields(@CurrentUser() user: { id: string }) {
+  async getCustomFields(@CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getCustomFields(user.id)
   }
 
   @ApiBearerAuth()
   @Post('crm/custom-fields')
   @ApiOperation({ summary: 'Create a custom field definition' })
-  createCustomField(@CurrentUser() user: { id: string }, @Body() dto: CreateCustomFieldDto) {
+  async createCustomField(@CurrentUser() user: { id: string }, @Body() dto: CreateCustomFieldDto) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.createCustomField(user.id, dto)
   }
 
   @ApiBearerAuth()
   @Patch('crm/custom-fields/:fieldId')
   @ApiOperation({ summary: 'Update a custom field definition' })
-  updateCustomField(
+  async updateCustomField(
     @Param('fieldId') fieldId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateCustomFieldDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.updateCustomField(fieldId, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Delete('crm/custom-fields/:fieldId')
   @ApiOperation({ summary: 'Delete a custom field definition' })
-  deleteCustomField(@Param('fieldId') fieldId: string, @CurrentUser() user: { id: string }) {
+  async deleteCustomField(@Param('fieldId') fieldId: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.deleteCustomField(fieldId, user.id)
   }
 
   @ApiBearerAuth()
   @Put('contacts/:id/custom-fields/:fieldId')
   @ApiOperation({ summary: 'Set a custom field value on a contact' })
-  setCustomFieldValue(
+  async setCustomFieldValue(
     @Param('id') contactId: string,
     @Param('fieldId') fieldId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: SetCustomFieldValueDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.setCustomFieldValue(contactId, user.id, fieldId, dto.value)
   }
 
@@ -1079,25 +1129,28 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('contacts/:id/deals')
   @ApiOperation({ summary: 'Create a deal for a contact' })
-  createDeal(
+  async createDeal(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: CreateDealDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.createDeal(id, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Get('contacts/:id/deals')
   @ApiOperation({ summary: 'Get all deals for a contact' })
-  getDeals(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async getDeals(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getDeals(id, user.id)
   }
 
   @ApiBearerAuth()
   @Get('deals')
   @ApiOperation({ summary: 'Get all deals for the authenticated user' })
-  getAllDeals(@CurrentUser() user: { id: string }, @Query() query: DealsQuery) {
+  async getAllDeals(@CurrentUser() user: { id: string }, @Query() query: DealsQuery) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getAllDeals(user.id, {
       page: query.page,
       limit: query.limit,
@@ -1109,25 +1162,28 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('deals/summary')
   @ApiOperation({ summary: 'Get deal summary metrics for the authenticated user' })
-  getDealsSummary(@CurrentUser() user: { id: string }) {
+  async getDealsSummary(@CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getDealsSummary(user.id)
   }
 
   @ApiBearerAuth()
   @Patch('deals/:dealId')
   @ApiOperation({ summary: 'Update a deal' })
-  updateDeal(
+  async updateDeal(
     @Param('dealId') dealId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateDealDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.updateDeal(dealId, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Delete('deals/:dealId')
   @ApiOperation({ summary: 'Delete a deal' })
-  deleteDeal(@Param('dealId') dealId: string, @CurrentUser() user: { id: string }) {
+  async deleteDeal(@Param('dealId') dealId: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.deleteDeal(dealId, user.id)
   }
 
@@ -1138,7 +1194,8 @@ export class ContactsController {
   @ApiOperation({
     summary: 'Import contacts from CSV text (Content-Type: application/json, field: csv)',
   })
-  importContacts(@CurrentUser() user: { id: string }, @Body('csv') csvText: string) {
+  async importContacts(@CurrentUser() user: { id: string }, @Body('csv') csvText: string) {
+    await this.assertBasicCrmAccess(user.id)
     // Cap CSV payload at 1 MB (~10,000 contacts) to prevent memory exhaustion.
     // NestJS's body-parser default limit is 100 KB; we explicitly enforce 1 MB
     // here as a second line of defence so the check travels with the handler.
@@ -1195,7 +1252,8 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('email-templates')
   @ApiOperation({ summary: 'Create an email template' })
-  createEmailTemplate(@CurrentUser() user: { id: string }, @Body() dto: CreateEmailTemplateDto) {
+  async createEmailTemplate(@CurrentUser() user: { id: string }, @Body() dto: CreateEmailTemplateDto) {
+    await this.assertEmailTemplateAccess(user.id)
     return this.contactsService.createEmailTemplate(user.id, dto)
   }
 
@@ -1203,6 +1261,7 @@ export class ContactsController {
   @Get('email-templates')
   @ApiOperation({ summary: 'List all email templates for the user' })
   async getEmailTemplates(@CurrentUser() user: { id: string }) {
+    await this.assertEmailTemplateAccess(user.id)
     const items = await this.contactsService.getEmailTemplates(user.id)
     return { items }
   }
@@ -1210,28 +1269,31 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('contacts/:id/emails')
   @ApiOperation({ summary: 'Get sent email history for a contact' })
-  getContactEmails(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async getContactEmails(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getContactEmails(id, user.id)
   }
 
   @ApiBearerAuth()
   @Patch('email-templates/:templateId')
   @ApiOperation({ summary: 'Update an email template' })
-  updateEmailTemplate(
+  async updateEmailTemplate(
     @Param('templateId') templateId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateEmailTemplateDto,
   ) {
+    await this.assertEmailTemplateAccess(user.id)
     return this.contactsService.updateEmailTemplate(templateId, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Delete('email-templates/:templateId')
   @ApiOperation({ summary: 'Delete an email template' })
-  deleteEmailTemplate(
+  async deleteEmailTemplate(
     @Param('templateId') templateId: string,
     @CurrentUser() user: { id: string },
   ) {
+    await this.assertEmailTemplateAccess(user.id)
     return this.contactsService.deleteEmailTemplate(templateId, user.id)
   }
 
@@ -1240,25 +1302,28 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('contacts/:id/tasks')
   @ApiOperation({ summary: 'Create a task for a contact' })
-  createTask(
+  async createTask(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: CreateTaskDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.createTask(id, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Get('contacts/:id/tasks')
   @ApiOperation({ summary: 'Get all tasks for a contact' })
-  getTasks(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+  async getTasks(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getTasks(id, user.id)
   }
 
   @ApiBearerAuth()
   @Get('tasks')
   @ApiOperation({ summary: 'Get all tasks for the authenticated user' })
-  getAllTasks(@CurrentUser() user: { id: string }, @Query() query: TasksQuery) {
+  async getAllTasks(@CurrentUser() user: { id: string }, @Query() query: TasksQuery) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getAllTasks(user.id, {
       completed: query.completed,
       page: query.page,
@@ -1271,25 +1336,28 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('tasks/summary')
   @ApiOperation({ summary: 'Get task summary metrics for the authenticated user' })
-  getTasksSummary(@CurrentUser() user: { id: string }) {
+  async getTasksSummary(@CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getTasksSummary(user.id)
   }
 
   @ApiBearerAuth()
   @Patch('tasks/:taskId')
   @ApiOperation({ summary: 'Update a task' })
-  updateTask(
+  async updateTask(
     @Param('taskId') taskId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateTaskDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.updateTask(taskId, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Delete('tasks/:taskId')
   @ApiOperation({ summary: 'Delete a task' })
-  deleteTask(@Param('taskId') taskId: string, @CurrentUser() user: { id: string }) {
+  async deleteTask(@Param('taskId') taskId: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.deleteTask(taskId, user.id)
   }
 
@@ -1298,18 +1366,20 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('contacts/:id/merge')
   @ApiOperation({ summary: 'Merge a duplicate contact into this contact' })
-  mergeContacts(
+  async mergeContacts(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: MergeContactDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.mergeContacts(id, dto.duplicateId, user.id)
   }
 
   @ApiBearerAuth()
   @Get('crm/duplicates')
   @ApiOperation({ summary: 'Find potential duplicate contacts' })
-  findDuplicates(@CurrentUser() user: { id: string }) {
+  async findDuplicates(@CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.findDuplicates(user.id)
   }
 
@@ -1320,7 +1390,8 @@ export class ContactsController {
   @ApiOperation({
     summary: 'Get stage conversion funnel analytics (supports dateFrom/dateTo query params)',
   })
-  getFunnelAnalytics(@CurrentUser() user: { id: string }, @Query() query: FunnelAnalyticsQuery) {
+  async getFunnelAnalytics(@CurrentUser() user: { id: string }, @Query() query: FunnelAnalyticsQuery) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getFunnelAnalytics(user.id, {
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
@@ -1332,7 +1403,8 @@ export class ContactsController {
   @ApiBearerAuth()
   @Patch('contacts/bulk-update')
   @ApiOperation({ summary: 'Bulk update arbitrary fields on multiple contacts' })
-  bulkUpdateFields(@CurrentUser() user: { id: string }, @Body() dto: BulkUpdateFieldsDto) {
+  async bulkUpdateFields(@CurrentUser() user: { id: string }, @Body() dto: BulkUpdateFieldsDto) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.bulkUpdateFields(user.id, dto.ids, {
       company: dto.company,
       tags: dto.tags,
@@ -1346,43 +1418,48 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('pipelines')
   @ApiOperation({ summary: 'List all pipelines for the user' })
-  getPipelines(@CurrentUser() user: { id: string }) {
+  async getPipelines(@CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getPipelines(user.id)
   }
 
   @ApiBearerAuth()
   @Post('pipelines')
   @ApiOperation({ summary: 'Create a new pipeline' })
-  createPipeline(@CurrentUser() user: { id: string }, @Body() dto: CreatePipelineDto) {
+  async createPipeline(@CurrentUser() user: { id: string }, @Body() dto: CreatePipelineDto) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.createPipeline(user.id, dto)
   }
 
   @ApiBearerAuth()
   @Patch('pipelines/:pipelineId')
   @ApiOperation({ summary: 'Update a pipeline' })
-  updatePipeline(
+  async updatePipeline(
     @Param('pipelineId') pipelineId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdatePipelineDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.updatePipeline(pipelineId, user.id, dto)
   }
 
   @ApiBearerAuth()
   @Delete('pipelines/:pipelineId')
   @ApiOperation({ summary: 'Delete a pipeline' })
-  deletePipeline(@Param('pipelineId') pipelineId: string, @CurrentUser() user: { id: string }) {
+  async deletePipeline(@Param('pipelineId') pipelineId: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.deletePipeline(pipelineId, user.id)
   }
 
   @ApiBearerAuth()
   @Patch('contacts/:id/pipeline')
   @ApiOperation({ summary: 'Assign a contact to a pipeline (or remove from pipeline)' })
-  assignContactToPipeline(
+  async assignContactToPipeline(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
     @Body() dto: AssignPipelineDto,
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.assignContactToPipeline(
       id,
       user.id,
@@ -1394,10 +1471,11 @@ export class ContactsController {
   @ApiBearerAuth()
   @Get('pipelines/:pipelineId/contacts')
   @ApiOperation({ summary: 'Get all contacts in a pipeline' })
-  getPipelineContacts(
+  async getPipelineContacts(
     @Param('pipelineId') pipelineId: string,
     @CurrentUser() user: { id: string },
   ) {
+    await this.assertFullCrmAccess(user.id)
     return this.contactsService.getPipelineContacts(pipelineId, user.id)
   }
 }

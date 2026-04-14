@@ -1,6 +1,19 @@
 import { ConflictException } from '@nestjs/common'
 import { SchedulingService } from './scheduling.service'
 
+function nextUtcWeekdayAt(targetDow: number, hour: number, minute: number): Date {
+  const candidate = new Date()
+  candidate.setUTCHours(hour, minute, 0, 0)
+
+  let daysUntil = (targetDow - candidate.getUTCDay() + 7) % 7
+  if (daysUntil === 0) {
+    daysUntil = 7
+  }
+
+  candidate.setUTCDate(candidate.getUTCDate() + daysUntil)
+  return candidate
+}
+
 describe('SchedulingService booking buffers', () => {
   function createService(overrides?: {
     bookingFindFirst?: jest.Mock
@@ -75,10 +88,13 @@ describe('SchedulingService booking buffers', () => {
   }
 
   it('rejects createBooking when an existing booking buffer overlaps the requested slot', async () => {
+    const existingStart = nextUtcWeekdayAt(1, 10, 15)
+    const existingEnd = new Date(existingStart.getTime() + 30 * 60_000)
+    const requestedStart = nextUtcWeekdayAt(1, 10, 45)
     const existingBooking = {
       id: 'booking_existing',
-      startAt: new Date('2026-04-13T10:15:00.000Z'),
-      endAt: new Date('2026-04-13T10:45:00.000Z'),
+      startAt: existingStart,
+      endAt: existingEnd,
     }
     const { service, bookingFindFirst } = createService({
       bookingFindFirst: jest.fn().mockResolvedValue(existingBooking),
@@ -86,7 +102,7 @@ describe('SchedulingService booking buffers', () => {
 
     await expect(
       service.createBooking('owner_1', 'intro-call', {
-        startAt: '2026-04-13T10:45:00.000Z',
+        startAt: requestedStart.toISOString(),
         guestName: 'Guest',
         guestEmail: 'guest@example.com',
         guestNotes: '',
@@ -97,14 +113,19 @@ describe('SchedulingService booking buffers', () => {
     expect(bookingFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          startAt: { lt: new Date('2026-04-13T11:30:00.000Z') },
-          endAt: { gt: new Date('2026-04-13T10:30:00.000Z') },
+          startAt: { lt: new Date(requestedStart.getTime() + 45 * 60_000) },
+          endAt: { gt: new Date(requestedStart.getTime() - 15 * 60_000) },
         }),
       }),
     )
   })
 
   it('rejects reschedule when the new slot lands inside another booking buffer', async () => {
+    const currentStart = nextUtcWeekdayAt(1, 9, 0)
+    const currentEnd = new Date(currentStart.getTime() + 30 * 60_000)
+    const requestedStart = nextUtcWeekdayAt(1, 10, 45)
+    const existingStart = nextUtcWeekdayAt(1, 10, 15)
+    const existingEnd = new Date(existingStart.getTime() + 30 * 60_000)
     const bookingFindUnique = jest
       .fn()
       .mockResolvedValueOnce({
@@ -112,9 +133,9 @@ describe('SchedulingService booking buffers', () => {
         token: 'token_1',
         ownerUserId: 'owner_1',
         status: 'CONFIRMED',
-        startAt: new Date('2026-04-13T09:00:00.000Z'),
-        endAt: new Date('2026-04-13T09:30:00.000Z'),
-        tokenExpiresAt: new Date('2026-04-14T09:00:00.000Z'),
+        startAt: currentStart,
+        endAt: currentEnd,
+        tokenExpiresAt: new Date(Date.now() + 24 * 60 * 60_000),
         googleEventId: null,
         appointmentType: {
           id: 'apt_1',
@@ -135,32 +156,33 @@ describe('SchedulingService booking buffers', () => {
       bookingFindUnique,
       bookingFindFirst: jest.fn().mockResolvedValue({
         id: 'booking_existing',
-        startAt: new Date('2026-04-13T10:15:00.000Z'),
-        endAt: new Date('2026-04-13T10:45:00.000Z'),
+        startAt: existingStart,
+        endAt: existingEnd,
       }),
     })
 
-    await expect(service.rescheduleByToken('token_1', '2026-04-13T10:45:00.000Z')).rejects.toThrow(
-      ConflictException,
-    )
+    await expect(
+      service.rescheduleByToken('token_1', requestedStart.toISOString()),
+    ).rejects.toThrow(ConflictException)
 
     expect(bookingFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          startAt: { lt: new Date('2026-04-13T11:30:00.000Z') },
-          endAt: { gt: new Date('2026-04-13T10:30:00.000Z') },
+          startAt: { lt: new Date(requestedStart.getTime() + 45 * 60_000) },
+          endAt: { gt: new Date(requestedStart.getTime() - 15 * 60_000) },
         }),
       }),
     )
   })
 
   it('creates a CRM contact after a successful booking', async () => {
+    const requestedStart = nextUtcWeekdayAt(1, 10, 0)
     const { service, contactsService } = createService({
       bookingFindFirst: jest.fn().mockResolvedValue(null),
     })
 
     await service.createBooking('owner_1', 'intro-call', {
-      startAt: '2026-04-13T10:00:00.000Z',
+      startAt: requestedStart.toISOString(),
       guestName: 'Guest User',
       guestEmail: 'guest@example.com',
       guestNotes: 'Interested in pricing',

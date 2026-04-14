@@ -3,6 +3,14 @@ import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import type { JSX } from 'react'
 import { AuthBoundary } from '@/components/AuthBoundary'
 import { PostHogProvider } from '@/components/PostHogProvider'
+import {
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+  SITE_TAGLINE,
+  buildMarketingOgImage,
+  getMetadataBase,
+} from '@/lib/seo'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -10,18 +18,70 @@ const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--fon
 
 export const metadata: Metadata = {
   title: {
-    default: 'Dotly.one — Digital Business Cards',
+    default: `${SITE_NAME} - ${SITE_TAGLINE}`,
     template: '%s | Dotly.one',
   },
-  description:
-    'Create stunning digital business cards, track engagement analytics, and manage your contacts with Dotly.one.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'),
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  metadataBase: getMetadataBase(),
+  keywords: SITE_KEYWORDS,
+  referrer: 'origin-when-cross-origin',
+  alternates: {
+    canonical: '/',
+  },
+  category: 'business networking',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: 'default',
+  },
   openGraph: {
     type: 'website',
-    siteName: 'Dotly.one',
+    locale: 'en_US',
+    url: '/',
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: buildMarketingOgImage({
+          title: SITE_TAGLINE,
+          description: SITE_DESCRIPTION,
+          path: '/',
+        }),
+        width: 1200,
+        height: 630,
+        alt: `${SITE_NAME} | ${SITE_TAGLINE}`,
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    images: [
+      buildMarketingOgImage({
+        title: SITE_TAGLINE,
+        description: SITE_DESCRIPTION,
+        path: '/',
+      }),
+    ],
   },
 }
 

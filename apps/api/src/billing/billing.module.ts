@@ -5,6 +5,7 @@ import { BillingCronService } from './billing.cron.service'
 import { BillingService } from './billing.service'
 import { BoosterAiClient } from './boosterai.client'
 import { BoosterAiPartnerGuard } from './boosterai-partner.guard'
+import { DotlySupportOpsGuard } from './dotly-support-ops.guard'
 import { PartnerLinkController } from './partner-link.controller'
 import { PaymentVaultQuotes } from './payment-vault-quotes'
 import { AuditModule } from '../audit/audit.module'
@@ -17,6 +18,7 @@ import { AuditModule } from '../audit/audit.module'
     BillingCronService,
     BoosterAiClient,
     BoosterAiPartnerGuard,
+    DotlySupportOpsGuard,
     PaymentVaultQuotes,
   ],
   exports: [BillingService, BoosterAiClient, PaymentVaultQuotes],

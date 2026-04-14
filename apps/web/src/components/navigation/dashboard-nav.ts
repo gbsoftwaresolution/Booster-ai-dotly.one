@@ -40,26 +40,39 @@ export const dashboardNavItems: DashboardNavItem[] = [
 
   // Cards
   { href: '/cards', label: 'My Cards', icon: CreditCard, section: 'Cards' },
-  { href: '/apps/cards/email-templates', label: 'Email Templates', icon: Mail, section: 'Cards' },
+  {
+    href: '/apps/cards/email-templates',
+    label: 'Email Templates',
+    icon: Mail,
+    section: 'Cards',
+    minPlan: 'STARTER',
+  },
   {
     href: '/apps/cards/email-signature',
     label: 'Signature',
     icon: FileSignature,
     section: 'Cards',
+    minPlan: 'STARTER',
   },
 
   // Scheduling — own section so it stands out
-  { href: '/scheduling', label: 'Scheduling', icon: Calendar, section: 'Scheduling' },
+  { href: '/scheduling', label: 'Scheduling', icon: Calendar, section: 'Scheduling', minPlan: 'STARTER' },
 
   // CRM
-  { href: '/contacts', label: 'Contacts', icon: Users, section: 'CRM' },
+  { href: '/contacts', label: 'Contacts', icon: Users, section: 'CRM', minPlan: 'STARTER' },
   { href: '/leads', label: 'Lead Submissions', icon: Inbox, section: 'CRM' },
-  { href: '/deals', label: 'Deals', icon: DollarSign, section: 'CRM' },
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare, section: 'CRM' },
-  { href: '/crm', label: 'Pipeline', icon: Kanban, section: 'CRM' },
-  { href: '/pipelines', label: 'Pipelines', icon: GitBranch, section: 'CRM' },
-  { href: '/crm/custom-fields', label: 'Custom Fields', icon: SlidersHorizontal, section: 'CRM' },
-  { href: '/crm/analytics', label: 'CRM Analytics', icon: TrendingUp, section: 'CRM' },
+  { href: '/deals', label: 'Deals', icon: DollarSign, section: 'CRM', minPlan: 'PRO' },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare, section: 'CRM', minPlan: 'PRO' },
+  { href: '/crm', label: 'Pipeline', icon: Kanban, section: 'CRM', minPlan: 'PRO' },
+  { href: '/pipelines', label: 'Pipelines', icon: GitBranch, section: 'CRM', minPlan: 'PRO' },
+  {
+    href: '/crm/custom-fields',
+    label: 'Custom Fields',
+    icon: SlidersHorizontal,
+    section: 'CRM',
+    minPlan: 'PRO',
+  },
+  { href: '/crm/analytics', label: 'CRM Analytics', icon: TrendingUp, section: 'CRM', minPlan: 'PRO' },
 
   // Administration
   {
@@ -76,6 +89,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
     section: 'Administration',
     minPlan: 'PRO',
   },
+  { href: '/settings/billing', label: 'Billing', icon: DollarSign, section: 'Administration' },
   { href: '/settings', label: 'Settings', icon: Settings, section: 'Administration' },
 ]
 

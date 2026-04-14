@@ -13,6 +13,8 @@ import {
 import { BillingService } from './billing.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Plan, BillingDuration } from '@dotly/types'
+import { Public } from '../auth/decorators/public.decorator'
+import { DotlySupportOpsGuard } from './dotly-support-ops.guard'
 
 interface AuthUser {
   id: string
@@ -77,6 +79,14 @@ class BillingSummaryQueryDto {
   countryCode?: string
 }
 
+class AdminRefundDto {
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'paymentId must be a valid 32-byte hex string prefixed with 0x',
+  })
+  paymentId!: string
+}
+
 @ApiTags('billing')
 @ApiBearerAuth()
 @Controller('billing')
@@ -136,5 +146,26 @@ export class BillingController {
       dto.txHash,
       dto.chainId,
     )
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('refund/request')
+  requestRefundReview(@CurrentUser() user: AuthUser) {
+    return this.billingService.requestManualRefundReview(user.id)
+  }
+
+  @Public()
+  @UseGuards(DotlySupportOpsGuard)
+  @Get('internal/refunds')
+  getInternalRefundQueue() {
+    return this.billingService.listRefundReviewRequests()
+  }
+
+  @Public()
+  @UseGuards(DotlySupportOpsGuard)
+  @Post('internal/refunds/admin')
+  adminRefund(@Body() dto: AdminRefundDto) {
+    return this.billingService.adminRefundPayment(dto.paymentId)
   }
 }

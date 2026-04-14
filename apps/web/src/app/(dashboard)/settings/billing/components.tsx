@@ -1,10 +1,20 @@
 'use client'
 
 import type { JSX } from 'react'
-import { ExternalLink, ShieldCheck, Wallet } from 'lucide-react'
+import {
+  ExternalLink,
+  ShieldCheck,
+  Wallet,
+  CreditCard,
+  Building2,
+  Coins,
+  Ban,
+  RefreshCcw,
+} from 'lucide-react'
 
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { cn } from '@/lib/cn'
+import { BILLING_FEATURE_MATRIX, getPlanFeatureValue } from '@/lib/billing-plans'
 
 import {
   BILLING_DURATIONS,
@@ -12,6 +22,7 @@ import {
   DURATION_SAVINGS,
   formatPlanLabel,
   PAID_PLANS,
+  PLAN_PRICES,
   PLAN_COLORS,
   STATUS_COLORS,
 } from './helpers'
@@ -231,9 +242,40 @@ export function CurrentPlanCard({
   subscription: SubscriptionData | null
   expiryDate: string | null
 }): JSX.Element {
+  const FEATURES = BILLING_FEATURE_MATRIX.map((row) => ({
+    label: row.label,
+    current: getPlanFeatureValue(row, currentPlan),
+  }))
   return (
     <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
       <h2 className="text-xl font-bold tracking-tight text-gray-950">Current Plan</h2>
+      
+      <div className="mt-8 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm">
+              <th className="px-5 py-4 font-bold text-gray-700">Feature overview</th>
+              <th className="px-4 py-4 text-center font-bold text-gray-700">Your Plan</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100/60">
+            {FEATURES.map((row, i) => (
+              <tr key={row.label} className={i % 2 === 0 ? "bg-white/40" : "bg-transparent"}>
+                <td className="px-5 py-3 font-medium text-gray-600">{row.label}</td>
+                <td className="px-4 py-3 text-center">
+                  {row.current === true ? (
+                    <svg className="mx-auto h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                  ) : row.current === false ? (
+                    <span className="text-gray-300 mx-auto block w-5 text-center">-</span>
+                  ) : (
+                    <span className="font-semibold text-gray-800">{row.current}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <span
           className={cn(
@@ -420,12 +462,14 @@ export function UpgradePlanCard({
   walletAddress,
   hasWallet,
   subscribing,
+  onConnectWallet,
   onSelectPlan,
   onSelectDuration,
   onActivateNoWallet,
   onNoWalletTxHashChange,
   onGeneratePaymentLinks,
   onSubscribe,
+  onOpenCheckout,
   cryptoBlocked,
   billingCountry,
 }: {
@@ -439,103 +483,224 @@ export function UpgradePlanCard({
   walletAddress: string | null
   hasWallet: boolean | null
   subscribing: boolean
+  onConnectWallet: () => void
   onSelectPlan: (plan: PlanId) => void
   onSelectDuration: (duration: Duration) => void
   onActivateNoWallet: () => void
   onNoWalletTxHashChange: (value: string) => void
   onGeneratePaymentLinks: () => void
   onSubscribe: () => void
+  onOpenCheckout?: () => void
   cryptoBlocked: boolean
   billingCountry: string | null
 }): JSX.Element | null {
   if (currentPlan === 'ENTERPRISE') return null
 
+  const FEATURES = BILLING_FEATURE_MATRIX.map((row) => ({
+    label: row.label,
+    current: getPlanFeatureValue(row, selectedPlan),
+  }))
+
   return (
-    <div id="upgrade" className="app-panel rounded-[28px] p-6 sm:p-7">
+    <div id="upgrade" className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
       <h2 className="text-xl font-bold tracking-tight text-indigo-950">Upgrade Plan</h2>
-      <p className="mt-1 text-sm text-gray-500">
-        Plans are priced in USD. Crypto checkout is available today, and additional payment methods
-        can be added here later.
+      <p className="mt-2 text-sm sm:text-base font-medium leading-relaxed text-gray-500">
+        Upgrade to unlock powerful follow-up tools and deeper analytics.
       </p>
-      <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3 text-sm text-sky-900">
+      <div className="mt-6 rounded-[20px] border border-indigo-100/50 bg-gradient-to-br from-indigo-50/50 to-sky-50/50 px-5 py-4 text-sm font-medium text-indigo-900 shadow-sm backdrop-blur-sm">
         Paid upgrades include a 7-day refund window. If you are unsure, stay on the free plan first
         and upgrade once you are ready.
       </div>
 
       <div className="mt-5 space-y-5">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Select plan</label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">1. Choose your plan</label>
+          <div className="flex flex-wrap gap-3">
+          
             {PAID_PLANS.map((plan) => (
               <button
                 key={plan}
                 type="button"
                 onClick={() => onSelectPlan(plan)}
                 className={cn(
-                  'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                  'relative flex items-center justify-center rounded-[18px] border px-6 py-3.5 text-sm font-bold transition-all duration-300 min-w-[120px]',
                   selectedPlan === plan
-                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300',
+                    ? 'border-indigo-500/20 bg-gradient-to-b from-indigo-50 to-indigo-100/50 text-indigo-700 shadow-[0_4px_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/30 scale-[1.02]'
+                    : 'border-white/60 bg-white/40 text-gray-600 hover:bg-white/80 hover:text-gray-900 shadow-sm active:scale-[0.98]'
                 )}
               >
                 {formatPlanLabel(plan)}
               </button>
             ))}
           </div>
-        </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Billing period</label>
-          <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1">
-            {BILLING_DURATIONS.map((duration) => (
-              <button
-                key={duration}
-                type="button"
-                onClick={() => onSelectDuration(duration)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                  selectedDuration === duration
-                    ? 'bg-white text-gray-900 shadow'
-                    : 'text-gray-500 hover:text-gray-700',
-                )}
-              >
-                {DURATION_LABEL[duration]}
-                {DURATION_SAVINGS[duration] && (
-                  <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-700">
-                    {DURATION_SAVINGS[duration]}
-                  </span>
-                )}
-              </button>
-            ))}
+          {/* Dynamic Upgrade Features */}
+          <div className="mt-8 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5 overflow-hidden">
+            <div className="rounded-[18px] bg-white/40 shadow-inner overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm">
+                    <th className="px-5 py-4 font-bold text-gray-700">Premium feature</th>
+                    <th className="px-4 py-4 text-center font-bold text-indigo-900 bg-indigo-50/50">
+                      <div className="text-base">{formatPlanLabel(selectedPlan)}</div>
+                      {selectedPrice ? (
+                        <div className="mt-0.5 text-xs font-medium text-indigo-600/80">
+                          ${(selectedPrice / (selectedDuration === 'ANNUAL' ? 12 : selectedDuration === 'SIX_MONTHS' ? 6 : 1)).toLocaleString('en-US', { maximumFractionDigits: 2 })} / mo
+                        </div>
+                      ) : null}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100/60">
+                  {FEATURES.map((row, i) => (
+                    <tr key={row.label} className={i % 2 === 0 ? "bg-white/60 transition-colors hover:bg-white/80" : "bg-transparent transition-colors hover:bg-white/40"}>
+                      <td className="px-5 py-3.5 font-medium text-gray-600">{row.label}</td>
+                      <td className="bg-indigo-50/20 px-4 py-3.5 text-center">
+                        {row.current === true ? (
+                          <svg className="mx-auto h-5 w-5 text-indigo-500 backdrop-blur-sm" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                        ) : row.current === false ? (
+                          <span className="text-gray-300 mx-auto block w-5 text-center">-</span>
+                        ) : (
+                          <span className="font-bold text-indigo-700">{row.current}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Payment method</label>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-400">
-              <p className="font-medium">Card</p>
-              <p className="mt-1 text-xs">Coming soon</p>
+        <div className="pt-6 border-t border-indigo-100/50">
+          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">2. Choose billing period</label>
+          <div className="flex flex-col gap-3">
+            {BILLING_DURATIONS.map((duration) => {
+              const price = PLAN_PRICES[selectedPlan]?.[duration]
+              const moPrice = price ? (price / (duration === 'ANNUAL' ? 12 : duration === 'SIX_MONTHS' ? 6 : 1)).toFixed(2).replace(/\.00$/, '') : null
+              
+              return (
+                <button
+                  key={duration}
+                  type="button"
+                  onClick={() => onSelectDuration(duration)}
+                  className={cn(
+                    'group relative flex w-full items-center justify-between rounded-[24px] border p-5 text-left transition-all duration-300',
+                    selectedDuration === duration
+                      ? 'border-indigo-500/30 bg-gradient-to-b from-indigo-50/50 to-indigo-100/50 shadow-[0_8px_24px_rgba(99,102,241,0.15)] ring-1 ring-indigo-400/20 scale-[1.02]'
+                      : 'border-white/60 bg-white/40 hover:bg-white/80 hover:shadow-sm active:scale-[0.99] text-gray-600 hover:text-gray-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]'
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all duration-300 shadow-sm",
+                      selectedDuration === duration 
+                        ? "border-indigo-600 bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.5)]" 
+                        : "border-gray-300 bg-white/80 group-hover:border-indigo-300"
+                    )}>
+                      <div className={cn(
+                        "h-2 w-2 rounded-full bg-white transition-all duration-300",
+                        selectedDuration === duration ? "scale-100 opacity-100" : "scale-0 opacity-0"
+                      )} />
+                    </div>
+                    <div>
+                      <div className={cn("text-[15px] font-extrabold tracking-wide", selectedDuration === duration ? "text-indigo-950" : "text-gray-800")}>
+                        {DURATION_LABEL[duration]}
+                      </div>
+                      {DURATION_SAVINGS[duration] && (
+                        <div className="mt-1.5 flex items-center gap-2 text-xs font-bold text-emerald-600">
+                          <span className={cn(
+                            "rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.05em] shadow-[0_2px_4px_rgba(16,185,129,0.1)] transition-colors",
+                            selectedDuration === duration 
+                              ? "border-emerald-300 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700" 
+                              : "border-emerald-200/60 bg-emerald-50/50 group-hover:bg-emerald-100/50"
+                          )}>
+                            {DURATION_SAVINGS[duration]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {price ? (
+                      <>
+                        <div className={cn("text-xl font-black tracking-tight", selectedDuration === duration ? "text-indigo-600" : "text-gray-900 group-hover:text-indigo-500 transition-colors")}>
+                          ${price}
+                        </div>
+                        <div className={cn("mt-1 text-xs font-bold uppercase tracking-wider", selectedDuration === duration ? "text-indigo-500/80" : "text-gray-400 group-hover:text-gray-500 transition-colors")}>
+                          ${moPrice} / mo
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm font-bold text-gray-400">Contact Sales</div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="pt-6 border-t border-indigo-100/50">
+          <label className="mb-3 block text-sm font-bold text-gray-950 uppercase tracking-wider">3. Payment method</label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            
+            {/* Card (Coming Soon) */}
+            <div className="group relative flex flex-col justify-between rounded-[20px] border border-white/60 bg-white/40 p-4 text-left transition-all duration-300 opacity-60 grayscale-[100%] cursor-not-allowed shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-400 shadow-sm">
+                  <CreditCard className="h-4 w-4" />
+                </div>
+                <div className="font-bold text-gray-700">Card</div>
+              </div>
+              <div className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-400">
+                Coming soon
+              </div>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-400">
-              <p className="font-medium">Bank transfer</p>
-              <p className="mt-1 text-xs">Coming soon</p>
+
+            {/* Bank (Coming Soon) */}
+            <div className="group relative flex flex-col justify-between rounded-[20px] border border-white/60 bg-white/40 p-4 text-left transition-all duration-300 opacity-60 grayscale-[100%] cursor-not-allowed shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-400 shadow-sm">
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <div className="font-bold text-gray-700">Bank</div>
+              </div>
+              <div className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-400">
+                Coming soon
+              </div>
             </div>
-            <div
-              className={cn(
-                'rounded-2xl border px-4 py-3 text-sm',
-                cryptoBlocked
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : 'border-emerald-200 bg-emerald-50 text-emerald-700',
-              )}
-            >
-              <p className="font-medium">Crypto</p>
-              <p className="mt-1 text-xs">
-                {cryptoBlocked
-                  ? `Unavailable${billingCountry ? ` in ${billingCountry}` : ''}`
-                  : 'Available now'}
-              </p>
+
+            {/* Crypto */}
+            <div className={cn(
+              "group relative flex flex-col justify-between rounded-[20px] border p-4 text-left transition-all duration-300",
+              cryptoBlocked
+                ? "border-red-200/60 bg-red-50/50 shadow-sm opacity-70 cursor-not-allowed"
+                : "border-indigo-500/30 bg-gradient-to-b from-indigo-50/50 to-indigo-100/50 shadow-[0_8px_24px_rgba(99,102,241,0.15)] ring-1 ring-indigo-400/20 scale-[1.02] z-10"
+            )}>
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-all duration-300",
+                  cryptoBlocked
+                    ? "border-red-200 bg-white text-red-500"
+                    : "border-indigo-600 bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]"
+                )}>
+                  {cryptoBlocked ? <Ban className="h-4 w-4" /> : <Coins className="h-4 w-4" />}
+                </div>
+                <div className={cn("font-bold text-[15px] tracking-wide", cryptoBlocked ? "text-red-900" : "text-indigo-950")}>Crypto</div>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <div className={cn("text-[10px] font-extrabold uppercase tracking-wider", cryptoBlocked ? "text-red-500" : "text-indigo-600")}>
+                  {cryptoBlocked ? `Unavailable${billingCountry ? ` in ${billingCountry}` : ''}` : 'Selected'}
+                </div>
+                {!cryptoBlocked && (
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm border border-indigo-400">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                  </div>
+                )}
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -653,38 +818,42 @@ export function UpgradePlanCard({
         ) : (
           !noWalletOrder && (
             <>
-              {hasWallet === false && walletAddress ? (
-                <button
-                  type="button"
-                  onClick={onGeneratePaymentLinks}
-                  disabled={subscribing}
-                  className={cn(
-                    'rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600',
-                    'disabled:cursor-not-allowed disabled:opacity-50',
-                  )}
-                >
-                  {subscribing ? 'Preparing checkout…' : 'Generate crypto payment links'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onSubscribe}
-                  disabled={subscribing || !walletAddress || cryptoBlocked}
-                  className={cn(
-                    'rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600',
-                    'disabled:cursor-not-allowed disabled:opacity-50',
-                  )}
-                >
-                  {subscribing ? (subscribeStep ?? 'Processing…') : 'Pay with crypto'}
-                </button>
-              )}
-              {!walletAddress && (
-                <p className="text-xs text-gray-400">
-                  {hasWallet === false
-                    ? 'Enter your wallet address above to generate crypto payment links.'
-                    : 'Connect your wallet above to continue with crypto checkout.'}
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (hasWallet === false) {
+                    onGeneratePaymentLinks()
+                    return
+                  }
+
+                  if (!walletAddress) {
+                    onConnectWallet()
+                    return
+                  }
+
+                  if (onOpenCheckout) {
+                    onOpenCheckout()
+                    return
+                  }
+
+                  onSubscribe()
+                }}
+                disabled={subscribing || cryptoBlocked}
+                className={cn(
+                  'w-full sm:w-auto rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 hover:shadow-[0_6px_20px_rgba(79,70,229,0.35)] active:scale-[0.98]',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                )}
+              >
+                {subscribing
+                  ? (subscribeStep ?? 'Processing…')
+                  : hasWallet === false
+                      ? 'Pay with crypto — generate payment links'
+                      : !walletAddress
+                        ? 'Connect wallet to pay with crypto'
+                        : onOpenCheckout
+                          ? 'Continue to crypto checkout'
+                          : 'Pay with crypto'}
+              </button>
             </>
           )
         )}
@@ -731,6 +900,174 @@ export function TransactionHistoryCard({
       ) : (
         <p className="mt-2 text-sm text-gray-400">No subscription payment activity recorded yet.</p>
       )}
+    </div>
+  )
+}
+
+function formatRefundStatusLabel(status: NonNullable<SubscriptionData['refund']>['status']): string {
+  switch (status) {
+    case 'PAID_ESCROW':
+      return 'Refund window open'
+    case 'REFUNDED':
+      return 'Refunded on chain'
+    case 'FINALIZED':
+      return 'Refund window closed'
+    default:
+      return 'No refund data'
+  }
+}
+
+function formatDateTime(value: string | null): string | null {
+  if (!value) return null
+
+  return new Date(value).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatRefundTimeRemaining(refundUntil: string | null): string | null {
+  if (!refundUntil) return null
+
+  const deadline = new Date(refundUntil)
+  const diffMs = deadline.getTime() - Date.now()
+
+  if (Number.isNaN(deadline.getTime()) || diffMs <= 0) return null
+
+  const minutesLeft = Math.ceil(diffMs / (60 * 1000))
+  const hoursLeft = Math.ceil(diffMs / (60 * 60 * 1000))
+  const daysLeft = Math.ceil(diffMs / (24 * 60 * 60 * 1000))
+
+  if (daysLeft >= 2) return `${daysLeft} days left to claim`
+  if (daysLeft === 1 && diffMs > 24 * 60 * 60 * 1000 - 60 * 1000) return '1 day left to claim'
+  if (hoursLeft >= 2) return `${hoursLeft} hours left to claim`
+  if (hoursLeft === 1) return '1 hour left to claim'
+  if (minutesLeft >= 2) return `${minutesLeft} minutes left to claim`
+  return 'Less than 1 minute left to claim'
+}
+
+export function RefundCard({
+  subscription,
+  refunding,
+  requestingManualReview,
+  onRequestRefund,
+  onRequestManualReview,
+}: {
+  subscription: SubscriptionData | null
+  refunding: boolean
+  requestingManualReview: boolean
+  onRequestRefund: () => void
+  onRequestManualReview: () => void
+}): JSX.Element {
+  const refund = subscription?.refund
+
+  if (!refund) {
+    return (
+      <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5">
+        <h2 className="text-base font-semibold text-gray-900">Refund Status</h2>
+        <p className="mt-2 text-sm text-gray-500">
+          Refund details appear here after a paid crypto subscription has been activated.
+        </p>
+      </div>
+    )
+  }
+
+  const refundUntilLabel = formatDateTime(refund.refundUntil)
+  const supportRequestedLabel = formatDateTime(refund.supportRequestedAt)
+  const refundTimeRemaining =
+    refund.status === 'PAID_ESCROW' ? formatRefundTimeRemaining(refund.refundUntil) : null
+
+  return (
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-6 sm:p-10 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Refund Status</h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Dotly refunds are executed against the on-chain payment record for your latest paid
+            subscription.
+          </p>
+        </div>
+        <span
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-semibold',
+            refund.status === 'PAID_ESCROW'
+              ? 'bg-amber-100 text-amber-800'
+              : refund.status === 'REFUNDED'
+                ? 'bg-green-100 text-green-800'
+                : refund.status === 'FINALIZED'
+                  ? 'bg-gray-100 text-gray-700'
+                  : 'bg-gray-100 text-gray-600',
+          )}
+        >
+          {formatRefundStatusLabel(refund.status)}
+        </span>
+      </div>
+
+      <div className="mt-4 rounded-[24px] border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md ring-1 ring-black/5">
+        <div className="space-y-2 text-sm text-gray-700">
+          <p>
+            Payment ID:{' '}
+            <span className="font-mono text-xs text-gray-500">{refund.paymentId ?? '—'}</span>
+          </p>
+          <p>
+            Refund deadline: <span className="font-medium">{refundUntilLabel ?? '—'}</span>
+          </p>
+          <p>
+            Claim window: <span className="font-medium">{refundTimeRemaining ?? 'Closed'}</span>
+          </p>
+          <p>
+            Manual review: <span className="font-medium">{supportRequestedLabel ?? 'Not requested'}</span>
+          </p>
+        </div>
+      </div>
+
+      {refund.status === 'PAID_ESCROW' && (
+        <p className="mt-4 text-sm text-gray-600">
+          The refund window is still open. You can submit the refund on chain from the original
+          paying wallet, or log a manual review request for support fallback.
+        </p>
+      )}
+
+      {refund.status === 'REFUNDED' && (
+        <p className="mt-4 text-sm text-green-700">
+          This payment has already been refunded on chain. Billing access is downgraded after the
+          next sync and is also refreshed when this page reloads.
+        </p>
+      )}
+
+      {refund.status === 'FINALIZED' && (
+        <p className="mt-4 text-sm text-gray-600">
+          The escrow period has ended and this payment is finalized, so the refund window is no
+          longer available.
+        </p>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={onRequestRefund}
+          disabled={!refund.canSelfRefund || refunding}
+          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCcw className="h-4 w-4" />
+          {refunding ? 'Submitting refund…' : 'Request refund in wallet'}
+        </button>
+        <button
+          type="button"
+          onClick={onRequestManualReview}
+          disabled={!refund.canRequestManualReview || requestingManualReview || !!refund.supportRequestedAt}
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {requestingManualReview
+            ? 'Recording review request…'
+            : refund.supportRequestedAt
+              ? 'Manual review requested'
+              : 'Request manual review'}
+        </button>
+      </div>
     </div>
   )
 }

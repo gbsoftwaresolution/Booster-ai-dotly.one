@@ -1,6 +1,7 @@
 import type {
   BillingActivateCheckoutResponse,
   BillingCheckoutQuoteResponse,
+  BillingRefundRequestResponse,
   BillingSummaryResponse,
 } from '@dotly/types'
 
@@ -12,6 +13,8 @@ export type SubscriptionData = BillingSummaryResponse
 export type CreateOrderResponse = BillingCheckoutQuoteResponse
 
 export type ActivateOrderResponse = BillingActivateCheckoutResponse
+
+export type RefundRequestResponse = BillingRefundRequestResponse
 
 export interface NoWalletOrder {
   approveLink: string

@@ -67,7 +67,152 @@ export async function GET(req: NextRequest) {
   const handle = searchParams.get('handle')
 
   if (!handle) {
-    return new Response('Missing handle', { status: 400 })
+    const title = (searchParams.get('title') ?? 'Dotly.one').slice(0, 90)
+    const description = searchParams.get('description')?.slice(0, 180) ?? ''
+    const pagePath = searchParams.get('path') ?? '/'
+
+    const imageResponse = new ImageResponse(
+      <div
+        style={{
+          width: W,
+          height: H,
+          display: 'flex',
+          position: 'relative',
+          overflow: 'hidden',
+          background:
+            'linear-gradient(135deg, rgba(15,23,42,1) 0%, rgba(30,41,59,1) 48%, rgba(14,165,233,1) 100%)',
+          color: '#ffffff',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'radial-gradient(circle at top left, rgba(255,255,255,0.14), transparent 40%), radial-gradient(circle at bottom right, rgba(255,255,255,0.18), transparent 35%)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: -120,
+            right: -120,
+            width: 360,
+            height: 360,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.12)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -80,
+            left: -40,
+            width: 280,
+            height: 280,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+          }}
+        />
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: '58px 64px',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 940 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                width: 'fit-content',
+                borderRadius: 999,
+                padding: '10px 18px',
+                background: 'rgba(255,255,255,0.14)',
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: '-0.4px',
+              }}
+            >
+              Dotly.one
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                fontSize: 74,
+                lineHeight: 1.02,
+                fontWeight: 800,
+                letterSpacing: '-2.4px',
+              }}
+            >
+              {title}
+            </div>
+            {description ? (
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: 30,
+                  lineHeight: 1.35,
+                  color: 'rgba(255,255,255,0.88)',
+                  maxWidth: 900,
+                }}
+              >
+                {description}
+              </div>
+            ) : null}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                color: 'rgba(255,255,255,0.92)',
+                fontSize: 24,
+                fontWeight: 600,
+              }}
+            >
+              Digital business cards, analytics, CRM, and scheduling
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: 999,
+                padding: '10px 22px',
+                background: 'rgba(255,255,255,0.14)',
+                fontSize: 24,
+                fontWeight: 700,
+              }}
+            >
+              {pagePath}
+            </div>
+          </div>
+        </div>
+      </div>,
+      { width: W, height: H },
+    )
+
+    imageResponse.headers.set(
+      'Cache-Control',
+      'public, s-maxage=300, max-age=300, stale-while-revalidate=600',
+    )
+    imageResponse.headers.set('Content-Type', 'image/png')
+
+    return imageResponse
   }
 
   // Fetch card data server-side

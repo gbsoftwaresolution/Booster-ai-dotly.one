@@ -29,7 +29,10 @@
         "DOTLY_CONTRACT_ADDRESS",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
-        "OPENAI_API_KEY"
+        "OPENAI_API_KEY",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_DSN"
       ],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },

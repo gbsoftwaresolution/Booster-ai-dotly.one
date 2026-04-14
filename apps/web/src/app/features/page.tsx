@@ -1,14 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { StructuredData } from '@/components/seo/StructuredData'
 import { Navbar } from '@/components/marketing/Navbar'
 import { CtaBanner } from '@/components/marketing/CtaBanner'
 import { Footer } from '@/components/marketing/Footer'
+import { absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createMarketingMetadata({
   title: 'Features',
   description:
-    'Explore Dotly.one features available today: NFC & QR sharing, analytics, CRM, portfolio blocks, scheduling, and the currently published plan surface.',
-}
+    'Explore Dotly.one features available today: NFC and QR sharing, analytics, CRM, portfolio blocks, scheduling, and the currently published plan surface.',
+  path: '/features',
+  keywords: ['product features', 'nfc sharing', 'analytics dashboard', 'crm features'],
+})
 
 // ─── Feature detail sections ──────────────────────────────────────────────────
 
@@ -131,9 +135,27 @@ const SECTIONS = [
   },
 ]
 
+const featureStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: 'Dotly.one Features',
+  url: absoluteUrl('/features'),
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: SECTIONS.map((section, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: section.title,
+      description: section.description,
+      url: `${absoluteUrl('/features')}#${section.id}`,
+    })),
+  },
+}
+
 export default function FeaturesPage() {
   return (
     <div className="min-h-screen bg-white">
+      <StructuredData id="features-structured-data" data={featureStructuredData} />
       <Navbar />
 
       {/* Page hero */}

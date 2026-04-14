@@ -53,8 +53,25 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Audit for high/critical CVEs
-        run: pnpm audit --audit-level=high
+      - name: Audit runtime dependencies for high/critical CVEs
+        run: pnpm audit --prod --audit-level=high
+
+  release-preflight:
+    name: Tracked Env Preflight
+    if: ${{ inputs.run-security-gates == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fail on tracked real env files
+        run: node ./scripts/release-preflight.mjs --mode=tracked-env
 
   lint:
     name: Lint

@@ -87,6 +87,17 @@ class EnvironmentVariables {
   @IsString()
   DOTLY_PAYMENT_SIGNER_PRIVATE_KEY?: string
 
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsOptional()
+  @Matches(/^0x[0-9a-fA-F]{64}$/, {
+    message: 'DOTLY_OWNER_PRIVATE_KEY must be a valid 32-byte hex private key',
+  })
+  DOTLY_OWNER_PRIVATE_KEY?: string
+
+  @IsOptional() @IsString() DOTLY_SUPPORT_OPS_KEY?: string
+
+  @IsOptional() @IsEmail() BILLING_SUPPORT_EMAIL?: string
+
   @IsOptional()
   @IsString()
   CRYPTO_BLOCKED_COUNTRIES?: string

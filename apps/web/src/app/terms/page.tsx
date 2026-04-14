@@ -1,19 +1,34 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { StructuredData } from '@/components/seo/StructuredData'
 import { Navbar } from '@/components/marketing/Navbar'
 import { Footer } from '@/components/marketing/Footer'
+import { absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createMarketingMetadata({
   title: 'Terms of Service',
   description:
-    'Dotly.one terms of service — your rights and responsibilities when using the platform.',
-}
+    'Read the Dotly.one terms of service covering account usage, subscriptions, refunds, acceptable use, and platform responsibilities.',
+  path: '/terms',
+  keywords: ['terms of service', 'subscription terms', 'refund policy'],
+})
 
 const LAST_UPDATED = 'April 13, 2026'
+
+const termsStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Dotly.one Terms of Service',
+  url: absoluteUrl('/terms'),
+  dateModified: '2026-04-13',
+  description:
+    'Dotly.one terms of service covering account access, payments, subscriptions, and acceptable use.',
+}
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-white">
+      <StructuredData id="terms-structured-data" data={termsStructuredData} />
       <Navbar />
 
       <main className="px-6 py-16">

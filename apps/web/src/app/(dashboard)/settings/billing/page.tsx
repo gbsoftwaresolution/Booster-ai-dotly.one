@@ -1,9 +1,11 @@
 'use client'
 
+import { Activity } from 'lucide-react'
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
 import { Interface } from 'ethers'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getAccessToken } from '@/lib/supabase/client'
 import {
@@ -11,11 +13,12 @@ import {
   BillingHero,
   BillingLoadingState,
   CurrentPlanCard,
-  TransactionHistoryCard,
+  RefundCard,
   UpgradePlanCard,
   WalletCard,
 } from './components'
 import {
+  ensureWalletChain,
   buildApproveDeepLink,
   buildPayDeepLink,
   ERC20_APPROVE_SELECTOR,
@@ -32,10 +35,12 @@ import type {
   Duration,
   NoWalletOrder,
   PlanId,
+  RefundRequestResponse,
   SubscriptionData,
 } from './types'
 
 export default function BillingSettingsPage(): JSX.Element {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,6 +53,8 @@ export default function BillingSettingsPage(): JSX.Element {
 
   const [connectingWallet, setConnectingWallet] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
+  const [refunding, setRefunding] = useState(false)
+  const [requestingManualRefund, setRequestingManualRefund] = useState(false)
   const [subscribeStep, setSubscribeStep] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -267,13 +274,7 @@ export default function BillingSettingsPage(): JSX.Element {
         chainId: requiredChainId,
       } = order
 
-      const chainIdHex = (await window.ethereum.request({ method: 'eth_chainId' })) as string
-      const chainId = parseInt(chainIdHex, 16)
-      if (chainId !== requiredChainId) {
-        throw new Error(
-          `Please switch your wallet to chain ${requiredChainId} (Arbitrum One). Currently on ${chainId}.`,
-        )
-      }
+      await ensureWalletChain(requiredChainId)
 
       setSubscribeStep('Approving crypto payment…')
 
@@ -354,6 +355,75 @@ export default function BillingSettingsPage(): JSX.Element {
     }
   }
 
+  const handleRequestRefund = async () => {
+    const refund = subscription?.refund
+
+    if (!refund?.canSelfRefund || !refund.paymentId || !refund.paymentVaultAddress) {
+      setError('This payment is not currently eligible for a self-serve refund.')
+      return
+    }
+    if (!walletAddress) {
+      setError('Connect the original paying wallet before requesting a refund.')
+      return
+    }
+    if (!window.ethereum) {
+      setError('MetaMask is not installed.')
+      return
+    }
+
+    setRefunding(true)
+    setError(null)
+
+    try {
+      await ensureWalletChain(subscription?.chainId ?? 42161)
+
+      const iface = new Interface(['function requestRefund(bytes32 paymentId)'])
+      const data = iface.encodeFunctionData('requestRefund', [refund.paymentId])
+
+      const txHash = (await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: walletAddress, to: refund.paymentVaultAddress, data }],
+      })) as string
+
+      await waitForReceipt(txHash)
+      await fetchSubscription()
+      setSuccessMsg('Refund confirmed on chain and billing status has been refreshed.')
+      setTimeout(() => setSuccessMsg(null), 6_000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Refund transaction failed.'
+      if (/user rejected|User rejected/i.test(message)) {
+        setError('Refund transaction was cancelled.')
+      } else {
+        setError(message)
+      }
+    } finally {
+      setRefunding(false)
+    }
+  }
+
+  const handleRequestManualRefund = async () => {
+    setRequestingManualRefund(true)
+    setError(null)
+
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Not authenticated.')
+
+      const result = await apiPost<RefundRequestResponse>('/billing/refund/request', {}, token)
+      await fetchSubscription()
+      setSuccessMsg(
+        result.alreadyRequested
+          ? `Manual refund review was already requested on ${new Date(result.requestedAt).toLocaleString('en-US')}.`
+          : 'Manual refund review has been recorded for this payment.',
+      )
+      setTimeout(() => setSuccessMsg(null), 6_000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not request manual refund review.')
+    } finally {
+      setRequestingManualRefund(false)
+    }
+  }
+
   const currentPlan = (subscription?.plan as PlanId | undefined) ?? 'FREE'
   const currentStatus = subscription?.status ?? 'FREE'
   const expiryDate = formatExpiryDate(subscription?.currentPeriodEnd)
@@ -393,15 +463,7 @@ export default function BillingSettingsPage(): JSX.Element {
             expiryDate={expiryDate}
           />
 
-          <WalletCard
-            walletAddress={walletAddress}
-            hasWallet={hasWallet}
-            connectingWallet={connectingWallet}
-            onConnectWallet={() => void connectWallet()}
-            onManualWalletChange={(value) => setWalletAddress(value.trim() || null)}
-            cryptoBlocked={cryptoBlocked}
-            billingCountry={billingCountry}
-          />
+          
 
           <UpgradePlanCard
             currentPlan={currentPlan}
@@ -414,6 +476,7 @@ export default function BillingSettingsPage(): JSX.Element {
             walletAddress={walletAddress}
             hasWallet={hasWallet}
             subscribing={subscribing}
+            onConnectWallet={() => void connectWallet()}
             onSelectPlan={setSelectedPlan}
             onSelectDuration={setSelectedDuration}
             onActivateNoWallet={() => void handleNoWalletActivate()}
@@ -427,11 +490,35 @@ export default function BillingSettingsPage(): JSX.Element {
               void handleNoWalletSubscribe(walletAddress)
             }}
             onSubscribe={() => void handleSubscribe()}
+            onOpenCheckout={() => {
+              router.push(
+                `/settings/billing/checkout?plan=${selectedPlan}&duration=${selectedDuration}`,
+              )
+            }}
             cryptoBlocked={cryptoBlocked}
             billingCountry={billingCountry}
           />
 
-          <TransactionHistoryCard subscription={subscription} expiryDate={expiryDate} />
+          <RefundCard
+            subscription={subscription}
+            refunding={refunding}
+            requestingManualReview={requestingManualRefund}
+            onRequestRefund={() => void handleRequestRefund()}
+            onRequestManualReview={() => void handleRequestManualRefund()}
+          />
+
+          
+        {/* Transaction History Link instead of card */}
+        <div className="mt-8 flex justify-end">
+          <Link
+             href="/settings/billing/history"
+             className="inline-flex items-center gap-2 rounded-xl bg-white/60 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300/50 hover:bg-gray-50/80 transition-all hover:ring-gray-300"
+          >
+            <Activity className="h-4 w-4 text-brand-500" />
+             View Transaction History
+          </Link>
+        </div>
+
         </>
       )}
     </div>

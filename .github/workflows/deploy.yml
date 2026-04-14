@@ -14,8 +14,6 @@ jobs:
   # Gate: all CI checks must pass
   ci-gate:
     uses: ./.github/workflows/ci.yml
-    with:
-      run-security-gates: false
 
   deploy-api:
     needs: ci-gate

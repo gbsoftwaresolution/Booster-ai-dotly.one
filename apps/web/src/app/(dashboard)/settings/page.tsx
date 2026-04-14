@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
+import { useRouter } from 'next/navigation'
 import { getAccessToken } from '@/lib/supabase/client'
 import { apiGet, apiPatch } from '@/lib/api'
 import type { BillingSummaryResponse, UserMeResponse } from '@dotly/types'
@@ -28,6 +29,7 @@ async function getToken(): Promise<string | undefined> {
 }
 
 export default function SettingsPage(): JSX.Element {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('Profile')
 
   const [profileLoading, setProfileLoading] = useState(true)
@@ -195,7 +197,11 @@ export default function SettingsPage(): JSX.Element {
         email={email}
       />
 
-      <SettingsTabs activeTab={activeTab} onChange={setActiveTab} />
+      <SettingsTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        onOpenBilling={() => router.push('/settings/billing')}
+      />
 
       <div className="app-panel rounded-[28px] p-6 sm:p-7">
         {activeTab === 'Profile' && (
