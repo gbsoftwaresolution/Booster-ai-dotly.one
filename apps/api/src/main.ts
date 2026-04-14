@@ -75,8 +75,8 @@ async function bootstrap() {
 
   app.enableShutdownHooks()
 
-  const port = configService.get<string>('PORT') || 3001
-  await app.listen(port)
+  const port = Number(configService.get<string>('PORT') || 3001)
+  await app.listen(port, '0.0.0.0')
   const logger = app.get(WINSTON_MODULE_NEST_PROVIDER)
   const url = await app.getUrl()
   logger.log(`Dotly API running on ${url}`, 'Bootstrap')
