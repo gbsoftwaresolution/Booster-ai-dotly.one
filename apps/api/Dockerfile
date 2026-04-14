@@ -29,7 +29,7 @@ COPY . .
 
 # Generate Prisma client (requires DATABASE_URL only at generate time, not a real DB)
 RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
-    pnpm --filter @dotly/database exec prisma generate
+  pnpm --filter @dotly/database run db:generate
 
 # Build the NestJS API
 RUN pnpm turbo build --filter=@dotly/api
