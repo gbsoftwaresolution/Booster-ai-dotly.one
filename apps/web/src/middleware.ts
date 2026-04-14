@@ -44,6 +44,13 @@ const LEGACY_REDIRECTS: RedirectEntry[] = [
 ]
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Keep liveness probes independent from Supabase auth and custom-domain logic.
+  if (pathname === '/api/health' || pathname === '/api/health/live') {
+    return NextResponse.next()
+  }
+
   // H-2: Fail visibly if critical Supabase env vars are absent.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -129,7 +136,6 @@ export async function middleware(request: NextRequest) {
 
   // ─── Legacy flat-URL → /apps/* permanent redirects (308) ─────────────────
   // Only runs for authenticated users (unauthenticated were handled above).
-  const { pathname } = request.nextUrl
   for (const entry of LEGACY_REDIRECTS) {
     const [pattern, target] = entry
     if (typeof pattern === 'string') {
@@ -188,5 +194,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|card/).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|card/|api/health(?:/live)?$).*)'],
 }
