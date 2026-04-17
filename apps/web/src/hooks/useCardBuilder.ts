@@ -234,7 +234,7 @@ export function useCardBuilder(cardId: string) {
   )
 
   const updateActions = useCallback(
-    (actions: CardActionsConfig | undefined, services?: CardServiceOffer[] | undefined) => {
+    (actions: CardActionsConfig | undefined) => {
       setState((prev) => {
         if (!prev.card) return prev
         const nextFields = { ...prev.card.fields }
@@ -243,6 +243,26 @@ export function useCardBuilder(cardId: string) {
         } else {
           delete nextFields.actions
         }
+        latestFieldsRef.current = nextFields
+        return {
+          ...prev,
+          card: { ...prev.card, fields: nextFields },
+        }
+      })
+      pendingFieldChanges.current = {
+        ...pendingFieldChanges.current,
+        actions: actions ?? null,
+      }
+      triggerAutoSave()
+    },
+    [triggerAutoSave],
+  )
+
+  const updateServices = useCallback(
+    (services: CardServiceOffer[] | undefined) => {
+      setState((prev) => {
+        if (!prev.card) return prev
+        const nextFields = { ...prev.card.fields }
         if ((services?.length ?? 0) > 0) {
           nextFields.services = services
         } else {
@@ -256,7 +276,6 @@ export function useCardBuilder(cardId: string) {
       })
       pendingFieldChanges.current = {
         ...pendingFieldChanges.current,
-        actions: actions ?? null,
         services: services ?? null,
       }
       triggerAutoSave()
@@ -429,6 +448,7 @@ export function useCardBuilder(cardId: string) {
     ...state,
     updateField,
     updateActions,
+    updateServices,
     updateHandle,
     updateTheme,
     updateTemplate,

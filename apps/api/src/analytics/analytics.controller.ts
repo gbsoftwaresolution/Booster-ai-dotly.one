@@ -44,6 +44,7 @@ const VALID_ACTION_TYPES = [
   'deposit_completed',
   'payment_started',
   'payment_completed',
+  'services_page_viewed',
   'service_checkout_started',
   'service_checkout_completed',
   'save_contact_attempt',

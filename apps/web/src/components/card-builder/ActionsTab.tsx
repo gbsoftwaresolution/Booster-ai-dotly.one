@@ -5,7 +5,6 @@ import type {
   CardActionsConfig,
   CardActionConfig,
   CardActionType,
-  CardServiceOffer,
   PartialCardFields,
 } from '@dotly/types'
 import { MessageCircleMore, CalendarDays, ClipboardList } from 'lucide-react'
@@ -13,10 +12,7 @@ import { cn } from '@/lib/cn'
 
 interface ActionsTabProps {
   fields: PartialCardFields
-  onActionsChange: (
-    actions: CardActionsConfig | undefined,
-    services?: CardServiceOffer[] | undefined,
-  ) => void
+  onActionsChange: (actions: CardActionsConfig | undefined) => void
 }
 
 const ACTION_ORDER: CardActionType[] = ['BOOK', 'WHATSAPP_CHAT', 'LEAD_CAPTURE']
@@ -85,10 +81,8 @@ export function ActionsTab({ fields, onActionsChange }: ActionsTabProps): JSX.El
     availableSecondaryTypes(primary.type).find((type) => type !== firstSecondaryType) ??
     'LEAD_CAPTURE'
 
-  const services = Array.isArray(fields.services) ? fields.services.slice(0, 3) : []
-
   function update(next: CardActionsConfig) {
-    onActionsChange(next, services)
+    onActionsChange(next)
   }
 
   function updatePrimary(type: CardActionType) {
@@ -182,10 +176,6 @@ export function ActionsTab({ fields, onActionsChange }: ActionsTabProps): JSX.El
           )
           .find((item) => item.type === 'WHATSAPP_CHAT')
 
-  function updateServices(nextServices: CardServiceOffer[]) {
-    onActionsChange(actions, nextServices)
-  }
-
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-slate-200 bg-white/70 p-5 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.22)]">
@@ -269,104 +259,6 @@ export function ActionsTab({ fields, onActionsChange }: ActionsTabProps): JSX.El
           onChange={(e) => updateWhatsappMessage(e.target.value.slice(0, 500))}
           className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
         />
-      </div>
-
-      <div className="rounded-[28px] border border-slate-200 bg-white/70 p-5 space-y-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-            Fixed-price services
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            Add up to 3 offers visitors can buy directly from your card with crypto checkout.
-          </p>
-        </div>
-
-        {services.map((service, index) => (
-          <div
-            key={service.id || index}
-            className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3"
-          >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                type="text"
-                value={service.name}
-                onChange={(e) => {
-                  const next = [...services]
-                  next[index] = { ...service, name: e.target.value.slice(0, 160) }
-                  updateServices(next)
-                }}
-                placeholder="Service name"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
-              />
-              <input
-                type="text"
-                value={service.priceUsdt}
-                onChange={(e) => {
-                  const next = [...services]
-                  next[index] = { ...service, priceUsdt: e.target.value.slice(0, 32) }
-                  updateServices(next)
-                }}
-                placeholder="Price in USDT"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <textarea
-              rows={3}
-              value={service.description ?? ''}
-              onChange={(e) => {
-                const next = [...services]
-                next[index] = { ...service, description: e.target.value.slice(0, 400) }
-                updateServices(next)
-              }}
-              placeholder="What the buyer gets"
-              className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
-            />
-            <div className="flex items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={!!service.highlighted}
-                  onChange={(e) => {
-                    const next = services.map((item, itemIndex) => ({
-                      ...item,
-                      highlighted: itemIndex === index ? e.target.checked : false,
-                    }))
-                    updateServices(next)
-                  }}
-                />
-                Highlight this offer
-              </label>
-              <button
-                type="button"
-                onClick={() =>
-                  updateServices(services.filter((_, itemIndex) => itemIndex !== index))
-                }
-                className="text-sm font-semibold text-red-500 hover:text-red-600"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {services.length < 3 && (
-          <button
-            type="button"
-            onClick={() =>
-              updateServices([
-                ...services,
-                {
-                  id: `service-${Date.now().toString(36)}`,
-                  name: '',
-                  priceUsdt: '',
-                },
-              ])
-            }
-            className="rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-slate-50"
-          >
-            Add service offer
-          </button>
-        )}
       </div>
     </div>
   )
