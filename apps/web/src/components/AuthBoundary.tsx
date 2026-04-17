@@ -33,6 +33,9 @@ export function AuthBoundary() {
       !pathname ||
       pathname === '/' ||
       pathname.startsWith('/auth') ||
+      pathname === '/verify-email' ||
+      pathname === '/reset-password' ||
+      pathname === '/confirm-email-change' ||
       pathname.startsWith('/card/') ||
       pathname.startsWith('/pricing')
 

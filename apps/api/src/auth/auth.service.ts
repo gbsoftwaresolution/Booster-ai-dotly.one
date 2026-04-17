@@ -108,7 +108,7 @@ export class AuthService {
       },
     })
 
-    const verificationUrl = `${this.webUrl}/auth/verify-email?token=${encodeURIComponent(rawToken)}`
+    const verificationUrl = `${this.webUrl}/verify-email?token=${encodeURIComponent(rawToken)}`
     await this.email.sendEmailVerificationEmail(
       user.email,
       user.name ?? user.email.split('@')[0] ?? user.email,
@@ -343,7 +343,7 @@ export class AuthService {
       },
     })
 
-    const path = mobile ? '/auth/mobile-reset' : '/auth/reset-password'
+    const path = mobile ? '/auth/mobile-reset' : '/reset-password'
     const resetUrl = `${this.webUrl}${path}?token=${encodeURIComponent(rawToken)}`
 
     await this.email.sendPasswordResetEmail(user.email, resetUrl)
@@ -637,7 +637,7 @@ export class AuthService {
       }),
     ])
 
-    const verificationUrl = `${this.webUrl}/auth/confirm-email-change?token=${encodeURIComponent(rawToken)}`
+    const verificationUrl = `${this.webUrl}/confirm-email-change?token=${encodeURIComponent(rawToken)}`
     await Promise.all([
       this.email.sendEmailChangeVerificationEmail(
         newEmail,

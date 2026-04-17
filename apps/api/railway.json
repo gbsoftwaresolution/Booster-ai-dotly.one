@@ -8,7 +8,7 @@
     "releaseCommand": "pnpm --filter @dotly/database exec prisma migrate deploy",
     "startCommand": "node apps/api/dist/src/main",
     "healthcheckPath": "/health/live",
-    "healthcheckTimeout": 30,
+    "healthcheckTimeout": 90,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3,
     "numReplicas": 2

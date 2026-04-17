@@ -69,7 +69,7 @@ EXPOSE 3001
 
 USER nestjs
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=5 \
   CMD node -e "require('http').get('http://127.0.0.1:3001/health/live', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["node", "apps/api/dist/src/main"]
