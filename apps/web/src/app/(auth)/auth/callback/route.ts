@@ -2,6 +2,36 @@ import { sanitizeNextPath } from '@/lib/app-url'
 import { NextRequest, NextResponse } from 'next/server'
 import { setServerSession } from '@/lib/auth/session'
 
+function renderSessionBootstrapHtml(params: {
+  accessToken: string
+  refreshToken: string
+  redirectTo: string
+}): string {
+  const accessToken = JSON.stringify(params.accessToken)
+  const refreshToken = JSON.stringify(params.refreshToken)
+  const redirectTo = JSON.stringify(params.redirectTo)
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="3;url=${params.redirectTo.replace(/&/g, '&amp;')}" />
+    <title>Completing sign-in...</title>
+  </head>
+  <body>
+    <p>Completing sign-in...</p>
+    <script>
+      try {
+        window.localStorage.setItem('dotly_access_token', ${accessToken});
+        window.localStorage.setItem('dotly_refresh_token', ${refreshToken});
+      } catch {}
+      window.location.replace(${redirectTo});
+    </script>
+  </body>
+</html>`
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const payload = searchParams.get('payload')
@@ -51,7 +81,20 @@ export async function GET(request: NextRequest) {
         return redirectWithError('invalid_payload')
       }
       await setServerSession({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken })
-      return NextResponse.redirect(`${origin}${sanitizeNextPath(parsed.next, next)}`)
+      const redirectTo = `${origin}${sanitizeNextPath(parsed.next, next)}`
+      return new NextResponse(
+        renderSessionBootstrapHtml({
+          accessToken: parsed.accessToken,
+          refreshToken: parsed.refreshToken,
+          redirectTo,
+        }),
+        {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        },
+      )
     } catch {
       return redirectWithError('invalid_payload')
     }
