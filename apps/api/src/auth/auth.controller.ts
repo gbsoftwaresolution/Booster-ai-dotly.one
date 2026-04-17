@@ -70,18 +70,10 @@ class ResetPasswordDto {
   password!: string
 }
 
-class GoogleQueryDto {
+class GoogleStartQueryDto {
   @IsOptional()
   @IsString()
   next?: string
-
-  @IsOptional()
-  @IsString()
-  code?: string
-
-  @IsOptional()
-  @IsString()
-  state?: string
 
   @IsOptional()
   @IsString()
@@ -162,7 +154,7 @@ export class AuthController {
 
   @Public()
   @Get('google')
-  google(@Query() query: GoogleQueryDto, @Res() res: Response) {
+  google(@Query() query: GoogleStartQueryDto, @Res() res: Response) {
     const next =
       typeof query.next === 'string' && query.next.startsWith('/') && !query.next.startsWith('//')
         ? query.next
@@ -173,13 +165,18 @@ export class AuthController {
 
   @Public()
   @Get('google/callback')
-  async googleCallback(@Query() query: GoogleQueryDto, @Req() req: Request, @Res() res: Response) {
-    if (!query.code || !query.state) {
+  async googleCallback(
+    @Query('code') code: string | undefined,
+    @Query('state') stateToken: string | undefined,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    if (!code || !stateToken) {
       throw new BadRequestException('Missing Google callback parameters.')
     }
 
-    const state = this.authService.parseGoogleCallbackState(query.state)
-    const tokens = await this.authService.exchangeGoogleCode(query.code)
+    const state = this.authService.parseGoogleCallbackState(stateToken)
+    const tokens = await this.authService.exchangeGoogleCode(code)
     const profile = await this.authService.getGoogleProfile(tokens.access_token)
     const session = await this.authService.signInWithGoogle(profile, this.getSessionMeta(req))
 
