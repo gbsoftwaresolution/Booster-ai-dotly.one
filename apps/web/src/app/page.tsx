@@ -65,12 +65,7 @@ export default async function HomePage() {
   try {
     const token = await getServerAccessToken()
     if (token) {
-      try {
-        const state = await getOnboardingState(token)
-        redirect(getOnboardingNextStep(state) ? '/onboarding' : '/dashboard')
-      } catch {
-        redirect('/onboarding')
-      }
+      redirect('/auth/continue?next=%2Fdashboard')
     }
   } catch {
     // Fall back to the public marketing homepage when auth is unavailable.

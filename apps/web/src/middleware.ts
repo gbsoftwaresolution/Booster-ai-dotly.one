@@ -119,8 +119,9 @@ export async function middleware(request: NextRequest) {
 
   if (hasSession && request.nextUrl.pathname === '/auth') {
     const url = request.nextUrl.clone()
-    url.pathname = '/onboarding'
+    url.pathname = '/auth/continue'
     url.search = ''
+    url.searchParams.set('next', '/dashboard')
     return applyNoStoreHeaders(request, NextResponse.redirect(url))
   }
 

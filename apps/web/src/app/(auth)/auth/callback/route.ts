@@ -35,7 +35,7 @@ function renderSessionBootstrapHtml(params: {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const payload = searchParams.get('payload')
-  const next = sanitizeNextPath(searchParams.get('next'), '/onboarding')
+  const next = sanitizeNextPath(searchParams.get('next'), '/auth/continue')
 
   const configuredOrigin = (
     process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_WEB_URL
@@ -81,7 +81,10 @@ export async function GET(request: NextRequest) {
         return redirectWithError('invalid_payload')
       }
       await setServerSession({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken })
-      const redirectTo = `${origin}${sanitizeNextPath(parsed.next, next)}`
+      const redirectPath = sanitizeNextPath(parsed.next, next)
+      const redirectTo = shouldUseDecisionPage(redirectPath)
+        ? `${origin}/auth/continue?next=${encodeURIComponent(redirectPath)}`
+        : `${origin}${redirectPath}`
       return new NextResponse(
         renderSessionBootstrapHtml({
           accessToken: parsed.accessToken,
@@ -100,4 +103,8 @@ export async function GET(request: NextRequest) {
     }
   }
   return redirectWithError('auth_callback_failed')
+}
+
+function shouldUseDecisionPage(next: string): boolean {
+  return next === '/' || next === '/dashboard' || next === '/onboarding'
 }

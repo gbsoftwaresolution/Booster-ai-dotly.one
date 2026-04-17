@@ -37,6 +37,10 @@ function AuthPageContent(): JSX.Element {
     [searchParams],
   )
   const authCallbackUrl = useMemo(() => getAuthCallbackUrl(), [])
+  const postAuthPath = useMemo(
+    () => `/auth/continue?next=${encodeURIComponent(next)}`,
+    [next],
+  )
 
   useEffect(() => {
     const requestedMode = searchParams.get('mode')
@@ -108,7 +112,7 @@ function AuthPageContent(): JSX.Element {
           refreshToken: string
         }>('/auth/sign-in', { email: trimmedEmail, password })
         await persistSession(session)
-        router.push(next)
+        router.push(postAuthPath)
         router.refresh()
       } else {
         await apiPost<{
@@ -153,7 +157,7 @@ function AuthPageContent(): JSX.Element {
 
   async function handleGoogleAuth() {
     setError(null)
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google?next=${encodeURIComponent(next)}`
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google?next=${encodeURIComponent(postAuthPath)}`
   }
 
   return (
