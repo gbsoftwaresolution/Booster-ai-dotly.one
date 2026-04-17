@@ -5,6 +5,7 @@
     "dockerfilePath": "apps/api/Dockerfile"
   },
   "deploy": {
+    "releaseCommand": "pnpm --filter @dotly/database exec prisma migrate deploy",
     "startCommand": "node apps/api/dist/src/main",
     "healthcheckPath": "/health/live",
     "healthcheckTimeout": 30,
