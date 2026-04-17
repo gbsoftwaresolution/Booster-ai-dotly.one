@@ -2,11 +2,12 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { getAuthCallbackUrl, sanitizeNextPath } from '@/lib/app-url'
+import { apiPost } from '@/lib/api'
+import { storeClientSession } from '@/lib/auth/client'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -20,6 +21,7 @@ export default function AuthPage(): JSX.Element {
 
 function AuthPageContent(): JSX.Element {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +30,6 @@ function AuthPageContent(): JSX.Element {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
   const next = useMemo(
     () => sanitizeNextPath(searchParams.get('next'), '/onboarding'),
     [searchParams],
@@ -94,26 +95,30 @@ function AuthPageContent(): JSX.Element {
 
     try {
       if (mode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-          redirectTo: `${authCallbackUrl}?next=${encodeURIComponent('/settings')}`,
+        await apiPost('/auth/forgot-password', {
+          email: trimmedEmail,
         })
-        if (error) throw error
         setSuccessMessage('Password reset link sent — check your email.')
       } else if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
-        if (error) throw error
+        const session = await apiPost<{
+          accessToken: string
+          refreshToken: string
+        }>('/auth/sign-in', { email: trimmedEmail, password })
+        storeClientSession(session)
         router.push(next)
         router.refresh()
       } else {
-        const { error } = await supabase.auth.signUp({
+        const session = await apiPost<{
+          accessToken: string
+          refreshToken: string
+        }>('/auth/sign-up', {
+          name: name.trim() || undefined,
           email: trimmedEmail,
           password,
-          options: {
-            emailRedirectTo: `${authCallbackUrl}?next=${encodeURIComponent(next)}`,
-          },
         })
-        if (error) throw error
-        setSuccessMessage('Check your email to confirm your account.')
+        storeClientSession(session)
+        router.push(next)
+        router.refresh()
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
@@ -124,13 +129,7 @@ function AuthPageContent(): JSX.Element {
 
   async function handleGoogleAuth() {
     setError(null)
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${authCallbackUrl}?next=${encodeURIComponent(next)}`,
-      },
-    })
-    if (error) setError(error.message)
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google?next=${encodeURIComponent(next)}`
   }
 
   return (
@@ -257,6 +256,23 @@ function AuthPageContent(): JSX.Element {
             )}
 
             <form onSubmit={handleEmailAuth} className="space-y-4">
+              {mode === 'signup' && (
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Full name
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 block w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    placeholder="Jane Doe"
+                  />
+                </div>
+              )}
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                   Email address

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { apiGet } from '@/lib/api'
 import { BillingPlan, normalizePlan } from '@/lib/billing-plans'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import type { BillingSummaryResponse } from '@dotly/types'
 
 interface BillingPlanContextValue {

@@ -14,7 +14,7 @@ import { PublishBar } from '@/components/card-builder/PublishBar'
 import { QrSection } from '@/components/card-builder/QrSection'
 import { LeadFormTab } from '@/components/card-builder/LeadFormTab'
 import type { CardData, CardTemplate, SocialLinkData, MediaBlockData } from '@dotly/types'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet, apiDelete } from '@/lib/api'
 import {
   ArrowLeft,

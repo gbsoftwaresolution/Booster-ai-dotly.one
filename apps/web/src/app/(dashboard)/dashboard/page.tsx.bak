@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Pencil,
 } from 'lucide-react'
-import { getAccessToken, createClient } from '@/lib/supabase/client'
+import { getAccessToken, createClient } from '@/lib/auth/client'
 import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
 

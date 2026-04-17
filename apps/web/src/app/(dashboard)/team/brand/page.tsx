@@ -8,7 +8,7 @@ import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiGet, apiPut, isApiError } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 import { BrandConfigForm, BrandPreview, TeamBrandHero } from './components'
 import { DEFAULT_BRAND_CONFIG, mergeBrandConfig } from './helpers'

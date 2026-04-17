@@ -22,7 +22,6 @@
 | PostHog (Analytics)   | https://app.posthog.com                                                                        |
 | Railway (API hosting) | https://railway.app/project/dotly-api                                                          |
 | Railway (Web hosting) | https://railway.app                                                                            |
-| Supabase (Auth/DB)    | https://app.supabase.com/project/dotly                                                         |
 | Redis Cloud           | https://app.redislabs.com                                                                      |
 | Mailgun               | https://app.mailgun.com                                                                        |
 
@@ -61,7 +60,7 @@
 1. Open Sentry dashboard, filter by `environment:production`, sort by volume
 2. Identify the top error — check stack trace and affected release
 3. If the error is from a recent deploy: initiate rollback (see Rollback Procedure below)
-4. If it is a third-party failure (Supabase, Mailgun): check their status pages
+4. If it is a third-party failure (Google OAuth, Mailgun, Railway, Cloudflare): check their status pages
 5. Silence noisy non-critical errors in Sentry while investigating
 
 ---
@@ -73,8 +72,8 @@
 **Steps:**
 
 1. Restart the API service to flush idle connections
-2. Check PgBouncer / Supabase connection pooler status
-3. Identify slow queries via Supabase Query Performance dashboard
+2. Check the PostgreSQL connection pooler status on the current hosting provider
+3. Identify slow queries using your database monitoring tooling
 4. Add `LIMIT` / indexes or kill long-running queries:
    ```sql
    SELECT pid, now() - pg_stat_activity.query_start AS duration, query

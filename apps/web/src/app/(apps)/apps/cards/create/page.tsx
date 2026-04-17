@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiPost, isApiError } from '@/lib/api'
 import { CardTemplate } from '@dotly/types'
 import { cn } from '@/lib/cn'

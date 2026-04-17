@@ -6,7 +6,7 @@ import type { JSX } from 'react'
 import type { CardTemplate, UserMeResponse } from '@dotly/types'
 import { CardTemplate as CardTemplateEnum } from '@dotly/types'
 import { apiGet, apiPatch, apiPost, isApiError } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import {
   COUNTRY_OPTIONS,
   detectBrowserCountry,

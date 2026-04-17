@@ -20,6 +20,7 @@ Initialize the Turborepo monorepo with pnpm workspaces. Configure the build pipe
 apps and packages can be built, linted, and type-checked in a single command.
 
 **Steps:**
+
 - [ ] Initialize repo with `pnpm init` and `pnpm add -D turbo` at root
 - [ ] Create `pnpm-workspace.yaml` defining `apps/*` and `packages/*`
 - [ ] Create `turbo.json` with `build`, `lint`, `typecheck`, and `dev` pipeline tasks
@@ -31,6 +32,7 @@ apps and packages can be built, linted, and type-checked in a single command.
       shared Prettier config
 
 **Acceptance Criteria:**
+
 - [ ] `pnpm install` completes with no errors from repo root
 - [ ] `turbo build` runs across all workspaces and exits 0 (even with empty packages)
 - [ ] `turbo lint` runs ESLint across all workspaces using shared config
@@ -46,6 +48,7 @@ Create the three shared packages that the API, web, and mobile apps all depend o
 be wired up before any app code is written.
 
 **Steps:**
+
 - [ ] `packages/types` — Create `index.ts` with initial shared enums and interfaces:
   - `Plan` enum: `FREE | PRO | BUSINESS | ENTERPRISE`
   - `CardTemplate` enum: `MINIMAL | BOLD | CREATIVE | CORPORATE`
@@ -57,6 +60,7 @@ be wired up before any app code is written.
 - [ ] Wire `packages/types` as a dependency in `apps/api`, `apps/web`, `apps/mobile`
 
 **Acceptance Criteria:**
+
 - [ ] `import { Plan } from '@dotly/types'` works in both `apps/api` and `apps/web` with no errors
 - [ ] `turbo typecheck` passes with the new package imports
 - [ ] No `any` types in `packages/types`
@@ -70,6 +74,7 @@ Define the complete Prisma schema for all core entities. Run the initial migrati
 a seed script with test data.
 
 **Steps:**
+
 - [ ] Initialize Prisma in `packages/database`: `prisma init`
 - [ ] Write `schema.prisma` with all core models:
   - `User` — id, email, name, avatarUrl, plan, stripeCustomerId, createdAt
@@ -94,6 +99,7 @@ a seed script with test data.
   - 2 contacts with CRM pipeline entries
 
 **Acceptance Criteria:**
+
 - [ ] `prisma migrate dev` runs with no errors and generates migration SQL
 - [ ] `prisma db seed` runs and inserts test data without errors
 - [ ] `prisma studio` opens and shows all 13 tables with the correct columns
@@ -106,27 +112,27 @@ a seed script with test data.
 ### T4 — NestJS API Scaffold
 
 **Description:**
-Bootstrap the NestJS application with the core module structure, Supabase JWT guard, global
+Bootstrap the NestJS application with the core module structure, first-party JWT guard, global
 configuration, and a health check endpoint.
 
 **Steps:**
+
 - [ ] Create `apps/api` with NestJS CLI: `nest new api --package-manager pnpm`
 - [ ] Install and configure dependencies:
   - `@nestjs/config` — environment variables via `ConfigModule.forRoot()`
   - `@nestjs/swagger` — OpenAPI docs at `/api/docs`
-  - `@supabase/supabase-js` — for JWT verification
   - `@prisma/client` — import from `packages/database`
   - `class-validator` + `class-transformer` — DTO validation
 - [ ] Create module structure:
   - `AppModule` — root module, imports all feature modules
   - `PrismaModule` — global Prisma service wrapping `PrismaClient`
-  - `AuthModule` — Supabase JWT strategy + `JwtAuthGuard`
+  - `AuthModule` — first-party JWT strategy + `JwtAuthGuard`
   - `UsersModule` — stub for user profile endpoints
   - `CardsModule` — stub for card CRUD endpoints
   - `HealthModule` — `GET /health` endpoint
-- [ ] Implement `SupabaseJwtStrategy`:
+- [ ] Implement `JwtStrategy`:
   - Extract Bearer token from `Authorization` header
-  - Verify JWT using Supabase JWT secret (`SUPABASE_JWT_SECRET` env var)
+  - Verify JWT using `AUTH_JWT_SECRET`
   - Attach decoded user payload to `request.user`
 - [ ] Apply `JwtAuthGuard` globally with `APP_GUARD` provider
 - [ ] Add `HealthController` with `GET /health` returning `{ status: 'ok', timestamp: ISO_STRING }`
@@ -134,49 +140,51 @@ configuration, and a health check endpoint.
 - [ ] Configure CORS for web app origin
 
 **Acceptance Criteria:**
+
 - [ ] `pnpm --filter api dev` starts the server on port 3001 with no errors
 - [ ] `GET http://localhost:3001/health` returns `200 { status: 'ok', timestamp: '...' }`
 - [ ] `GET http://localhost:3001/users/me` without a token returns `401 Unauthorized`
-- [ ] `GET http://localhost:3001/users/me` with a valid Supabase JWT returns `200`
+- [ ] `GET http://localhost:3001/users/me` with a valid first-party JWT returns `200`
 - [ ] `GET http://localhost:3001/api/docs` renders Swagger UI with all documented endpoints
 - [ ] Sending a DTO with an invalid field returns `400 Bad Request` with validation messages
 
 ---
 
-### T5 — Supabase Auth Integration
+### T5 — First-Party Auth Integration
 
 **Description:**
-Set up the Supabase project and wire auth into both the NestJS API (JWT validation) and the
-Next.js web app (session management). Configure Google OAuth provider.
+Set up first-party auth in the NestJS API and wire it into both the Next.js web app and Expo
+mobile app. Configure Google OAuth provider.
 
 **Steps:**
-- [ ] Create Supabase project in the dashboard, note `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-- [ ] Enable Google OAuth provider in Supabase Auth settings
-- [ ] Enable Email/Password auth provider
-- [ ] Note `SUPABASE_JWT_SECRET` from Project Settings → API
+
+- [ ] Generate `AUTH_JWT_SECRET`
+- [ ] Create Google OAuth credentials in Google Cloud Console
+- [ ] Enable Email/Password sign-in in the app itself
 - [ ] Add `.env.example` to `apps/api`:
   ```
   DATABASE_URL=
-  SUPABASE_URL=
-  SUPABASE_ANON_KEY=
-  SUPABASE_JWT_SECRET=
+  API_URL=
+  AUTH_JWT_SECRET=
+  GOOGLE_AUTH_CLIENT_ID=
+  GOOGLE_AUTH_CLIENT_SECRET=
+  GOOGLE_AUTH_STATE_SECRET=
   REDIS_URL=
   PORT=3001
   ```
-- [ ] Install `@supabase/ssr` and `@supabase/supabase-js` in `apps/web`
-- [ ] Create Supabase browser client helper `lib/supabase/client.ts`
-- [ ] Create Supabase server client helper `lib/supabase/server.ts` (uses cookies)
-- [ ] Create `middleware.ts` in Next.js root to refresh session on every request
+- [ ] Create web auth/session helpers for access + refresh tokens
+- [ ] Create `middleware.ts` in Next.js root to protect authenticated routes
 - [ ] Create `/auth` route with sign-in (email/password + Google OAuth button) and sign-up forms
 - [ ] Create `/auth/callback` route handler for OAuth redirect
 
 **Acceptance Criteria:**
+
 - [ ] A new user can sign up with email + password via the web UI
 - [ ] A new user can sign in with Google OAuth via the web UI
-- [ ] After sign-in, the Supabase session cookie is set and `middleware.ts` keeps it refreshed
-- [ ] The NestJS API correctly validates a JWT token obtained from the Supabase sign-in response
+- [ ] After sign-in, the app persists first-party access/refresh tokens and authenticated routes load
+- [ ] The NestJS API correctly validates a JWT token obtained from the app sign-in response
 - [ ] A user accessing `/dashboard` while unauthenticated is redirected to `/auth`
-- [ ] Token expiry causes automatic session refresh (via `@supabase/ssr` middleware)
+- [ ] Token expiry causes automatic session refresh via the app refresh-token flow
 
 ---
 
@@ -187,6 +195,7 @@ Bootstrap the Next.js 14 App Router application with Tailwind CSS, Shadcn/UI, th
 route structure, and auth-aware layout.
 
 **Steps:**
+
 - [ ] Create `apps/web` with Next.js: `pnpm create next-app@latest web --typescript --tailwind --app`
 - [ ] Install and initialize Shadcn/UI: `pnpm dlx shadcn-ui@latest init`
 - [ ] Add Shadcn components: Button, Input, Label, Card, Avatar, Badge, Separator, Dropdown
@@ -212,13 +221,14 @@ route structure, and auth-aware layout.
   └── layout.tsx                # Root layout
   ```
 - [ ] Create `(dashboard)/layout.tsx` with sidebar navigation and auth guard
-  (redirect to `/auth` if no session)
+      (redirect to `/auth` if no session)
 - [ ] Create stub pages for dashboard, contacts, analytics with placeholder content
 - [ ] Create public `card/[handle]` page with SSR fetching card data from the API
 - [ ] Add `next.config.ts` with custom domain rewrite support (placeholder for Phase 4)
 - [ ] Wire `@dotly/types` import for shared DTOs
 
 **Acceptance Criteria:**
+
 - [ ] `pnpm --filter web dev` starts on port 3000 with no errors
 - [ ] Visiting `/dashboard` while unauthenticated redirects to `/auth`
 - [ ] Visiting `/dashboard` while authenticated renders the sidebar layout
@@ -231,16 +241,16 @@ route structure, and auth-aware layout.
 ### T7 — React Native (Expo) Mobile Shell
 
 **Description:**
-Bootstrap the Expo app with navigation, Supabase auth client, and tab structure. The app should
+Bootstrap the Expo app with navigation, first-party auth client, and tab structure. The app should
 boot, complete auth, and reach the main tab navigator on both iOS and Android.
 
 **Steps:**
+
 - [ ] Create `apps/mobile` with Expo: `pnpm create expo-app mobile --template tabs`
 - [ ] Install dependencies:
   - `expo-router` — file-based navigation
-  - `@supabase/supabase-js` — auth client
   - `expo-secure-store` — token storage
-  - `react-native-url-polyfill` — required by Supabase
+  - `react-native-url-polyfill` — URL compatibility for shared app code
   - `nativewind` — Tailwind for React Native
   - `@dotly/types` — shared types
 - [ ] Configure NativeWind with `tailwind.config.js`
@@ -258,13 +268,14 @@ boot, complete auth, and reach the main tab navigator on both iOS and Android.
       ├── analytics.tsx         # Analytics tab
       └── settings.tsx          # Settings tab
   ```
-- [ ] Create Supabase client for React Native with `expo-secure-store` adapter
+- [ ] Create mobile auth client for access + refresh token storage with `expo-secure-store`
 - [ ] Implement auth flow: unauthenticated → redirect to `(auth)/sign-in`
 - [ ] Add email/password sign-in on the sign-in screen (Google OAuth in Phase 2)
 - [ ] Each tab renders a stub screen with the tab title and a placeholder message
 - [ ] Wire API base URL via `EXPO_PUBLIC_API_URL` environment variable
 
 **Acceptance Criteria:**
+
 - [ ] App boots on iOS Simulator without crashing
 - [ ] App boots on Android Emulator without crashing
 - [ ] Unauthenticated launch shows the sign-in screen
@@ -282,6 +293,7 @@ Set up GitHub Actions to run lint, typecheck, and build on every pull request. T
 must fail fast on any code quality issue.
 
 **Steps:**
+
 - [ ] Create `.github/workflows/ci.yml` with the following jobs:
   - `lint` — runs `turbo lint` across all workspaces
   - `typecheck` — runs `turbo typecheck` across all workspaces
@@ -299,6 +311,7 @@ must fail fast on any code quality issue.
   ```
 
 **Acceptance Criteria:**
+
 - [ ] Opening a PR triggers the CI workflow automatically
 - [ ] Introducing a TypeScript error causes `typecheck` job to fail with a clear error message
 - [ ] Introducing an ESLint violation causes `lint` job to fail with the rule name
@@ -314,15 +327,19 @@ Document all required environment variables across all apps and create `.env.exa
 so any developer can onboard without asking for values.
 
 **Steps:**
+
 - [ ] Create `apps/api/.env.example`:
+
   ```
   # Database
   DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/dotly
 
-  # Supabase
-  SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-  SUPABASE_ANON_KEY=
-  SUPABASE_JWT_SECRET=
+  # Auth
+  API_URL=http://localhost:3001
+  AUTH_JWT_SECRET=
+  GOOGLE_AUTH_CLIENT_ID=
+  GOOGLE_AUTH_CLIENT_SECRET=
+  GOOGLE_AUTH_STATE_SECRET=
 
   # Redis
   REDIS_URL=redis://localhost:6379
@@ -339,38 +356,34 @@ so any developer can onboard without asking for values.
   NODE_ENV=development
   WEB_URL=http://localhost:3000
   ```
-- [ ] Create `apps/web/.env.example`:
-  ```
-  # Supabase
-  NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
+- [ ] Create `apps/web/.env.example`:
+
+  ```
   # API
   NEXT_PUBLIC_API_URL=http://localhost:3001
 
   # App
   NEXT_PUBLIC_APP_URL=http://localhost:3000
   ```
+
 - [ ] Create `apps/mobile/.env.example`:
   ```
-  # Supabase
-  EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-  EXPO_PUBLIC_SUPABASE_ANON_KEY=
-
   # API
   EXPO_PUBLIC_API_URL=http://localhost:3001
   ```
 - [ ] Confirm all `.env` files are in `.gitignore`
 - [ ] Add a brief `docs/ENVIRONMENT.md` describing each variable, its source, and whether it is
-  required or optional
+      required or optional
 
 **Acceptance Criteria:**
+
 - [ ] No `.env` files with real secrets exist in the repo
 - [ ] All `.env.example` files are committed and contain every variable the app reads
-- [ ] A developer can copy `.env.example` to `.env`, fill in Supabase values from the dashboard,
-  and start all three apps without hitting a missing-variable error
+- [ ] A developer can copy `.env.example` to `.env`, fill in first-party auth and API values,
+      and start all three apps without hitting a missing-variable error
 - [ ] `process.env.SOME_VAR` calls without a fallback that are not in `.env.example` are treated
-  as a lint/review failure
+      as a lint/review failure
 
 ---
 
@@ -380,7 +393,7 @@ The phase is complete when all of the following are true:
 
 - [ ] All 9 tasks above have every acceptance criterion checked
 - [ ] `git clone → pnpm install → turbo dev` brings up API (3001), web (3000), and Expo dev
-  server with no manual intervention beyond copying `.env.example`
+      server with no manual intervention beyond copying `.env.example`
 - [ ] Auth works end-to-end: sign up → sign in → JWT validated by API → dashboard accessible
 - [ ] `GET /card/test-user` on the web renders the seeded test card data
 - [ ] CI passes on a clean PR with all three jobs green
@@ -391,13 +404,13 @@ The phase is complete when all of the following are true:
 
 ## Dependencies & Blockers
 
-| Dependency | Owner | Needed by |
-|---|---|---|
-| Supabase project created | Team lead | T4, T5, T6, T7 |
-| PostgreSQL instance available (local or Railway) | Dev | T3, T4 |
-| Redis instance available (local or Railway) | Dev | T4 |
-| GitHub repo created with branch protection | Team lead | T8 |
-| Stripe account (test mode keys) | Team lead | T9 (keys only, no billing logic in Phase 1) |
+| Dependency                                       | Owner     | Needed by                                   |
+| ------------------------------------------------ | --------- | ------------------------------------------- |
+| Auth secrets + Google OAuth app configured       | Team lead | T4, T5, T6, T7                              |
+| PostgreSQL instance available (local or Railway) | Dev       | T3, T4                                      |
+| Redis instance available (local or Railway)      | Dev       | T4                                          |
+| GitHub repo created with branch protection       | Team lead | T8                                          |
+| Stripe account (test mode keys)                  | Team lead | T9 (keys only, no billing logic in Phase 1) |
 
 ---
 
@@ -414,5 +427,5 @@ The phase is complete when all of the following are true:
 
 ---
 
-*Phase 1 of 4 — Dotly.one*
-*Next: [Phase 2 — Core MVP] (coming after Phase 1 is complete)*
+_Phase 1 of 4 — Dotly.one_
+_Next: [Phase 2 — Core MVP] (coming after Phase 1 is complete)_

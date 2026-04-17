@@ -85,7 +85,7 @@ divergent codebases.
 | Backend API   | NestJS (TypeScript)                              | Modular, scalable, first-class DI and guard system                                                                |
 | ORM           | Prisma                                           | Type-safe DB access, clean migrations                                                                             |
 | Database      | PostgreSQL                                       | Relational, ACID, proven for structured card/CRM data — Local: host=localhost, user=naveenprasath-p, db=dotly_one |
-| Auth          | Supabase Auth                                    | Managed JWT, Google + LinkedIn OAuth, minimal setup                                                               |
+| Auth          | First-party JWT auth                             | API-owned email/password + Google OAuth, refresh sessions, full control                                           |
 | File Storage  | Cloudflare R2                                    | S3-compatible object storage for avatars, logos, portfolio images, QR exports                                     |
 | Cache / Queue | Redis                                            | Analytics event queue, session cache — Local Redis: localhost:6379                                                |
 | Email         | Mailgun (primary) + Amazon SES (fallback)        | Transactional email with automatic failover (lead notifications, billing)                                         |
@@ -228,7 +228,7 @@ Pricing note:
 
 | Phase                               | Duration    | Deliverable                                                                                |
 | ----------------------------------- | ----------- | ------------------------------------------------------------------------------------------ |
-| Phase 1 — Foundation                | Weeks 1–3   | Monorepo, NestJS scaffold, Prisma schema, Supabase auth, Next.js shell, Expo shell, CI     |
+| Phase 1 — Foundation                | Weeks 1–3   | Monorepo, NestJS scaffold, Prisma schema, first-party auth, Next.js shell, Expo shell, CI  |
 | Phase 2 — Core MVP                  | Weeks 4–7   | Card builder, public card page, QR generation, social links, basic analytics               |
 | Phase 3 — Growth Features           | Weeks 8–11  | Lead capture, inbuilt CRM, analytics dashboard, Smart Contract billing, email signatures   |
 | Phase 4 — Polish & Scale            | Weeks 12–15 | Custom domains, NFC writing, mobile push, white label, E2E tests, production deploy        |

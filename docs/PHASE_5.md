@@ -7,6 +7,7 @@ testing, disaster recovery, and a final zero-downtime deployment to dotly.one. T
 final phase. Every task gate-keeps the public launch.
 
 **Stack overrides (authoritative for this phase):**
+
 - **Billing:** Smart contract / crypto (EVM — Polygon or Base, USDC/ETH). No Stripe.
 - **Storage:** Cloudflare R2
 - **Email:** Mailgun (primary), Amazon SES (fallback)
@@ -32,33 +33,35 @@ enriched field carries a confidence score. Low-confidence fields are displayed w
 background job so it never blocks the API request thread.
 
 **Steps:**
+
 - [ ] Create `EnrichmentModule` in `apps/api/src/enrichment/`
 - [ ] Install `openai` SDK and `bullmq` (if not already present from Phase 2)
 - [ ] Define `EnrichmentJob` payload type in `packages/types`:
   ```ts
   interface EnrichmentJobPayload {
-    contactId: string;
-    userId: string;
-    name: string;
-    email: string;
-    company?: string;
+    contactId: string
+    userId: string
+    name: string
+    email: string
+    company?: string
   }
   ```
 - [ ] Define `EnrichmentResult` type in `packages/types`:
   ```ts
   interface EnrichedField {
-    value: string;
-    confidence: number; // 0.0 – 1.0
-    source: 'ai';
+    value: string
+    confidence: number // 0.0 – 1.0
+    source: 'ai'
   }
   interface EnrichmentResult {
-    linkedinUrl?: EnrichedField;
-    jobTitle?: EnrichedField;
-    industry?: EnrichedField;
-    companySize?: EnrichedField;
+    linkedinUrl?: EnrichedField
+    jobTitle?: EnrichedField
+    industry?: EnrichedField
+    companySize?: EnrichedField
   }
   ```
 - [ ] Add `ContactEnrichment` Prisma model to `packages/database/schema.prisma`:
+
   ```prisma
   model ContactEnrichment {
     id            String   @id @default(cuid())
@@ -84,6 +87,7 @@ background job so it never blocks the API request thread.
     FAILED
   }
   ```
+
 - [ ] Run `prisma migrate dev --name add_contact_enrichment`
 - [ ] Create `EnrichmentQueue` BullMQ queue (Redis connection: `localhost:6379`)
 - [ ] Create `EnrichmentProcessor` (BullMQ worker):
@@ -110,7 +114,7 @@ background job so it never blocks the API request thread.
 - [ ] Add `aiEnrichmentEnabled` boolean to `User` model (default `true`); migrate
 - [ ] Add `POST /users/me/settings` (or `PATCH /users/me`) to toggle `aiEnrichmentEnabled`
 - [ ] Auto-trigger enrichment job on `POST /contacts` (create) if `aiEnrichmentEnabled === true`
-  and the user's plan allows it
+      and the user's plan allows it
 - [ ] **Web:**
   - Add "Enrich" button to contact detail page (disabled if enrichment in progress)
   - Show spinner while status is `PENDING` or `PROCESSING` (poll `GET /contacts/:id/enrich/status`
@@ -134,10 +138,11 @@ background job so it never blocks the API request thread.
 - [ ] Add Swagger docs for both endpoints
 
 **Acceptance Criteria:**
+
 - [ ] `POST /contacts/:id/enrich` with a valid Pro token returns `202` and creates a
-  `ContactEnrichment` record with status `PENDING`
+      `ContactEnrichment` record with status `PENDING`
 - [ ] `GET /contacts/:id/enrich/status` returns `{ status: 'COMPLETED', linkedinUrl: '...', ... }`
-  after the BullMQ worker processes the job
+      after the BullMQ worker processes the job
 - [ ] Every enriched field has a `confidence` value between 0.0 and 1.0
 - [ ] Fields with confidence < 0.7 are displayed with a "Suggested" badge in both web and mobile
 - [ ] A Pro user who has used 100 enrichments today receives `429` on the 101st request
@@ -157,6 +162,7 @@ in an editable review form before saving. Low-confidence fields are highlighted 
 If AI enrichment is enabled, it is auto-triggered after save.
 
 **Steps:**
+
 - [ ] Install `expo-camera` and `expo-image-picker` in `apps/mobile`
 - [ ] Add camera and photo library permissions to `app.json`:
   ```json
@@ -205,11 +211,11 @@ If AI enrichment is enabled, it is auto-triggered after save.
     ```json
     {
       "fields": {
-        "name":    { "value": "Jane Doe", "confidence": 0.95 },
-        "title":   { "value": "Product Manager", "confidence": 0.88 },
+        "name": { "value": "Jane Doe", "confidence": 0.95 },
+        "title": { "value": "Product Manager", "confidence": 0.88 },
         "company": { "value": "Acme Corp", "confidence": 0.91 },
-        "email":   { "value": "jane@acme.com", "confidence": 0.99 },
-        "phone":   { "value": "+1 555 123 4567", "confidence": 0.97 },
+        "email": { "value": "jane@acme.com", "confidence": 0.99 },
+        "phone": { "value": "+1 555 123 4567", "confidence": 0.97 },
         "website": { "value": "acme.com", "confidence": 0.82 },
         "address": { "value": "123 Main St, San Francisco, CA", "confidence": 0.74 }
       },
@@ -241,15 +247,16 @@ If AI enrichment is enabled, it is auto-triggered after save.
   - Returns low confidence for ambiguous name lines
 
 **Acceptance Criteria:**
+
 - [ ] Tapping "Scan Card" FAB opens the camera screen without crashing on iOS and Android
 - [ ] Capturing an image of a business card and submitting calls `POST /contacts/scan`
-  and returns extracted fields within 5 seconds
+      and returns extracted fields within 5 seconds
 - [ ] The review form pre-fills all extracted fields; fields with confidence < 0.75 have
-  yellow background highlight
+      yellow background highlight
 - [ ] User can edit any field before saving
 - [ ] Saving creates a new contact in the DB via `POST /contacts`
 - [ ] If Google Cloud Vision fails, AWS Textract is used automatically (verified by mocking
-  Vision to return 500 in tests)
+      Vision to return 500 in tests)
 - [ ] If both OCR services fail, the blank fallback form opens
 - [ ] Pro user hitting 51st scan today receives `429`; toast is shown in the app
 - [ ] Unit tests for field-extraction pass: `turbo test --filter mobile` exits 0
@@ -265,6 +272,7 @@ so no request thread is ever blocked. Users can configure per-type toggles in Se
 Notification taps deep-link to the relevant screen.
 
 **Steps:**
+
 - [ ] Install `expo-notifications` in `apps/mobile`
 - [ ] Configure FCM in Firebase Console; download `google-services.json`; add to `apps/mobile/`
 - [ ] Configure APNs in Apple Developer Portal; upload `.p8` key to Expo (EAS Credentials)
@@ -319,6 +327,7 @@ Notification taps deep-link to the relevant screen.
   - Auth-protected
   - Returns current preferences for the authenticated user
 - [ ] Create `NotificationsService` with method:
+
   ```ts
   sendToUser(
     userId: string,
@@ -330,9 +339,11 @@ Notification taps deep-link to the relevant screen.
     }
   ): Promise<void>
   ```
+
   - Look up all `PushToken` records for `userId`
   - Check `NotificationPreferences` — skip if that notification type is disabled
   - Enqueue `NotificationDeliveryJob` to BullMQ queue (`notifications-delivery`)
+
 - [ ] Create `NotificationDeliveryProcessor` (BullMQ worker):
   - For each token, call Expo Push API (`https://exp.host/--/api/v2/push/send`)
   - Batch up to 100 messages per request (Expo push batch limit)
@@ -381,20 +392,21 @@ Notification taps deep-link to the relevant screen.
   - Load current state from `GET /notifications/preferences` on screen mount
 
 **Acceptance Criteria:**
+
 - [ ] `POST /notifications/register` with a valid Expo push token returns `201` and
-  persists a `PushToken` record
+      persists a `PushToken` record
 - [ ] `NotificationsService.sendToUser` enqueues a job without blocking the calling request
 - [ ] A new lead submission triggers a push notification delivered to the card owner's device
-  within 10 seconds
+      within 10 seconds
 - [ ] View milestone notification fires exactly once when total card views crosses 100 (no
-  duplicate sends verified by Redis key check)
+      duplicate sends verified by Redis key check)
 - [ ] Per-type toggles in mobile Settings persist to the DB and suppress the correct
-  notification type
+      notification type
 - [ ] Tapping a `NEW_LEAD` notification while the app is backgrounded opens the CRM contact
-  detail screen for that lead
+      detail screen for that lead
 - [ ] Stale tokens (`DeviceNotRegistered`) are deleted from DB automatically
 - [ ] Renewal reminder cron job correctly identifies users with `currentPeriodEnd` in 3 days
-  (verified with a test subscription record)
+      (verified with a test subscription record)
 
 ---
 
@@ -442,7 +454,7 @@ build configuration, and the staged rollout strategy on Android.
   }
   ```
 - [ ] Run `eas credentials` to generate/upload iOS Distribution Certificate and
-  Provisioning Profile
+      Provisioning Profile
 - [ ] Run `eas build --platform ios --profile production` and confirm IPA is generated
 - [ ] Create App Store Connect listing:
   - Name: `Dotly — Digital Business Card`
@@ -459,6 +471,7 @@ build configuration, and the staged rollout strategy on Android.
   - iPad Pro 12.9" 6th gen: 5 screenshots (same screens, iPad layout)
 - [ ] Upload screenshots and app previews to App Store Connect via Transporter or web upload
 - [ ] App Review Notes:
+
   ```
   Test credentials:
     Email: appreviewer@dotly.one
@@ -470,6 +483,7 @@ build configuration, and the staged rollout strategy on Android.
   Crypto billing note: Subscription payments use USDC on Polygon/Base network. The app
   does not facilitate cryptocurrency trading or exchange.
   ```
+
 - [ ] Set age rating to 4+
 - [ ] Select primary category: Business; secondary category: Productivity
 - [ ] Export compliance: HTTPS only; select "No" for encryption beyond standard HTTPS
@@ -516,7 +530,7 @@ build configuration, and the staged rollout strategy on Android.
     - Screenshots: phone (min 2, max 8; 5 provided), tablet optional
   - Category: Business
 - [ ] Complete IARC content rating questionnaire (answer: no violence, no mature content →
-  rated Everyone / PEGI 3)
+      rated Everyone / PEGI 3)
 - [ ] Set target SDK to API level 34 (Android 14) in `app.json`
 - [ ] Complete Data Safety form:
   - Camera: collected, not shared with third parties
@@ -524,16 +538,17 @@ build configuration, and the staged rollout strategy on Android.
   - Device or other IDs (push tokens): collected for app functionality
   - No user data sold
 - [ ] Promote from Internal Testing → Closed Testing (add 10 internal testers) → Open Testing →
-  Production (staged rollout: 10% → 50% → 100% over 7 days)
+      Production (staged rollout: 10% → 50% → 100% over 7 days)
 
 #### Both Platforms
 
 - [ ] Confirm Privacy Policy at `dotly.one/privacy` is live, accessible, and covers:
-  camera, contacts, push notifications, crypto wallet addresses, analytics data
+      camera, contacts, push notifications, crypto wallet addresses, analytics data
 - [ ] Confirm Terms of Service at `dotly.one/terms` is live
 - [ ] Confirm app version numbers match in `app.json`, EAS, and store listings
 
 **Acceptance Criteria:**
+
 - [ ] EAS Build produces a valid IPA for iOS distribution without build errors
 - [ ] EAS Build produces a valid AAB for Android without build errors
 - [ ] App Store Connect listing is fully completed with no missing required fields
@@ -568,7 +583,7 @@ infrastructure uptime monitoring (BetterUptime/Checkly), and structured server-s
       tracesSampleRate: 1.0,
       profilesSampleRate: 1.0,
       integrations: [nodeProfilingIntegration()],
-    });
+    })
     ```
   - Add `SentryInterceptor` as a global interceptor to capture all unhandled exceptions
   - Add Sentry performance instrumentation for all HTTP endpoints
@@ -592,7 +607,7 @@ infrastructure uptime monitoring (BetterUptime/Checkly), and structured server-s
       dsn: process.env.EXPO_PUBLIC_SENTRY_DSN_MOBILE,
       enableAutoSessionTracking: true,
       tracesSampleRate: 1.0,
-    });
+    })
     ```
   - Wrap root component with `Sentry.wrap()`
   - Upload source maps as part of EAS Build post-hook:
@@ -616,14 +631,14 @@ infrastructure uptime monitoring (BetterUptime/Checkly), and structured server-s
       api_host: 'https://app.posthog.com',
       capture_pageview: false, // manual for SPA
       loaded: (posthog) => {
-        if (process.env.NODE_ENV === 'development') posthog.opt_out_capturing();
+        if (process.env.NODE_ENV === 'development') posthog.opt_out_capturing()
       },
-    });
+    })
     ```
   - Add `PostHogProvider` wrapping the app in `layout.tsx`
   - Use `usePostHog` hook to call `identify()` after auth:
     ```ts
-    posthog.identify(userId, { plan, createdAt });
+    posthog.identify(userId, { plan, createdAt })
     ```
   - Instrument events:
     - `card_created` — `POST /cards` success
@@ -676,17 +691,18 @@ infrastructure uptime monitoring (BetterUptime/Checkly), and structured server-s
   - Set up Logtail (or Datadog) log drain on Railway; confirm logs appear in dashboard
 
 **Acceptance Criteria:**
+
 - [ ] A thrown exception in `apps/api` appears in the `dotly-api` Sentry project within 60 seconds
 - [ ] A JavaScript error in `apps/web` appears in the `dotly-web` Sentry project within 60 seconds
 - [ ] A native crash in `apps/mobile` appears in the `dotly-mobile` Sentry project with a
-  symbolicated stack trace (not hex addresses)
+      symbolicated stack trace (not hex addresses)
 - [ ] All 8 PostHog events fire correctly — verified in PostHog Live Events view during manual
-  walkthrough of each flow
+      walkthrough of each flow
 - [ ] `posthog.identify()` is called with `plan` and `createdAt` properties after sign-in
-  on both web and mobile
+      on both web and mobile
 - [ ] BetterUptime/Checkly monitor shows green for all 3 checks in the dashboard
 - [ ] Bringing `GET /health` down (temporarily returning 500) triggers a Slack alert within 3
-  minutes
+      minutes
 - [ ] API logs are structured JSON in production and visible in Logtail/Datadog
 - [ ] No PII (email, full name, phone) appears in raw log output
 
@@ -706,30 +722,37 @@ key hygiene and on-chain verification replace traditional server-side billing tr
 
 - [ ] Install `helmet` in `apps/api`; apply as global middleware with full options:
   ```ts
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com', 'https://*.r2.cloudflarestorage.com'],
-        connectSrc: ["'self'", 'https://api.dotly.one'],
-        frameSrc: ["'none'"],
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: [
+            "'self'",
+            'data:',
+            'https://res.cloudinary.com',
+            'https://*.r2.cloudflarestorage.com',
+          ],
+          connectSrc: ["'self'", 'https://api.dotly.one'],
+          frameSrc: ["'none'"],
+        },
       },
-    },
-    hsts: { maxAge: 63072000, includeSubDomains: true, preload: true },
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-    xFrameOptions: { action: 'deny' },
-  }));
+      hsts: { maxAge: 63072000, includeSubDomains: true, preload: true },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      xFrameOptions: { action: 'deny' },
+    }),
+  )
   ```
 - [ ] Harden CORS to a strict allowlist:
   - Allowed origins: `['https://dotly.one', 'https://www.dotly.one', 'https://app.dotly.one']`
   - Development only: add `http://localhost:3000`
   - Reject all other origins with `403`
 - [ ] Install `dompurify` + `jsdom` in `apps/api`; sanitize all user-supplied HTML fields
-  (card bio, custom HTML blocks) before storage using `DOMPurify.sanitize()`
+      (card bio, custom HTML blocks) before storage using `DOMPurify.sanitize()`
 - [ ] Audit all Prisma `$queryRaw` and `$executeRaw` calls — ensure every one uses tagged
-  template literals (not string concatenation); add lint rule to fail on raw query string concat
+      template literals (not string concatenation); add lint rule to fail on raw query string concat
 - [ ] Implement SSRF prevention middleware:
   - Before any server-side URL fetch (R2 uploads, webhook delivery, custom domain validation):
     resolve the hostname to an IP
@@ -743,19 +766,19 @@ key hygiene and on-chain verification replace traditional server-side billing tr
 
 #### Authentication Security
 
-- [ ] Configure Supabase access token TTL to 1 hour (via Supabase dashboard → Auth → Settings)
-- [ ] Configure Supabase refresh token TTL to 7 days
+- [ ] Configure first-party access token TTL to 15 minutes
+- [ ] Configure first-party refresh token TTL to 30 days
 - [ ] Implement session invalidation on plan downgrade:
-  - When a user's plan is downgraded (detected in billing event handler), call Supabase Admin API
-    `signOut(userId, { scope: 'global' })` to invalidate all sessions
+  - When a user's plan is downgraded (detected in billing event handler), revoke all local refresh
+    sessions for the user
   - User will be prompted to sign in again, receiving a new token reflecting the new plan
 - [ ] Implement auth rate limiting:
   - Add Redis-backed rate limiter to `POST /auth/login` and `POST /auth/register` (or equivalent
-    Supabase auth proxy endpoints): 10 attempts per 15 minutes per IP
+    first-party auth endpoints): 10 attempts per 15 minutes per IP
   - After limit hit: `429 Too Many Requests`, `Retry-After: 900` header
   - Log blocked attempts to the structured logger with `level: 'warn'`
 - [ ] Implement TOTP MFA:
-  - Enable TOTP in Supabase Auth settings
+  - Add TOTP enrollment and verification to the first-party auth system
   - For Business+ plan users: allow team owners to enforce MFA for all team members
     (`enforceTeamMfa: boolean` field on `Team` model; add migration)
   - When `enforceTeamMfa` is true: API middleware checks `amr` claim in JWT; if no TOTP factor
@@ -778,7 +801,7 @@ key hygiene and on-chain verification replace traditional server-side billing tr
   - Body: `{ confirmation: "DELETE MY ACCOUNT" }` (must match exactly)
   - Immediately:
     - Anonymize PII: set `name = '[deleted]'`, `email = null`, `avatarUrl = null` on `User`
-    - Revoke all Supabase sessions for the user
+    - Revoke all first-party refresh sessions for the user
     - Set `deletedAt` on `User` record
   - Schedule hard delete in 30 days via BullMQ delayed job:
     - Delete all `Card`, `Contact`, `CrmPipeline`, `AnalyticsEvent`, `PushToken`,
@@ -848,7 +871,7 @@ key hygiene and on-chain verification replace traditional server-side billing tr
   - Smart contract deployment key: use a hardware wallet (Ledger) or AWS KMS; document process
   - Subscription contract owner key: same requirement
 - [ ] All transaction signing is performed client-side (in the mobile/web app using the user's
-  connected wallet — MetaMask, WalletConnect, or Coinbase Wallet)
+      connected wallet — MetaMask, WalletConnect, or Coinbase Wallet)
 - [ ] API server verifies subscription status by reading on-chain state only:
   - Call the subscription smart contract's `isSubscriptionActive(address)` view function
   - Never trust client-reported payment status
@@ -858,9 +881,10 @@ key hygiene and on-chain verification replace traditional server-side billing tr
   - Audit scope: subscription contract, payment contract, upgrade/downgrade logic
 
 **Acceptance Criteria:**
+
 - [ ] `curl -I https://api.dotly.one/health` returns `X-Frame-Options: DENY`,
-  `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, and a `Content-Security-Policy`
-  header
+      `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, and a `Content-Security-Policy`
+      header
 - [ ] A CORS request from `https://evil.example.com` to the API returns `403`
 - [ ] DOMPurify strips `<script>` tags from card bio input (verified in unit test)
 - [ ] SSRF middleware rejects URLs resolving to `192.168.1.1` with `400` (unit test)
@@ -869,14 +893,14 @@ key hygiene and on-chain verification replace traditional server-side billing tr
 - [ ] A 5th auth attempt within 5 minutes from the same IP returns `429`
 - [ ] `GET /users/me/export` returns a signed ZIP URL containing JSON files for all user data
 - [ ] `DELETE /users/me` with the correct confirmation string returns `202` and sends the
-  confirmation email via Mailgun
+      confirmation email via Mailgun
 - [ ] Cookie consent banner appears on first visit to dotly.one and blocks PostHog until accepted
 - [ ] Every `card.created` event has a corresponding `AuditLog` row with `userId`, `action`,
-  `resource`, `ipAddress`, and `createdAt`
+      `resource`, `ipAddress`, and `createdAt`
 - [ ] `npm audit --audit-level=high` in CI fails a branch that has a known HIGH CVE introduced
 - [ ] No private keys present in any environment variable or `.env.example` file
 - [ ] API correctly returns `403 Subscription inactive` for a wallet address with no active
-  on-chain subscription
+      on-chain subscription
 
 ---
 
@@ -922,9 +946,9 @@ RTO/RPO targets.
   ```
 - [ ] Run all three scenarios against the staging environment before promoting to production
 - [ ] Document results in `docs/LOAD_TEST_RESULTS.md` with p50/p95/p99 latencies, throughput,
-  and error rates for each scenario
+      and error rates for each scenario
 - [ ] If any threshold fails: identify bottleneck (DB query, missing index, N+1, CPU),
-  fix, re-run until all thresholds pass
+      fix, re-run until all thresholds pass
 
 #### Database Resilience
 
@@ -975,6 +999,7 @@ RTO/RPO targets.
   - Document result in `docs/DR_RUNBOOK.md`
 
 **Acceptance Criteria:**
+
 - [ ] S1 (1000 concurrent public card GETs for 5min): p95 < 200ms, error rate < 0.1%
 - [ ] S2 (200 concurrent authenticated dashboard users): p95 < 400ms, error rate < 0.5%
 - [ ] S3 (500 events/sec analytics ingestion): p95 < 100ms, error rate < 0.1%
@@ -982,7 +1007,7 @@ RTO/RPO targets.
 - [ ] `docs/LOAD_TEST_RESULTS.md` exists with complete metrics from each scenario run
 - [ ] PgBouncer is running; `SHOW POOLS` in psql shows active connections
 - [ ] Analytics read queries are confirmed routing to the replica (verified via `SELECT
-  pg_is_in_recovery()` returning `true` on the query connection)
+pg_is_in_recovery()` returning `true` on the query connection)
 - [ ] Automated daily backup visible in Railway dashboard with 30-day retention policy
 - [ ] PITR restore drill completed successfully; documented in `docs/DR_RUNBOOK.md`
 - [ ] `docs/DR_RUNBOOK.md` contains all 4 runbooks with step-by-step recovery procedures
@@ -1029,6 +1054,7 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
 #### CI/CD Pipeline
 
 - [ ] Update `.github/workflows/ci.yml` to add full deployment pipeline:
+
   ```yaml
   on:
     push:
@@ -1037,9 +1063,9 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
       branches: [main]
 
   jobs:
-    lint:        # existing
-    typecheck:   # existing
-    build:       # existing
+    lint: # existing
+    typecheck: # existing
+    build: # existing
     secret-scan: # new (T36)
     dependency-audit: # new (T36)
 
@@ -1056,7 +1082,7 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
     deploy-production:
       needs: [deploy-staging]
       if: github.ref == 'refs/heads/main'
-      environment: production   # GitHub environment with required reviewer protection
+      environment: production # GitHub environment with required reviewer protection
       runs-on: ubuntu-latest
       steps:
         - name: Run prisma migrate deploy (production)
@@ -1066,8 +1092,9 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
         - name: Deploy Web to Vercel production
           run: vercel --prod
   ```
+
 - [ ] Create GitHub `production` environment with required reviewers (at least 1 manual approval
-  before `deploy-production` job runs)
+      before `deploy-production` job runs)
 - [ ] Configure one-click rollback:
   - Railway: use Railway's "Rollback" button in the deployment history UI
   - Vercel: use Vercel's "Instant Rollback" button in deployment history UI
@@ -1092,7 +1119,7 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
 
 - [ ] All environment variables configured in Vercel production project
 - [ ] All environment variables configured in Railway production service
-- [ ] Supabase project upgraded to paid plan (Pro or above — required for production SLAs)
+- [ ] Production auth, storage, and database services are on plans that meet production SLAs
 - [ ] Smart contract deployed and verified on-chain (Polygon or Base mainnet):
   - Contract source code verified on Polygonscan/Basescan
   - Contract address stored in environment as `SUBSCRIPTION_CONTRACT_ADDRESS`
@@ -1101,8 +1128,13 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
 - [ ] Mailgun sending domain shows "Active" in Mailgun dashboard
 - [ ] Cloudflare R2 bucket `dotly-uploads` created with CORS policy:
   ```json
-  [{ "AllowedOrigins": ["https://dotly.one"], "AllowedMethods": ["GET", "PUT", "DELETE"],
-     "AllowedHeaders": ["*"] }]
+  [
+    {
+      "AllowedOrigins": ["https://dotly.one"],
+      "AllowedMethods": ["GET", "PUT", "DELETE"],
+      "AllowedHeaders": ["*"]
+    }
+  ]
   ```
 - [ ] Sentry DSNs added to all three production environments; source maps uploading on deploy
 - [ ] PostHog production project API key configured in Vercel and Railway env vars
@@ -1117,13 +1149,14 @@ strategy, and complete the full pre-launch checklist. This task is the launch ga
 - [ ] All runbooks written and reviewed by at least one other engineer
 
 **Acceptance Criteria:**
+
 - [ ] `https://dotly.one` loads the Next.js web app with valid SSL — no certificate warnings
 - [ ] `https://api.dotly.one/health` returns `200 { "status": "ok" }` with valid SSL
 - [ ] `https://dotly.one/card/test-user` renders the seeded test card (end-to-end SSR working)
 - [ ] CI pipeline on a clean `main` merge triggers staging deploy automatically and waits for
-  manual approval before promoting to production
+      manual approval before promoting to production
 - [ ] A failed production deploy can be rolled back to the previous version within 5 minutes
-  using the one-click rollback in Railway/Vercel
+      using the one-click rollback in Railway/Vercel
 - [ ] `prisma migrate deploy` runs successfully as the Railway release command with no errors
 - [ ] All pre-launch checklist items above are checked
 
@@ -1135,16 +1168,16 @@ The phase — and the entire Dotly.one build — is complete when all of the fol
 
 - [ ] All 8 tasks (T31–T38) have every acceptance criterion checked
 - [ ] AI Contact Enrichment is live: `POST /contacts/:id/enrich` returns enriched fields
-  with confidence scores; rate limits enforced per plan
+      with confidence scores; rate limits enforced per plan
 - [ ] Business Card Scanner is live in the iOS and Android apps: camera → OCR → review →
-  save flow works end-to-end without crashing
+      save flow works end-to-end without crashing
 - [ ] Push notifications are delivered within 10 seconds of a triggering event on both iOS
-  and Android; per-type preferences are respected
+      and Android; per-type preferences are respected
 - [ ] iOS app is approved and live in the App Store (status: "Ready for Sale")
 - [ ] Android app is approved and live in Google Play production track
 - [ ] Sentry is capturing errors with symbolicated stack traces across API, web, and mobile
 - [ ] PostHog is recording all 8 instrumented events; `identify()` fires on sign-in with plan
-  and `createdAt` properties
+      and `createdAt` properties
 - [ ] BetterUptime/Checkly monitors are green for all 3 endpoints across 3 regions
 - [ ] Structured JSON logging is active in production; logs are visible in Logtail/Datadog
 - [ ] All Helmet security headers present on API responses; CORS allowlist is enforced
@@ -1152,33 +1185,33 @@ The phase — and the entire Dotly.one build — is complete when all of the fol
 - [ ] `GET /users/me/export` and `DELETE /users/me` are functional and tested
 - [ ] GDPR cookie consent banner is live on dotly.one
 - [ ] Smart contract is deployed, verified on-chain (Polygon or Base mainnet), and externally
-  audited; no private keys in any env file
+      audited; no private keys in any env file
 - [ ] All three load test scenarios pass their p95/error-rate thresholds on staging
 - [ ] `docs/DR_RUNBOOK.md` contains runbooks for all 4 failure modes; PITR and backup restore
-  drills are documented
+      drills are documented
 - [ ] Zero-downtime failover test passed with < 0.5% error rate during Railway redeploy
 - [ ] CI/CD pipeline has manual approval gate for production; one-click rollback is confirmed
-  working
+      working
 - [ ] All pre-launch checklist items in T38 are checked
 - [ ] `dotly.one` is live with valid SSL; `api.dotly.one` is live with valid SSL;
-  `dotly.one/card/test-user` renders correctly in production
+      `dotly.one/card/test-user` renders correctly in production
 
 ---
 
 ## Dependencies & Blockers
 
-| Dependency | Owner | Needed by |
-|---|---|---|
-| Apple Developer Program account (active, paid) | Team lead | T34 — iOS submission, EAS credentials |
-| Google Play Console account (one-time $25 fee paid) | Team lead | T34 — Android submission |
-| OpenAI API key (GPT-4o access, billing enabled) | Team lead | T31 — AI enrichment |
-| Google Cloud Vision API key (billing enabled, quota sufficient) | Team lead | T32 — card scanner OCR |
-| AWS account with Textract enabled (fallback) | Team lead | T32 — OCR fallback |
-| Smart contract auditor engaged and audit timeline confirmed | Team lead | T36, T38 — security gate + launch checklist |
-| Mailgun account with `dotly.one` domain verified (DKIM + SPF) | Team lead | T36 (account deletion email), T38 (launch checklist) |
-| Cloudflare R2 bucket created with CORS configured | Dev | T32 (scan uploads), T36 (export ZIP), T38 (launch checklist) |
-| Vercel API token (for CI deploy job) | Dev | T38 — CI/CD deployment |
-| Railway API token (for CI deploy job) | Dev | T38 — CI/CD deployment |
+| Dependency                                                      | Owner     | Needed by                                                    |
+| --------------------------------------------------------------- | --------- | ------------------------------------------------------------ |
+| Apple Developer Program account (active, paid)                  | Team lead | T34 — iOS submission, EAS credentials                        |
+| Google Play Console account (one-time $25 fee paid)             | Team lead | T34 — Android submission                                     |
+| OpenAI API key (GPT-4o access, billing enabled)                 | Team lead | T31 — AI enrichment                                          |
+| Google Cloud Vision API key (billing enabled, quota sufficient) | Team lead | T32 — card scanner OCR                                       |
+| AWS account with Textract enabled (fallback)                    | Team lead | T32 — OCR fallback                                           |
+| Smart contract auditor engaged and audit timeline confirmed     | Team lead | T36, T38 — security gate + launch checklist                  |
+| Mailgun account with `dotly.one` domain verified (DKIM + SPF)   | Team lead | T36 (account deletion email), T38 (launch checklist)         |
+| Cloudflare R2 bucket created with CORS configured               | Dev       | T32 (scan uploads), T36 (export ZIP), T38 (launch checklist) |
+| Vercel API token (for CI deploy job)                            | Dev       | T38 — CI/CD deployment                                       |
+| Railway API token (for CI deploy job)                           | Dev       | T38 — CI/CD deployment                                       |
 
 ---
 
@@ -1191,4 +1224,4 @@ platform is ready for growth.
 
 ---
 
-*Phase 5 of 5 — Dotly.one / Prev: Phase 4 — Polish & Scale | This is the final phase.*
+_Phase 5 of 5 — Dotly.one / Prev: Phase 4 — Polish & Scale | This is the final phase._

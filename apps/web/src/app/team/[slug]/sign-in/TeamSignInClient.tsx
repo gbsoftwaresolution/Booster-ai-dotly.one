@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import Image from 'next/image'
-import { getAuthCallbackUrl } from '@/lib/app-url'
-import { apiGet } from '@/lib/api'
-import { createClient } from '@/lib/supabase/client'
+import { apiGet, apiPost } from '@/lib/api'
+import { getAccessToken, storeClientSession } from '@/lib/auth/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -31,7 +30,6 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
   const brandColor = team.brandColor ?? '#0ea5e9'
   const displayName = team.brandName ?? team.name
   const teamNext = '/team'
@@ -58,8 +56,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     let cancelled = false
 
     async function verifyExistingSession() {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
+      const token = await getAccessToken()
       if (!token) return
       try {
         await apiGet(`/teams/${team.id}`, token)
@@ -77,7 +74,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [router, supabase, team.id])
+  }, [router, team.id])
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
@@ -106,13 +103,15 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     setError(null)
     setLoading(true)
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const session = await apiPost<{
+        accessToken: string
+        refreshToken: string
+      }>('/auth/sign-in', {
         email: trimmedEmail,
         password,
       })
-      if (authError) throw authError
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
+      storeClientSession(session)
+      const token = session.accessToken
       await apiGet(`/teams/${team.id}`, token)
       router.push(teamNext)
       router.refresh()
@@ -125,13 +124,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
 
   async function handleGoogleAuth() {
     setError(null)
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${getAuthCallbackUrl()}?next=${encodeURIComponent(teamSignInPath)}`,
-      },
-    })
-    if (authError) setError(authError.message)
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google?next=${encodeURIComponent(teamSignInPath)}`
   }
 
   return (

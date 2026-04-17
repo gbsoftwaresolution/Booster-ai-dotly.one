@@ -20,7 +20,7 @@ import type { Area } from 'react-easy-crop'
 import { X, Upload, Camera, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { apiPost } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 // ─── Module-level constants ──────────────────────────────────────────────────
 

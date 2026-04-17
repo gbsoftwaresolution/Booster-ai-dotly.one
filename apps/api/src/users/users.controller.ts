@@ -67,10 +67,7 @@ class DeleteAccountDto {
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // HIGH-08: Use findById instead of findOrCreate so that a deleted account
-  // is not silently recreated the next time an old JWT reaches this endpoint.
-  // findOrCreate was required on first-login (handled by SupabaseStrategy.validate);
-  // by the time /users/me is called the DB row MUST already exist.
+  // Use findById so that a deleted account is not silently recreated.
   @Get('me')
   getMe(@CurrentUser() user: { id: string }) {
     return this.usersService.getMe(user.id)

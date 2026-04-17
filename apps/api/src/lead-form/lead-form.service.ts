@@ -30,11 +30,7 @@ export class LeadFormService {
   // ─── Ownership guard ─────────────────────────────────────────────────────────
 
   private async assertCardOwner(cardId: string, userId: string): Promise<void> {
-    // Support both internal userId and supabaseId
-    const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: userId }, { supabaseId: userId }] },
-      select: { id: true },
-    })
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
     if (!user) throw new ForbiddenException('User not found')
 
     const card = await this.prisma.card.findUnique({

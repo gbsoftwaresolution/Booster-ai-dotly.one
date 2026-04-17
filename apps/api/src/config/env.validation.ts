@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsEmail,
   IsUrl,
-  IsNotIn,
   Matches,
   IsBooleanString,
   ValidateIf,
@@ -21,21 +20,7 @@ const httpUrlOptions = {
 class EnvironmentVariables {
   @IsOptional() @IsString() NODE_ENV?: string
   @IsString() DATABASE_URL!: string
-  @IsUrl() SUPABASE_URL!: string
-  @IsString() SUPABASE_ANON_KEY!: string
-  @IsString()
-  @IsNotIn(['super-secret-jwt-key-placeholder', 'your-jwt-secret', 'changeme'], {
-    message:
-      'SUPABASE_JWT_SECRET must be set to the real value from your Supabase project — placeholder detected',
-  })
-  SUPABASE_JWT_SECRET!: string
-
-  // SUPABASE_SERVICE_ROLE_KEY is required for deleteUser() during account deletion.
-  // Must be set in production via Railway secrets (never commit to source control).
-  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
-  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
-  @IsString()
-  SUPABASE_SERVICE_ROLE_KEY?: string
+  @IsUrl(httpUrlOptions) API_URL!: string
 
   @IsString() REDIS_URL!: string
   @IsUrl(httpUrlOptions) WEB_URL!: string
@@ -159,6 +144,26 @@ class EnvironmentVariables {
   @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
   @IsString()
   GOOGLE_OAUTH_STATE_SECRET?: string
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  AUTH_JWT_SECRET?: string
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  GOOGLE_AUTH_CLIENT_ID?: string
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  GOOGLE_AUTH_CLIENT_SECRET?: string
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)
+  @IsString()
+  GOOGLE_AUTH_STATE_SECRET?: string
 
   @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @ValidateIf((o, value) => o.NODE_ENV === 'production' || value !== undefined)

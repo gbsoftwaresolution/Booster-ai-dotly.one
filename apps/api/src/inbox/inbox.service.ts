@@ -174,11 +174,7 @@ export class InboxService {
       select: { userId: true },
     })
     if (!card) throw new NotFoundException('Card not found')
-    // support both internal id and supabaseId
-    const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: userId }, { supabaseId: userId }] },
-      select: { id: true },
-    })
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
     if (!user || card.userId !== user.id) throw new ForbiddenException('Forbidden')
     return user.id
   }
@@ -460,7 +456,7 @@ export class InboxService {
   async getInboxSummary(userId: string) {
     // resolve internal user id
     const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: userId }, { supabaseId: userId }] },
+      where: { id: userId },
       select: { id: true },
     })
     if (!user) throw new NotFoundException('User not found')
@@ -543,7 +539,7 @@ export class InboxService {
 
   private async resolveUserId(userId: string) {
     const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: userId }, { supabaseId: userId }] },
+      where: { id: userId },
       select: { id: true },
     })
     if (!user) throw new NotFoundException('User not found')

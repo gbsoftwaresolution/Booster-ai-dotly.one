@@ -207,17 +207,9 @@ export class AnalyticsService {
     }
   }
 
-  // Resolve Supabase auth ID → internal DB user ID (mirrors CardsService.resolveInternalUserId).
-  // AnalyticsService previously compared card.userId directly to the raw auth userId,
-  // which fails for users whose auth ID differs from their DB primary key.
   private async resolveInternalUserId(userId: string): Promise<string> {
     const byId = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
     if (byId) return byId.id
-    const bySupabase = await this.prisma.user.findUnique({
-      where: { supabaseId: userId },
-      select: { id: true },
-    })
-    if (bySupabase) return bySupabase.id
     throw new ForbiddenException('Authenticated user not found')
   }
 

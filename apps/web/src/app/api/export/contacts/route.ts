@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getServerAccessToken } from '@/lib/auth/session'
 import { getServerApiUrl } from '@/lib/server-api'
 import type { BillingSummaryResponse, PaginatedResponse } from '@dotly/types'
 
@@ -19,23 +19,8 @@ const PAGE_LIMIT = 200
 const MAX_EXPORT_ROWS = 2000
 
 export async function GET(): Promise<NextResponse> {
-  const supabase = await createClient()
-  // Use getUser() — it re-validates the JWT with Supabase's servers.
-  // getSession() only reads the cookie and can be spoofed.
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // We still need the session's access_token to call the API on behalf of the user.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) {
+  const accessToken = await getServerAccessToken()
+  if (!accessToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -47,7 +32,7 @@ export async function GET(): Promise<NextResponse> {
     // the gate was only applied on billingRes.ok, meaning a billing outage
     // silently granted every user unrestricted export access.
     const billingRes = await fetch(`${apiUrl}/billing`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
       cache: 'no-store',
     })
     if (!billingRes.ok) {
@@ -69,7 +54,7 @@ export async function GET(): Promise<NextResponse> {
 
     while (allContacts.length < MAX_EXPORT_ROWS) {
       const res = await fetch(`${apiUrl}/contacts?page=${page}&limit=${PAGE_LIMIT}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
         cache: 'no-store',
       })
 

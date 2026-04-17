@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { SelectField } from '@/components/ui/SelectField'
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { useUserTimezone } from '@/hooks/useUserLocale'
 import { formatDateTimeFull } from '@/lib/tz'
 import type { ItemsResponse } from '@dotly/types'

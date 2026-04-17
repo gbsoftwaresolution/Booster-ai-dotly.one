@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { getSession } from './auth'
 import type {
   AppointmentTypeResponse,
   BookingResponse,
@@ -62,6 +62,13 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
 }
 
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return apiFetch<T>(path, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 // H-08: Allowed image MIME types for upload endpoints.
 // Anything outside this list is rejected before hitting the network so that
 // the server cannot be confused by unexpected content types.
@@ -77,15 +84,9 @@ function assertAllowedMimeType(mimeType: string, context: string): void {
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return {}
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session) return {}
-  return { Authorization: `Bearer ${session.access_token}` }
+  return { Authorization: `Bearer ${session.accessToken}` }
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {

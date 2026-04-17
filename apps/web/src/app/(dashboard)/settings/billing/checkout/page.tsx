@@ -5,7 +5,7 @@ import type { JSX } from 'react'
 import { Interface } from 'ethers'
 import { useSearchParams } from 'next/navigation'
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import {
   BillingFeedback,
   BillingHero,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiPost } from '@/lib/api'
 import { getPublicApiUrl } from '@/lib/public-env'
 import {

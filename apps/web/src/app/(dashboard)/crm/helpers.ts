@@ -1,4 +1,4 @@
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 export const DEFAULT_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED', 'LOST'] as const
 export type DefaultStage = (typeof DEFAULT_STAGES)[number]

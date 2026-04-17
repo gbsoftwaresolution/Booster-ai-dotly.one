@@ -1,6 +1,6 @@
 import { apiPatch, isApiError } from '@/lib/api'
 import { incrementPwaMetric } from '@/lib/pwa/metrics'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 export const PWA_QUEUE_CHANGED_EVENT = 'dotly:pwa-queue-changed'
 

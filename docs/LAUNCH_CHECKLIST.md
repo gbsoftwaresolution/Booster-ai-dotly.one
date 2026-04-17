@@ -7,7 +7,7 @@
 - [ ] Load test run against staging (p95 < 500ms)
 - [ ] Security scan (npm audit, OWASP ZAP basic scan)
 - [ ] Smart contract deployed to Polygon Mumbai testnet
-- [ ] Supabase Auth configured (Google OAuth redirect URLs set)
+- [ ] First-party auth configured (Google OAuth client + redirect URLs set)
 - [ ] Mailgun domain verified (dotly.one)
 - [ ] Cloudflare R2 bucket created and CORS configured
 - [ ] All environment variables set in Vercel + Railway production

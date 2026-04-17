@@ -3,40 +3,28 @@ import { useEffect, useRef, useState } from 'react'
 import { Slot, useRouter, useSegments } from 'expo-router'
 import * as Linking from 'expo-linking'
 import * as Notifications from 'expo-notifications'
-import { supabase } from '../lib/supabase'
 import { View, ActivityIndicator } from 'react-native'
-import type { Session } from '@supabase/supabase-js'
 import { registerForPushNotifications, setupNotificationListeners } from '../lib/notifications'
 import { savePushToken } from '../lib/api'
 import { AuthzProvider } from '../components/AuthzProvider'
+import { clearSession, getSession, setSession, type MobileSession } from '../lib/auth'
 
 export default function RootLayout() {
-  const [session, setSession] = useState<Session | null>(null)
+  const [session, setAuthSession] = useState<MobileSession | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const segments = useSegments()
   const notificationResponseRef = useRef<Notifications.NotificationResponse | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s)
+    getSession().then((session) => {
+      setAuthSession(session)
       setLoading(false)
     })
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s)
-    })
-    return () => subscription.unsubscribe()
   }, [])
 
-  // Handle deep links for Supabase email confirmation (magic links, password reset, etc.)
-  // The app scheme is "dotly" (see app.json). Supabase redirects to:
-  //   dotly://auth/callback?access_token=...&refresh_token=...&type=...
-  // expo-linking surfaces this URL so we can hand the tokens to the Supabase client.
   useEffect(() => {
     async function handleUrl(url: string) {
-      // Parse fragment-style tokens (#access_token=...) as well as query params
       const parsed = Linking.parse(url)
 
       // SECURITY: Only accept auth tokens from the exact expected callback path.
@@ -48,16 +36,26 @@ export default function RootLayout() {
       }
 
       const params = parsed.queryParams ?? {}
-      // Supabase sometimes encodes tokens in the fragment; expo-linking puts them in queryParams
-      const accessToken = params['access_token'] as string | undefined
-      const refreshToken = params['refresh_token'] as string | undefined
+      const payload = params['payload'] as string | undefined
       const type = params['type'] as string | undefined
+      const token = params['token'] as string | undefined
+      if (type === 'recovery' && token) {
+        router.replace(`/(auth)/reset-password?token=${encodeURIComponent(token)}`)
+        return
+      }
+      if (!payload) return
+      let parsedPayload: { accessToken?: string; refreshToken?: string } | null = null
+      try {
+        parsedPayload = JSON.parse(payload) as { accessToken?: string; refreshToken?: string }
+      } catch {
+        parsedPayload = null
+      }
+      const accessToken = parsedPayload?.accessToken
+      const refreshToken = parsedPayload?.refreshToken
       if (accessToken && refreshToken) {
-        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-        if (type === 'recovery') {
-          router.replace('/(auth)/reset-password')
-          return
-        }
+        const nextSession = { accessToken, refreshToken }
+        await setSession(nextSession)
+        setAuthSession(nextSession)
       }
     }
 

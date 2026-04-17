@@ -61,7 +61,7 @@ describe('AnalyticsService', () => {
     expect(result.totalLeads).toBe(2)
   })
 
-  it('getAnalytics resolves Supabase auth ids and keeps the card lookup narrow', async () => {
+  it('getAnalytics resolves authenticated user ids and keeps the card lookup narrow', async () => {
     const prisma = createPrismaMock()
     const redis = createRedisMock()
     const service = new AnalyticsService(prisma as never, redis as never)
@@ -69,7 +69,7 @@ describe('AnalyticsService', () => {
     const from = new Date('2026-04-01T00:00:00.000Z')
     const to = new Date('2026-04-07T23:59:59.999Z')
 
-    prisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'owner-1' })
+    prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner-1' })
     prisma.card.findUnique.mockResolvedValueOnce({ id: 'card-1', userId: 'owner-1' })
     prisma.analyticsEvent.findMany.mockResolvedValueOnce([
       {
@@ -96,7 +96,7 @@ describe('AnalyticsService', () => {
       { type: 'CLICK', _count: { _all: 3 } },
     ])
 
-    const result = await service.getAnalytics('card-1', 'supabase-user-1', { from, to })
+    const result = await service.getAnalytics('card-1', 'owner-1', { from, to })
 
     expect(prisma.card.findUnique).toHaveBeenCalledWith({
       where: { id: 'card-1' },

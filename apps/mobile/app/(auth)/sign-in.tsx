@@ -10,7 +10,8 @@ import {
   ScrollView,
 } from 'react-native'
 import { Link } from 'expo-router'
-import { supabase } from '../../lib/supabase'
+import { apiPost } from '../../lib/api'
+import { setSession } from '../../lib/auth'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -47,13 +48,14 @@ export default function SignInScreen() {
     setError(null)
     setFieldErrors({})
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const session = await apiPost<{
+        accessToken: string
+        refreshToken: string
+      }>('/auth/sign-in', {
         email: trimmedEmail,
         password,
       })
-      if (signInError) {
-        setError(signInError.message)
-      }
+      await setSession(session)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
     } finally {
@@ -79,10 +81,10 @@ export default function SignInScreen() {
     setResetMessage(null)
     setFieldErrors((prev) => ({ ...prev, email: undefined }))
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-        redirectTo: 'dotly://auth/callback',
+      await apiPost('/auth/forgot-password', {
+        email: trimmedEmail,
+        mobile: true,
       })
-      if (resetError) throw resetError
       setResetMessage('Password reset link sent. Check your email.')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send reset link')

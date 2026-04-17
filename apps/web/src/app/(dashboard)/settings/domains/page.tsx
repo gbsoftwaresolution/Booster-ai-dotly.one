@@ -7,7 +7,7 @@ import { FeatureGateCard } from '@/components/billing/FeatureGateCard'
 import { useBillingPlan } from '@/components/billing/BillingPlanProvider'
 import { apiDelete, apiGet, apiPatch, apiPost, isApiError } from '@/lib/api'
 import { hasPlanAccess } from '@/lib/billing-plans'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import type { ItemsResponse } from '@dotly/types'
 
 import {

@@ -41,26 +41,35 @@ async function fetchWidgetData(token: string) {
 
   return {
     cards: results[0].status === 'fulfilled' ? results[0].value.items : [],
-    contacts: results[1].status === 'fulfilled' ? results[1].value.items ?? [] : [],
-    leads: results[2].status === 'fulfilled' ? results[2].value.items ?? [] : [],
-    deals: results[3].status === 'fulfilled' ? results[3].value.items ?? [] : [],
-    tasks: results[4].status === 'fulfilled' ? results[4].value.items ?? [] : [],
+    contacts: results[1].status === 'fulfilled' ? (results[1].value.items ?? []) : [],
+    leads: results[2].status === 'fulfilled' ? (results[2].value.items ?? []) : [],
+    deals: results[3].status === 'fulfilled' ? (results[3].value.items ?? []) : [],
+    tasks: results[4].status === 'fulfilled' ? (results[4].value.items ?? []) : [],
     funnel: results[5].status === 'fulfilled' ? results[5].value : null,
-    appointmentTypes: results[6].status === 'fulfilled' ? results[6].value.items.filter((a) => a.isActive) : [],
-    sectionErrors: results.filter(r => r.status === 'rejected').map((_, i) => String(i)) // Mapping error index simplified
+    appointmentTypes:
+      results[6].status === 'fulfilled' ? results[6].value.items.filter((a) => a.isActive) : [],
+    sectionErrors: results.filter((r) => r.status === 'rejected').map((_, i) => String(i)), // Mapping error index simplified
   }
 }
 
 // ─── Server Components ────────────────────────────────────────────────────────
 
-async function DashboardWidgetsLoader({ token, analyticsSummary }: { token: string, analyticsSummary: DashboardAnalyticsSummary | null }) {
+async function DashboardWidgetsLoader({
+  token,
+  analyticsSummary,
+}: {
+  token: string
+  analyticsSummary: DashboardAnalyticsSummary | null
+}) {
   const data = await fetchWidgetData(token)
-  
+
   const openDeals = data.deals
-  const pipelineValue = analyticsSummary?.openPipelineValue ?? openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
+  const pipelineValue =
+    analyticsSummary?.openPipelineValue ?? openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
   const overdueTasks = data.tasks.filter(isTaskOverdue)
   const funnelMax = data.funnel ? Math.max(...data.funnel.stages.map((s) => s.count), 1) : 1
-  const activeCards = analyticsSummary?.activeCards ?? data.cards.filter((card) => card.isActive).length
+  const activeCards =
+    analyticsSummary?.activeCards ?? data.cards.filter((card) => card.isActive).length
   const totalViews = analyticsSummary?.totalViews ?? 0
   const totalClicks = analyticsSummary?.totalClicks ?? 0
   const totalLeads = analyticsSummary?.totalLeads ?? 0
@@ -92,7 +101,12 @@ function DashboardContentSkeleton() {
   return (
     <div className="space-y-6 opacity-70">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[1,2,3,4].map(i => <div key={i} className="h-32 rounded-[26px] bg-white ring-1 ring-gray-950/[0.03] animate-pulse" />)}
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-32 rounded-[26px] bg-white ring-1 ring-gray-950/[0.03] animate-pulse"
+          />
+        ))}
       </div>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <SkeletonList rows={4} />
@@ -106,11 +120,8 @@ function DashboardContentSkeleton() {
 
 export default async function DashboardPage(): Promise<JSX.Element> {
   const { user, token } = await getServerUserAndTokenOrRedirect('/auth')
-  
-  const userName =
-    (user?.user_metadata?.full_name as string | undefined) ??
-    user?.email?.split('@')[0] ??
-    'there'
+
+  const userName = user?.name ?? user?.email?.split('@')[0] ?? 'there'
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -146,7 +157,7 @@ export default async function DashboardPage(): Promise<JSX.Element> {
         totalLeads={totalLeads}
         userName={userName}
       />
-      
+
       {/* Non-blocking data stream for the heavy CRM/API queries */}
       <Suspense fallback={<DashboardContentSkeleton />}>
         <DashboardWidgetsLoader token={token} analyticsSummary={analyticsSummary} />

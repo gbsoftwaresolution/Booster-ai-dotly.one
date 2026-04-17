@@ -203,10 +203,8 @@ export class AnalyticsController {
     // F-02: Enforce plan-based maximum date range so FREE users cannot query
     // unlimited history.  The plan limit is read from the canonical source
     // (BillingService.getPlanLimits) so it stays in sync with billing changes.
-    // Resolve supabaseId → internal DB user to ensure the plan lookup succeeds
-    // even when the JWT sub (user.id) is the Supabase UUID, not the DB primary key.
-    const dbUser = await this.prisma.user.findFirst({
-      where: { OR: [{ id: user.id }, { supabaseId: user.id }] },
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
       select: { plan: true },
     })
     const plan: Plan = (dbUser?.plan as Plan | undefined) ?? Plan.FREE

@@ -2,7 +2,7 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet } from '@/lib/api'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import type { ItemsResponse } from '@dotly/types'

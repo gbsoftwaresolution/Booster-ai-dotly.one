@@ -14,7 +14,7 @@ import * as winston from 'winston'
  * above systems. Do not change `format.json()` to `format.simple()` in production.
  *
  * L-04: Recursively redact known PII field names from log metadata so that
- * email addresses, names, Supabase UUIDs, and tokens never appear in
+ * email addresses, names, user ids, and tokens never appear in
  * production log aggregators (Datadog, Loki, CloudWatch, etc.).
  *
  * We redact at the logger level rather than at each call-site because:
@@ -28,7 +28,6 @@ import * as winston from 'winston'
 const PII_FIELDS = new Set([
   'email',
   'name',
-  'supabaseId',
   'pushToken',
   'walletAddress',
   'password',

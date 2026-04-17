@@ -1,12 +1,18 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getServerAccessToken } from '@/lib/auth/session'
+import { apiGet } from '@/lib/api'
 
 export async function getServerUserOrRedirect(authPath = '/auth') {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const token = await getServerAccessToken()
+    if (!token) {
+      redirect(authPath)
+    }
+
+    const user = await apiGet<{ id: string; email: string; name?: string | null }>(
+      '/users/me',
+      token,
+    )
 
     if (!user) {
       redirect(authPath)
@@ -20,12 +26,7 @@ export async function getServerUserOrRedirect(authPath = '/auth') {
 
 export async function getServerSessionAccessTokenOrRedirect(authPath = '/auth') {
   try {
-    const supabase = await createClient()
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    const token = session?.access_token
+    const token = await getServerAccessToken()
     if (!token) {
       redirect(authPath)
     }
@@ -38,14 +39,10 @@ export async function getServerSessionAccessTokenOrRedirect(authPath = '/auth') 
 
 export async function getServerUserAndTokenOrRedirect(authPath = '/auth') {
   try {
-    const supabase = await createClient()
-    const [userResult, sessionResult] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase.auth.getSession(),
-    ])
-
-    const user = userResult.data.user
-    const token = sessionResult.data.session?.access_token
+    const token = await getServerAccessToken()
+    const user = token
+      ? await apiGet<{ id: string; email: string; name?: string | null }>('/users/me', token)
+      : null
 
     if (!user || !token) {
       redirect(authPath)

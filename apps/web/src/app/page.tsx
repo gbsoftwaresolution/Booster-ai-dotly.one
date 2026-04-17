@@ -8,7 +8,10 @@ import { HowItWorks } from '@/components/marketing/HowItWorks'
 import { Testimonials } from '@/components/marketing/Testimonials'
 import { CtaBanner } from '@/components/marketing/CtaBanner'
 import { Footer } from '@/components/marketing/Footer'
+import { getOnboardingNextStep, getOnboardingState } from '@/lib/onboarding'
 import { SITE_DESCRIPTION, SITE_NAME, absoluteUrl, createMarketingMetadata } from '@/lib/seo'
+import { getServerAccessToken } from '@/lib/auth/session'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = createMarketingMetadata({
   title: 'Tap. Share. Convert.',
@@ -53,7 +56,21 @@ const homeStructuredData = [
   },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
+  try {
+    const token = await getServerAccessToken()
+    if (token) {
+      try {
+        const state = await getOnboardingState(token)
+        redirect(getOnboardingNextStep(state) ? '/onboarding' : '/dashboard')
+      } catch {
+        redirect('/onboarding')
+      }
+    }
+  } catch {
+    // Fall back to the public marketing homepage when auth is unavailable.
+  }
+
   return (
     <div className="min-h-screen bg-transparent">
       <StructuredData id="home-structured-data" data={homeStructuredData} />

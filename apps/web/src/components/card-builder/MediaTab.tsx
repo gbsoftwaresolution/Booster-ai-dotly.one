@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/cn'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiPost } from '@/lib/api'
 
 // ─── Constants ────────────────────────────────────────────────────────────────

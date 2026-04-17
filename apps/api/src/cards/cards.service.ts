@@ -20,7 +20,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import * as path from 'path'
 import { randomBytes } from 'crypto'
-import { verifySupabaseJwt } from '../auth/utils/verify-supabase-jwt'
+import { AuthService } from '../auth/auth.service'
 import { assertSafeUrl } from '../common/utils/ssrf-guard'
 
 // F-26: Single source of truth for plan limits used in card creation.
@@ -85,6 +85,7 @@ export class CardsService {
     private readonly audit: AuditService,
     private readonly config: ConfigService,
     private readonly analytics: AnalyticsService,
+    private readonly authService: AuthService,
   ) {
     const accountId = this.config.getOrThrow<string>('R2_ACCOUNT_ID')
     const accessKeyId = this.config.getOrThrow<string>('R2_ACCESS_KEY_ID')
@@ -113,12 +114,6 @@ export class CardsService {
       select: { id: true },
     })
     if (userById) return userById.id
-
-    const userBySupabaseId = await this.prisma.user.findUnique({
-      where: { supabaseId: userId },
-      select: { id: true },
-    })
-    if (userBySupabaseId) return userBySupabaseId.id
 
     throw new UnauthorizedException('Authenticated user not found')
   }
@@ -791,15 +786,14 @@ export class CardsService {
     // unpublished, so the handle used in the header is always a real DB value.
     const card = await this.findByHandle(handle)
 
-    // SEC-01: MEMBERS_ONLY policy — verify the JWT signature before trusting sub.
-    // Previously the controller decoded the JWT payload without verifying the
-    // signature, allowing a forged token to bypass the policy check. Now we
-    // verify the signature here using the same SUPABASE_JWT_SECRET used by
-    // passport-jwt in SupabaseStrategy, so forged tokens are rejected.
+    // MEMBERS_ONLY policy requires a valid first-party access token.
     if (card.vcardPolicy === 'MEMBERS_ONLY') {
-      const jwtSecret = this.config.get<string>('SUPABASE_JWT_SECRET') ?? ''
-      const requestUserId = bearerToken ? verifySupabaseJwt(bearerToken, jwtSecret) : null
-      if (!requestUserId) {
+      try {
+        if (!bearerToken) {
+          throw new ForbiddenException('Sign in to download this contact')
+        }
+        await this.authService.validateAccessToken(bearerToken)
+      } catch {
         throw new ForbiddenException('Sign in to download this contact')
       }
     }

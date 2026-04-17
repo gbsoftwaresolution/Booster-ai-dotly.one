@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
 import { Prisma, type PrismaClient, type User } from '@dotly/database'
@@ -14,7 +13,6 @@ const LEGACY_USER_SELECT = {
   avatarUrl: true,
   plan: true,
   walletAddress: true,
-  supabaseId: true,
   pushToken: true,
   createdAt: true,
   updatedAt: true,
@@ -33,8 +31,6 @@ const LEGACY_USER_PROFILE_COLUMNS = new Set([
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name)
-  /** Supabase admin client — uses the service-role key (never exposed to browsers). */
-  private readonly supabaseAdmin: SupabaseClient | null
   /** R2 client used only for account-deletion cleanup. */
   private readonly r2Client: S3Client | null
   private readonly r2Bucket: string
@@ -45,23 +41,6 @@ export class UsersService {
     private emailService: EmailService,
     private config: ConfigService,
   ) {
-    // F-18: Initialise the Supabase admin client so we can delete the auth user
-    // during account deletion.  Without this, the Supabase session stays valid
-    // and `findOrCreate` will recreate the DB record on the next authenticated
-    // request — effectively making deletion a no-op.
-    const supabaseUrl = this.config.get<string>('SUPABASE_URL')
-    const serviceRoleKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY')
-    if (supabaseUrl && serviceRoleKey) {
-      this.supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    } else {
-      this.supabaseAdmin = null
-      this.logger.warn(
-        'SUPABASE_SERVICE_ROLE_KEY not set — deleteUserAccount will NOT revoke Supabase sessions',
-      )
-    }
-
     // B8: Initialise a minimal R2 client for cleaning up uploaded media on
     // account deletion.  All uploads use the key prefix `${cardId}/...` so we
     // can list and delete every object for each card before the card rows are
@@ -154,40 +133,6 @@ export class UsersService {
     }
   }
 
-  async findOrCreate(
-    supabaseId: string,
-    email: string,
-    name?: string,
-  ): Promise<{ id: string; email: string }> {
-    const existing = await this.prisma.user.findUnique({
-      where: { supabaseId },
-      select: { id: true, email: true },
-    })
-
-    if (existing) {
-      return existing
-    }
-
-    const user = await this.prisma.user.create({
-      data: { supabaseId, email, name: name ?? null },
-      select: { id: true, email: true },
-    })
-
-    // Fire-and-forget welcome email
-    void this.emailService
-      .sendWelcomeEmail(email, name ?? email.split('@')[0] ?? email)
-      // MED-05: Mask the email address in the log — log only the domain part so
-      // PII is not written to log aggregators.
-      .catch((err) => {
-        const maskedEmail = email.replace(/^[^@]+/, '***')
-        this.logger.warn(
-          `Welcome email failed for ${maskedEmail}: ${err instanceof Error ? err.message : err}`,
-        )
-      })
-
-    return user
-  }
-
   async findById(id: string): Promise<User | null> {
     return this.sanitizeUser(await this.findUniqueCompat({ id })) as User | null
   }
@@ -210,10 +155,6 @@ export class UsersService {
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     }
-  }
-
-  async findBySupabaseId(supabaseId: string): Promise<User | null> {
-    return this.sanitizeUser(await this.findUniqueCompat({ supabaseId })) as User | null
   }
 
   async savePushToken(userId: string, token: string): Promise<void> {
@@ -313,12 +254,6 @@ export class UsersService {
   }
 
   async deleteUserAccount(userId: string): Promise<void> {
-    // Fetch the supabaseId before deleting DB rows so we can revoke the auth user.
-    const dbUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { supabaseId: true },
-    })
-
     // B8: Collect all card IDs for this user BEFORE deleting DB rows so we can
     // clean up R2 objects afterwards.  We do this outside the transaction so
     // that a failure here (e.g. DB query error) doesn't silently skip cleanup.
@@ -397,21 +332,6 @@ export class UsersService {
     // re-raising would give the caller a misleading error.
     if (this.r2Client && userCards.length > 0) {
       await this.deleteUserR2Objects(userCards.map((c) => c.id))
-    }
-
-    // F-18: Delete the Supabase Auth user AFTER the DB transaction succeeds.
-    // This invalidates all existing JWTs for this user and prevents
-    // findOrCreate from recreating the DB record on any subsequent request.
-    // We do this outside the Prisma transaction because it is an external call
-    // and cannot be rolled back; if it fails we log the error but do not
-    // re-raise (the DB data is already gone, which is the primary obligation).
-    if (this.supabaseAdmin && dbUser?.supabaseId) {
-      const { error } = await this.supabaseAdmin.auth.admin.deleteUser(dbUser.supabaseId)
-      if (error) {
-        this.logger.error(
-          `deleteUserAccount: failed to delete Supabase auth user ${dbUser.supabaseId}: ${error.message}`,
-        )
-      }
     }
   }
 

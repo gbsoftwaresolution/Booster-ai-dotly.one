@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { SelectField } from '@/components/ui/SelectField'
 import { apiPatch, apiPost } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { useDialogFocusTrap } from '@/hooks/useDialogFocusTrap'
 import { ModalBackdrop } from '@/components/crm/ModalBackdrop'
 import {

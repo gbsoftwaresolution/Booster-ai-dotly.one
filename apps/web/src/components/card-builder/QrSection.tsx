@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { getPublicApiUrl } from '@/lib/public-env'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 interface QrSectionProps {
   cardId: string

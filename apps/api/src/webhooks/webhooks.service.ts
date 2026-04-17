@@ -238,10 +238,7 @@ export class WebhooksService {
   // ─── Ownership guard ─────────────────────────────────────────────────────────
 
   private async resolveUserId(rawId: string): Promise<string> {
-    const u = await this.prisma.user.findFirst({
-      where: { OR: [{ id: rawId }, { supabaseId: rawId }] },
-      select: { id: true },
-    })
+    const u = await this.prisma.user.findUnique({ where: { id: rawId }, select: { id: true } })
     if (!u) throw new ForbiddenException('User not found')
     return u.id
   }

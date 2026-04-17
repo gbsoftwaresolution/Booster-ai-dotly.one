@@ -2,7 +2,9 @@ import { Prisma } from '@dotly/database'
 import { UsersService } from './users.service'
 
 function createMissingColumnError(column: string): Prisma.PrismaClientKnownRequestError {
-  const error = Object.create(Prisma.PrismaClientKnownRequestError.prototype) as Prisma.PrismaClientKnownRequestError & {
+  const error = Object.create(
+    Prisma.PrismaClientKnownRequestError.prototype,
+  ) as Prisma.PrismaClientKnownRequestError & {
     code: string
     meta: { column: string }
   }
@@ -12,7 +14,7 @@ function createMissingColumnError(column: string): Prisma.PrismaClientKnownReque
 }
 
 describe('UsersService.getMe', () => {
-  it('returns a minimal user profile without internal push token or supabase id', async () => {
+  it('returns a minimal user profile without internal push token', async () => {
     const prisma = {
       user: {
         findUnique: jest.fn().mockResolvedValue({
@@ -28,7 +30,6 @@ describe('UsersService.getMe', () => {
           notifWeeklyDigest: false,
           notifProductUpdates: false,
           pushToken: 'secret-push-token',
-          supabaseId: 'supabase-secret',
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
           updatedAt: new Date('2026-01-02T00:00:00.000Z'),
         }),
@@ -58,7 +59,6 @@ describe('UsersService.getMe', () => {
       updatedAt: '2026-01-02T00:00:00.000Z',
     })
     expect(result).not.toHaveProperty('pushToken')
-    expect(result).not.toHaveProperty('supabaseId')
   })
 
   it('falls back to legacy defaults when notification columns are missing in the local database', async () => {
@@ -72,7 +72,6 @@ describe('UsersService.getMe', () => {
         avatarUrl: null,
         plan: 'FREE',
         walletAddress: null,
-        supabaseId: 'supabase_legacy',
         pushToken: null,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         updatedAt: new Date('2026-01-02T00:00:00.000Z'),

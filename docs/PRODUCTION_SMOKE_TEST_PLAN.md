@@ -40,14 +40,15 @@ Confirm envs are set:
   - `NEXT_PUBLIC_APP_URL`
   - `NEXT_PUBLIC_WEB_URL`
   - `NEXT_PUBLIC_SITE_URL`
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - web server-side:
   - `API_URL`
   - `INTERNAL_API_URL` only if still using the legacy alias
 - api:
   - `WEB_URL`
-  - `SUPABASE_JWT_SECRET`
+  - `AUTH_JWT_SECRET`
+  - `GOOGLE_AUTH_CLIENT_ID`
+  - `GOOGLE_AUTH_CLIENT_SECRET`
+  - `GOOGLE_AUTH_STATE_SECRET`
   - `REDIS_URL`
   - `R2_SECRET_ACCESS_KEY`
   - payment and email envs

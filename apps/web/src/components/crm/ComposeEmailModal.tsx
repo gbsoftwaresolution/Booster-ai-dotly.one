@@ -3,7 +3,7 @@
 import type { JSX } from 'react'
 import { useState, useEffect, useId, useRef } from 'react'
 import { X, Send, Mail, ChevronDown } from 'lucide-react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiPost, apiGet } from '@/lib/api'
 import type { ItemsResponse } from '@dotly/types'
 import { useDialogFocusTrap } from '@/hooks/useDialogFocusTrap'

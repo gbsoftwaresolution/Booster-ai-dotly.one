@@ -29,6 +29,7 @@ the card builder preview and the public card page. A Storybook instance document
 sub-component in isolation.
 
 **Steps:**
+
 - [ ] Define `CardRendererProps` in `packages/types/src/card-renderer.types.ts`:
   - `card: CardData` — all card field data (name, title, company, bio, phone, email, website)
   - `theme: CardThemeData` — primaryColor, secondaryColor, fontFamily, backgroundUrl, logoUrl
@@ -117,6 +118,7 @@ sub-component in isolation.
 - [ ] Update `turbo.json` to include a `storybook:build` pipeline task
 
 **Acceptance Criteria:**
+
 - [ ] `import { CardRenderer } from '@dotly/ui'` resolves in both `apps/web` and `apps/mobile`
       with no TypeScript errors
 - [ ] All four templates render visually correctly in Storybook with no console errors
@@ -139,9 +141,10 @@ sub-component in isolation.
 **Description:**
 Implement the full `CardsModule` in the NestJS API, covering all CRUD operations, a public
 read endpoint, DTOs with validation, an owner guard, a plan enforcement guard, handle conflict
-handling, a signed Supabase Storage upload URL endpoint, and a vCard generation endpoint.
+handling, a signed storage upload URL endpoint, and a vCard generation endpoint.
 
 **Steps:**
+
 - [ ] Create `CardsModule` in `apps/api/src/cards/` with the following files:
   ```
   cards/
@@ -194,7 +197,7 @@ handling, a signed Supabase Storage upload URL endpoint, and a vCard generation 
   - `unpublish(cardId)` — sets `isActive = false`
   - `getPublicCard(handle)` — fetches active card by handle; throws `404` if not found or
     `isActive === false`
-  - `getUploadUrl(cardId, fileType, fileName)` — calls Supabase Storage to generate a signed
+  - `getUploadUrl(cardId, fileType, fileName)` — calls the configured object storage service to generate a signed
     upload URL; returns `{ uploadUrl, publicUrl }`
   - `generateVCard(handle)` — builds a vCard 3.0 string from card data and returns it
 - [ ] Implement `CardOwnerGuard`:
@@ -239,6 +242,7 @@ handling, a signed Supabase Storage upload URL endpoint, and a vCard generation 
   - `getPublicCard` — inactive card → 404
 
 **Acceptance Criteria:**
+
 - [ ] `POST /cards` with valid DTO creates a card and returns `201` with the card object
 - [ ] `POST /cards` with a duplicate handle returns `409` with a `suggestion` field
 - [ ] `GET /public/cards/:handle` returns the full card payload without an auth token
@@ -248,7 +252,7 @@ handling, a signed Supabase Storage upload URL endpoint, and a vCard generation 
 - [ ] `DELETE /cards/:id` called by a different user returns `403`
 - [ ] A FREE-plan user attempting to create a second card returns `403` with
       `PLAN_LIMIT_REACHED`
-- [ ] `POST /cards/:id/upload-url` returns a signed URL from Supabase Storage
+- [ ] `POST /cards/:id/upload-url` returns a signed URL from object storage
 - [ ] All DTO validation errors return `400` with per-field error messages
 - [ ] Swagger UI at `/api/docs` documents all new endpoints
 - [ ] All new unit tests pass with `turbo test --filter api`
@@ -267,6 +271,7 @@ exposes a Publish button that reveals the live public URL. Unsaved changes are g
 navigation.
 
 **Steps:**
+
 - [ ] Create route `app/(dashboard)/builder/[cardId]/page.tsx` and
       `app/(dashboard)/builder/new/page.tsx`
 - [ ] Create the main layout component `CardBuilderLayout`:
@@ -281,7 +286,7 @@ navigation.
 - [ ] Implement **Profile tab** (`ProfileEditor`):
   - Inputs: Display Name, Job Title, Company, Bio (textarea), Phone, Email, Website, Address
   - Avatar upload: drag-and-drop zone + file picker, preview thumbnail, max 2 MB enforced
-    client-side with error message, uploads via `POST /cards/:id/upload-url` → Supabase PUT
+    client-side with error message, uploads via `POST /cards/:id/upload-url` → signed PUT
   - Background image upload: max 5 MB, same upload flow
   - Handle field: text input with `dotly.one/` prefix label, real-time availability check
     (debounced 500ms) that calls `GET /public/cards/:handle` and shows a green checkmark if
@@ -338,6 +343,7 @@ navigation.
       items link to `/builder/:cardId`
 
 **Acceptance Criteria:**
+
 - [ ] Navigating to `/builder/new` creates a new draft card and redirects to `/builder/:newId`
 - [ ] All four editor tabs render without errors and are navigable
 - [ ] Changing any profile field updates the right-panel preview within 100ms
@@ -362,6 +368,7 @@ and client-side analytics beacon firing. The page must score ≥ 90 on Lighthous
 return a `404` for inactive or missing card handles.
 
 **Steps:**
+
 - [ ] Implement `app/card/[handle]/page.tsx` as an async Server Component:
   - Fetch card data from `GET /public/cards/:handle` at render time (no client-side fetch)
   - If fetch returns `404` or card is inactive: call Next.js `notFound()` to render the
@@ -403,7 +410,7 @@ return a `404` for inactive or missing card handles.
   - Rendered inside `app/card/[handle]/page.tsx` as a Client Component island
   - On mount (`useEffect`): fire `POST /public/analytics` with
     `{ type: 'VIEW', cardId, handle, referrer: document.referrer,
-      userAgent: navigator.userAgent }`
+userAgent: navigator.userAgent }`
   - Runs once per page load, suppressed if the viewer is the card owner (check for auth cookie)
 - [ ] Implement **Analytics CLICK tracking**:
   - `onSocialLinkClick` callback passed to `CardRenderer` → fires
@@ -422,6 +429,7 @@ return a `404` for inactive or missing card handles.
   - Defer all analytics beacon scripts to after page paint
 
 **Acceptance Criteria:**
+
 - [ ] `GET /card/test-user` server-renders the full card HTML with no client-side flash
 - [ ] Page `<head>` contains correct `og:title`, `og:image`, and `twitter:card` tags
       (verify with `curl` or browser DevTools)
@@ -448,6 +456,7 @@ on the card detail screen. All QR codes encode the canonical card URL `dotly.one
 must be natively scannable by iOS and Android cameras.
 
 **Steps:**
+
 - [ ] Install QR generation library in `apps/api`: `qrcode` (`pnpm add qrcode @types/qrcode`)
 - [ ] Create `QrCodesModule` in `apps/api/src/qr-codes/`:
   ```
@@ -494,7 +503,7 @@ must be natively scannable by iOS and Android cameras.
 - [ ] Install `react-native-qrcode-svg` in `apps/mobile`
 - [ ] On the mobile card detail screen (T16), render the QR code:
   - Use `<QRCode value="https://dotly.one/:handle" size={200} color="#000000"
-    backgroundColor="#FFFFFF" />`
+backgroundColor="#FFFFFF" />`
   - Show below the card preview section
   - QR code dimensions ensure scannability (minimum 200×200 px logical pixels)
 - [ ] Validate that a generated QR code is scannable:
@@ -503,6 +512,7 @@ must be natively scannable by iOS and Android cameras.
   - Confirm decoded URL matches `https://dotly.one/:handle`
 
 **Acceptance Criteria:**
+
 - [ ] `POST /cards/:id/qr` returns `201` with `svgString` and `pngBase64` fields
 - [ ] `GET /cards/:id/qr` returns the stored QR config or `404` if not generated
 - [ ] `POST /cards/:id/qr` called by a non-owner returns `403`
@@ -526,6 +536,7 @@ high-volume event ingestion without write-storming the database during viral car
 direct-write fallback ensures no event is lost if Redis is unavailable.
 
 **Steps:**
+
 - [ ] Create `AnalyticsModule` in `apps/api/src/analytics/`:
   ```
   analytics/
@@ -602,6 +613,7 @@ direct-write fallback ensures no event is lost if Redis is unavailable.
   - Returns `{ status: 'ok', redis: 'up' | 'down', ... }`
 
 **Acceptance Criteria:**
+
 - [ ] Calling `POST /public/analytics` 100 times in quick succession results in 100 events
       in Redis queue and does not cause any Postgres write errors during the burst
 - [ ] Within 30 seconds, the cron job flushes all 100 events into `AnalyticsEvent` table
@@ -626,14 +638,15 @@ mobile mode alongside a native QR code, a share sheet, and a copy-link button. T
 skeleton loading states while data fetches.
 
 **Steps:**
+
 - [ ] Create an API client library `apps/mobile/lib/api.ts`:
-  - Export `getCards()`: `GET /cards` with JWT attached (reads token from Supabase session)
+  - Export `getCards()`: `GET /cards` with JWT attached (reads token from app auth storage)
   - Export `getCard(id)`: `GET /cards/:id` with JWT attached
   - Export `getAnalyticsSummary(id)`: `GET /cards/:id/analytics/summary` with JWT attached
-  - Attach JWT: read from Supabase session via `supabase.auth.getSession()`,
+  - Attach JWT: read from app auth storage,
     include as `Authorization: Bearer <token>` header
   - Return typed responses using types from `@dotly/types`
-  - Handle `401` → call `supabase.auth.signOut()` and redirect to sign-in
+  - Handle `401` → clear stored session and redirect to sign-in
   - Handle `403`, `404`, `500` with typed error objects
 - [ ] Implement **My Cards tab** (`app/(tabs)/index.tsx`):
   - On mount: call `getCards()`, store result in state
@@ -684,6 +697,7 @@ skeleton loading states while data fetches.
       empty state "Go to Dashboard" link
 
 **Acceptance Criteria:**
+
 - [ ] My Cards tab renders a list of the authenticated user's cards with avatar, name, handle,
       and view count badge
 - [ ] Pull-to-refresh triggers a fresh `GET /cards` request and updates the list
@@ -725,18 +739,18 @@ The phase is complete when all of the following are true:
 
 ## Dependencies & Blockers
 
-| Dependency | Owner | Needed by |
-|---|---|---|
-| Phase 1 complete (API scaffold, Prisma schema, auth, web/mobile shells) | All | T10–T16 |
-| `packages/types` `CardRendererProps` defined | T10 author | T11, T12, T13, T16 |
-| `CardRenderer` component published from `packages/ui` | T10 | T12, T13, T16 |
-| `CardsModule` API endpoints live | T11 | T12, T13, T14, T15, T16 |
-| Supabase Storage bucket created and CORS policy configured for web origin | Team lead | T11, T12 |
-| `sharp` binary compatible with Railway deployment target (Linux x64) | Dev | T14 |
-| Redis available in development (Docker Compose or Railway) | Dev | T15 |
-| `NEXT_PUBLIC_APP_URL` set to `https://dotly.one` (or staging equivalent) | Team lead | T13, T14 |
-| Google Fonts subset CSS loaded in `apps/web` (`next/font` or CDN) | T12 author | T12 |
-| `react-native-qrcode-svg` compatible with current Expo SDK version | T14/T16 author | T14, T16 |
+| Dependency                                                               | Owner          | Needed by               |
+| ------------------------------------------------------------------------ | -------------- | ----------------------- |
+| Phase 1 complete (API scaffold, Prisma schema, auth, web/mobile shells)  | All            | T10–T16                 |
+| `packages/types` `CardRendererProps` defined                             | T10 author     | T11, T12, T13, T16      |
+| `CardRenderer` component published from `packages/ui`                    | T10            | T12, T13, T16           |
+| `CardsModule` API endpoints live                                         | T11            | T12, T13, T14, T15, T16 |
+| Object storage bucket created and CORS policy configured for web origin  | Team lead      | T11, T12                |
+| `sharp` binary compatible with Railway deployment target (Linux x64)     | Dev            | T14                     |
+| Redis available in development (Docker Compose or Railway)               | Dev            | T15                     |
+| `NEXT_PUBLIC_APP_URL` set to `https://dotly.one` (or staging equivalent) | Team lead      | T13, T14                |
+| Google Fonts subset CSS loaded in `apps/web` (`next/font` or CDN)        | T12 author     | T12                     |
+| `react-native-qrcode-svg` compatible with current Expo SDK version       | T14/T16 author | T14, T16                |
 
 ---
 
@@ -773,4 +787,4 @@ The phase is complete when all of the following are true:
 
 ---
 
-*Phase 2 of 5 — Dotly.one / Prev: Phase 1 — Foundation | Next: Phase 3 — Growth Features*
+_Phase 2 of 5 — Dotly.one / Prev: Phase 1 — Foundation | Next: Phase 3 — Growth Features_

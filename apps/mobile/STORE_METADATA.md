@@ -1,12 +1,15 @@
 # Dotly — App Store & Play Store Metadata
 
 ## App Name
+
 Dotly — Digital Business Card
 
 ## Subtitle (iOS, max 30 chars)
+
 Tap. Share. Convert.
 
 ## Short Description (Android, max 80 chars)
+
 Share your digital business card via NFC, QR code, or link. Capture leads instantly.
 
 ---
@@ -26,6 +29,7 @@ Forget paper cards that get lost or thrown away. With Dotly, your contact inform
 ### Capture & Convert Leads
 
 Every time someone visits your card, they can submit their contact info with a single tap. Dotly automatically:
+
 - Creates a contact in your built-in CRM pipeline
 - Notifies you instantly via push notification ("New Lead! Alex Chen just saved your card")
 - Sends a follow-up email notification so you never miss a connection
@@ -57,21 +61,27 @@ Download Dotly today and turn every handshake into a lasting business relationsh
 ---
 
 ## Keywords (iOS, comma-separated, max 100 chars)
+
 business card, networking, NFC, digital card, CRM, contacts, QR code, lead generation
 
 ## Category
+
 Business
 
 ## Content Rating
+
 4+ (iOS) / Everyone (Android)
 
 ## Privacy Policy URL
+
 https://dotly.one/privacy
 
 ## Support URL
+
 https://dotly.one/support
 
 ## Marketing URL
+
 https://dotly.one
 
 ---
@@ -116,6 +126,7 @@ https://dotly.one
 This is the launch release of Dotly — the digital business card platform built for modern professionals.
 
 **What's included in v1.0.0:**
+
 - Digital business card creation with 4 customisable templates
 - NFC tap-to-share and QR code sharing
 - Unique shareable card URL (dotly.one/yourname)
@@ -124,6 +135,6 @@ This is the launch release of Dotly — the digital business card platform built
 - Contact timeline and email sending from within the app
 - Card analytics (views, clicks, leads)
 - Team management with brand lock
-- Secure authentication via Supabase
+- Secure authentication with email/password and Google sign-in
 
 We'd love your feedback — reach us at support@dotly.one

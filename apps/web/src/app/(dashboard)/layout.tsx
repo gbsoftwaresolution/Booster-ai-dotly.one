@@ -1,5 +1,4 @@
 import { getServerUserOrRedirect } from '@/lib/server-auth'
-import { redirect } from 'next/navigation'
 import type { JSX } from 'react'
 import { BillingPlanProvider } from '@/components/billing/BillingPlanProvider'
 import { OnboardingGate } from '@/components/auth/OnboardingGate'
@@ -15,10 +14,7 @@ export default async function DashboardLayout({
 }): Promise<JSX.Element> {
   const user = await getServerUserOrRedirect('/auth')
 
-  const displayName =
-    (user.user_metadata?.['full_name'] as string | undefined) ??
-    (user.user_metadata?.['name'] as string | undefined) ??
-    undefined
+  const displayName = user.name ?? undefined
 
   return (
     <OnboardingGate>

@@ -131,8 +131,9 @@ model User {
   plan          Plan    @default(FREE)
   walletAddress String? @unique // crypto billing
   boosterAiPartnerId String? @unique // linked BoosterAI partner identity for self-referral checks
-  supabaseId    String? @unique // Supabase Auth user ID
   pushToken     String?
+  passwordHash  String?
+  googleId      String? @unique
   /// ISO 3166-1 alpha-2 country code, e.g. "US", "GB", "IN"
   country       String? @db.VarChar(2)
   /// IANA timezone identifier, e.g. "America/New_York", "Asia/Kolkata"
@@ -162,8 +163,42 @@ model User {
   bookings           Booking[]
   googleCalendar     GoogleCalendarConnection?
   contactMemories    ContactMemory[]
+  authSessions       AuthSession[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
+}
+
+model AuthSession {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Card {

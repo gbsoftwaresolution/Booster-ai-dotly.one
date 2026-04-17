@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { apiGet } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import type { PaginatedResponse } from '@dotly/types'
 
 import {

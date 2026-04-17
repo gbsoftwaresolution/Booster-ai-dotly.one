@@ -287,8 +287,7 @@ export class CardsController {
     // headers, and browser history — all of which would leak the JWT.
     // Clients that need to download MEMBERS_ONLY vCards must set the
     // Authorization header (e.g. via a fetch() + createObjectURL approach).
-    // Signature verification is delegated to CardsService.getVcard() which
-    // calls verifySupabaseJwt() — same logic as SupabaseStrategy.
+    // Signature verification is delegated to CardsService.getVcard().
     const authHeader = req.headers['authorization'] ?? ''
     const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined
     const { content, handle: safeHandle } = await this.cardsService.getVcard(handle, bearerToken)

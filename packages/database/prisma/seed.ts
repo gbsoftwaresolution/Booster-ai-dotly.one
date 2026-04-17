@@ -20,7 +20,6 @@ async function main() {
       email: 'test@dotly.one',
       name: 'Test User',
       plan: Plan.FREE,
-      supabaseId: 'test-supabase-id',
     },
   })
   console.log(`✅ User: ${user.email} (${user.id})`)

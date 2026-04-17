@@ -39,7 +39,7 @@ import {
   type VisibleStageCounts,
 } from './types'
 import { apiPost } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 export function ContactsHeader({
   focusMessage,

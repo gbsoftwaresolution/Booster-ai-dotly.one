@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet, apiPatch } from '@/lib/api'
 import { enqueueNotificationPrefsMutation } from '@/lib/pwa/queue'
 import type { BillingSummaryResponse, UserMeResponse } from '@dotly/types'

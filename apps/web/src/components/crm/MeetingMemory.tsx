@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getPublicApiUrl } from '@/lib/public-env'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import {
   Plus,
   MapPin,

@@ -31,6 +31,7 @@ differentiating feature not offered by any major competitor.
 **Steps:**
 
 _Database_
+
 - [ ] Add `txtRecord` (String, unique, auto-generated UUID-based token) and `isVerified` (Boolean,
       default false) and `sslStatus` (enum: `PENDING | PROVISIONED | FAILED`) fields to
       `CustomDomain` model in Prisma schema if not already present from Phase 1
@@ -39,6 +40,7 @@ _Database_
 - [ ] Run `prisma migrate dev --name custom-domain-ssl-fields`
 
 _API — DomainsModule (NestJS)_
+
 - [ ] Create `DomainsModule`, `DomainsController`, `DomainsService` in `apps/api/src/domains/`
 - [ ] Implement `POST /domains`:
   - Accept `{ domain: string, cardHandle?: string }` DTO
@@ -80,6 +82,7 @@ _API — DomainsModule (NestJS)_
 - [ ] Apply `PlanGuard` (Business+) to all `DomainsController` endpoints; return `403` for Free/Pro
 
 _Background Verification Polling (BullMQ)_
+
 - [ ] Create `DomainVerificationQueue` in BullMQ backed by Redis
 - [ ] Add a repeatable job `verify-pending-domains` that runs every 5 minutes:
   - Query all `CustomDomain` records where `isVerified: false` and `createdAt` is within the
@@ -89,6 +92,7 @@ _Background Verification Polling (BullMQ)_
 - [ ] Add `DomainVerificationProcessor` as a BullMQ worker in the API process
 
 _Next.js Middleware (apps/web)_
+
 - [ ] Update `middleware.ts`:
   - On every incoming request, extract `request.headers.get('host')` (the hostname)
   - If hostname matches `*.dotly.one` or `localhost`, skip — normal routing applies
@@ -102,6 +106,7 @@ _Next.js Middleware (apps/web)_
       on every request from a high-traffic custom domain card
 
 _Web UI (apps/web)_
+
 - [ ] Add "Custom Domain" section to `/dashboard/settings`:
   - Input field for domain entry, "Add Domain" button
   - DNS instructions panel: CNAME record and TXT record shown in a copyable code block
@@ -117,6 +122,7 @@ _Web UI (apps/web)_
 - [ ] Show 409 error inline if domain is already taken by another account
 
 **Acceptance Criteria:**
+
 - [ ] A Business+ user can submit `card.acme.com`, receive correct CNAME and TXT DNS instructions
 - [ ] `POST /domains` returns `409` if the domain is already registered to a different account
 - [ ] `POST /domains/:id/verify` returns `isVerified: true` after a correct TXT record is detected
@@ -148,6 +154,7 @@ business card products.
 **Steps:**
 
 _Setup_
+
 - [ ] Install `expo-nfc` in `apps/mobile`: `pnpm --filter mobile add expo-nfc`
 - [ ] Add NFC permissions to `app.json`:
   - iOS: add `NFCReaderUsageDescription` to `infoPlist`; add `com.apple.developer.nfc.readersession.formats`
@@ -157,6 +164,7 @@ _Setup_
       to pick up the new entitlements
 
 _NFC Write Flow_
+
 - [ ] Add an "NFC" tab or a dedicated "Write to NFC Tag" button on the Card Detail screen
       (accessible from the Cards tab → tap any card)
 - [ ] On tap, check `NfcManager.isSupported()`:
@@ -183,6 +191,7 @@ _NFC Write Flow_
       NFC session regardless of outcome
 
 _NFC Read on App Launch (Android)_
+
 - [ ] In `app/_layout.tsx` (root layout), add a `useEffect` that subscribes to NFC tag discovery
       events on Android using `NfcManager.registerTagEvent(callback)`
 - [ ] If a tag is detected that contains a `dotly.one` URL: open the card URL in the in-app browser
@@ -191,11 +200,13 @@ _NFC Read on App Launch (Android)_
       "Scan Tag" button that starts a foreground NFC read session and opens the URL
 
 _Supported Tag Types_
+
 - [ ] Document in code comments that the implementation targets NTAG213, NTAG215, and NTAG216
       (standard NFC business card chips); MIFARE Classic requires separate tech request and is
       explicitly out of scope
 
 **Acceptance Criteria:**
+
 - [ ] On a device with NFC, tapping "Write to NFC Tag" starts an NFC session and the bottom sheet
       modal appears
 - [ ] A blank NTAG213/215/216 tag held to the device is written with the NDEF URL record
@@ -226,6 +237,7 @@ This unlocks the agency resale use case and is the primary value driver of the E
 **Steps:**
 
 _Database_
+
 - [ ] Add white-label fields to the `Team` model (or extend the existing `brandConfig` JSON field):
   ```
   customAppName       String?
@@ -240,12 +252,13 @@ _Database_
 - [ ] Run `prisma migrate dev --name team-white-label`
 
 _API_
+
 - [ ] Add `PUT /teams/:id/white-label` endpoint to `TeamsModule`:
   - Accept `WhiteLabelDto`: `{ customAppName?, customLogoUrl?, customFaviconUrl?,
-    customPrimaryColor?, customDomain?, hideDotyBranding? }`
+customPrimaryColor?, customDomain?, hideDotyBranding? }`
   - Validate `customPrimaryColor` matches hex color regex `^#[0-9A-Fa-f]{6}$`
   - Validate `customLogoUrl` and `customFaviconUrl` are valid https URLs pointing to
-    Supabase Storage (enforce same-origin asset policy to prevent hotlinking arbitrary URLs)
+    approved asset hosts (enforce same-origin asset policy to prevent hotlinking arbitrary URLs)
   - Apply `PlanGuard` (Enterprise only) — return `403` for all lower plans
   - Persist changes, return updated team record
 - [ ] Add `GET /teams/:id/white-label` to retrieve current white-label config (Enterprise only)
@@ -254,11 +267,12 @@ _API_
       with `hideDotyBranding: true`
 
 _Web — White Label Settings Page_
+
 - [ ] Create `/dashboard/team/white-label` route (Enterprise plan guard — redirect to upsell if
       lower plan)
 - [ ] Form fields:
   - App name input (used in `<title>` and nav branding on custom domain)
-  - Logo URL input + preview thumbnail (or upload button using existing Supabase Storage uploader)
+  - Logo URL input + preview thumbnail (or upload button using the existing asset uploader)
   - Favicon URL input + preview
   - Primary color picker (hex input + `<input type="color">` native picker)
   - Custom domain input (links to T23 Custom Domain flow for domain setup)
@@ -266,6 +280,7 @@ _Web — White Label Settings Page_
 - [ ] Show "Enterprise only" upsell banner for non-Enterprise teams with a link to billing
 
 _Card Page Rendering (apps/web)_
+
 - [ ] In `app/card/[handle]/page.tsx` (SSR), after fetching card + team white-label config:
   - If `hideDotyBranding: true`: suppress the `<footer>` "Powered by Dotly.one" link entirely
   - If `customLogoUrl` present: render team logo in the card page header/footer area instead
@@ -275,6 +290,7 @@ _Card Page Rendering (apps/web)_
   - If `customAppName` present: use as the `<title>` and OG `site_name` meta tag
 
 _White-Label Login Page_
+
 - [ ] In `middleware.ts`, detect requests to a custom Enterprise domain (cross-reference
       `Team.customDomain` via the domain resolution cache):
   - Rewrite `/auth` to a white-labeled sign-in page that renders team logo and `customAppName`
@@ -283,6 +299,7 @@ _White-Label Login Page_
       a `teamId` query param set by the middleware rewrite
 
 _Email White Label (Resend)_
+
 - [ ] When sending lead capture notification emails for a card owned by an Enterprise team with
       `hideDotyBranding: true`:
   - Use the team's `customLogoUrl` in the email header template instead of the Dotly.one logo
@@ -293,6 +310,7 @@ _Email White Label (Resend)_
       Resend custom domain to be set up per Enterprise team and verified
 
 **Acceptance Criteria:**
+
 - [ ] `PUT /teams/:id/white-label` returns `403` for a Pro user and `200` for an Enterprise user
 - [ ] An Enterprise user saving white-label settings persists all six fields correctly in the database
 - [ ] An invalid `customPrimaryColor` (e.g. `"red"` instead of `"#FF0000"`) returns `400` with
@@ -309,7 +327,7 @@ _Email White Label (Resend)_
       `customAppName` sender name — verified in Resend logs
 - [ ] Non-Enterprise team members cannot access `/dashboard/team/white-label` — redirected to
       the upsell page
-- [ ] A logo URL pointing to a non-Supabase Storage origin is rejected with `400`
+- [ ] A logo URL pointing to a non-approved asset origin is rejected with `400`
 
 ---
 
@@ -325,6 +343,7 @@ mobile editor.
 **Steps:**
 
 _Navigation_
+
 - [ ] Add a "Create Card" FAB (floating action button) on the My Cards tab (`app/(tabs)/index.tsx`)
 - [ ] Add a stack navigator nested inside the tabs navigator for card editing:
   ```
@@ -337,6 +356,7 @@ _Navigation_
   ```
 
 _Create Card Screen (`create.tsx`)_
+
 - [ ] Step 1 — Template Picker:
   - Horizontally scrollable template selector showing all 4 templates
     (`MINIMAL`, `BOLD`, `CREATIVE`, `CORPORATE`) as thumbnail previews rendered by
@@ -346,18 +366,19 @@ _Create Card Screen (`create.tsx`)_
   - `TextInput` fields: Full Name (required), Job Title, Company, Phone, Email (required),
     Website, Bio (multiline, max 160 chars with character counter)
   - Avatar upload: "Add Photo" button → `expo-image-picker` launches image picker
-    (camera or library) → selected image is uploaded to Supabase Storage via the existing
+    (camera or library) → selected image is uploaded via the existing signed upload flow
     `POST /upload` endpoint → returned URL set as `avatarUrl` on the card
   - "Create Card" button calls `POST /cards` API and navigates to the Edit screen for the
     new card on success
   - Inline field validation (required fields highlighted on attempted submit)
 
 _Edit Card Screen (`edit.tsx`)_
+
 - [ ] All fields from Create screen, pre-populated with existing card data
 - [ ] Social Links Manager:
   - List of existing social links with platform icon, URL, and delete icon
   - "Add Social Link" button: platform picker (dropdown list of all supported platforms)
-    + URL input + "Add" confirm
+    - URL input + "Add" confirm
   - Reorder via long-press drag (use `react-native-draggable-flatlist`)
 - [ ] Theme section:
   - Primary color picker: a grid of 12 preset colors + a hex input field
@@ -376,19 +397,22 @@ _Edit Card Screen (`edit.tsx`)_
 - [ ] Optimistic UI: apply changes to local state immediately, revert on API error with a toast
 
 _Preview Screen (`preview.tsx`)_
+
 - [ ] Render the card using the shared `packages/ui` `CardRenderer` component (same component
       used on the web public card page) inside a `ScrollView`
 - [ ] "Share" button: native share sheet with the card URL (`expo-sharing` or `Share.share()`)
 - [ ] "Open in Browser" button: opens the public card URL in `expo-web-browser`
 
 _Avatar Upload_
+
 - [ ] Request `MediaLibrary` and `Camera` permissions via `expo-image-picker` before opening picker
 - [ ] Compress image to max 1MB before upload (use `expo-image-manipulator` to resize to
       max 800×800 and convert to JPEG quality 80)
-- [ ] Show upload progress indicator while the image is being uploaded to Supabase Storage
+- [ ] Show upload progress indicator while the image is being uploaded
 - [ ] On upload error, show a toast and keep the previous avatar
 
 **Acceptance Criteria:**
+
 - [ ] A user can create a new card from the mobile app (select template, fill required fields,
       upload avatar) and the card appears in the My Cards list immediately after creation
 - [ ] All 7 core fields (name, title, company, phone, email, website, bio) save correctly and
@@ -421,6 +445,7 @@ useful for follow-up without needing a separate email client.
 **Steps:**
 
 _Database_
+
 - [ ] Create `ContactEmail` model:
   ```
   id            String   @id @default(cuid())
@@ -436,6 +461,7 @@ _Database_
 - [ ] Run `prisma migrate dev --name contact-email-log`
 
 _API — ContactEmailsModule (NestJS)_
+
 - [ ] Create `ContactEmailsModule` with `ContactEmailsController` and `ContactEmailsService`
 - [ ] Implement `POST /contacts/:id/emails`:
   - Guard: contact must belong to authenticated user
@@ -459,6 +485,7 @@ _API — ContactEmailsModule (NestJS)_
 - [ ] Add `GET /contacts/:id/emails/:emailId` to return the full email body for a single record
 
 _User Email Settings_
+
 - [ ] Create `UserEmailSettings` model:
   ```
   id              String  @id @default(cuid())
@@ -472,6 +499,7 @@ _User Email Settings_
       validate `replyToAddress` is a valid email format
 
 _Web UI_
+
 - [ ] Contact detail drawer / page: add "Send Email" button in the action bar
 - [ ] "Send Email" opens a compose modal (Shadcn `Dialog`):
   - Subject input field
@@ -489,6 +517,7 @@ _Web UI_
     `/dashboard/email-signature` — show a shortcut link here)
 
 **Acceptance Criteria:**
+
 - [ ] A Pro user can open the compose modal from a contact's detail view, fill subject and body,
       and send — the email is delivered (verified in Resend dashboard logs)
 - [ ] The sent email appears in the contact's timeline immediately after sending without a
@@ -524,10 +553,12 @@ for the product.
 **Steps:**
 
 _Route & Layout_
+
 - [ ] Create `/dashboard/email-signature` page in `apps/web`
 - [ ] Page layout: left column = controls, right column = live preview iframe
 
 _Signature Generation Logic_
+
 - [ ] Create a pure TypeScript function `generateSignatureHtml(card: CardData, style: SignatureStyle): string`
       in `packages/ui/src/signature/generateSignatureHtml.ts`
 - [ ] Implement three signature styles:
@@ -540,12 +571,13 @@ _Signature Generation Logic_
     card URL as a styled button (inline background-color), social icons centered below
 - [ ] All styles must use only inline CSS (`style=""` attributes) and HTML tables — no external
       stylesheets, no `<style>` blocks, no CSS classes (required for Outlook compatibility)
-- [ ] Social icons: use 16×16 PNG icons hosted on Supabase Storage (static assets) referenced
+- [ ] Social icons: use 16×16 PNG icons hosted on approved asset storage referenced
       by absolute URL — do not use SVG (not supported in Outlook)
 - [ ] "View my digital card" link must include UTM parameters:
       `?utm_source=email_signature&utm_medium=email&utm_campaign=dotly_sig`
 
 _Web UI_
+
 - [ ] Card selector: `<Select>` dropdown showing all the user's cards (fetched from
       `GET /cards`) — selecting a card updates the preview in real time
 - [ ] Style picker: three buttons/tabs for Classic, Compact, Modern
@@ -557,7 +589,9 @@ _Web UI_
 - [ ] "Copy for Gmail" button:
   - Uses `ClipboardItem` with `text/html` MIME type:
     ```ts
-    const item = new ClipboardItem({ 'text/html': new Blob([signatureHtml], { type: 'text/html' }) })
+    const item = new ClipboardItem({
+      'text/html': new Blob([signatureHtml], { type: 'text/html' }),
+    })
     await navigator.clipboard.write([item])
     ```
   - This allows pasting directly into Gmail's compose window with formatting preserved
@@ -569,11 +603,13 @@ _Web UI_
       (new field: `String?`, values `CLASSIC | COMPACT | MODERN`)
 
 _Integration with T27_
+
 - [ ] After a signature is generated, a "Use as My Email Signature" button calls
       `PUT /settings/email` with `{ signatureHtml: <generated html> }` so it is pre-populated
       in the T27 email compose modal
 
 **Acceptance Criteria:**
+
 - [ ] Selecting a card and a style instantly updates the live iframe preview without a page reload
 - [ ] The generated HTML for all three styles passes W3C HTML validation with no errors
 - [ ] The generated HTML uses only inline styles and tables — no `<style>` blocks present in
@@ -605,6 +641,7 @@ card templates to catch unintended UI regressions between deploys.
 **Steps:**
 
 _Setup_
+
 - [ ] Install Playwright in `apps/web`:
       `pnpm --filter web add -D @playwright/test`
 - [ ] Run `pnpm --filter web exec playwright install --with-deps chromium firefox`
@@ -621,8 +658,8 @@ _Test Suites_
   - Sign up with a new email+password → verify redirect to `/dashboard`
   - Sign in with existing credentials → verify dashboard accessible
   - Sign out → verify redirect to `/auth`
-  - Google OAuth: mock the Supabase OAuth endpoint using Playwright's `page.route()` to
-    intercept the OAuth redirect and inject a mock session cookie; verify dashboard accessible
+  - Google OAuth: mock the first-party Google callback flow using Playwright's `page.route()` to
+    intercept the OAuth redirect and inject a mock app session; verify dashboard accessible
 
 - [ ] **Card builder** (`e2e/card-builder.spec.ts`):
   - Sign in as a test user (fixture)
@@ -672,6 +709,7 @@ _Test Suites_
   - Verify the domain status badge shows "Pending DNS"
 
 _Visual Regression_
+
 - [ ] Create `e2e/visual-regression.spec.ts`:
   - Seed one test card for each of the 4 templates (MINIMAL, BOLD, CREATIVE, CORPORATE)
   - Visit each card's public URL
@@ -683,6 +721,7 @@ _Visual Regression_
       document the process for updating baselines in a code comment
 
 _CI Integration_
+
 - [ ] Add a new job `e2e` to `.github/workflows/ci.yml`:
   ```yaml
   e2e:
@@ -718,6 +757,7 @@ _CI Integration_
 - [ ] Mark the `e2e` job as a required check in the branch protection rule for `main`
 
 **Acceptance Criteria:**
+
 - [ ] All 6 test suites pass on a clean checkout against a local seeded database
 - [ ] The auth flow test correctly mocks Google OAuth without requiring real credentials in CI
 - [ ] The billing test completes the Stripe test mode checkout flow end-to-end using test card
@@ -747,6 +787,7 @@ are not optional polish, they are launch requirements.
 **Steps:**
 
 _Next.js — Image Optimization_
+
 - [ ] Audit all `<img>` tags across `apps/web` — replace every instance with `next/image`
 - [ ] Set explicit `width` and `height` props on all `next/image` instances to eliminate
       Cumulative Layout Shift (CLS)
@@ -756,6 +797,7 @@ _Next.js — Image Optimization_
       (e.g. `sizes="(max-width: 768px) 80px, 120px"`) to avoid downloading oversized images
 
 _Next.js — Font Optimization_
+
 - [ ] Replace any `@import url('https://fonts.googleapis.com/...')` calls with `next/font/google`
       equivalents in the card page and dashboard layout
 - [ ] Use `display: 'swap'` and `subsets: ['latin']` to minimize font download size and
@@ -763,6 +805,7 @@ _Next.js — Font Optimization_
 - [ ] Confirm zero layout shift from font loading — verify with Lighthouse CLS score of 0
 
 _Next.js — Bundle Analysis_
+
 - [ ] Install `@next/bundle-analyzer`: `pnpm --filter web add -D @next/bundle-analyzer`
 - [ ] Add `analyze` script to `apps/web/package.json`:
       `"analyze": "ANALYZE=true next build"`
@@ -774,6 +817,7 @@ _Next.js — Bundle Analysis_
       dashboard vs card page bundles
 
 _Next.js — ISR (Incremental Static Regeneration)_
+
 - [ ] Convert `app/card/[handle]/page.tsx` from a fully dynamic SSR page to an ISR page:
   - Add `export const revalidate = 60` to the page module (revalidates every 60 seconds)
   - Add `generateStaticParams()` to pre-generate the top 100 most-viewed card handles at
@@ -789,6 +833,7 @@ _Next.js — ISR (Incremental Static Regeneration)_
     non-top-100 cards; on-demand revalidation reduces this to ~2 seconds for active editors
 
 _API — Response Time & Indexing_
+
 - [ ] Run an index audit on the `AnalyticsEvent`, `Contact`, and `Card` tables:
   - Confirm `Card.handle` has a unique index (from Phase 1)
   - Add composite index `(cardId, createdAt)` on `AnalyticsEvent` for time-series queries
@@ -802,6 +847,7 @@ _API — Response Time & Indexing_
       and document the result in a PR comment
 
 _API — Rate Limiting_
+
 - [ ] Install `express-rate-limit` (or `@nestjs/throttler` for NestJS):
       `pnpm --filter api add @nestjs/throttler`
 - [ ] Configure `ThrottlerModule` globally:
@@ -812,11 +858,12 @@ _API — Rate Limiting_
 - [ ] Return `429 Too Many Requests` with `Retry-After` header when limit is exceeded
 
 _API — Security Headers (Helmet.js)_
+
 - [ ] Install `helmet`: `pnpm --filter api add helmet`
 - [ ] Apply `helmet()` middleware globally in `main.ts` before the NestJS app bootstraps
 - [ ] Configure Helmet options:
   - `contentSecurityPolicy`: configure `defaultSrc`, `scriptSrc`, `imgSrc`, `connectSrc`
-    to allow Supabase Storage and Resend image domains
+    to allow approved asset storage and Resend image domains
   - `crossOriginEmbedderPolicy: false` (required for iframe embeds in card pages)
   - `hsts`: `{ maxAge: 31536000, includeSubDomains: true }`
 - [ ] Verify headers in Playwright test: `GET /health` response must include
@@ -824,6 +871,7 @@ _API — Security Headers (Helmet.js)_
       `Strict-Transport-Security` headers
 
 _Accessibility — Keyboard Navigation_
+
 - [ ] Audit the card builder (`/dashboard/cards/[id]/edit`) and the CRM contacts page:
   - Tab order follows logical reading order — verify using browser DevTools accessibility tree
   - All interactive elements (buttons, inputs, dropdowns, modals) are reachable via Tab and
@@ -833,6 +881,7 @@ _Accessibility — Keyboard Navigation_
     keys to reorder)
 
 _Accessibility — ARIA Labels_
+
 - [ ] Audit all interactive elements across the dashboard and public card page:
   - All icon-only buttons have `aria-label` (e.g. "Delete social link", "Copy card URL")
   - All form inputs have associated `<label>` elements (not just placeholder text)
@@ -841,6 +890,7 @@ _Accessibility — ARIA Labels_
   - The Kanban pipeline columns have `role="list"` and each card has `role="listitem"`
 
 _Accessibility — Color Contrast_
+
 - [ ] Install `axe-core` Playwright integration:
       `pnpm --filter web add -D axe-playwright`
 - [ ] Add `e2e/accessibility.spec.ts`:
@@ -852,6 +902,7 @@ _Accessibility — Color Contrast_
 - [ ] Fix any contrast violations found in Tailwind theme config or card template styles
 
 _Accessibility — Screen Reader Testing_
+
 - [ ] Test the public card page with VoiceOver (macOS/iOS):
   - Navigate through the entire page using VoiceOver keyboard commands
   - Verify the card holder's name, job title, company, social links, and CTA buttons are all
@@ -861,6 +912,7 @@ _Accessibility — Screen Reader Testing_
 - [ ] Document any issues found and fix before marking this task complete
 
 _Lighthouse CI_
+
 - [ ] Install `@lhci/cli`: `pnpm --filter web add -D @lhci/cli`
 - [ ] Create `apps/web/lighthouserc.js`:
   ```js
@@ -888,6 +940,7 @@ _Lighthouse CI_
   - Assert mobile Lighthouse performance score ≥ 90 (fail CI if below threshold)
 
 **Acceptance Criteria:**
+
 - [ ] All `<img>` tags on the public card page are replaced with `next/image` — verified by
       running `grep -r '<img' apps/web/app/card` returning zero results
 - [ ] Google Fonts are loaded via `next/font` with zero FOIT or CLS — verified by Lighthouse
@@ -950,15 +1003,15 @@ The phase is complete when all of the following are true:
 
 ## Dependencies & Blockers
 
-| Dependency | Owner | Needed by | Notes |
-|---|---|---|---|
-| Vercel API token + Project ID (`VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`) | DevOps / Team lead | T23 | Required to add custom domains to the Vercel project programmatically and provision SSL; without this, SSL provisioning falls back to the Railway + Let's Encrypt path |
-| Expo NFC entitlement for iOS (`com.apple.developer.nfc.readersession.formats`) | Mobile lead | T24 | Must be added to `app.json` and an EAS build must be triggered before NFC can be tested on a physical iOS device; iOS Simulator does not support NFC |
-| Physical NFC tags (NTAG213/215/216) for testing | QA | T24 | Cannot be tested on emulators; at least 5 physical blank NFC tags required for write and overwrite test coverage |
-| Enterprise client or internal test account for white-label testing | Product / Sales | T25 | The white-label feature requires an Enterprise-plan workspace to fully exercise; a test Enterprise account must be provisioned in staging before T25 acceptance criteria can be signed off |
-| Resend custom domain verified per Enterprise team | DevOps | T25 | White-label outbound emails require a Resend sending domain separate from the default `dotly.one` sending domain; each Enterprise team needs a verified Resend domain or a shared branded domain configured |
-| Stripe test mode active with test products matching Pro / Business plans | DevOps | T29 | The Playwright billing E2E test requires Stripe test mode keys and the correct test price IDs to be set in the staging environment; mismatched IDs cause silent checkout failures |
-| Staging environment with seeded test data | DevOps | T29, T30 | All E2E tests and the Lighthouse CI job require a running staging environment with the seeded `test-user` card and associated analytics events |
+| Dependency                                                                     | Owner              | Needed by | Notes                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------ | ------------------ | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vercel API token + Project ID (`VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`)        | DevOps / Team lead | T23       | Required to add custom domains to the Vercel project programmatically and provision SSL; without this, SSL provisioning falls back to the Railway + Let's Encrypt path                                      |
+| Expo NFC entitlement for iOS (`com.apple.developer.nfc.readersession.formats`) | Mobile lead        | T24       | Must be added to `app.json` and an EAS build must be triggered before NFC can be tested on a physical iOS device; iOS Simulator does not support NFC                                                        |
+| Physical NFC tags (NTAG213/215/216) for testing                                | QA                 | T24       | Cannot be tested on emulators; at least 5 physical blank NFC tags required for write and overwrite test coverage                                                                                            |
+| Enterprise client or internal test account for white-label testing             | Product / Sales    | T25       | The white-label feature requires an Enterprise-plan workspace to fully exercise; a test Enterprise account must be provisioned in staging before T25 acceptance criteria can be signed off                  |
+| Resend custom domain verified per Enterprise team                              | DevOps             | T25       | White-label outbound emails require a Resend sending domain separate from the default `dotly.one` sending domain; each Enterprise team needs a verified Resend domain or a shared branded domain configured |
+| Stripe test mode active with test products matching Pro / Business plans       | DevOps             | T29       | The Playwright billing E2E test requires Stripe test mode keys and the correct test price IDs to be set in the staging environment; mismatched IDs cause silent checkout failures                           |
+| Staging environment with seeded test data                                      | DevOps             | T29, T30  | All E2E tests and the Lighthouse CI job require a running staging environment with the seeded `test-user` card and associated analytics events                                                              |
 
 ---
 
@@ -1003,4 +1056,4 @@ The phase is complete when all of the following are true:
 
 ---
 
-*Phase 4 of 5 — Dotly.one / Prev: Phase 3 — Growth Features | Next: Phase 5 — Production Hardening & AI*
+_Phase 4 of 5 — Dotly.one / Prev: Phase 3 — Growth Features | Next: Phase 5 — Production Hardening & AI_

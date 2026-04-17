@@ -1,6 +1,6 @@
 import { CONTACT_STAGES, DEAL_STAGES } from '@dotly/types'
 import { formatDate as tzFormatDate } from '@/lib/tz'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import type { ContactTask } from './types'
 
 export const STAGES = CONTACT_STAGES

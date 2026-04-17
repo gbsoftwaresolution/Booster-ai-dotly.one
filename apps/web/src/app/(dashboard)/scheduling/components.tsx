@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { StatusNotice } from '@/components/ui/StatusNotice'
 import { SelectField } from '@/components/ui/SelectField'
 import { apiPost, apiPut } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ModalBackdrop } from '@/components/crm/ModalBackdrop'
 import {

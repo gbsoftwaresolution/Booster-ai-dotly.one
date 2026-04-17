@@ -11,7 +11,7 @@ import type {
   CardTemplate,
   VcardPolicy,
 } from '@dotly/types'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet, apiPut, apiPatch } from '@/lib/api'
 
 export interface CardBuilderState {

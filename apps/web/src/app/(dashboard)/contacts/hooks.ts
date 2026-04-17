@@ -5,7 +5,7 @@ import { apiDelete, apiDeleteWithBody, apiGet, apiPatch, ApiError, isApiError } 
 import { readCachedData, saveCachedData } from '@/lib/pwa/cache'
 import { incrementPwaMetric } from '@/lib/pwa/metrics'
 import { enqueueContactBulkStageMutation } from '@/lib/pwa/queue'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import type {
   CardSummary,
   ConfirmDialogState,

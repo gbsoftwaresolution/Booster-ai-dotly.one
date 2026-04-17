@@ -21,8 +21,6 @@
     "@dotly/types": "workspace:*",
     "@dotly/ui": "workspace:*",
     "@sentry/nextjs": "^10.47.0",
-    "@supabase/ssr": "^0.3.0",
-    "@supabase/supabase-js": "^2.43.5",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dompurify": "^3.3.3",

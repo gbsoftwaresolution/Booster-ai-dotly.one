@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, GripVertical, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { apiGet, apiPut } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 
 // ── Types matching the backend ────────────────────────────────────────────────
 

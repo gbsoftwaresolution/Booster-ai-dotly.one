@@ -14,6 +14,7 @@ Dotly.one is a well-architected digital business card platform with a thoughtful
 There are **3 CRITICAL blockers** that must be resolved before any public launch, **25+ HIGH issues** that create meaningful security and reliability risk, and over **40 MEDIUM/LOW** findings that should be addressed in the weeks following initial launch.
 
 The critical blockers are:
+
 1. Real production secrets exist in `.env` files on disk (all must be rotated before any git push)
 2. `next@14.2.4` has an explicit security vulnerability notice in the lock file
 3. The mobile app uses `enterpriseProvisioning: "universal"` for App Store distribution (Apple TOS violation — will result in certificate revocation)
@@ -28,16 +29,17 @@ The critical blockers are:
 
 Live, working credentials are present in `.env` files on disk:
 
-| Credential | File | Risk |
-|---|---|---|
-| Mailgun API key (`7c16b119...`) | `apps/api/.env` | Full email send/receive access |
-| R2 Access Key + Secret | `apps/api/.env` | Full object storage read/write/delete |
-| BoosterAI Internal API Key | `apps/api/.env` | Internal billing API access |
-| BoosterAI Dotly API Key | `apps/api/.env` | Partner billing access |
-| Supabase URL + Anon Key | `apps/api/.env`, `.env`, `apps/web/.env.local` | Database row-level access |
-| Supabase JWT Secret (ES256 JWK) | `apps/api/.env` | JWT verification key material |
+| Credential                      | File                    | Risk                                  |
+| ------------------------------- | ----------------------- | ------------------------------------- |
+| Mailgun API key (`7c16b119...`) | `apps/api/.env`         | Full email send/receive access        |
+| R2 Access Key + Secret          | `apps/api/.env`         | Full object storage read/write/delete |
+| BoosterAI Internal API Key      | `apps/api/.env`         | Internal billing API access           |
+| BoosterAI Dotly API Key         | `apps/api/.env`         | Partner billing access                |
+| Auth JWT Secret                 | `apps/api/.env`, `.env` | First-party JWT signing key material  |
+| Google Auth Client Secret       | `apps/api/.env`, `.env` | Google sign-in impersonation risk     |
 
 **Actions (in order):**
+
 1. Run `git log --all --full-history -- apps/api/.env .env apps/web/.env.local` — if any of these were ever committed, purge with `git-filter-repo` immediately
 2. Rotate **every credential** listed above regardless of git history findings
 3. Move all secrets to Railway environment variables (API), Vercel environment variables (web), and EAS Secrets (mobile) — never store real values in `.env` files in the repository
@@ -49,7 +51,7 @@ Live, working credentials are present in `.env` files on disk:
 
 **File:** `apps/web/package.json` — `"next": "14.2.4"` (exact pin)
 
-The pnpm lock file carries an official `deprecated` notice on this version: *"This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11 for more details."*
+The pnpm lock file carries an official `deprecated` notice on this version: _"This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11 for more details."_
 
 **Action:** Upgrade to the latest patched `14.2.x` release (>=14.2.30 per the advisory), or migrate to Next.js 15.x. Also update `"eslint-config-next": "14.2.4"` to match.
 
@@ -74,11 +76,13 @@ The pnpm lock file carries an official `deprecated` notice on this version: *"Th
 Redis port `6379` is bound to `0.0.0.0` (all interfaces) with no password (`--requirepass` not set). Any host or network peer that can reach port 6379 can read and write the rate-limit counters and BullMQ job queues.
 
 **Fix:**
+
 ```yaml
 command: redis-server --appendonly yes --requirepass <STRONG_PASSWORD>
 ports:
-  - "127.0.0.1:6379:6379"
+  - '127.0.0.1:6379:6379'
 ```
+
 Add `REDIS_URL=redis://:password@localhost:6379` to consuming services.
 
 ---
@@ -124,6 +128,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001'
 If `EXPO_PUBLIC_API_URL` is unset in a production EAS build, all API calls go to plaintext HTTP localhost and silently fail — or worse, succeed against a different service on the device. Tokens and PII would travel over unencrypted HTTP.
 
 **Fix:**
+
 ```typescript
 const API_URL = process.env.EXPO_PUBLIC_API_URL
 if (!API_URL || !API_URL.startsWith('https://')) {
@@ -171,7 +176,7 @@ The mobile client sends `mimeType` verbatim to the server. If the server trusts 
 
 ### H-09 | No Certificate Pinning on Any Mobile Network Call
 
-**Files:** `apps/mobile/lib/api.ts`, `apps/mobile/lib/supabase.ts`
+**Files:** `apps/mobile/lib/api.ts`, `apps/mobile/lib/auth.ts`
 
 The mobile app is vulnerable to MITM on devices with a custom root certificate (Burp Suite, corporate MDM, jailbroken devices).
 
@@ -186,6 +191,7 @@ The mobile app is vulnerable to MITM on devices with a custom root certificate (
 Rate limits reset on every pod restart and are not shared across horizontal API replicas.
 
 **Fix:**
+
 ```typescript
 ThrottlerModule.forRoot({
   throttlers: [...],
@@ -202,6 +208,7 @@ ThrottlerModule.forRoot({
 Plain `===` comparison for API key verification is vulnerable to timing attacks.
 
 **Fix:** Use `crypto.timingSafeEqual()`:
+
 ```typescript
 import { timingSafeEqual } from 'crypto'
 const a = Buffer.from(provided)
@@ -283,6 +290,7 @@ In CI, `pnpm install` would install `4.x`, not `6.x`, silently breaking any v5/v
 The iOS info plist does not declare `NSPhotoLibraryUsageDescription`, but the app calls `ImagePicker.requestMediaLibraryPermissionsAsync()` in the create-card and edit-card flows. iOS will crash the app when requesting photo library access.
 
 **Fix:** Add to `app.json` under `ios.infoPlist`:
+
 ```json
 "NSPhotoLibraryUsageDescription": "Used to select a profile photo for your digital card"
 ```
@@ -291,11 +299,11 @@ The iOS info plist does not declare `NSPhotoLibraryUsageDescription`, but the ap
 
 ### H-19 | Email Confirmation Deep Link Not Handled in Mobile App
 
-**File:** `apps/mobile/lib/supabase.ts`, `apps/mobile/app/_layout.tsx`
+**File:** `apps/mobile/lib/auth.ts`, `apps/mobile/app/_layout.tsx`
 
-`detectSessionInUrl: false` is set (correct for React Native), but no deep link handler exists to exchange the email confirmation token. Email confirmation silently fails — users remain unconfirmed indefinitely.
+The mobile app must handle password reset and Google sign-in deep links consistently or users can land in a dead-end auth state.
 
-**Fix:** Add a `useURL()` listener in `_layout.tsx` and call `supabase.auth.exchangeCodeForSession(url)` for the confirmation URL.
+**Fix:** Keep the `_layout.tsx` deep-link listener aligned with the first-party auth callback payload format and cover it with end-to-end tests.
 
 ---
 
@@ -326,6 +334,7 @@ Sentry is initialized with `enabled: !!SENTRY_DSN`, so it is disabled in product
 The web deployment races against the API container restart after migrations. A schema-breaking change could cause a brief period of incompatibility.
 
 **Fix:**
+
 ```yaml
 deploy-web:
   needs: [ci-gate, deploy-api]
@@ -347,79 +356,82 @@ The owner can call `setMonthlyPrice` after a user's `approve()` transaction appe
 
 ### Infrastructure & CI/CD
 
-| ID | Finding | File |
-|---|---|---|
-| M-01 | No rollback step after failed deployment | `.github/workflows/deploy.yml` |
-| M-02 | No Dockerfile — Railway uses Nixpacks with no pinned base image or non-root user | `apps/api/Procfile` |
-| M-03 | No staging environment in CI pipeline | `.github/workflows/deploy.yml` |
-| M-04 | No secret-scanning step in CI | `.github/workflows/ci.yml` |
-| M-05 | No `pnpm audit` step in CI | `.github/workflows/ci.yml` |
-| M-06 | EAS production build auto-submits to stores without human approval gate | `.github/workflows/eas-build.yml` |
-| M-07 | Load tests use `continue-on-error: true` — failures are not enforced | `.github/workflows/load-test.yml` |
-| M-08 | No `railway.toml` — health check path not declared as code | (missing) |
-| M-09 | No database backup strategy documented | `infrastructure/` |
-| M-10 | Log aggregation is console-only — logs lost on pod restart | `apps/api/src/common/logger/logger.module.ts` |
+| ID   | Finding                                                                          | File                                          |
+| ---- | -------------------------------------------------------------------------------- | --------------------------------------------- |
+| M-01 | No rollback step after failed deployment                                         | `.github/workflows/deploy.yml`                |
+| M-02 | No Dockerfile — Railway uses Nixpacks with no pinned base image or non-root user | `apps/api/Procfile`                           |
+| M-03 | No staging environment in CI pipeline                                            | `.github/workflows/deploy.yml`                |
+| M-04 | No secret-scanning step in CI                                                    | `.github/workflows/ci.yml`                    |
+| M-05 | No `pnpm audit` step in CI                                                       | `.github/workflows/ci.yml`                    |
+| M-06 | EAS production build auto-submits to stores without human approval gate          | `.github/workflows/eas-build.yml`             |
+| M-07 | Load tests use `continue-on-error: true` — failures are not enforced             | `.github/workflows/load-test.yml`             |
+| M-08 | No `railway.toml` — health check path not declared as code                       | (missing)                                     |
+| M-09 | No database backup strategy documented                                           | `infrastructure/`                             |
+| M-10 | Log aggregation is console-only — logs lost on pod restart                       | `apps/api/src/common/logger/logger.module.ts` |
 
 ### API
 
-| ID | Finding | File |
-|---|---|---|
-| M-11 | `SUPABASE_SERVICE_ROLE_KEY` is `@IsOptional()` — account deletion does not revoke sessions if missing | `apps/api/src/config/env.validation.ts` |
-| M-12 | `SentryExceptionFilter` drops all 4xx errors — auth failures not captured | `apps/api/src/common/filters/sentry-exception.filter.ts` |
-| M-13 | No Prisma connection pool limits — can exhaust connections under horizontal scale | `apps/api/src/prisma/prisma.service.ts` |
-| M-14 | Analytics flush lock is 25s but flush could exceed this under load | `apps/api/src/analytics/analytics.service.ts` |
-| M-15 | `email.service.ts` logs full recipient email address in SES branch (PII leak) | `apps/api/src/email/email.service.ts` line 102 |
+| ID   | Finding                                                                               | File                                                       |
+| ---- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| M-11 | Account deletion must revoke local refresh sessions and clear all auth state reliably | `apps/api/src/auth`, `apps/api/src/users/users.service.ts` |
+| M-12 | `SentryExceptionFilter` drops all 4xx errors — auth failures not captured             | `apps/api/src/common/filters/sentry-exception.filter.ts`   |
+| M-13 | No Prisma connection pool limits — can exhaust connections under horizontal scale     | `apps/api/src/prisma/prisma.service.ts`                    |
+| M-14 | Analytics flush lock is 25s but flush could exceed this under load                    | `apps/api/src/analytics/analytics.service.ts`              |
+| M-15 | `email.service.ts` logs full recipient email address in SES branch (PII leak)         | `apps/api/src/email/email.service.ts` line 102             |
 
 ### Mobile
 
-| ID | Finding | File |
-|---|---|---|
-| M-16 | EAS Project ID is a placeholder — OTA updates and push notifications will fail | `apps/mobile/app.json` line 42 |
-| M-17 | Apple submission IDs are placeholders — `eas submit` will fail | `apps/mobile/eas.json` lines 38–41 |
-| M-18 | Deprecated `Clipboard` API from React Native core (removed in RN 0.59) | `apps/mobile/app/card/[id].tsx` line 91 |
-| M-19 | No input length/format validation on any user-facing text field | `sign-up.tsx`, `create-card.tsx`, `edit/[id].tsx` |
-| M-20 | `Linking.openURL` called with unsanitized server-supplied email/phone | `apps/mobile/app/contact/[id].tsx` lines 244, 253 |
-| M-21 | `app.json privacy: "public"` exposes OTA update bundles publicly on expo.dev | `apps/mobile/app.json` line 10 |
-| M-22 | Store metadata describes features not yet implemented (App Store rejection risk) | `apps/mobile/STORE_METADATA.md` |
+| ID   | Finding                                                                          | File                                              |
+| ---- | -------------------------------------------------------------------------------- | ------------------------------------------------- |
+| M-16 | EAS Project ID is a placeholder — OTA updates and push notifications will fail   | `apps/mobile/app.json` line 42                    |
+| M-17 | Apple submission IDs are placeholders — `eas submit` will fail                   | `apps/mobile/eas.json` lines 38–41                |
+| M-18 | Deprecated `Clipboard` API from React Native core (removed in RN 0.59)           | `apps/mobile/app/card/[id].tsx` line 91           |
+| M-19 | No input length/format validation on any user-facing text field                  | `sign-up.tsx`, `create-card.tsx`, `edit/[id].tsx` |
+| M-20 | `Linking.openURL` called with unsanitized server-supplied email/phone            | `apps/mobile/app/contact/[id].tsx` lines 244, 253 |
+| M-21 | `app.json privacy: "public"` exposes OTA update bundles publicly on expo.dev     | `apps/mobile/app.json` line 10                    |
+| M-22 | Store metadata describes features not yet implemented (App Store rejection risk) | `apps/mobile/STORE_METADATA.md`                   |
 
 ### Smart Contracts
 
-| ID | Finding | File |
-|---|---|---|
-| M-23 | Cancelled subscription retains stale `expiresAt` — off-chain systems may misread state | `DotlySubscription.sol` lines 60–64 |
-| M-24 | Plan switching allows downgrade exploit — user can overwrite paid plan at lower tier price | `DotlySubscription.sol` lines 39–58 |
-| M-25 | Non-upgradeable contract — bugs require full redeployment and user migration | `DotlySubscription.sol` |
-| M-26 | 30-day month approximation loses 5 days per year vs. calendar billing | `DotlySubscription.sol` lines 48–49 |
-| M-27 | No `Pausable` circuit breaker — cannot halt subscriptions during an incident | `DotlySubscription.sol` |
-| M-28 | Only 4 happy-path test cases — no boundary, error, or adversarial coverage | `contracts/test/DotlySubscription.ts` |
-| M-29 | Slither and Mythril not run — checklist items marked incomplete | `contracts/SECURITY_AUDIT.md` |
+| ID   | Finding                                                                                    | File                                  |
+| ---- | ------------------------------------------------------------------------------------------ | ------------------------------------- |
+| M-23 | Cancelled subscription retains stale `expiresAt` — off-chain systems may misread state     | `DotlySubscription.sol` lines 60–64   |
+| M-24 | Plan switching allows downgrade exploit — user can overwrite paid plan at lower tier price | `DotlySubscription.sol` lines 39–58   |
+| M-25 | Non-upgradeable contract — bugs require full redeployment and user migration               | `DotlySubscription.sol`               |
+| M-26 | 30-day month approximation loses 5 days per year vs. calendar billing                      | `DotlySubscription.sol` lines 48–49   |
+| M-27 | No `Pausable` circuit breaker — cannot halt subscriptions during an incident               | `DotlySubscription.sol`               |
+| M-28 | Only 4 happy-path test cases — no boundary, error, or adversarial coverage                 | `contracts/test/DotlySubscription.ts` |
+| M-29 | Slither and Mythril not run — checklist items marked incomplete                            | `contracts/SECURITY_AUDIT.md`         |
 
 ### Dependencies
 
-| ID | Finding | Package |
-|---|---|---|
-| M-30 | `@xmldom/xmldom@0.7.13` — deprecated with "critical issues" notice | Transitive via Expo |
-| M-31 | `path-to-regexp@0.1.13` — CVE-2024-45296 ReDoS via Express | Transitive via NestJS |
-| M-32 | `@nestjs/bull@11` vs `@nestjs/common@10` major version mismatch | `apps/api` |
-| M-33 | `@supabase/ssr@0.3.0` — significantly outdated SSR auth adapter (current: 0.6.x) | `apps/web` |
-| M-34 | Expo SDK 55 module packages (`expo-device`, `expo-image-picker`, `expo-notifications`) used with SDK 51 core | `apps/mobile` |
-| M-35 | `eslint@8.57.1` — officially deprecated / EOL | `apps/web`, `apps/mobile`, `packages/config` |
-| M-36 | Two TypeScript versions in build toolchain (`5.7.2` and `5.9.3`) | Transitive tooling |
+| ID   | Finding                                                                                                      | Package                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| M-30 | `@xmldom/xmldom@0.7.13` — deprecated with "critical issues" notice                                           | Transitive via Expo                          |
+| M-31 | `path-to-regexp@0.1.13` — CVE-2024-45296 ReDoS via Express                                                   | Transitive via NestJS                        |
+| M-32 | `@nestjs/bull@11` vs `@nestjs/common@10` major version mismatch                                              | `apps/api`                                   |
+| M-33 | Web auth/session flow should be covered by end-to-end tests after the first-party auth migration             | `apps/web`                                   |
+| M-34 | Expo SDK 55 module packages (`expo-device`, `expo-image-picker`, `expo-notifications`) used with SDK 51 core | `apps/mobile`                                |
+| M-35 | `eslint@8.57.1` — officially deprecated / EOL                                                                | `apps/web`, `apps/mobile`, `packages/config` |
+| M-36 | Two TypeScript versions in build toolchain (`5.7.2` and `5.9.3`)                                             | Transitive tooling                           |
 
 ---
 
 ## LOW — Address in First Quarter
 
 ### API
+
 - `SentryExceptionFilter` only captures 500+ errors — 4xx auth failures are silently dropped
 - No request ID / correlation ID in error responses
 - `HealthModule` does not import `RedisModule` — fragile dependency resolution
 
 ### Web
+
 - Missing `Strict-Transport-Security` (HSTS) header in `vercel.json`
 - Missing `Content-Security-Policy` header in `vercel.json`
 
 ### Mobile
+
 - `expo@~51.0.0` is 39 patch versions behind (latest: 51.0.39)
 - Email confirmation deep link not handled (auth flow broken)
 - `NfcManager.start()` called on every write instead of once at init
@@ -430,6 +442,7 @@ The owner can call `setMonthlyPrice` after a user's `approve()` transaction appe
 - Push notification `contactId` not validated before routing
 
 ### Smart Contracts
+
 - Floating `^0.8.20` pragma — lock to `0.8.20` for production
 - No `FundsWithdrawn` event on `withdrawUSDC`
 - ENTERPRISE plan has misleading error message when price is zero
@@ -437,6 +450,7 @@ The owner can call `setMonthlyPrice` after a user's `approve()` transaction appe
 - Hardhat local network uses `address(1)` placeholder for USDC
 
 ### Dependencies
+
 - `jsonwebtoken` duplicated at `9.0.2` and `9.0.3` — add `pnpm.overrides`
 - `lodash` duplicated at `4.17.21` and `4.18.1` — add `pnpm.overrides`
 - `glob` present at 7 deprecated versions — transitive, address via toolchain upgrades
@@ -451,23 +465,23 @@ The owner can call `setMonthlyPrice` after a user's `approve()` transaction appe
 
 The following were found to be correctly and carefully implemented:
 
-| Area | Implementation |
-|---|---|
-| JWT Security | Algorithm pinning (ES256 vs HS256), no `ignoreExpiration`, placeholder detection in env validation |
-| Rate Limiting | ThrottlerGuard applied before JwtAuthGuard — correct ordering |
-| File Upload Validation | Magic-byte (libmagic) validation on avatar uploads — rejects mismatched MIME types |
-| SSRF Protection | `assertSafeUrl()` guard applied to custom domain and brand config URL fields |
-| Input Validation | `class-validator` DTOs throughout the API with documented max lengths |
-| Injection Prevention | Log injection sanitization in `AuditService`; email header injection prevention (stripCrLf, escHtml) |
-| PII Handling | Winston logger redacts PII in production; vCard Content-Disposition uses DB-validated handle |
-| Transaction Safety | Serializable transaction for plan-limit check on card creation (prevents TOCTOU race) |
-| GDPR | Export and erasure endpoints with transaction-atomic deletion |
-| Team Safety | Last-admin protection; invite email verification (email must match invite) |
-| Distributed Systems | Distributed lock for analytics flush cron prevents multi-pod double-flush |
-| Headers | Helmet CSP, strict CORS allowlist, `trust proxy: 1`, 8MB body size limit |
-| Health | Health endpoint does not expose uptime/timestamp fingerprinting data |
-| Swagger | Disabled in production |
-| Contract | `nonReentrant` guard on `subscribe()` (highest-value attack surface); `usdc` is `immutable` |
+| Area                   | Implementation                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| JWT Security           | Algorithm pinning (ES256 vs HS256), no `ignoreExpiration`, placeholder detection in env validation   |
+| Rate Limiting          | ThrottlerGuard applied before JwtAuthGuard — correct ordering                                        |
+| File Upload Validation | Magic-byte (libmagic) validation on avatar uploads — rejects mismatched MIME types                   |
+| SSRF Protection        | `assertSafeUrl()` guard applied to custom domain and brand config URL fields                         |
+| Input Validation       | `class-validator` DTOs throughout the API with documented max lengths                                |
+| Injection Prevention   | Log injection sanitization in `AuditService`; email header injection prevention (stripCrLf, escHtml) |
+| PII Handling           | Winston logger redacts PII in production; vCard Content-Disposition uses DB-validated handle         |
+| Transaction Safety     | Serializable transaction for plan-limit check on card creation (prevents TOCTOU race)                |
+| GDPR                   | Export and erasure endpoints with transaction-atomic deletion                                        |
+| Team Safety            | Last-admin protection; invite email verification (email must match invite)                           |
+| Distributed Systems    | Distributed lock for analytics flush cron prevents multi-pod double-flush                            |
+| Headers                | Helmet CSP, strict CORS allowlist, `trust proxy: 1`, 8MB body size limit                             |
+| Health                 | Health endpoint does not expose uptime/timestamp fingerprinting data                                 |
+| Swagger                | Disabled in production                                                                               |
+| Contract               | `nonReentrant` guard on `subscribe()` (highest-value attack surface); `usdc` is `immutable`          |
 
 ---
 
@@ -518,4 +532,4 @@ Add to root `package.json` to address transitive dependency risks:
 
 ---
 
-*This report was generated by automated static analysis and code review. Manual penetration testing and a formal smart contract audit by a certified auditing firm are strongly recommended before handling real user data or on-chain funds.*
+_This report was generated by automated static analysis and code review. Manual penetration testing and a formal smart contract audit by a certified auditing firm are strongly recommended before handling real user data or on-chain funds._

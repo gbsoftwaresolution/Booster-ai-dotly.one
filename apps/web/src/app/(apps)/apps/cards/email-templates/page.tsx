@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { useUserTimezone } from '@/hooks/useUserLocale'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import type { ItemsResponse } from '@dotly/types'
 
 import {

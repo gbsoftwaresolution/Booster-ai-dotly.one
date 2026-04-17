@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { signOut } from '@/lib/auth/client'
 
 function clearClientAuthArtifacts() {
   if (typeof window === 'undefined') return
@@ -31,8 +31,7 @@ export function useSignOut() {
   const handleSignOut = async () => {
     setSigningOut(true)
     try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
+      await signOut()
       clearClientAuthArtifacts()
       router.push('/auth')
       router.refresh()

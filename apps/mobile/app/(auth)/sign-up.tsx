@@ -10,7 +10,8 @@ import {
   ScrollView,
 } from 'react-native'
 import { Link } from 'expo-router'
-import { supabase } from '../../lib/supabase'
+import { apiPost } from '../../lib/api'
+import { setSession } from '../../lib/auth'
 
 export default function SignUpScreen() {
   const [name, setName] = useState('')
@@ -39,18 +40,16 @@ export default function SignUpScreen() {
 
     setLoading(true)
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const session = await apiPost<{
+        accessToken: string
+        refreshToken: string
+      }>('/auth/sign-up', {
+        name: name.trim(),
         email: email.trim(),
         password,
-        options: {
-          data: { name: name.trim() },
-        },
       })
-      if (signUpError) {
-        setError(signUpError.message)
-      } else {
-        setSuccess(true)
-      }
+      await setSession(session)
+      setSuccess(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
     } finally {

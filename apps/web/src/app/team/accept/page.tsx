@@ -5,7 +5,7 @@ import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Handshake, X } from 'lucide-react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiPost, isApiError } from '@/lib/api'
 
 export const dynamic = 'force-dynamic'

@@ -6,7 +6,8 @@ import { absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = createMarketingMetadata({
   title: 'Privacy Policy',
-  description: 'Read the Dotly.one privacy policy and learn how data is collected, used, retained, and protected across the platform.',
+  description:
+    'Read the Dotly.one privacy policy and learn how data is collected, used, retained, and protected across the platform.',
   path: '/privacy',
   keywords: ['privacy policy', 'data protection', 'personal data'],
 })
@@ -105,7 +106,7 @@ export default function PrivacyPage() {
             <ul>
               <li>
                 <strong>Service providers:</strong> hosting (Railway, Vercel), database
-                (Supabase/PostgreSQL), email delivery (Amazon SES), error monitoring (Sentry). These
+                (PostgreSQL), email delivery (Amazon SES), error monitoring (Sentry). These
                 providers process data only on our instructions.
               </li>
               <li>

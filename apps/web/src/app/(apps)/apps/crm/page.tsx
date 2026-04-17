@@ -17,7 +17,7 @@ import {
   Calendar,
   Zap,
 } from 'lucide-react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { StatusNotice } from '@/components/ui/StatusNotice'

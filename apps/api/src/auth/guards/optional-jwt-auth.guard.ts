@@ -3,7 +3,7 @@ import { AuthGuard } from '@nestjs/passport'
 
 @Injectable()
 export class OptionalJwtAuthGuard implements CanActivate {
-  private readonly delegate = new (AuthGuard('supabase-jwt'))()
+  private readonly delegate = new (AuthGuard('jwt'))()
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context

@@ -30,6 +30,7 @@ in Settings on the web app. Apply a 14-day Pro trial on sign-up with no credit c
 **Steps:**
 
 _Stripe product & price configuration_
+
 - [ ] In the Stripe dashboard (test mode), create four products:
   - `Dotly Free` — no price attached (plan tracked in DB only)
   - `Dotly Pro` — monthly price $9.00/mo (`price_pro_monthly`), annual price $90.00/yr
@@ -45,9 +46,10 @@ _Stripe product & price configuration_
   STRIPE_PRICE_BUSINESS_ANNUAL=
   ```
 - [ ] Add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PUBLISHABLE_KEY` to
-  `apps/api/.env.example` and `apps/web/.env.example`
+      `apps/api/.env.example` and `apps/web/.env.example`
 
 _NestJS — BillingModule_
+
 - [ ] Create `apps/api/src/billing/billing.module.ts` importing `StripeService`, `BillingController`
 - [ ] Create `apps/api/src/billing/stripe.service.ts`:
   - Initialize `stripe` client using `STRIPE_SECRET_KEY` via `ConfigService`
@@ -70,6 +72,7 @@ _NestJS — BillingModule_
     returns `400` if signature verification fails
 
 _Webhook event handlers_
+
 - [ ] Handle `checkout.session.completed`:
   - Extract `subscription` and `customer` from the session object
   - Upsert `Subscription` record: set `stripeSubId`, `plan` (derive from price metadata),
@@ -85,9 +88,10 @@ _Webhook event handlers_
   - Set `Subscription.status: 'past_due'`
   - Log the failure; trigger `EmailService.sendPaymentFailedEmail()` (see T20)
 - [ ] All webhook handlers run inside a try/catch; log errors to Sentry; always return `200` to
-  Stripe to prevent retries on non-critical processing errors
+      Stripe to prevent retries on non-critical processing errors
 
 _PlanGuard_
+
 - [ ] Create `apps/api/src/auth/plan.guard.ts`:
   - Decorator `@RequirePlan(...plans: Plan[])` — attaches metadata listing the minimum required plans
   - `PlanGuard` reads `request.user.plan` and compares against the required plan list
@@ -96,16 +100,18 @@ _PlanGuard_
   - `ENTERPRISE` always passes all plan gates
 - [ ] Register `PlanGuard` as a global guard alongside `JwtAuthGuard` in `AppModule`
 - [ ] Apply `@RequirePlan(Plan.PRO, Plan.BUSINESS, Plan.ENTERPRISE)` to: analytics history > 7 days,
-  lead export, CRM, team features (documented inline at each controller)
+      lead export, CRM, team features (documented inline at each controller)
 
 _14-day trial_
-- [ ] On user sign-up (`POST /auth/register` or Supabase webhook), create a `Subscription` record
-  with `plan: PRO`, `status: 'trialing'`, `trialEndsAt: now + 14 days`
+
+- [ ] On user sign-up (`POST /auth/register` or equivalent app flow), create a `Subscription` record
+      with `plan: PRO`, `status: 'trialing'`, `trialEndsAt: now + 14 days`
 - [ ] `PlanGuard` treats `status: 'trialing'` as equivalent to the trial plan for gate checks
 - [ ] When `customer.subscription.updated` fires with `status: 'trialing'` → `'active'` or
-  `'cancelled'`, update the record accordingly
+      `'cancelled'`, update the record accordingly
 
 _Web — Pricing page_
+
 - [ ] Create `apps/web/app/(marketing)/pricing/page.tsx`:
   - Full-page plan comparison table with columns: Free / Pro / Business / Enterprise
   - Feature rows: cards, analytics history, lead capture, CRM, team management, custom domain,
@@ -119,6 +125,7 @@ _Web — Pricing page_
   - Annual billing note: "Save 2 months — billed annually"
 
 _Web — Billing settings_
+
 - [ ] Create `apps/web/app/(dashboard)/dashboard/settings/billing/page.tsx`:
   - Current plan badge (Free / Pro / Business / Enterprise) with trial countdown if applicable
   - Next billing date (from `Subscription.currentPeriodEnd`)
@@ -132,22 +139,24 @@ _Web — Billing settings_
   ```
 
 _Test mode / live mode_
+
 - [ ] All Stripe keys in development point to Stripe test mode
 - [ ] Add note in `docs/ENVIRONMENT.md` to swap to live keys before production deploy
 - [ ] Use Stripe CLI (`stripe listen --forward-to localhost:3001/billing/webhook`) for local
-  webhook testing and document the command in `docs/ENVIRONMENT.md`
+      webhook testing and document the command in `docs/ENVIRONMENT.md`
 
 **Acceptance Criteria:**
+
 - [ ] `POST /billing/checkout` with a valid JWT and a Pro monthly price ID returns a Stripe
-  Checkout URL and redirects correctly in the browser
+      Checkout URL and redirects correctly in the browser
 - [ ] Completing the Stripe Checkout flow (test card `4242 4242 4242 4242`) updates the user's plan
-  to `PRO` and creates a `Subscription` record in the database
+      to `PRO` and creates a `Subscription` record in the database
 - [ ] `POST /billing/portal` returns a valid Stripe Customer Portal URL for the authenticated user
 - [ ] `POST /billing/webhook` with an invalid signature returns `400 Bad Request`
 - [ ] `POST /billing/webhook` for `customer.subscription.deleted` downgrades the user to `FREE`
 - [ ] `POST /billing/webhook` for `invoice.payment_failed` sets subscription status to `past_due`
 - [ ] A Free-plan user calling an endpoint decorated with `@RequirePlan(Plan.PRO)` receives
-  `403 Forbidden` with the upgrade message
+      `403 Forbidden` with the upgrade message
 - [ ] A Pro-plan user passes the same guard
 - [ ] A new user signing up has a 14-day Pro trial automatically created
 - [ ] The `/pricing` page renders correctly with monthly/annual toggle and correct prices
@@ -169,6 +178,7 @@ Analytics history depth is gated by plan via `PlanGuard`.
 **Steps:**
 
 _API — analytics query endpoint_
+
 - [ ] Add `GET /cards/:id/analytics` to `CardsController` (or a dedicated `AnalyticsController`):
   - Query params: `from` (ISO date), `to` (ISO date), `metrics[]` (array: `views`, `clicks`,
     `devices`, `countries`, `referrers`, `leads`)
@@ -193,18 +203,22 @@ _API — analytics query endpoint_
       "devices": [{ "type": "mobile", "count": 0 }],
       "countries": [{ "country": "US", "views": 0 }],
       "referrers": [{ "referrer": "linkedin.com", "count": 0 }],
-      "leads": [{ "id": "...", "name": "...", "email": "...", "sourceCard": "...", "createdAt": "..." }]
+      "leads": [
+        { "id": "...", "name": "...", "email": "...", "sourceCard": "...", "createdAt": "..." }
+      ]
     }
     ```
   - `uniqueVisitors` is estimated as `COUNT(DISTINCT ipHash)` within the date range
   - `conversionRate` is computed as `(totalLeads / totalViews) * 100`, rounded to 2 decimal places
 
 _Web — route and layout_
+
 - [ ] Create `apps/web/app/(dashboard)/dashboard/analytics/page.tsx` as a client component
 - [ ] Install `recharts` (or `@tremor/react`) in `apps/web`: `pnpm add recharts`
 - [ ] Create `apps/web/src/components/analytics/` directory for all chart components
 
 _Date range picker_
+
 - [ ] Create `DateRangePicker` component:
   - Preset buttons: **7 days**, **30 days**, **90 days**
   - Custom range: two date inputs (from / to) with calendar popover using Shadcn/UI `Popover` and
@@ -214,12 +228,14 @@ _Date range picker_
   - State held in URL search params (`?from=&to=`) so ranges are shareable
 
 _Card selector_
+
 - [ ] Create `CardSelector` dropdown component:
   - Fetches the user's cards from `GET /cards` (existing endpoint from Phase 2)
   - Renders as Shadcn/UI `Select` with card handle and name
   - Switching card updates URL param `?cardId=` and refetches analytics
 
 _Stats summary row_
+
 - [ ] Create `AnalyticsSummaryRow` component:
   - Five stat cards in a horizontal row: Total Views, Unique Visitors, Total Clicks, Total Leads,
     Conversion Rate
@@ -228,6 +244,7 @@ _Stats summary row_
   - Skeleton loading state while data is fetching
 
 _Charts_
+
 - [ ] Create `ViewsSavesLineChart` component:
   - `recharts` `<LineChart>` with two lines: views (primary color) and saves (secondary color)
   - X-axis: dates formatted as `MMM DD`
@@ -252,6 +269,7 @@ _Charts_
   - Country code labels on Y-axis
 
 _Leads table_
+
 - [ ] Create `LeadsTable` component:
   - Columns: Name, Email, Source Card, Date Added
   - Sortable by clicking column headers (client-side sort)
@@ -263,12 +281,14 @@ _Leads table_
   - Empty state: "No leads yet — share your card to start capturing contacts"
 
 _Referrer table_
+
 - [ ] Create `ReferrerTable` component:
   - Columns: Referrer, Count, Percentage of total
   - Top 20 referrers sorted by count descending
   - "Direct / Unknown" row for events with no referrer
 
 _Page assembly_
+
 - [ ] Assemble all components in the analytics page with the following layout:
   ```
   [CardSelector]           [DateRangePicker]
@@ -282,24 +302,25 @@ _Page assembly_
   [LeadsTable (full width)]
   ```
 - [ ] All chart data is loaded in a single `useEffect` call to `GET /cards/:id/analytics` with
-  the selected date range and all metrics requested
+      the selected date range and all metrics requested
 - [ ] Show a full-page skeleton loader while the initial data fetch is in progress
 - [ ] Show an error banner if the fetch fails, with a "Retry" button
 
 **Acceptance Criteria:**
+
 - [ ] `GET /cards/:id/analytics?from=&to=&metrics[]=views,clicks,devices,countries,referrers,leads`
-  returns the correct aggregated JSON for a card with seeded analytics events
+      returns the correct aggregated JSON for a card with seeded analytics events
 - [ ] A Free-plan user requesting analytics with `from` older than 7 days receives `403 Forbidden`
 - [ ] The `/dashboard/analytics` page renders all five stat cards, four charts, leads table, and
-  referrer table without errors
+      referrer table without errors
 - [ ] Switching the date range preset to "30 days" updates all charts with new data
 - [ ] Switching the card selector updates all charts for the newly selected card
 - [ ] The "Export CSV" button is visible but disabled (with tooltip) for Free-plan users
 - [ ] The "Export CSV" button for a Pro-plan user downloads a correctly formatted CSV file
 - [ ] Unique visitor count uses `DISTINCT ipHash` — two events with the same `ipHash` count as
-  one unique visitor
+      one unique visitor
 - [ ] Conversion rate is calculated as `(totalLeads / totalViews) * 100` and displayed as a
-  percentage rounded to 2 decimal places
+      percentage rounded to 2 decimal places
 - [ ] All charts are responsive and render correctly at 375px viewport width (mobile browser)
 - [ ] `turbo build` passes with no TypeScript errors after all analytics code is added
 
@@ -318,6 +339,7 @@ API endpoints.
 **Steps:**
 
 _API — ContactsModule_
+
 - [ ] Create `apps/api/src/contacts/contacts.module.ts`
 - [ ] Create `apps/api/src/contacts/contacts.controller.ts` with:
   - `GET /contacts` — paginated list; query params: `page`, `limit`, `search` (name/email),
@@ -364,12 +386,13 @@ _API — ContactsModule_
   ```
 - [ ] Run `prisma migrate dev --name add_contact_timeline_soft_delete`
 - [ ] Apply `@RequirePlan(Plan.PRO, Plan.BUSINESS, Plan.ENTERPRISE)` to all `/contacts` and
-  `/crm` endpoints — CRM is a Pro+ feature
+      `/crm` endpoints — CRM is a Pro+ feature
 
 _Web — Contact list page_
+
 - [ ] Create `apps/web/app/(dashboard)/dashboard/contacts/page.tsx`
 - [ ] Install `@tanstack/react-table` for table management:
-  `pnpm add @tanstack/react-table`
+      `pnpm add @tanstack/react-table`
 - [ ] Build `ContactsTable` component using TanStack Table:
   - Columns: checkbox, Name (with avatar initials), Email, Phone, Company, Source Card, Date Added,
     Stage (colored badge)
@@ -393,9 +416,10 @@ _Web — Contact list page_
   - Submit calls `POST /contacts`, closes modal on success, refreshes table
 
 _Web — CRM Kanban board_
+
 - [ ] Create `apps/web/app/(dashboard)/dashboard/crm/page.tsx`
 - [ ] Install `@dnd-kit/core` and `@dnd-kit/sortable`:
-  `pnpm add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities`
+      `pnpm add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities`
 - [ ] Build `CrmKanbanBoard` component:
   - Fetches `GET /crm/pipeline` on mount
   - Renders 5 columns: **New**, **Contacted**, **Qualified**, **Closed**, **Lost**
@@ -433,6 +457,7 @@ _Web — CRM Kanban board_
   - Drawer is dismissible via `Escape` key and clicking the overlay
 
 **Acceptance Criteria:**
+
 - [ ] `GET /contacts` returns paginated contacts scoped to the authenticated user
 - [ ] `POST /contacts` creates a contact and returns the new record with a `NEW` stage entry
 - [ ] `PATCH /contacts/:id/stage` updates the stage and appends a `STAGE_CHANGED` timeline event
@@ -440,15 +465,15 @@ _Web — CRM Kanban board_
 - [ ] `GET /crm/pipeline` returns contacts correctly grouped into all 5 stage keys
 - [ ] A Free-plan user calling `GET /contacts` receives `403 Forbidden` with the upgrade message
 - [ ] The `/dashboard/contacts` page renders the contacts table with all columns, sorting,
-  filtering, and pagination working correctly
+      filtering, and pagination working correctly
 - [ ] The bulk "Change Stage" action updates all selected contacts in the database
 - [ ] The bulk "Export CSV" action is gated behind Pro plan with a tooltip for Free users
 - [ ] The "Add Contact" modal creates a contact and it appears in the table without a page refresh
 - [ ] The `/dashboard/crm` Kanban board renders all 5 columns with contact cards
 - [ ] Dragging a contact from "New" to "Contacted" calls `PATCH /contacts/:id/stage` and the card
-  appears in the correct column after the API responds
+      appears in the correct column after the API responds
 - [ ] Dragging a card and receiving an API error rolls back the card to its original column and
-  shows a toast error notification
+      shows a toast error notification
 - [ ] The `ContactDetailDrawer` opens when a Kanban card is clicked
 - [ ] Inline edits to contact fields auto-save via `PUT /contacts/:id` on blur
 - [ ] Notes are auto-saved with a 1-second debounce and show a "Saved" confirmation
@@ -469,6 +494,7 @@ or React Email components. Every email send is non-blocking (fire-and-forget wit
 **Steps:**
 
 _Setup_
+
 - [ ] Install Resend SDK in `apps/api`: `pnpm --filter api add resend`
 - [ ] Add to `apps/api/.env.example`:
   ```
@@ -478,6 +504,7 @@ _Setup_
 - [ ] Register `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in `ConfigModule`
 
 _EmailModule_
+
 - [ ] Create `apps/api/src/email/email.module.ts`:
   - Exports `EmailService` as a global provider so any module can inject it without importing
     `EmailModule` explicitly
@@ -486,7 +513,7 @@ _EmailModule_
   - All send methods are `async` and wrapped in try/catch; errors are logged to Sentry / console
     but never thrown (fire-and-forget — email failure must not break the primary request)
   - Method `sendNewLeadNotification(ownerEmail, ownerName, leadName, leadEmail, cardName,
-    cardUrl)` — sends new lead email to card owner
+cardUrl)` — sends new lead email to card owner
   - Method `sendWelcomeEmail(userEmail, userName)` — sends welcome email on sign-up
   - Method `sendSubscriptionUpgradeEmail(userEmail, userName, newPlan)` — sends upgrade
     confirmation
@@ -495,6 +522,7 @@ _EmailModule_
     warning
 
 _Email templates_
+
 - [ ] Create `apps/api/src/email/templates/` directory with the following HTML template files:
 
 - [ ] `new-lead.html.ts` — exports a function `newLeadTemplate(params)` returning an HTML string:
@@ -526,10 +554,11 @@ _Email templates_
     to the Stripe Customer Portal
 
 _Trigger integrations_
+
 - [ ] In `LeadCaptureService` (created in Phase 2 T13): after a lead is saved to the database,
-  call `EmailService.sendNewLeadNotification(...)` — inject `EmailService` via constructor DI
+      call `EmailService.sendNewLeadNotification(...)` — inject `EmailService` via constructor DI
 - [ ] In `UsersService.createUser()` (called on first sign-in / registration): call
-  `EmailService.sendWelcomeEmail(...)`
+      `EmailService.sendWelcomeEmail(...)`
 - [ ] In `BillingService` webhook handlers (T17):
   - On `customer.subscription.updated` where new status is `active` (upgrade from trial or
     plan change): call `EmailService.sendSubscriptionUpgradeEmail(...)`
@@ -537,24 +566,26 @@ _Trigger integrations_
   - On `invoice.payment_failed`: call `EmailService.sendPaymentFailedEmail(...)`
 
 _Resend domain verification_
+
 - [ ] Document in `docs/ENVIRONMENT.md`: Resend requires `dotly.one` to be added as a verified
-  sending domain in the Resend dashboard with the required DNS records before any emails send
-  from a `@dotly.one` address in production
+      sending domain in the Resend dashboard with the required DNS records before any emails send
+      from a `@dotly.one` address in production
 
 **Acceptance Criteria:**
+
 - [ ] `EmailService` initializes with the Resend client using `RESEND_API_KEY` from environment
 - [ ] Submitting the lead capture form on a public card page triggers a new-lead notification
-  email to the card owner (verified via Resend dashboard logs in test mode)
+      email to the card owner (verified via Resend dashboard logs in test mode)
 - [ ] A newly registered user receives a welcome email within 30 seconds of sign-up
 - [ ] Completing a Stripe Checkout upgrade triggers the subscription upgrade email
 - [ ] A `customer.subscription.deleted` webhook triggers the cancellation email
 - [ ] An `invoice.payment_failed` webhook triggers the payment failed email with a portal link
 - [ ] If Resend returns an error (e.g., invalid API key), the primary request still completes
-  successfully and the error is logged — the email failure is silent to the user
+      successfully and the error is logged — the email failure is silent to the user
 - [ ] All email templates render valid HTML (no broken tags, no missing variables)
 - [ ] The "View in CRM" CTA in the new-lead email links to the correct URL
 - [ ] No hardcoded email addresses or API keys exist in the template files — all values come
-  from function parameters or environment variables
+      from function parameters or environment variables
 - [ ] `turbo build` passes with no TypeScript errors in the email module
 
 ---
@@ -572,6 +603,7 @@ by both `JwtAuthGuard` and `@RequirePlan(Plan.BUSINESS, Plan.ENTERPRISE)`.
 **Steps:**
 
 _API — TeamsModule_
+
 - [ ] Create `apps/api/src/teams/teams.module.ts`
 - [ ] Create `apps/api/src/teams/teams.controller.ts` with:
   - `POST /teams` — body: `{ name: string }`; creates team record, sets `ownerUserId` to
@@ -613,16 +645,18 @@ _API — TeamsModule_
 - [ ] Run `prisma migrate dev --name add_team_invite`
 
 _Brand lock enforcement_
+
 - [ ] Add `brandLock Boolean @default(false)` field to `Team` model in Prisma schema
 - [ ] Run `prisma migrate dev --name add_team_brand_lock`
 - [ ] In the `GET /cards/:handle` public card page SSR handler (`apps/web`): after fetching the
-  card, check if `card.userId` belongs to a team with `brandLock: true`; if so, merge
-  `team.brandConfig` (logo, primaryColor, secondaryColor, fontFamily) over the card's own
-  `CardTheme` before passing to the renderer
+      card, check if `card.userId` belongs to a team with `brandLock: true`; if so, merge
+      `team.brandConfig` (logo, primaryColor, secondaryColor, fontFamily) over the card's own
+      `CardTheme` before passing to the renderer
 - [ ] In `packages/ui` card renderer: accept an optional `brandOverride` prop; when present,
-  the brand values in `brandOverride` replace the card's own theme values
+      the brand values in `brandOverride` replace the card's own theme values
 
 _Email — team invite_
+
 - [ ] Add `sendTeamInviteEmail(inviteeEmail, inviterName, teamName, acceptUrl)` to `EmailService`
 - [ ] Create `team-invite.html.ts` template:
   - Subject: `{{inviterName}} has invited you to join {{teamName}} on Dotly.one`
@@ -631,6 +665,7 @@ _Email — team invite_
   - Note: link expires in 48 hours
 
 _Web — Team settings pages_
+
 - [ ] Create `apps/web/app/(dashboard)/dashboard/team/page.tsx`:
   - Shows team name at the top (editable inline for Admins)
   - Member list table: columns: Avatar, Name, Email, Role badge (Admin / Member), Joined date,
@@ -646,7 +681,7 @@ _Web — Team settings pages_
 
 - [ ] Create `apps/web/app/(dashboard)/dashboard/team/brand/page.tsx`:
   - Brand config editor:
-    - Logo uploader (Supabase Storage upload, same pattern as card logo upload in Phase 2)
+    - Logo uploader (object storage upload, same pattern as card logo upload in Phase 2)
     - Primary color picker (`<input type="color">` with hex input fallback)
     - Secondary color picker
     - Font family selector (same font list as the card builder from Phase 2)
@@ -658,9 +693,10 @@ _Web — Team settings pages_
     `brandLock` value
 
 - [ ] Add "Team" entry to the dashboard sidebar navigation, visible only to Business+ plan users
-  (hidden for Free and Pro with no tooltip — teams are not advertised until upgrade)
+      (hidden for Free and Pro with no tooltip — teams are not advertised until upgrade)
 
 _Invite acceptance flow_
+
 - [ ] Create `apps/web/app/(dashboard)/accept-invite/page.tsx`:
   - Reads `token` from URL query param
   - If user is authenticated: calls `GET /teams/:id/members/accept-invite?token=` → on success
@@ -671,22 +707,23 @@ _Invite acceptance flow_
     fire the accept-invite API call before redirecting to dashboard
 
 **Acceptance Criteria:**
+
 - [ ] `POST /teams` creates a team and automatically adds the creator as an Admin member
 - [ ] `POST /teams/:id/members/invite` sends an invite email with a valid accept link
 - [ ] Visiting the accept link as an authenticated user adds the user to the team
 - [ ] Visiting the accept link as an unauthenticated user presents the sign-in/sign-up prompt
-  and the invite is applied after authentication
+      and the invite is applied after authentication
 - [ ] `DELETE /teams/:id/members/:userId` removes the member and they can no longer access
-  team endpoints
+      team endpoints
 - [ ] `PATCH /teams/:id/members/:userId/role` updates the member's role and the change is
-  reflected immediately in `GET /teams/:id`
+      reflected immediately in `GET /teams/:id`
 - [ ] `GET /teams/:id/analytics` returns aggregated view and click totals for all team cards
 - [ ] A Business-plan user calling `POST /teams` succeeds; a Pro-plan user receives `403 Forbidden`
 - [ ] When `brandLock: true`, the public card page for a team member's card renders with the
-  team's logo and colors, not the card's own theme
+      team's logo and colors, not the card's own theme
 - [ ] The brand editor live preview updates in real time as colors and font are changed
 - [ ] The `/dashboard/team` page renders correctly with member list, invite modal, and pending
-  invites section
+      invites section
 - [ ] An expired invite token (> 48 hours) is rejected at the accept endpoint with a clear error
 - [ ] `turbo build` passes with no TypeScript errors after all team code is added
 
@@ -704,6 +741,7 @@ Phase 3; editing is deferred to Phase 4.
 **Steps:**
 
 _Contacts tab screen_
+
 - [ ] Replace the stub `app/(tabs)/contacts.tsx` with a full implementation:
   - Fetches `GET /contacts?limit=50&page=1` from the API on mount using the authenticated
     session token
@@ -723,6 +761,7 @@ _Contacts tab screen_
     - Text: "Your leads will appear here after someone scans your card"
 
 _Search bar_
+
 - [ ] Add a `TextInput` search bar above the `FlatList`:
   - Uses NativeWind for styling (rounded, gray background, search icon left)
   - Filters the in-memory contact list client-side on `name` and `email` fields
@@ -730,9 +769,10 @@ _Search bar_
   - Debounced 300ms to avoid excessive re-renders on fast typing
 
 _Swipe-to-action_
+
 - [ ] Install `react-native-gesture-handler` (already included with Expo Router; confirm it is
-  in the project):
-  `pnpm --filter mobile add react-native-gesture-handler`
+      in the project):
+      `pnpm --filter mobile add react-native-gesture-handler`
 - [ ] Wrap each `ContactListItem` in a `Swipeable` component (from `react-native-gesture-handler`):
   - **Swipe left** — reveals "Change Stage" action button (blue):
     - Opens a bottom sheet / `ActionSheetIOS` (iOS) or `Alert` with options (Android) listing
@@ -744,8 +784,9 @@ _Swipe-to-action_
     - "Email" (blue): opens `mailto:[email]` deep link via `Linking.openURL`
 
 _Contact Detail screen_
+
 - [ ] Create `app/(tabs)/contact-detail.tsx` (or a modal screen `app/contact/[id].tsx` using
-  Expo Router modal presentation):
+      Expo Router modal presentation):
   - Navigated to by tapping a `ContactListItem` — pass `contactId` as a route param
   - Fetches `GET /contacts/:id` on mount
   - Renders:
@@ -764,31 +805,33 @@ _Contact Detail screen_
   - Back button in the header navigates back to the contacts list
 
 _Loading and error states_
+
 - [ ] Show a `ActivityIndicator` (centered) while the contact list is loading on first mount
 - [ ] Show a `ActivityIndicator` in the navigation bar while a stage change is in progress
 - [ ] If `GET /contacts` returns `403` (Free plan), show a full-screen upsell card:
   - Text: "CRM is available on Pro and above"
   - CTA button: "Upgrade Now" — opens `Linking.openURL('https://dotly.one/pricing')`
 - [ ] If any API call fails, show a red error banner at the top of the screen with the error
-  message and a "Retry" button
+      message and a "Retry" button
 
 **Acceptance Criteria:**
+
 - [ ] The Contacts tab renders a `FlatList` of contacts fetched from `GET /contacts` using the
-  authenticated token
+      authenticated token
 - [ ] Each contact list item displays name, email, source card chip, and stage badge with the
-  correct stage color
+      correct stage color
 - [ ] Typing in the search bar filters the list to matching contacts (client-side)
 - [ ] Pull-to-refresh re-fetches the contact list and updates the UI
 - [ ] Scrolling to the bottom of the list triggers pagination and loads the next page of contacts
 - [ ] Swiping left on a contact reveals the "Change Stage" button; selecting a new stage updates
-  the contact in the database and the badge updates in the list
+      the contact in the database and the badge updates in the list
 - [ ] Swiping right on a contact reveals "Call" and "Email" buttons; tapping "Call" opens the
-  phone dialer with the contact's number
+      phone dialer with the contact's number
 - [ ] Tapping a contact navigates to the Contact Detail screen
 - [ ] The Contact Detail screen shows name, email, phone, company, stage selector, notes, and
-  timeline
+      timeline
 - [ ] Tapping a different stage button on the Contact Detail screen calls `PATCH /contacts/:id/stage`
-  and the active stage button updates
+      and the active stage button updates
 - [ ] Notes are displayed read-only with a "coming soon" indicator for editing
 - [ ] A Free-plan user sees the upsell card instead of the contact list
 - [ ] An API error shows the red error banner with a retry option
@@ -802,40 +845,40 @@ The phase is complete when all of the following are true:
 
 - [ ] All 6 tasks (T17–T22) have every acceptance criterion checked and verified
 - [ ] Stripe billing is functional in test mode: checkout, portal, and all four webhook events
-  work correctly; `User.plan` and `Subscription` are correctly updated on every event
+      work correctly; `User.plan` and `Subscription` are correctly updated on every event
 - [ ] `PlanGuard` is enforced at the API layer: Free users are blocked from CRM, analytics
-  history > 7 days, CSV export, and team features — verified with automated or manual tests
+      history > 7 days, CSV export, and team features — verified with automated or manual tests
 - [ ] The full analytics dashboard renders all charts and tables with live data and correct
-  plan-based date range restrictions
+      plan-based date range restrictions
 - [ ] The CRM pipeline Kanban board supports drag-and-drop stage changes that persist to the
-  database and appear in the contact timeline
+      database and appear in the contact timeline
 - [ ] All four transactional emails (new lead, welcome, subscription change, payment failed)
-  are confirmed delivered in Resend test logs
+      are confirmed delivered in Resend test logs
 - [ ] Team management is functional for Business-plan users: create team, invite by email,
-  accept invite, brand lock enforcement on public card pages
+      accept invite, brand lock enforcement on public card pages
 - [ ] Mobile Contacts tab renders, searches, paginates, swipe-actions work, and the Contact
-  Detail screen displays correctly on both iOS Simulator and Android Emulator
+      Detail screen displays correctly on both iOS Simulator and Android Emulator
 - [ ] No `console.error` or unhandled promise rejections in development mode across all apps
 - [ ] `turbo build` exits 0 for `apps/api`, `apps/web`, and `turbo typecheck` exits 0 for all
-  workspaces
+      workspaces
 - [ ] CI passes on a clean PR with all jobs green
 - [ ] All Stripe test-mode keys are confirmed; a note is filed to rotate to live keys before
-  Phase 4 production deploy
+      Phase 4 production deploy
 - [ ] Phase 4 can begin immediately without any Phase 3 rework
 
 ---
 
 ## Dependencies & Blockers
 
-| Dependency | Owner | Needed by | Notes |
-|---|---|---|---|
-| Stripe account with live mode keys approved | Team lead | T17 | Test mode keys sufficient for Phase 3 dev; live keys required before Phase 4 production deploy |
-| Resend account with `dotly.one` domain verified | Team lead | T20, T21 | DNS records (SPF, DKIM, DMARC) must be added to the domain registrar; without this, emails send from a Resend subdomain in test mode |
-| Team invite email domain — `dotly.one` MX records | Team lead | T21 | Invite emails must be deliverable to recipient inboxes; domain reputation matters for deliverability |
-| Phase 2 lead capture form (`POST /leads`) complete | Dev | T20 | T20 hooks into the lead capture endpoint built in Phase 2 T13; that endpoint must exist before T20 can be integrated |
-| Phase 2 card builder & `GET /cards` endpoint complete | Dev | T18, T19, T22 | Analytics dashboard card selector and CRM source card filter depend on the card list endpoint from Phase 2 |
-| `packages/ui` card renderer accepts `brandOverride` prop | Dev | T21 | Brand lock enforcement requires the renderer to accept and apply a brand override; this is a `packages/ui` change that affects both web and mobile renders |
-| Redis available on Railway (or local Docker) | Dev | T18 | Analytics queries in Phase 2 write events to Redis before flushing to PostgreSQL; the analytics endpoint in T18 reads from PostgreSQL after flush |
+| Dependency                                               | Owner     | Needed by     | Notes                                                                                                                                                      |
+| -------------------------------------------------------- | --------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stripe account with live mode keys approved              | Team lead | T17           | Test mode keys sufficient for Phase 3 dev; live keys required before Phase 4 production deploy                                                             |
+| Resend account with `dotly.one` domain verified          | Team lead | T20, T21      | DNS records (SPF, DKIM, DMARC) must be added to the domain registrar; without this, emails send from a Resend subdomain in test mode                       |
+| Team invite email domain — `dotly.one` MX records        | Team lead | T21           | Invite emails must be deliverable to recipient inboxes; domain reputation matters for deliverability                                                       |
+| Phase 2 lead capture form (`POST /leads`) complete       | Dev       | T20           | T20 hooks into the lead capture endpoint built in Phase 2 T13; that endpoint must exist before T20 can be integrated                                       |
+| Phase 2 card builder & `GET /cards` endpoint complete    | Dev       | T18, T19, T22 | Analytics dashboard card selector and CRM source card filter depend on the card list endpoint from Phase 2                                                 |
+| `packages/ui` card renderer accepts `brandOverride` prop | Dev       | T21           | Brand lock enforcement requires the renderer to accept and apply a brand override; this is a `packages/ui` change that affects both web and mobile renders |
+| Redis available on Railway (or local Docker)             | Dev       | T18           | Analytics queries in Phase 2 write events to Redis before flushing to PostgreSQL; the analytics endpoint in T18 reads from PostgreSQL after flush          |
 
 ---
 
@@ -868,4 +911,4 @@ The phase is complete when all of the following are true:
 
 ---
 
-*Phase 3 of 5 — Dotly.one / Prev: Phase 2 — Core MVP | Next: Phase 4 — Polish & Scale*
+_Phase 3 of 5 — Dotly.one / Prev: Phase 2 — Core MVP | Next: Phase 4 — Polish & Scale_

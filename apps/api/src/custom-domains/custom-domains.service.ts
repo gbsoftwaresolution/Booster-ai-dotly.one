@@ -37,8 +37,8 @@ export class CustomDomainsService {
   ) {}
 
   private async assertCustomDomainAccess(userId: string): Promise<void> {
-    const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: userId }, { supabaseId: userId }] },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
       select: { plan: true },
     })
 

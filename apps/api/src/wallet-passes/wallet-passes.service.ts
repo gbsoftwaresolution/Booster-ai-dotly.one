@@ -110,10 +110,7 @@ export class WalletPassesService {
   // ─── Ownership guard ─────────────────────────────────────────────────────────
 
   private async assertCardOwnerAndFetch(cardId: string, userId: string) {
-    const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: userId }, { supabaseId: userId }] },
-      select: { id: true },
-    })
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
     if (!user) throw new ForbiddenException('User not found')
 
     const card = await this.prisma.card.findUnique({

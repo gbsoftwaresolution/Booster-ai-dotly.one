@@ -1,31 +1,25 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native'
-import { supabase } from '../../lib/supabase'
-import type { Session } from '@supabase/supabase-js'
-import { clearPushToken } from '../../lib/api'
+import { apiPost, clearPushToken } from '../../lib/api'
+import { clearSession, getSession, type MobileSession } from '../../lib/auth'
 
 export default function SettingsTab() {
-  const [session, setSession] = useState<Session | null>(null)
+  const [session, setAuthSession] = useState<MobileSession | null>(null)
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s)
+    getSession().then((session) => {
+      setAuthSession(session)
     })
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s)
-    })
-    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSignOut() {
     setSigningOut(true)
     try {
       await clearPushToken().catch(() => void 0)
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      await apiPost('/auth/sign-out', { refreshToken: session?.refreshToken ?? null })
+      await clearSession()
+      setAuthSession(null)
     } catch (error) {
       Alert.alert('Sign out failed', error instanceof Error ? error.message : 'Please try again.')
     } finally {
@@ -52,7 +46,7 @@ export default function SettingsTab() {
 
       <View style={{ paddingHorizontal: 20, paddingTop: 24, gap: 20 }}>
         {/* User info */}
-        {session?.user?.email ? (
+        {session?.accessToken ? (
           <View
             style={{
               backgroundColor: '#ffffff',
@@ -65,9 +59,7 @@ export default function SettingsTab() {
             <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '600', marginBottom: 4 }}>
               SIGNED IN AS
             </Text>
-            <Text style={{ fontSize: 15, color: '#0f172a', fontWeight: '500' }}>
-              {session.user.email}
-            </Text>
+            <Text style={{ fontSize: 15, color: '#0f172a', fontWeight: '500' }}>Authenticated</Text>
           </View>
         ) : null}
 

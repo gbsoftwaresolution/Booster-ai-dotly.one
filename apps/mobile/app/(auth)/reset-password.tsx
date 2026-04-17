@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
-import { useRouter } from 'expo-router'
-import { supabase } from '../../lib/supabase'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { apiPost } from '../../lib/api'
 
 export default function ResetPasswordScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams<{ token?: string }>()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -25,10 +26,15 @@ export default function ResetPasswordScreen() {
 
     setSaving(true)
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password })
-      if (updateError) throw updateError
+      if (!params.token) {
+        throw new Error('Missing password reset token.')
+      }
+      await apiPost('/auth/reset-password', {
+        token: params.token,
+        password,
+      })
       Alert.alert('Password updated', 'Your password has been reset successfully.', [
-        { text: 'Continue', onPress: () => router.replace('/(tabs)') },
+        { text: 'Continue', onPress: () => router.replace('/(auth)/sign-in') },
       ])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update password.')

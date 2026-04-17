@@ -22,7 +22,7 @@ import {
   ExternalLink,
   RefreshCw,
 } from 'lucide-react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet, apiDelete } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { readCachedData, saveCachedData } from '@/lib/pwa/cache'

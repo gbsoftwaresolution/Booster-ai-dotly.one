@@ -765,8 +765,8 @@ export class ContactsController {
   ) {}
 
   private async getPlanLimits(rawUserId: string) {
-    const user = await this.prisma.user.findFirst({
-      where: { OR: [{ id: rawUserId }, { supabaseId: rawUserId }] },
+    const user = await this.prisma.user.findUnique({
+      where: { id: rawUserId },
       select: { plan: true },
     })
 
@@ -1252,7 +1252,10 @@ export class ContactsController {
   @ApiBearerAuth()
   @Post('email-templates')
   @ApiOperation({ summary: 'Create an email template' })
-  async createEmailTemplate(@CurrentUser() user: { id: string }, @Body() dto: CreateEmailTemplateDto) {
+  async createEmailTemplate(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateEmailTemplateDto,
+  ) {
     await this.assertEmailTemplateAccess(user.id)
     return this.contactsService.createEmailTemplate(user.id, dto)
   }
@@ -1390,7 +1393,10 @@ export class ContactsController {
   @ApiOperation({
     summary: 'Get stage conversion funnel analytics (supports dateFrom/dateTo query params)',
   })
-  async getFunnelAnalytics(@CurrentUser() user: { id: string }, @Query() query: FunnelAnalyticsQuery) {
+  async getFunnelAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query() query: FunnelAnalyticsQuery,
+  ) {
     await this.assertFullCrmAccess(user.id)
     return this.contactsService.getFunnelAnalytics(user.id, {
       dateFrom: query.dateFrom,
@@ -1446,7 +1452,10 @@ export class ContactsController {
   @ApiBearerAuth()
   @Delete('pipelines/:pipelineId')
   @ApiOperation({ summary: 'Delete a pipeline' })
-  async deletePipeline(@Param('pipelineId') pipelineId: string, @CurrentUser() user: { id: string }) {
+  async deletePipeline(
+    @Param('pipelineId') pipelineId: string,
+    @CurrentUser() user: { id: string },
+  ) {
     await this.assertFullCrmAccess(user.id)
     return this.contactsService.deletePipeline(pipelineId, user.id)
   }

@@ -2,7 +2,7 @@
 
 import type { JSX } from 'react'
 import { useState, useEffect, useCallback } from 'react'
-import { getAccessToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/auth/client'
 import { apiGet, apiPatch, apiDelete } from '@/lib/api'
 import {
   InboxActionError,
