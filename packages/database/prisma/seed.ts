@@ -15,10 +15,18 @@ async function main() {
   // ─── User ──────────────────────────────────────────────────────────────────
   const user = await prisma.user.upsert({
     where: { email: 'test@dotly.one' },
-    update: {},
+    update: {
+      username: 'testuser',
+      name: 'Test User',
+      pitch: 'I help businesses grow with fast, conversion-first sales links.',
+      phone: '15550000001',
+    },
     create: {
       email: 'test@dotly.one',
+      username: 'testuser',
       name: 'Test User',
+      pitch: 'I help businesses grow with fast, conversion-first sales links.',
+      phone: '15550000001',
       plan: Plan.FREE,
     },
   })

@@ -126,8 +126,10 @@ enum DealStage {
 model User {
   id            String  @id @default(cuid())
   email         String  @unique
+  username      String? @unique
   emailVerifiedAt DateTime?
   name          String?
+  pitch         String?
   avatarUrl     String?
   plan          Plan    @default(FREE)
   walletAddress String? @unique // crypto billing
@@ -135,6 +137,7 @@ model User {
   pushToken     String?
   passwordHash  String?
   googleId      String? @unique
+  phone         String?
   /// ISO 3166-1 alpha-2 country code, e.g. "US", "GB", "IN"
   country       String? @db.VarChar(2)
   /// IANA timezone identifier, e.g. "America/New_York", "Asia/Kolkata"
@@ -429,6 +432,15 @@ model AnalyticsEvent {
   // Eliminates full-table scans on getAnalytics / getSummary for high-traffic cards.
   @@index([cardId, type, createdAt])
   @@map("analytics_events")
+}
+
+model ClickEvent {
+  id        String   @id @default(uuid())
+  action    String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("click_events")
 }
 
 model Contact {

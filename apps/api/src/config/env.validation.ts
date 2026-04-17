@@ -184,7 +184,22 @@ class EnvironmentVariables {
 }
 
 export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
+  const normalizedConfig: Record<string, unknown> = { ...config }
+
+  // Local developer ergonomics: keep production strict, but allow the API to
+  // boot in development when these two values are omitted from a private local
+  // env file. Both defaults match the documented local setup.
+  const nodeEnv = String(normalizedConfig.NODE_ENV ?? 'development')
+  if (nodeEnv !== 'production') {
+    if (!normalizedConfig.API_URL) {
+      normalizedConfig.API_URL = 'http://localhost:3001'
+    }
+    if (!normalizedConfig.AUTH_JWT_SECRET) {
+      normalizedConfig.AUTH_JWT_SECRET = 'local-dev-auth-jwt-secret'
+    }
+  }
+
+  const validatedConfig = plainToInstance(EnvironmentVariables, normalizedConfig, {
     enableImplicitConversion: true,
   })
   const errors = validateSync(validatedConfig, { skipMissingProperties: false })

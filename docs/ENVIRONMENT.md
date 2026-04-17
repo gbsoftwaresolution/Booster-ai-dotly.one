@@ -68,6 +68,7 @@ Copy the relevant `.env.example` to `.env` in each app directory, fill in the va
 - Server-only secrets (`AUTH_JWT_SECRET`, `GOOGLE_AUTH_CLIENT_SECRET`, `GOOGLE_AUTH_STATE_SECRET`, `MAILGUN_API_KEY`, AWS keys, R2 keys, `POLYGON_RPC_URL`) must **never** appear in `apps/web` or `apps/mobile` env files.
 - `apps/web` currently requires both `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_WEB_URL`; keep them in sync unless and until the runtime usage is consolidated in code.
 - `.env` files are git-ignored. Only `.env.example` files are committed. Copy `.env.example` → `.env` and fill in real values locally.
+- In local development only, the API falls back to `API_URL=http://localhost:3001` and a non-production `AUTH_JWT_SECRET` when those two values are omitted. Set both explicitly in `apps/api/.env` if you need stable values across restarts or shared local environments.
 - Production web/API deploys now reuse the main CI workflow with security gates enabled. A deploy will be blocked if TruffleHog finds verified secrets, if runtime dependency audit reports high/critical issues, or if a real `.env` file is tracked in git.
 - Mobile EAS build/submit workflows now run a release preflight that fails when `apps/mobile/eas.json` still contains `TODO_REPLACE` store-submission placeholders.
 - For GitHub Actions production deploys, confirm these secrets exist before launch: `DATABASE_URL`, `RAILWAY_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and `EXPO_TOKEN` if mobile builds are part of the release.

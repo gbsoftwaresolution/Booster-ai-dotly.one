@@ -15,6 +15,7 @@
     "build": "tsc --project tsconfig.json",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:apply": "prisma migrate deploy",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "db:studio": "prisma studio",
