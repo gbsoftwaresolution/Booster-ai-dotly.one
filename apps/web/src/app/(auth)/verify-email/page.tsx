@@ -1,11 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { apiPost } from '@/lib/api'
 
 export default function VerifyEmailPage(): JSX.Element {
+  return (
+    <Suspense fallback={<VerifyEmailPageFallback />}>
+      <VerifyEmailPageContent />
+    </Suspense>
+  )
+}
+
+function VerifyEmailPageContent(): JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -48,6 +56,17 @@ export default function VerifyEmailPage(): JSX.Element {
             {status === 'success' ? 'Continue to dashboard' : 'Back to sign in'}
           </button>
         ) : null}
+      </div>
+    </div>
+  )
+}
+
+function VerifyEmailPageFallback(): JSX.Element {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-sm">
+        <h1 className="text-2xl font-semibold text-gray-950">Verify email</h1>
+        <p className="mt-4 text-sm text-gray-600">Loading verification details...</p>
       </div>
     </div>
   )

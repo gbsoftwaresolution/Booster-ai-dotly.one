@@ -1,11 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { apiPost } from '@/lib/api'
 
 export default function ResetPasswordPage(): JSX.Element {
+  return (
+    <Suspense fallback={<ResetPasswordPageFallback />}>
+      <ResetPasswordPageContent />
+    </Suspense>
+  )
+}
+
+function ResetPasswordPageContent(): JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -80,6 +88,17 @@ export default function ResetPasswordPage(): JSX.Element {
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+function ResetPasswordPageFallback(): JSX.Element {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
+        <h1 className="text-2xl font-semibold text-gray-950">Reset your password</h1>
+        <p className="mt-2 text-sm text-gray-500">Loading password reset form...</p>
+      </div>
     </div>
   )
 }
