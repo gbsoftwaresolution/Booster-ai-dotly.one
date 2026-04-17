@@ -22,7 +22,28 @@ import * as path from 'path'
 import { randomBytes } from 'crypto'
 import { AuthService } from '../auth/auth.service'
 import { assertSafeUrl } from '../common/utils/ssrf-guard'
-import type { CardActionConfig, CardActionsConfig, CardActionType } from '@dotly/types'
+import { createPublicClient, decodeEventLog, http, type Address, type Hash } from 'viem'
+import { arbitrum } from 'viem/chains'
+import type {
+  CardActionConfig,
+  CardActionsConfig,
+  CardActionType,
+  CardServiceOffer,
+} from '@dotly/types'
+
+const ERC20_TRANSFER_EVENT_ABI = [
+  {
+    type: 'event',
+    name: 'Transfer',
+    inputs: [
+      { indexed: true, name: 'from', type: 'address' },
+      { indexed: true, name: 'to', type: 'address' },
+      { indexed: false, name: 'value', type: 'uint256' },
+    ],
+  },
+] as const
+
+const SERVICE_ORDER_REUSE_WINDOW_MS = 60 * 60_000
 
 // F-26: Single source of truth for plan limits used in card creation.
 // BillingService.getPlanLimits() is the canonical source for all other plan
@@ -84,6 +105,49 @@ function sanitizeActionsConfig(value: unknown): CardActionsConfig | undefined {
     ...(primary ? { primary } : {}),
     ...(secondary.length > 0 ? { secondary } : {}),
   }
+}
+
+function sanitizeServiceOffer(value: unknown): CardServiceOffer | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const id = typeof record['id'] === 'string' ? record['id'].trim().slice(0, 100) : ''
+  const name = typeof record['name'] === 'string' ? record['name'].trim().slice(0, 160) : ''
+  const description =
+    typeof record['description'] === 'string' ? record['description'].trim().slice(0, 400) : ''
+  const priceRaw = typeof record['priceUsdt'] === 'string' ? record['priceUsdt'].trim() : ''
+  const priceNumber = Number(priceRaw)
+  if (!id || !name || !Number.isFinite(priceNumber) || priceNumber <= 0) return null
+
+  return {
+    id,
+    name,
+    priceUsdt: priceNumber.toFixed(2),
+    ...(description ? { description } : {}),
+    ...(typeof record['highlighted'] === 'boolean' ? { highlighted: record['highlighted'] } : {}),
+  }
+}
+
+function sanitizeServiceOffers(value: unknown): CardServiceOffer[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const offers = value
+    .map((item) => sanitizeServiceOffer(item))
+    .filter((item): item is CardServiceOffer => item !== null)
+    .slice(0, 3)
+
+  if (offers.length === 0) return undefined
+
+  const highlightedCount = offers.filter((offer) => offer.highlighted).length
+  if (highlightedCount <= 1) return offers
+
+  let highlightedUsed = false
+  return offers.map((offer) => {
+    if (!offer.highlighted) return offer
+    if (!highlightedUsed) {
+      highlightedUsed = true
+      return offer
+    }
+    return { ...offer, highlighted: false }
+  })
 }
 
 // F-04: Magic-byte signatures for the MIME types we allow.
@@ -172,6 +236,39 @@ export class CardsService {
     }
   }
 
+  private getUsdtAddress(): Address {
+    const address = this.config.get<string>('DOTLY_USDT_ADDRESS')
+    if (!address) throw new BadRequestException('USDT token is not configured')
+    return address.toLowerCase() as Address
+  }
+
+  private getArbitrumClient() {
+    const rpcUrl = this.config.get<string>('ARBITRUM_RPC_URL')
+    if (!rpcUrl) {
+      throw new BadRequestException('Arbitrum RPC URL is not configured')
+    }
+
+    return createPublicClient({ chain: arbitrum, transport: http(rpcUrl) })
+  }
+
+  private normalizeUsdtAmount(value: string | null | undefined): string {
+    const trimmed = value?.trim() ?? ''
+    const numeric = Number(trimmed)
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      throw new BadRequestException('Amount must be greater than zero')
+    }
+    return numeric.toFixed(2)
+  }
+
+  private parseUsdtAmountRaw(amountUsdt: string): bigint {
+    const [whole, decimals = ''] = amountUsdt.split('.')
+    return BigInt(whole ?? '0') * 1_000_000n + BigInt(decimals.padEnd(6, '0').slice(0, 6))
+  }
+
+  private generateServicePaymentId(): string {
+    return `svc_${randomBytes(6).toString('hex')}${Date.now().toString(36)}`
+  }
+
   private sanitizeCardFields(
     fields: Prisma.JsonValue | Prisma.InputJsonValue | null | undefined,
   ): Prisma.InputJsonValue {
@@ -197,6 +294,13 @@ export class CardsService {
       record['actions'] = actions as unknown as Prisma.InputJsonValue
     } else {
       delete record['actions']
+    }
+
+    const services = sanitizeServiceOffers(record['services'])
+    if (services) {
+      record['services'] = services as unknown as Prisma.InputJsonValue
+    } else {
+      delete record['services']
     }
     return record as Prisma.InputJsonValue
   }
@@ -507,6 +611,28 @@ export class CardsService {
     })
   }
 
+  async listServiceOrders(cardId: string, userId: string) {
+    await this.findById(cardId, userId)
+    return this.prisma.serviceOrder.findMany({
+      where: { cardId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        paymentId: true,
+        serviceId: true,
+        serviceName: true,
+        customerName: true,
+        customerEmail: true,
+        amountUsdt: true,
+        status: true,
+        txHash: true,
+        createdAt: true,
+        verifiedAt: true,
+        completedAt: true,
+      },
+    })
+  }
+
   async duplicate(id: string, userId: string) {
     const internalUserId = await this.resolveInternalUserId(userId)
     const source = await this.findById(id, userId)
@@ -746,6 +872,194 @@ export class CardsService {
             }
           : null,
     }
+  }
+
+  async createServiceCheckoutIntent(
+    handle: string,
+    dto: {
+      serviceId: string
+      customerName: string
+      customerEmail: string
+      walletAddress: string
+      notes?: string
+    },
+  ) {
+    const card = await this.prisma.card.findUnique({
+      where: { handle, isActive: true },
+      select: {
+        id: true,
+        userId: true,
+        fields: true,
+        user: { select: { walletAddress: true } },
+      },
+    })
+    if (!card) throw new NotFoundException('Card not found')
+
+    const services = sanitizeServiceOffers(
+      (card.fields as Record<string, unknown> | null)?.['services'],
+    )
+    const service = services?.find((item) => item.id === dto.serviceId.trim())
+    if (!service) {
+      throw new BadRequestException('Selected service was not found on this card')
+    }
+
+    const recipientAddress = card.user.walletAddress?.toLowerCase()
+    if (!recipientAddress) {
+      throw new BadRequestException('This seller has not configured crypto checkout yet')
+    }
+
+    const amountUsdt = this.normalizeUsdtAmount(service.priceUsdt)
+    const amountRaw = this.parseUsdtAmountRaw(amountUsdt)
+    const paymentId = this.generateServicePaymentId()
+
+    await this.prisma.serviceOrder.create({
+      data: {
+        cardId: card.id,
+        ownerUserId: card.userId,
+        paymentId,
+        serviceId: service.id,
+        serviceName: service.name,
+        customerName: dto.customerName.trim(),
+        customerEmail: dto.customerEmail.trim().toLowerCase(),
+        walletAddress: dto.walletAddress.toLowerCase(),
+        recipientAddress,
+        amountUsdt,
+        amountRaw: amountRaw.toString(),
+        tokenAddress: this.getUsdtAddress(),
+        chainId: arbitrum.id,
+        notes: dto.notes?.trim() || null,
+      },
+    })
+
+    return {
+      paymentId,
+      serviceId: service.id,
+      serviceName: service.name,
+      amountUsdt,
+      amountRaw: amountRaw.toString(),
+      tokenAddress: this.getUsdtAddress(),
+      recipientAddress,
+      chainId: arbitrum.id,
+    }
+  }
+
+  async activateServiceCheckout(handle: string, paymentId: string, txHash: string) {
+    const card = await this.prisma.card.findUnique({
+      where: { handle, isActive: true },
+      select: { id: true },
+    })
+    if (!card) throw new NotFoundException('Card not found')
+
+    const order = await this.assertServiceOrderVerified(handle, paymentId, txHash)
+
+    await this.prisma.serviceOrder.update({
+      where: { paymentId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    })
+
+    return {
+      success: true,
+      paymentId,
+      txHash,
+      serviceId: order.serviceId,
+      serviceName: order.serviceName,
+    }
+  }
+
+  private async assertServiceOrderVerified(handle: string, paymentId: string, txHash: string) {
+    const order = await this.prisma.serviceOrder.findUnique({
+      where: { paymentId },
+      select: {
+        card: { select: { handle: true } },
+        serviceId: true,
+        serviceName: true,
+        walletAddress: true,
+        recipientAddress: true,
+        amountUsdt: true,
+        amountRaw: true,
+        tokenAddress: true,
+        status: true,
+        txHash: true,
+        createdAt: true,
+      },
+    })
+
+    if (!order || order.card.handle !== handle) {
+      throw new BadRequestException('Service checkout intent was not found')
+    }
+
+    if (order.status === 'COMPLETED') {
+      throw new BadRequestException('This service checkout has already been completed')
+    }
+
+    if (
+      order.status === 'EXPIRED' ||
+      (order.status === 'INTENT_CREATED' &&
+        Date.now() - order.createdAt.getTime() > SERVICE_ORDER_REUSE_WINDOW_MS)
+    ) {
+      await this.prisma.serviceOrder.update({
+        where: { paymentId },
+        data: { status: 'EXPIRED' },
+      })
+      throw new BadRequestException(
+        'Service checkout intent has expired. Start again from the card.',
+      )
+    }
+
+    if (order.status === 'VERIFIED') {
+      if (order.txHash?.toLowerCase() === txHash.toLowerCase()) {
+        return order
+      }
+      throw new BadRequestException(
+        'This service checkout was already verified with another transaction',
+      )
+    }
+
+    const client = this.getArbitrumClient()
+    const receipt = await client.getTransactionReceipt({ hash: txHash as Hash })
+    const tokenAddress = order.tokenAddress.toLowerCase() as Address
+    const walletAddress = order.walletAddress.toLowerCase()
+    const recipientAddress = order.recipientAddress.toLowerCase()
+    const amountRaw = order.amountRaw
+
+    const matchesTransfer = receipt.logs.some((log) => {
+      if (log.address.toLowerCase() !== tokenAddress) return false
+      try {
+        const decoded = decodeEventLog({
+          abi: ERC20_TRANSFER_EVENT_ABI,
+          data: log.data,
+          topics: log.topics,
+        })
+        if (decoded.eventName !== 'Transfer') return false
+        return (
+          decoded.args.from.toLowerCase() === walletAddress &&
+          decoded.args.to.toLowerCase() === recipientAddress &&
+          decoded.args.value === BigInt(amountRaw)
+        )
+      } catch {
+        return false
+      }
+    })
+
+    if (!matchesTransfer) {
+      throw new BadRequestException('Service payment transaction could not be verified on-chain')
+    }
+
+    return this.prisma.serviceOrder.update({
+      where: { paymentId },
+      data: {
+        txHash,
+        status: 'VERIFIED',
+        verifiedAt: new Date(),
+      },
+      select: {
+        serviceId: true,
+        serviceName: true,
+      },
+    })
   }
 
   async uploadAvatar(id: string, userId: string, base64: string, mimeType: string) {

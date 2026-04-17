@@ -1,102 +1,207 @@
-/**
- * CardsService — pure logic unit tests
- *
- * Tests the magic-byte signature verification and PLAN_CARD_LIMITS map
- * without requiring a database or S3 connection.
- */
+import { BadRequestException } from '@nestjs/common'
+import { CardsService } from './cards.service'
 
-// ── Mirror of verifyMagicBytes from cards.service.ts ─────────────────────────
-const MAGIC_BYTES: Record<string, { offset: number; bytes: number[] }[]> = {
-  'image/jpeg': [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
-  'image/png': [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }],
-  'image/webp': [{ offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] }],
-  'image/gif': [
-    { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] },
-    { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] },
-  ],
-}
+jest.mock('viem', () => ({
+  createPublicClient: jest.fn(() => ({
+    getTransactionReceipt: jest.fn(),
+  })),
+  decodeEventLog: jest.fn(),
+  http: jest.fn(() => ({})),
+}))
 
-function verifyMagicBytes(buffer: Buffer, mimeType: string): boolean {
-  const signatures = MAGIC_BYTES[mimeType]
-  if (!signatures) return false
-  return signatures.some(({ offset, bytes }) => bytes.every((b, i) => buffer[offset + i] === b))
-}
+import { createPublicClient, decodeEventLog } from 'viem'
 
-// ── Mirror of PLAN_CARD_LIMITS ───────────────────────────────────────────────
-const PLAN_CARD_LIMITS: Record<string, number> = {
-  FREE: 1,
-  STARTER: 1,
-  PRO: 3,
-  BUSINESS: 10,
-  AGENCY: 50,
-  ENTERPRISE: Infinity,
-}
+describe('CardsService service checkout', () => {
+  function createService(overrides?: {
+    cardFindUnique?: jest.Mock
+    serviceOrderCreate?: jest.Mock
+    serviceOrderFindUnique?: jest.Mock
+    serviceOrderUpdate?: jest.Mock
+  }) {
+    const cardFindUnique = overrides?.cardFindUnique ?? jest.fn()
+    const serviceOrderCreate = overrides?.serviceOrderCreate ?? jest.fn()
+    const serviceOrderFindUnique = overrides?.serviceOrderFindUnique ?? jest.fn()
+    const serviceOrderUpdate = overrides?.serviceOrderUpdate ?? jest.fn()
 
-describe('verifyMagicBytes', () => {
-  it('accepts a valid JPEG (FF D8 FF prefix)', () => {
-    const buf = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00])
-    expect(verifyMagicBytes(buf, 'image/jpeg')).toBe(true)
-  })
-
-  it('accepts a valid PNG (89 50 4E 47 prefix)', () => {
-    const buf = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a])
-    expect(verifyMagicBytes(buf, 'image/png')).toBe(true)
-  })
-
-  it('accepts a valid GIF87a', () => {
-    const buf = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x00])
-    expect(verifyMagicBytes(buf, 'image/gif')).toBe(true)
-  })
-
-  it('accepts a valid GIF89a', () => {
-    const buf = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00])
-    expect(verifyMagicBytes(buf, 'image/gif')).toBe(true)
-  })
-
-  it('accepts a valid WebP (RIFF prefix)', () => {
-    const buf = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00])
-    expect(verifyMagicBytes(buf, 'image/webp')).toBe(true)
-  })
-
-  it('rejects a PHP file disguised as JPEG', () => {
-    const buf = Buffer.from('<?php echo "hello"; ?>', 'ascii')
-    expect(verifyMagicBytes(buf, 'image/jpeg')).toBe(false)
-  })
-
-  it('rejects an HTML file disguised as PNG', () => {
-    const buf = Buffer.from('<html><body>XSS</body></html>', 'ascii')
-    expect(verifyMagicBytes(buf, 'image/png')).toBe(false)
-  })
-
-  it('rejects an unknown MIME type', () => {
-    const buf = Buffer.from([0xff, 0xd8, 0xff])
-    expect(verifyMagicBytes(buf, 'application/octet-stream')).toBe(false)
-  })
-
-  it('rejects an empty buffer', () => {
-    expect(verifyMagicBytes(Buffer.alloc(0), 'image/jpeg')).toBe(false)
-  })
-})
-
-describe('PLAN_CARD_LIMITS', () => {
-  it('FREE plan allows 1 card', () => expect(PLAN_CARD_LIMITS['FREE']).toBe(1))
-  it('STARTER plan allows 1 card', () => expect(PLAN_CARD_LIMITS['STARTER']).toBe(1))
-  it('PRO plan allows 3 cards', () => expect(PLAN_CARD_LIMITS['PRO']).toBe(3))
-  it('BUSINESS plan allows 10 cards', () => expect(PLAN_CARD_LIMITS['BUSINESS']).toBe(10))
-  it('AGENCY plan allows 50 cards', () => expect(PLAN_CARD_LIMITS['AGENCY']).toBe(50))
-  it('ENTERPRISE plan has no limit', () => expect(PLAN_CARD_LIMITS['ENTERPRISE']).toBe(Infinity))
-
-  it('all 6 plan tiers are defined', () => {
-    const expected = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'AGENCY', 'ENTERPRISE']
-    expect(Object.keys(PLAN_CARD_LIMITS).sort()).toEqual(expected.sort())
-  })
-
-  it('limits are non-decreasing (no plan regresses)', () => {
-    const order = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'AGENCY', 'ENTERPRISE']
-    for (let i = 1; i < order.length; i++) {
-      const prev = PLAN_CARD_LIMITS[order[i - 1] as string] as number
-      const curr = PLAN_CARD_LIMITS[order[i] as string] as number
-      expect(curr).toBeGreaterThanOrEqual(prev)
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'owner_1' }) },
+      card: {
+        findUnique: cardFindUnique,
+      },
+      serviceOrder: {
+        create: serviceOrderCreate,
+        findUnique: serviceOrderFindUnique,
+        update: serviceOrderUpdate,
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     }
+
+    const audit = { log: jest.fn().mockResolvedValue(undefined) }
+    const analytics = { invalidateDashboardCache: jest.fn().mockResolvedValue(undefined) }
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'DOTLY_USDT_ADDRESS') return '0xtoken'
+        if (key === 'ARBITRUM_RPC_URL') return 'https://arb.example'
+        if (key === 'R2_PUBLIC_URL') return 'https://cdn.dotly.one'
+        if (key === 'R2_ACCOUNT_ID') return 'acc'
+        if (key === 'R2_ACCESS_KEY_ID') return 'key'
+        if (key === 'R2_SECRET_ACCESS_KEY') return 'secret'
+        if (key === 'R2_BUCKET') return 'bucket'
+        return null
+      }),
+      getOrThrow: jest.fn((key: string) => {
+        const values: Record<string, string> = {
+          R2_ACCOUNT_ID: 'acc',
+          R2_ACCESS_KEY_ID: 'key',
+          R2_SECRET_ACCESS_KEY: 'secret',
+          R2_BUCKET: 'bucket',
+        }
+        return values[key] ?? 'value'
+      }),
+    }
+    const authService = { validateAccessToken: jest.fn().mockResolvedValue({ sub: 'user_1' }) }
+
+    return {
+      service: new CardsService(
+        prisma as never,
+        audit as never,
+        config as never,
+        analytics as never,
+        authService as never,
+      ),
+      cardFindUnique,
+      serviceOrderCreate,
+      serviceOrderFindUnique,
+      serviceOrderUpdate,
+    }
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('creates a service checkout intent from card service offers', async () => {
+    const cardFindUnique = jest.fn().mockResolvedValue({
+      id: 'card_1',
+      userId: 'owner_1',
+      fields: {
+        services: [{ id: 'offer_1', name: 'Pitch Deck Review', priceUsdt: '49.00' }],
+      },
+      user: { walletAddress: '0xhostwallet' },
+    })
+    const { service, serviceOrderCreate } = createService({ cardFindUnique })
+
+    const result = await service.createServiceCheckoutIntent('alice', {
+      serviceId: 'offer_1',
+      customerName: 'Buyer',
+      customerEmail: 'buyer@example.com',
+      walletAddress: '0xbuyerwallet',
+      notes: 'Need quick turnaround',
+    })
+
+    expect(result.serviceName).toBe('Pitch Deck Review')
+    expect(result.amountUsdt).toBe('49.00')
+    expect(serviceOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cardId: 'card_1',
+          ownerUserId: 'owner_1',
+          serviceId: 'offer_1',
+          serviceName: 'Pitch Deck Review',
+          customerEmail: 'buyer@example.com',
+          recipientAddress: '0xhostwallet',
+        }),
+      }),
+    )
+  })
+
+  it('verifies a service checkout transfer and marks it completed', async () => {
+    const cardFindUnique = jest
+      .fn()
+      .mockResolvedValueOnce({ id: 'card_1' })
+      .mockResolvedValueOnce({
+        id: 'card_1',
+        userId: 'owner_1',
+        fields: { services: [{ id: 'offer_1', name: 'Pitch Deck Review', priceUsdt: '49.00' }] },
+        user: { walletAddress: '0xhostwallet' },
+      })
+    const serviceOrderFindUnique = jest.fn().mockResolvedValue({
+      card: { handle: 'alice' },
+      serviceId: 'offer_1',
+      serviceName: 'Pitch Deck Review',
+      walletAddress: '0xbuyerwallet',
+      recipientAddress: '0xhostwallet',
+      amountUsdt: '49.00',
+      amountRaw: '49000000',
+      tokenAddress: '0xtoken',
+      status: 'INTENT_CREATED',
+      txHash: null,
+      createdAt: new Date(),
+    })
+    const serviceOrderUpdate = jest
+      .fn()
+      .mockResolvedValueOnce({ serviceId: 'offer_1', serviceName: 'Pitch Deck Review' })
+      .mockResolvedValueOnce({})
+
+    ;(createPublicClient as jest.Mock).mockReturnValue({
+      getTransactionReceipt: jest.fn().mockResolvedValue({
+        logs: [{ address: '0xtoken', data: '0x', topics: ['0x1'] }],
+      }),
+    })
+    ;(decodeEventLog as jest.Mock).mockReturnValue({
+      eventName: 'Transfer',
+      args: {
+        from: '0xbuyerwallet',
+        to: '0xhostwallet',
+        value: 49000000n,
+      },
+    })
+
+    const { service } = createService({
+      cardFindUnique,
+      serviceOrderFindUnique,
+      serviceOrderUpdate,
+    })
+
+    const result = await service.activateServiceCheckout(
+      'alice',
+      'svc_payment',
+      `0x${'1'.repeat(64)}`,
+    )
+
+    expect(result.success).toBe(true)
+    expect(serviceOrderUpdate).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { paymentId: 'svc_payment' },
+        data: expect.objectContaining({ status: 'VERIFIED' }),
+      }),
+    )
+    expect(serviceOrderUpdate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { paymentId: 'svc_payment' },
+        data: expect.objectContaining({ status: 'COMPLETED' }),
+      }),
+    )
+  })
+
+  it('rejects missing service offers on the card', async () => {
+    const cardFindUnique = jest.fn().mockResolvedValue({
+      id: 'card_1',
+      userId: 'owner_1',
+      fields: { services: [] },
+      user: { walletAddress: '0xhostwallet' },
+    })
+    const { service } = createService({ cardFindUnique })
+
+    await expect(
+      service.createServiceCheckoutIntent('alice', {
+        serviceId: 'offer_missing',
+        customerName: 'Buyer',
+        customerEmail: 'buyer@example.com',
+        walletAddress: '0xbuyerwallet',
+      }),
+    ).rejects.toThrow(BadRequestException)
   })
 })

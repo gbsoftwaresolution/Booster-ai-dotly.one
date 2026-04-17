@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
-import { IsString, IsIn, IsInt, Min, Max, MaxLength, Matches } from 'class-validator'
+import { IsString, IsIn, IsInt, Min, Max, MaxLength, Matches, IsOptional } from 'class-validator'
 import type { Response } from 'express'
 import { CardsService } from './cards.service'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -100,6 +100,39 @@ class PublishActionDto {
   action!: 'publish' | 'unpublish'
 }
 
+class CreateServiceCheckoutIntentDto {
+  @IsString()
+  @MaxLength(100)
+  serviceId!: string
+
+  @IsString()
+  @MaxLength(120)
+  customerName!: string
+
+  @IsString()
+  @MaxLength(254)
+  customerEmail!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{40}$/)
+  walletAddress!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notes?: string
+}
+
+class ActivateServiceCheckoutDto {
+  @IsString()
+  @MaxLength(100)
+  paymentId!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/)
+  txHash!: string
+}
+
 @ApiTags('cards')
 @Controller()
 export class CardsController {
@@ -136,6 +169,14 @@ export class CardsController {
   @Get('cards/:id')
   findOne(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     return this.cardsService.findById(id, user.id)
+  }
+
+  @ApiBearerAuth()
+  @Get('cards/:id/service-orders')
+  listServiceOrders(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.cardsService
+      .listServiceOrders(id, user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
   @ApiBearerAuth()
@@ -267,6 +308,28 @@ export class CardsController {
   @Get('public/cards/:handle')
   findByHandle(@Param('handle') handle: string) {
     return this.cardsService.findByHandle(handle)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('public/cards/:handle/service-checkout-intent')
+  createServiceCheckoutIntent(
+    @Param('handle') handle: string,
+    @Body() dto: CreateServiceCheckoutIntentDto,
+  ) {
+    return this.cardsService.createServiceCheckoutIntent(handle, dto)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('public/cards/:handle/service-checkout-activate')
+  activateServiceCheckout(
+    @Param('handle') handle: string,
+    @Body() dto: ActivateServiceCheckoutDto,
+  ) {
+    return this.cardsService.activateServiceCheckout(handle, dto.paymentId, dto.txHash)
   }
 
   @Public()

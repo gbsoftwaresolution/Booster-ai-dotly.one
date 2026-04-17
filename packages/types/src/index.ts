@@ -61,9 +61,19 @@ export type AnalyticsActionType =
   | 'deposit_completed'
   | 'payment_started'
   | 'payment_completed'
+  | 'service_checkout_started'
+  | 'service_checkout_completed'
   | 'save_contact_attempt'
   | 'vcard_downloaded'
   | 'social_link_click'
+
+export interface CardServiceOffer {
+  id: string
+  name: string
+  description?: string
+  priceUsdt: string
+  highlighted?: boolean
+}
 
 export enum SocialPlatform {
   LINKEDIN = 'LINKEDIN',
@@ -150,6 +160,7 @@ export interface CardFields {
   logoUrl: string
   bookingAppointmentSlug?: string
   actions?: CardActionsConfig
+  services?: CardServiceOffer[]
 }
 
 export type ButtonStyle = 'icon' | 'filled-icon' | 'icon-text' | 'filled-icon-text'

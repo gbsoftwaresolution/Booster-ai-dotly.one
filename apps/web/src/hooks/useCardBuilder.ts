@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type {
   CardData,
   CardActionsConfig,
+  CardServiceOffer,
   CardEditorResponse,
   PartialCardFields,
   CardThemeData,
@@ -233,7 +234,7 @@ export function useCardBuilder(cardId: string) {
   )
 
   const updateActions = useCallback(
-    (actions: CardActionsConfig | undefined) => {
+    (actions: CardActionsConfig | undefined, services?: CardServiceOffer[] | undefined) => {
       setState((prev) => {
         if (!prev.card) return prev
         const nextFields = { ...prev.card.fields }
@@ -242,13 +243,22 @@ export function useCardBuilder(cardId: string) {
         } else {
           delete nextFields.actions
         }
+        if ((services?.length ?? 0) > 0) {
+          nextFields.services = services
+        } else {
+          delete nextFields.services
+        }
         latestFieldsRef.current = nextFields
         return {
           ...prev,
           card: { ...prev.card, fields: nextFields },
         }
       })
-      pendingFieldChanges.current = { ...pendingFieldChanges.current, actions: actions ?? null }
+      pendingFieldChanges.current = {
+        ...pendingFieldChanges.current,
+        actions: actions ?? null,
+        services: services ?? null,
+      }
       triggerAutoSave()
     },
     [triggerAutoSave],

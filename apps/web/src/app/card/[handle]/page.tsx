@@ -4,7 +4,13 @@ import Image from 'next/image'
 import { PoweredByDotly } from '@/components/PoweredByDotly'
 import { getServerApiUrl } from '@/lib/server-api'
 import { CardView } from './CardView'
-import type { CardTemplate, SocialPlatform, MediaBlockType, CardActionsConfig } from '@dotly/types'
+import type {
+  CardTemplate,
+  SocialPlatform,
+  MediaBlockType,
+  CardActionsConfig,
+  CardServiceOffer,
+} from '@dotly/types'
 
 export const revalidate = 0
 
@@ -214,6 +220,9 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
       logoUrl: stringField(fields, 'logoUrl'),
       bookingAppointmentSlug: stringField(fields, 'bookingAppointmentSlug') || undefined,
       actions: fields.actions as CardActionsConfig | undefined,
+      services: Array.isArray(fields.services)
+        ? (fields.services as CardServiceOffer[])
+        : undefined,
     },
   }
 
