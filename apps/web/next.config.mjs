@@ -18,12 +18,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 // crashes deep inside request handlers.  We validate here — at build/start
 // time — so the problem is caught before any traffic is served.
 //
-// NEXT_PUBLIC_* vars are inlined at build time; server-only vars (API_URL,
-// INTERNAL_API_URL) are read at runtime, so they are validated here too.
+// NEXT_PUBLIC_* vars are inlined at build time; server-only vars are read at
+// runtime, so production-critical values are validated here too.
 // ---------------------------------------------------------------------------
 const REQUIRED_ENV_VARS = [
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   // M-5: NEXT_PUBLIC_API_URL falls back to localhost:3001 if absent — every API
   // call from the browser silently fails in production.  Validate here.
   'NEXT_PUBLIC_API_URL',
@@ -34,9 +32,7 @@ const REQUIRED_ENV_VARS = [
 // Placeholder values that look valid but are definitely not real credentials
 const KNOWN_PLACEHOLDERS = new Set([
   'placeholder',
-  'your-anon-key',
   'changeme',
-  'https://placeholder.supabase.co',
   'http://localhost',
 ])
 
