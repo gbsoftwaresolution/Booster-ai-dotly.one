@@ -133,6 +133,39 @@ class ActivateServiceCheckoutDto {
   txHash!: string
 }
 
+class CreateProductCheckoutIntentDto {
+  @IsString()
+  @MaxLength(100)
+  productId!: string
+
+  @IsString()
+  @MaxLength(120)
+  customerName!: string
+
+  @IsString()
+  @MaxLength(254)
+  customerEmail!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{40}$/)
+  walletAddress!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notes?: string
+}
+
+class ActivateProductCheckoutDto {
+  @IsString()
+  @MaxLength(100)
+  paymentId!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/)
+  txHash!: string
+}
+
 @ApiTags('cards')
 @Controller()
 export class CardsController {
@@ -176,6 +209,14 @@ export class CardsController {
   listServiceOrders(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     return this.cardsService
       .listServiceOrders(id, user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
+  }
+
+  @ApiBearerAuth()
+  @Get('cards/:id/product-orders')
+  listProductOrders(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.cardsService
+      .listProductOrders(id, user.id)
       .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
@@ -330,6 +371,28 @@ export class CardsController {
     @Body() dto: ActivateServiceCheckoutDto,
   ) {
     return this.cardsService.activateServiceCheckout(handle, dto.paymentId, dto.txHash)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('public/cards/:handle/product-checkout-intent')
+  createProductCheckoutIntent(
+    @Param('handle') handle: string,
+    @Body() dto: CreateProductCheckoutIntentDto,
+  ) {
+    return this.cardsService.createProductCheckoutIntent(handle, dto)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('public/cards/:handle/product-checkout-activate')
+  activateProductCheckout(
+    @Param('handle') handle: string,
+    @Body() dto: ActivateProductCheckoutDto,
+  ) {
+    return this.cardsService.activateProductCheckout(handle, dto.paymentId, dto.txHash)
   }
 
   @Public()

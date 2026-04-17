@@ -8,6 +8,7 @@ import type {
   CardActionsConfig,
   CardActionType,
   CardServiceOffer,
+  CardStoreProduct,
 } from '@dotly/types'
 import Link from 'next/link'
 import { getAccessToken } from '@/lib/auth/client'
@@ -283,6 +284,14 @@ export function CardView({
         />
       )}
 
+      {(rendererProps.card.fields.products?.length ?? 0) > 0 && (
+        <StoreTeaserSection
+          cardHandle={cardHandle}
+          products={rendererProps.card.fields.products ?? []}
+          onAnalytics={trackInteraction}
+        />
+      )}
+
       {/* Share bar — shown below the card */}
       <ShareBar
         handle={cardHandle}
@@ -330,6 +339,64 @@ export function CardView({
 
       <AnalyticsBeacon cardId={rendererProps.card.id} />
     </>
+  )
+}
+
+function StoreTeaserSection({
+  cardHandle,
+  products,
+  onAnalytics,
+}: {
+  cardHandle: string
+  products: CardStoreProduct[]
+  onAnalytics: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
+}) {
+  const featured = products.find((product) => product.highlighted) ?? products[0] ?? null
+  if (!featured) return null
+
+  return (
+    <div className="px-4 pb-3">
+      <div className="rounded-[28px] border border-fuchsia-100 bg-white/90 p-4 shadow-sm backdrop-blur">
+        <div className="mb-3 px-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-fuchsia-600">
+            Store
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Open the storefront to browse products without cluttering the main card.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-slate-900">{featured.name}</p>
+              {featured.description && (
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                  {featured.description}
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">
+              {featured.priceUsdt} USDT
+            </div>
+          </div>
+        </div>
+        <Link
+          href={`/card/${encodeURIComponent(cardHandle)}/store`}
+          onClick={() => {
+            onAnalytics('CLICK', {
+              surface: 'store_teaser',
+              action: 'product_checkout_started',
+              source: 'card_public_page',
+              status: featured.id,
+              offerId: featured.id,
+            })
+          }}
+          className="mt-4 block rounded-2xl bg-fuchsia-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-fuchsia-700"
+        >
+          Open store
+        </Link>
+      </div>
+    </div>
   )
 }
 

@@ -29,6 +29,7 @@ import type {
   CardActionsConfig,
   CardActionType,
   CardServiceOffer,
+  CardStoreProduct,
 } from '@dotly/types'
 
 const ERC20_TRANSFER_EVENT_ABI = [
@@ -44,6 +45,7 @@ const ERC20_TRANSFER_EVENT_ABI = [
 ] as const
 
 const SERVICE_ORDER_REUSE_WINDOW_MS = 60 * 60_000
+const PRODUCT_ORDER_REUSE_WINDOW_MS = 60 * 60_000
 
 // F-26: Single source of truth for plan limits used in card creation.
 // BillingService.getPlanLimits() is the canonical source for all other plan
@@ -147,6 +149,74 @@ function sanitizeServiceOffers(value: unknown): CardServiceOffer[] | undefined {
       return offer
     }
     return { ...offer, highlighted: false }
+  })
+}
+
+function sanitizeStoreProduct(
+  value: unknown,
+  isTrustedAssetUrl: (value: string) => boolean,
+): CardStoreProduct | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const id = typeof record['id'] === 'string' ? record['id'].trim().slice(0, 100) : ''
+  const name = typeof record['name'] === 'string' ? record['name'].trim().slice(0, 160) : ''
+  const description =
+    typeof record['description'] === 'string' ? record['description'].trim().slice(0, 400) : ''
+  const priceRaw = typeof record['priceUsdt'] === 'string' ? record['priceUsdt'].trim() : ''
+  const imageUrl =
+    typeof record['imageUrl'] === 'string' ? record['imageUrl'].trim().slice(0, 500) : ''
+  const variantLabel =
+    typeof record['variantLabel'] === 'string' ? record['variantLabel'].trim().slice(0, 80) : ''
+  const shippingNote =
+    typeof record['shippingNote'] === 'string' ? record['shippingNote'].trim().slice(0, 120) : ''
+  const inventoryCountRaw = record['inventoryCount']
+  const priceNumber = Number(priceRaw)
+  if (!id || !name || !Number.isFinite(priceNumber) || priceNumber <= 0) return null
+  const inventoryCount =
+    typeof inventoryCountRaw === 'number' &&
+    Number.isInteger(inventoryCountRaw) &&
+    inventoryCountRaw >= 0
+      ? inventoryCountRaw
+      : typeof inventoryCountRaw === 'string' && /^\d+$/.test(inventoryCountRaw)
+        ? Number(inventoryCountRaw)
+        : undefined
+
+  return {
+    id,
+    name,
+    priceUsdt: priceNumber.toFixed(2),
+    ...(description ? { description } : {}),
+    ...(imageUrl && isTrustedAssetUrl(imageUrl) ? { imageUrl } : {}),
+    ...(inventoryCount !== undefined ? { inventoryCount } : {}),
+    ...(shippingNote ? { shippingNote } : {}),
+    ...(variantLabel ? { variantLabel } : {}),
+    ...(typeof record['highlighted'] === 'boolean' ? { highlighted: record['highlighted'] } : {}),
+  }
+}
+
+function sanitizeStoreProducts(
+  value: unknown,
+  isTrustedAssetUrl: (value: string) => boolean,
+): CardStoreProduct[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const products = value
+    .map((item) => sanitizeStoreProduct(item, isTrustedAssetUrl))
+    .filter((item): item is CardStoreProduct => item !== null)
+    .slice(0, 6)
+
+  if (products.length === 0) return undefined
+
+  const highlightedCount = products.filter((product) => product.highlighted).length
+  if (highlightedCount <= 1) return products
+
+  let highlightedUsed = false
+  return products.map((product) => {
+    if (!product.highlighted) return product
+    if (!highlightedUsed) {
+      highlightedUsed = true
+      return product
+    }
+    return { ...product, highlighted: false }
   })
 }
 
@@ -269,6 +339,10 @@ export class CardsService {
     return `svc_${randomBytes(6).toString('hex')}${Date.now().toString(36)}`
   }
 
+  private generateProductPaymentId(): string {
+    return `prd_${randomBytes(6).toString('hex')}${Date.now().toString(36)}`
+  }
+
   private sanitizeCardFields(
     fields: Prisma.JsonValue | Prisma.InputJsonValue | null | undefined,
   ): Prisma.InputJsonValue {
@@ -301,6 +375,15 @@ export class CardsService {
       record['services'] = services as unknown as Prisma.InputJsonValue
     } else {
       delete record['services']
+    }
+
+    const products = sanitizeStoreProducts(record['products'], (value) =>
+      this.isTrustedAssetUrl(value),
+    )
+    if (products) {
+      record['products'] = products as unknown as Prisma.InputJsonValue
+    } else {
+      delete record['products']
     }
     return record as Prisma.InputJsonValue
   }
@@ -621,6 +704,28 @@ export class CardsService {
         paymentId: true,
         serviceId: true,
         serviceName: true,
+        customerName: true,
+        customerEmail: true,
+        amountUsdt: true,
+        status: true,
+        txHash: true,
+        createdAt: true,
+        verifiedAt: true,
+        completedAt: true,
+      },
+    })
+  }
+
+  async listProductOrders(cardId: string, userId: string) {
+    await this.findById(cardId, userId)
+    return this.prisma.productOrder.findMany({
+      where: { cardId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        paymentId: true,
+        productId: true,
+        productName: true,
         customerName: true,
         customerEmail: true,
         amountUsdt: true,
@@ -969,6 +1074,102 @@ export class CardsService {
     }
   }
 
+  async createProductCheckoutIntent(
+    handle: string,
+    dto: {
+      productId: string
+      customerName: string
+      customerEmail: string
+      walletAddress: string
+      notes?: string
+    },
+  ) {
+    const card = await this.prisma.card.findUnique({
+      where: { handle, isActive: true },
+      select: {
+        id: true,
+        userId: true,
+        fields: true,
+        user: { select: { walletAddress: true } },
+      },
+    })
+    if (!card) throw new NotFoundException('Card not found')
+
+    const products = sanitizeStoreProducts(
+      (card.fields as Record<string, unknown> | null)?.['products'],
+      (value) => this.isTrustedAssetUrl(value),
+    )
+    const product = products?.find((item) => item.id === dto.productId.trim())
+    if (!product) {
+      throw new BadRequestException('Selected product was not found on this card')
+    }
+
+    const recipientAddress = card.user.walletAddress?.toLowerCase()
+    if (!recipientAddress) {
+      throw new BadRequestException('This seller has not configured crypto checkout yet')
+    }
+
+    const amountUsdt = this.normalizeUsdtAmount(product.priceUsdt)
+    const amountRaw = this.parseUsdtAmountRaw(amountUsdt)
+    const paymentId = this.generateProductPaymentId()
+
+    await this.prisma.productOrder.create({
+      data: {
+        cardId: card.id,
+        ownerUserId: card.userId,
+        paymentId,
+        productId: product.id,
+        productName: product.name,
+        customerName: dto.customerName.trim(),
+        customerEmail: dto.customerEmail.trim().toLowerCase(),
+        walletAddress: dto.walletAddress.toLowerCase(),
+        recipientAddress,
+        amountUsdt,
+        amountRaw: amountRaw.toString(),
+        tokenAddress: this.getUsdtAddress(),
+        chainId: arbitrum.id,
+        notes: dto.notes?.trim() || null,
+      },
+    })
+
+    return {
+      paymentId,
+      productId: product.id,
+      productName: product.name,
+      amountUsdt,
+      amountRaw: amountRaw.toString(),
+      tokenAddress: this.getUsdtAddress(),
+      recipientAddress,
+      chainId: arbitrum.id,
+    }
+  }
+
+  async activateProductCheckout(handle: string, paymentId: string, txHash: string) {
+    const card = await this.prisma.card.findUnique({
+      where: { handle, isActive: true },
+      select: { id: true },
+    })
+    if (!card) throw new NotFoundException('Card not found')
+
+    const order = await this.assertProductOrderVerified(handle, paymentId, txHash)
+
+    await this.prisma.productOrder.update({
+      where: { paymentId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    })
+
+    return {
+      success: true,
+      paymentId,
+      txHash,
+      productId: order.productId,
+      productName: order.productName,
+    }
+  }
+
   private async assertServiceOrderVerified(handle: string, paymentId: string, txHash: string) {
     const order = await this.prisma.serviceOrder.findUnique({
       where: { paymentId },
@@ -1058,6 +1259,99 @@ export class CardsService {
       select: {
         serviceId: true,
         serviceName: true,
+      },
+    })
+  }
+
+  private async assertProductOrderVerified(handle: string, paymentId: string, txHash: string) {
+    const order = await this.prisma.productOrder.findUnique({
+      where: { paymentId },
+      select: {
+        card: { select: { handle: true } },
+        productId: true,
+        productName: true,
+        walletAddress: true,
+        recipientAddress: true,
+        amountUsdt: true,
+        amountRaw: true,
+        tokenAddress: true,
+        status: true,
+        txHash: true,
+        createdAt: true,
+      },
+    })
+
+    if (!order || order.card.handle !== handle) {
+      throw new BadRequestException('Product checkout intent was not found')
+    }
+
+    if (order.status === 'COMPLETED') {
+      throw new BadRequestException('This product checkout has already been completed')
+    }
+
+    if (
+      order.status === 'EXPIRED' ||
+      (order.status === 'INTENT_CREATED' &&
+        Date.now() - order.createdAt.getTime() > PRODUCT_ORDER_REUSE_WINDOW_MS)
+    ) {
+      await this.prisma.productOrder.update({
+        where: { paymentId },
+        data: { status: 'EXPIRED' },
+      })
+      throw new BadRequestException(
+        'Product checkout intent has expired. Start again from the store.',
+      )
+    }
+
+    if (order.status === 'VERIFIED') {
+      if (order.txHash?.toLowerCase() === txHash.toLowerCase()) {
+        return order
+      }
+      throw new BadRequestException(
+        'This product checkout was already verified with another transaction',
+      )
+    }
+
+    const client = this.getArbitrumClient()
+    const receipt = await client.getTransactionReceipt({ hash: txHash as Hash })
+    const tokenAddress = order.tokenAddress.toLowerCase() as Address
+    const walletAddress = order.walletAddress.toLowerCase()
+    const recipientAddress = order.recipientAddress.toLowerCase()
+    const amountRaw = order.amountRaw
+
+    const matchesTransfer = receipt.logs.some((log) => {
+      if (log.address.toLowerCase() !== tokenAddress) return false
+      try {
+        const decoded = decodeEventLog({
+          abi: ERC20_TRANSFER_EVENT_ABI,
+          data: log.data,
+          topics: log.topics,
+        })
+        if (decoded.eventName !== 'Transfer') return false
+        return (
+          decoded.args.from.toLowerCase() === walletAddress &&
+          decoded.args.to.toLowerCase() === recipientAddress &&
+          decoded.args.value === BigInt(amountRaw)
+        )
+      } catch {
+        return false
+      }
+    })
+
+    if (!matchesTransfer) {
+      throw new BadRequestException('Product payment transaction could not be verified on-chain')
+    }
+
+    return this.prisma.productOrder.update({
+      where: { paymentId },
+      data: {
+        txHash,
+        status: 'VERIFIED',
+        verifiedAt: new Date(),
+      },
+      select: {
+        productId: true,
+        productName: true,
       },
     })
   }

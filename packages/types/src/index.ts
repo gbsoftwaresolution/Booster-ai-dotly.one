@@ -62,8 +62,11 @@ export type AnalyticsActionType =
   | 'payment_started'
   | 'payment_completed'
   | 'services_page_viewed'
+  | 'store_page_viewed'
   | 'service_checkout_started'
   | 'service_checkout_completed'
+  | 'product_checkout_started'
+  | 'product_checkout_completed'
   | 'save_contact_attempt'
   | 'vcard_downloaded'
   | 'social_link_click'
@@ -73,6 +76,18 @@ export interface CardServiceOffer {
   name: string
   description?: string
   priceUsdt: string
+  highlighted?: boolean
+}
+
+export interface CardStoreProduct {
+  id: string
+  name: string
+  description?: string
+  priceUsdt: string
+  imageUrl?: string
+  inventoryCount?: number
+  shippingNote?: string
+  variantLabel?: string
   highlighted?: boolean
 }
 
@@ -162,6 +177,7 @@ export interface CardFields {
   bookingAppointmentSlug?: string
   actions?: CardActionsConfig
   services?: CardServiceOffer[]
+  products?: CardStoreProduct[]
 }
 
 export type ButtonStyle = 'icon' | 'filled-icon' | 'icon-text' | 'filled-icon-text'

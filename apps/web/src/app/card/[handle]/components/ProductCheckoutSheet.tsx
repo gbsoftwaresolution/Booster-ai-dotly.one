@@ -1,0 +1,238 @@
+'use client'
+
+import { useState } from 'react'
+import { Interface } from 'ethers'
+import type { CardStoreProduct } from '@dotly/types'
+import { getPublicApiUrl } from '@/lib/public-env'
+import {
+  ARBITRUM_CHAIN_ID,
+  ensureWalletChain,
+  waitForReceipt,
+} from '@/app/(dashboard)/settings/billing/helpers'
+
+const API_URL = getPublicApiUrl()
+
+interface ProductCheckoutIntentResponse {
+  paymentId: string
+  productId: string
+  productName: string
+  amountUsdt: string
+  amountRaw: string
+  tokenAddress: string
+  recipientAddress: string
+  chainId: number
+}
+
+export function ProductCheckoutSheet({
+  cardHandle,
+  product,
+  source = 'card_store_page',
+  onClose,
+  onAnalytics,
+}: {
+  cardHandle: string
+  product: CardStoreProduct
+  source?: string
+  onClose: () => void
+  onAnalytics: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
+}) {
+  const [customerName, setCustomerName] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [notes, setNotes] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [step, setStep] = useState<string | null>(null)
+
+  async function handlePay() {
+    if (!window.ethereum) {
+      setError('Open this page inside a wallet browser such as MetaMask or Trust Wallet.')
+      return
+    }
+
+    const trimmedName = customerName.trim()
+    const trimmedEmail = customerEmail.trim().toLowerCase()
+    if (!trimmedName || !trimmedEmail) {
+      setError('Name and email are required before checkout.')
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const accounts = (await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      })) as string[]
+      const walletAddress = accounts[0]
+      if (!walletAddress) throw new Error('No wallet account was returned.')
+
+      setStep('Preparing checkout…')
+      const intent = await fetch(`${API_URL}/public/cards/${cardHandle}/product-checkout-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: product.id,
+          customerName: trimmedName,
+          customerEmail: trimmedEmail,
+          walletAddress,
+          notes: notes.trim() || undefined,
+        }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+          throw new Error(
+            typeof err['message'] === 'string' ? err['message'] : `Error ${res.status}`,
+          )
+        }
+        return (await res.json()) as ProductCheckoutIntentResponse
+      })
+
+      await ensureWalletChain(intent.chainId || ARBITRUM_CHAIN_ID)
+      setStep('Sending USDT payment…')
+
+      const iface = new Interface(['function transfer(address to,uint256 value)'])
+      const transferData = iface.encodeFunctionData('transfer', [
+        intent.recipientAddress,
+        BigInt(intent.amountRaw),
+      ])
+
+      const paymentTxHash = (await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: walletAddress, to: intent.tokenAddress, data: transferData }],
+      })) as string
+
+      setStep('Waiting for on-chain confirmation…')
+      await waitForReceipt(paymentTxHash)
+
+      setStep('Verifying payment with Dotly…')
+      const activateRes = await fetch(
+        `${API_URL}/public/cards/${cardHandle}/product-checkout-activate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentId: intent.paymentId, txHash: paymentTxHash }),
+        },
+      )
+      if (!activateRes.ok) {
+        const err = (await activateRes.json().catch(() => ({}))) as Record<string, unknown>
+        throw new Error(
+          typeof err['message'] === 'string' ? err['message'] : `Error ${activateRes.status}`,
+        )
+      }
+
+      onAnalytics('SAVE', {
+        surface: 'store_checkout',
+        action: 'product_checkout_completed',
+        source,
+        status: product.id,
+        offerId: product.id,
+        amount: Number(intent.amountUsdt),
+        currency: 'USDT',
+      })
+      onAnalytics('SAVE', {
+        surface: 'store_checkout',
+        action: 'payment_completed',
+        source,
+        status: product.id,
+        offerId: product.id,
+        amount: Number(intent.amountUsdt),
+        currency: 'USDT',
+      })
+      setSuccess(
+        `Payment received for ${intent.productName}. The seller can now fulfill your order.`,
+      )
+      setStep(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Product checkout failed.'
+      setError(
+        /user rejected|cancelled/i.test(message) ? 'The wallet action was cancelled.' : message,
+      )
+      setStep(null)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-white px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-5 shadow-2xl"
+        style={{ maxWidth: 520, margin: '0 auto' }}
+      >
+        <div className="mb-4 h-1 w-10 rounded-full bg-gray-200 mx-auto" />
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-500">
+              Crypto store checkout
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-slate-950">{product.name}</h3>
+            {product.description && (
+              <p className="mt-1 text-sm text-slate-500">{product.description}</p>
+            )}
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              {product.priceUsdt} USDT on Arbitrum
+            </p>
+          </div>
+
+          <input
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Your full name"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-fuchsia-400 focus:bg-white focus:ring-2 focus:ring-fuchsia-500/20"
+          />
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            placeholder="Your email"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-fuchsia-400 focus:bg-white focus:ring-2 focus:ring-fuchsia-500/20"
+          />
+          <textarea
+            rows={3}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional notes for the seller"
+            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-fuchsia-400 focus:bg-white focus:ring-2 focus:ring-fuchsia-500/20"
+          />
+
+          {step && <div className="text-sm font-medium text-fuchsia-700">{step}</div>}
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              {success}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => void handlePay()}
+              disabled={submitting}
+              className="flex-1 rounded-xl bg-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:opacity-50"
+            >
+              {submitting ? 'Processing…' : `Buy for ${product.priceUsdt} USDT`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}

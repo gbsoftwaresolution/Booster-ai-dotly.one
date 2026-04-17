@@ -17,11 +17,17 @@ describe('CardsService service checkout', () => {
     serviceOrderCreate?: jest.Mock
     serviceOrderFindUnique?: jest.Mock
     serviceOrderUpdate?: jest.Mock
+    productOrderCreate?: jest.Mock
+    productOrderFindUnique?: jest.Mock
+    productOrderUpdate?: jest.Mock
   }) {
     const cardFindUnique = overrides?.cardFindUnique ?? jest.fn()
     const serviceOrderCreate = overrides?.serviceOrderCreate ?? jest.fn()
     const serviceOrderFindUnique = overrides?.serviceOrderFindUnique ?? jest.fn()
     const serviceOrderUpdate = overrides?.serviceOrderUpdate ?? jest.fn()
+    const productOrderCreate = overrides?.productOrderCreate ?? jest.fn()
+    const productOrderFindUnique = overrides?.productOrderFindUnique ?? jest.fn()
+    const productOrderUpdate = overrides?.productOrderUpdate ?? jest.fn()
 
     const prisma = {
       user: { findUnique: jest.fn().mockResolvedValue({ id: 'owner_1' }) },
@@ -32,6 +38,12 @@ describe('CardsService service checkout', () => {
         create: serviceOrderCreate,
         findUnique: serviceOrderFindUnique,
         update: serviceOrderUpdate,
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      productOrder: {
+        create: productOrderCreate,
+        findUnique: productOrderFindUnique,
+        update: productOrderUpdate,
         findMany: jest.fn().mockResolvedValue([]),
       },
     }
@@ -73,6 +85,9 @@ describe('CardsService service checkout', () => {
       serviceOrderCreate,
       serviceOrderFindUnique,
       serviceOrderUpdate,
+      productOrderCreate,
+      productOrderFindUnique,
+      productOrderUpdate,
     }
   }
 
@@ -203,5 +218,103 @@ describe('CardsService service checkout', () => {
         walletAddress: '0xbuyerwallet',
       }),
     ).rejects.toThrow(BadRequestException)
+  })
+
+  it('creates a product checkout intent from card store products', async () => {
+    const cardFindUnique = jest.fn().mockResolvedValue({
+      id: 'card_1',
+      userId: 'owner_1',
+      fields: {
+        products: [{ id: 'product_1', name: 'Crypto Guide', priceUsdt: '29.00' }],
+      },
+      user: { walletAddress: '0xhostwallet' },
+    })
+    const { service, productOrderCreate } = createService({ cardFindUnique })
+
+    const result = await service.createProductCheckoutIntent('alice', {
+      productId: 'product_1',
+      customerName: 'Buyer',
+      customerEmail: 'buyer@example.com',
+      walletAddress: '0xbuyerwallet',
+      notes: 'Digital delivery please',
+    })
+
+    expect(result.productName).toBe('Crypto Guide')
+    expect(result.amountUsdt).toBe('29.00')
+    expect(productOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cardId: 'card_1',
+          ownerUserId: 'owner_1',
+          productId: 'product_1',
+          productName: 'Crypto Guide',
+          customerEmail: 'buyer@example.com',
+          recipientAddress: '0xhostwallet',
+        }),
+      }),
+    )
+  })
+
+  it('verifies a product checkout transfer and marks it completed', async () => {
+    const cardFindUnique = jest.fn().mockResolvedValueOnce({ id: 'card_1' })
+    const productOrderFindUnique = jest.fn().mockResolvedValue({
+      card: { handle: 'alice' },
+      productId: 'product_1',
+      productName: 'Crypto Guide',
+      walletAddress: '0xbuyerwallet',
+      recipientAddress: '0xhostwallet',
+      amountUsdt: '29.00',
+      amountRaw: '29000000',
+      tokenAddress: '0xtoken',
+      status: 'INTENT_CREATED',
+      txHash: null,
+      createdAt: new Date(),
+    })
+    const productOrderUpdate = jest
+      .fn()
+      .mockResolvedValueOnce({ productId: 'product_1', productName: 'Crypto Guide' })
+      .mockResolvedValueOnce({})
+
+    ;(createPublicClient as jest.Mock).mockReturnValue({
+      getTransactionReceipt: jest.fn().mockResolvedValue({
+        logs: [{ address: '0xtoken', data: '0x', topics: ['0x1'] }],
+      }),
+    })
+    ;(decodeEventLog as jest.Mock).mockReturnValue({
+      eventName: 'Transfer',
+      args: {
+        from: '0xbuyerwallet',
+        to: '0xhostwallet',
+        value: 29000000n,
+      },
+    })
+
+    const { service } = createService({
+      cardFindUnique,
+      productOrderFindUnique,
+      productOrderUpdate,
+    })
+
+    const result = await service.activateProductCheckout(
+      'alice',
+      'prd_payment',
+      `0x${'1'.repeat(64)}`,
+    )
+
+    expect(result.success).toBe(true)
+    expect(productOrderUpdate).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { paymentId: 'prd_payment' },
+        data: expect.objectContaining({ status: 'VERIFIED' }),
+      }),
+    )
+    expect(productOrderUpdate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { paymentId: 'prd_payment' },
+        data: expect.objectContaining({ status: 'COMPLETED' }),
+      }),
+    )
   })
 })

@@ -10,6 +10,7 @@ import type {
   MediaBlockType,
   CardActionsConfig,
   CardServiceOffer,
+  CardStoreProduct,
 } from '@dotly/types'
 
 export const revalidate = 0
@@ -222,6 +223,9 @@ export default async function CardPage({ params }: { params: Promise<{ handle: s
       actions: fields.actions as CardActionsConfig | undefined,
       services: Array.isArray(fields.services)
         ? (fields.services as CardServiceOffer[])
+        : undefined,
+      products: Array.isArray(fields.products)
+        ? (fields.products as CardStoreProduct[])
         : undefined,
     },
   }

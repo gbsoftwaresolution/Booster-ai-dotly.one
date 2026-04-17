@@ -71,6 +71,51 @@ class CardServiceOfferDto {
   highlighted?: boolean
 }
 
+class CardStoreProductDto {
+  @IsString()
+  @MaxLength(100)
+  id!: string
+
+  @IsString()
+  @MaxLength(160)
+  name!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  description?: string
+
+  @IsString()
+  @Matches(/^\d+(?:\.\d{1,2})?$/, {
+    message: 'priceUsdt must be a valid amount with up to 2 decimals',
+  })
+  @MaxLength(32)
+  priceUsdt!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string
+
+  @IsOptional()
+  @Type(() => Number)
+  inventoryCount?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  shippingNote?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  variantLabel?: string
+
+  @IsOptional()
+  @IsBoolean()
+  highlighted?: boolean
+}
+
 // HIGH-03: Replace the open-ended `Record<string, unknown>` fields type with an
 // explicit DTO that validates and caps every known card field.
 // Without this, an attacker can store arbitrarily large strings in any key
@@ -149,6 +194,12 @@ export class CardFieldsDto {
   @ValidateNested({ each: true })
   @Type(() => CardServiceOfferDto)
   services?: CardServiceOfferDto[]
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CardStoreProductDto)
+  products?: CardStoreProductDto[]
 }
 
 export class CreateCardDto {

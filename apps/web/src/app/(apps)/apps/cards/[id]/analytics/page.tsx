@@ -69,6 +69,21 @@ interface ServiceOrderItem {
   completedAt: string | null
 }
 
+interface ProductOrderItem {
+  id: string
+  paymentId: string
+  productId: string
+  productName: string
+  customerName: string
+  customerEmail: string
+  amountUsdt: string
+  status: 'INTENT_CREATED' | 'VERIFIED' | 'COMPLETED' | 'EXPIRED'
+  txHash: string | null
+  createdAt: string
+  verifiedAt: string | null
+  completedAt: string | null
+}
+
 const RANGES = [
   { label: '7d', days: 7 },
   { label: '30d', days: 30 },
@@ -267,6 +282,7 @@ export default function CardAnalyticsPage(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [serviceOrders, setServiceOrders] = useState<ServiceOrderItem[]>([])
+  const [productOrders, setProductOrders] = useState<ProductOrderItem[]>([])
   const [refreshing, setRefreshing] = useState(false)
   // Ref to cancel in-flight requests when range changes or component unmounts
   const abortRef = useRef<AbortController | null>(null)
@@ -285,7 +301,7 @@ export default function CardAnalyticsPage(): JSX.Element {
         const token = await getAccessToken()
         const from = isoFrom(range.days)
         const to = isoTo()
-        const [result, cardData, ordersData] = await Promise.all([
+        const [result, cardData, ordersData, productOrdersData] = await Promise.all([
           apiGet<AnalyticsData>(
             `/cards/${id}/analytics?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
             token,
@@ -299,11 +315,17 @@ export default function CardAnalyticsPage(): JSX.Element {
             token,
             controller.signal,
           ),
+          apiGet<{ items: ProductOrderItem[] }>(
+            `/cards/${id}/product-orders`,
+            token,
+            controller.signal,
+          ),
         ])
         // Only update state if this request wasn't superseded
         if (!controller.signal.aborted) {
           setData(result)
           setServiceOrders(ordersData.items ?? [])
+          setProductOrders(productOrdersData.items ?? [])
           if (cardData) {
             const fields = cardData.fields || {}
             setCardInfo({
@@ -743,6 +765,47 @@ export default function CardAnalyticsPage(): JSX.Element {
                     </p>
                   </div>
                   <span className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold text-white">
+                    {order.status.replace('_', ' ')}
+                  </span>
+                </div>
+                {order.txHash && (
+                  <p className="mt-2 break-all font-mono text-[11px] text-gray-400">
+                    {order.txHash}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="app-panel rounded-[28px] p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Product orders</h3>
+            <p className="text-xs text-gray-400">Recent store purchases from this card</p>
+          </div>
+          <span className="text-xs font-semibold text-gray-400">{productOrders.length} total</span>
+        </div>
+        {productOrders.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            No product orders yet. Publish store items to start collecting storefront payments.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {productOrders.map((order) => (
+              <div key={order.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{order.productName}</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {order.customerName} · {order.customerEmail}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {new Date(order.createdAt).toLocaleString()} · {order.amountUsdt} USDT
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-fuchsia-600 px-3 py-1 text-[10px] font-semibold text-white">
                     {order.status.replace('_', ' ')}
                   </span>
                 </div>

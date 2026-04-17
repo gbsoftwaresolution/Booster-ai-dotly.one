@@ -5,6 +5,7 @@ import type {
   CardData,
   CardActionsConfig,
   CardServiceOffer,
+  CardStoreProduct,
   CardEditorResponse,
   PartialCardFields,
   CardThemeData,
@@ -283,6 +284,31 @@ export function useCardBuilder(cardId: string) {
     [triggerAutoSave],
   )
 
+  const updateProducts = useCallback(
+    (products: CardStoreProduct[] | undefined) => {
+      setState((prev) => {
+        if (!prev.card) return prev
+        const nextFields = { ...prev.card.fields }
+        if ((products?.length ?? 0) > 0) {
+          nextFields.products = products
+        } else {
+          delete nextFields.products
+        }
+        latestFieldsRef.current = nextFields
+        return {
+          ...prev,
+          card: { ...prev.card, fields: nextFields },
+        }
+      })
+      pendingFieldChanges.current = {
+        ...pendingFieldChanges.current,
+        products: products ?? null,
+      }
+      triggerAutoSave()
+    },
+    [triggerAutoSave],
+  )
+
   const updateHandle = useCallback(
     (handle: string) => {
       const previousHandle = state.card?.handle ?? null
@@ -449,6 +475,7 @@ export function useCardBuilder(cardId: string) {
     updateField,
     updateActions,
     updateServices,
+    updateProducts,
     updateHandle,
     updateTheme,
     updateTemplate,

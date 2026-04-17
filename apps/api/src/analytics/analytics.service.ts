@@ -93,10 +93,12 @@ function summarizeActions(
         break
       case 'payment_started':
       case 'service_checkout_started':
+      case 'product_checkout_started':
         summary.totalPaymentStarts += 1
         break
       case 'payment_completed':
       case 'service_checkout_completed':
+      case 'product_checkout_completed':
         summary.totalPaymentCompletions += 1
         break
       default:

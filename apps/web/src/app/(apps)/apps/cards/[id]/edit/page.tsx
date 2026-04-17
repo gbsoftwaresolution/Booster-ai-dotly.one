@@ -10,6 +10,7 @@ import { ProfileTab } from '@/components/card-builder/ProfileTab'
 import { LinksTab } from '@/components/card-builder/LinksTab'
 import { ActionsTab } from '@/components/card-builder/ActionsTab'
 import { ServicesTab } from '@/components/card-builder/ServicesTab'
+import { StoreTab } from '@/components/card-builder/StoreTab'
 import { MediaTab } from '@/components/card-builder/MediaTab'
 import { ThemeTab } from '@/components/card-builder/ThemeTab'
 import { PublishBar } from '@/components/card-builder/PublishBar'
@@ -26,6 +27,7 @@ import {
   Palette,
   Eye,
   BriefcaseBusiness,
+  Store,
   QrCode,
   BarChart2,
   CheckCircle2,
@@ -42,6 +44,7 @@ type Tab =
   | 'profile'
   | 'actions'
   | 'services'
+  | 'store'
   | 'links'
   | 'media'
   | 'theme'
@@ -53,6 +56,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'actions', label: 'Actions', icon: MousePointerClick },
   { id: 'services', label: 'Services', icon: BriefcaseBusiness },
+  { id: 'store', label: 'Store', icon: Store },
   { id: 'links', label: 'Links', icon: Link2 },
   { id: 'media', label: 'Media', icon: Image },
   { id: 'theme', label: 'Theme', icon: Palette },
@@ -227,6 +231,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
     updateField,
     updateActions,
     updateServices,
+    updateProducts,
     updateHandle,
     updateTheme,
     updateTemplate,
@@ -510,6 +515,9 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                   )}
                   {activeTab === 'services' && (
                     <ServicesTab fields={card.fields} onServicesChange={updateServices} />
+                  )}
+                  {activeTab === 'store' && (
+                    <StoreTab cardId={id} fields={card.fields} onProductsChange={updateProducts} />
                   )}
                   {activeTab === 'links' && (
                     <LinksTab
