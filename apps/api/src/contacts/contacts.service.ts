@@ -95,6 +95,184 @@ function trimRequiredTemplateField(value: string, fieldName: string): string {
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
 
+  private async maybeCreateAutomationFollowUpTask(input: {
+    contactId: string
+    ownerUserId: string
+    event: string
+    metadata?: Record<string, unknown>
+  }): Promise<void> {
+    const matchingRule = await this.prisma.contactAutomationRule.findFirst({
+      where: {
+        ownerUserId: input.ownerUserId,
+        triggerEvent: input.event as
+          | 'WHATSAPP_CLICKED'
+          | 'WHATSAPP_AUTOMATION_TRIGGERED'
+          | 'LEAD_CAPTURED'
+          | 'BOOKING_COMPLETED'
+          | 'PAYMENT_COMPLETED',
+        isActive: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    const taskPlan = matchingRule
+      ? {
+          title: matchingRule.taskTitle,
+          type: matchingRule.taskType,
+          priority: matchingRule.taskPriority,
+          delayMinutes: matchingRule.delayMinutes,
+        }
+      : (() => {
+          switch (input.event) {
+            case 'WHATSAPP_CLICKED':
+              return {
+                title: 'Follow up on WhatsApp interest',
+                type: 'FOLLOW_UP' as const,
+                priority: 'MEDIUM' as const,
+                delayMinutes: 1440,
+              }
+            case 'WHATSAPP_AUTOMATION_TRIGGERED':
+              return {
+                title: 'Reply to automated WhatsApp handoff',
+                type: 'FOLLOW_UP' as const,
+                priority: 'HIGH' as const,
+                delayMinutes: 60,
+              }
+            case 'LEAD_CAPTURED':
+              return {
+                title: 'Contact new captured lead',
+                type: 'FOLLOW_UP' as const,
+                priority: 'HIGH' as const,
+                delayMinutes: 60,
+              }
+            case 'BOOKING_COMPLETED':
+              return {
+                title: 'Prepare for booked meeting follow-up',
+                type: 'FOLLOW_UP' as const,
+                priority: 'MEDIUM' as const,
+                delayMinutes: 1440,
+              }
+            case 'PAYMENT_COMPLETED':
+              return {
+                title: 'Fulfill paid conversion and follow up',
+                type: 'FOLLOW_UP' as const,
+                priority: 'HIGH' as const,
+                delayMinutes: 120,
+              }
+            default:
+              return null
+          }
+        })()
+
+    if (!taskPlan) return
+
+    const existing = await this.prisma.contactTask.findFirst({
+      where: {
+        contactId: input.contactId,
+        ownerUserId: input.ownerUserId,
+        completed: false,
+        title: taskPlan.title,
+      },
+      select: { id: true },
+    })
+    if (existing) return
+
+    const dueAt = new Date(Date.now() + taskPlan.delayMinutes * 60 * 1000)
+    const task = await this.prisma.contactTask.create({
+      data: {
+        contactId: input.contactId,
+        ownerUserId: input.ownerUserId,
+        title: taskPlan.title,
+        dueAt,
+        priority: taskPlan.priority,
+        type: taskPlan.type,
+      },
+      select: { id: true, title: true },
+    })
+
+    await this.prisma.contactTimeline.create({
+      data: {
+        contactId: input.contactId,
+        event: 'AUTOMATION_TASK_CREATED',
+        metadata: {
+          triggerEvent: input.event,
+          taskId: task.id,
+          title: task.title,
+          delayMinutes: taskPlan.delayMinutes,
+          ...(input.metadata ?? {}),
+        },
+      },
+    })
+  }
+
+  async getAutomationRules(userId: string) {
+    return this.prisma.contactAutomationRule.findMany({
+      where: { ownerUserId: userId },
+      orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
+    })
+  }
+
+  async createAutomationRule(
+    userId: string,
+    dto: {
+      name: string
+      triggerEvent:
+        | 'WHATSAPP_CLICKED'
+        | 'WHATSAPP_AUTOMATION_TRIGGERED'
+        | 'LEAD_CAPTURED'
+        | 'BOOKING_COMPLETED'
+        | 'PAYMENT_COMPLETED'
+      taskTitle: string
+      taskPriority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+      taskType?: 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
+      delayMinutes?: number
+      isActive?: boolean
+    },
+  ) {
+    return this.prisma.contactAutomationRule.create({
+      data: {
+        ownerUserId: userId,
+        name: dto.name,
+        triggerEvent: dto.triggerEvent,
+        taskTitle: dto.taskTitle,
+        taskPriority: dto.taskPriority ?? 'MEDIUM',
+        taskType: dto.taskType ?? 'FOLLOW_UP',
+        delayMinutes: dto.delayMinutes ?? 1440,
+        isActive: dto.isActive ?? true,
+      },
+    })
+  }
+
+  async updateAutomationRule(
+    ruleId: string,
+    userId: string,
+    dto: {
+      name?: string
+      triggerEvent?:
+        | 'WHATSAPP_CLICKED'
+        | 'WHATSAPP_AUTOMATION_TRIGGERED'
+        | 'LEAD_CAPTURED'
+        | 'BOOKING_COMPLETED'
+        | 'PAYMENT_COMPLETED'
+      taskTitle?: string
+      taskPriority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+      taskType?: 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
+      delayMinutes?: number
+      isActive?: boolean
+    },
+  ) {
+    const rule = await this.prisma.contactAutomationRule.findUnique({ where: { id: ruleId } })
+    if (!rule || rule.ownerUserId !== userId) throw new ForbiddenException()
+    return this.prisma.contactAutomationRule.update({ where: { id: ruleId }, data: dto })
+  }
+
+  async deleteAutomationRule(ruleId: string, userId: string) {
+    const rule = await this.prisma.contactAutomationRule.findUnique({ where: { id: ruleId } })
+    if (!rule || rule.ownerUserId !== userId) throw new ForbiddenException()
+    await this.prisma.contactAutomationRule.delete({ where: { id: ruleId } })
+    return { deleted: true }
+  }
+
   async recordPublicTimelineEvent(input: {
     contactId: string
     event: string
@@ -102,7 +280,7 @@ export class ContactsService {
   }): Promise<void> {
     const contact = await this.prisma.contact.findUnique({
       where: { id: input.contactId },
-      select: { id: true },
+      select: { id: true, ownerUserId: true },
     })
     if (!contact) throw new NotFoundException('Contact not found')
 
@@ -112,6 +290,13 @@ export class ContactsService {
         event: input.event,
         metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
       },
+    })
+
+    await this.maybeCreateAutomationFollowUpTask({
+      contactId: input.contactId,
+      ownerUserId: contact.ownerUserId,
+      event: input.event,
+      metadata: input.metadata,
     })
   }
 

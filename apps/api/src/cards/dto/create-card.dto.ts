@@ -116,6 +116,27 @@ class CardStoreProductDto {
   highlighted?: boolean
 }
 
+class WhatsappAutomationConfigDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  autoReplyTemplate?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  fallbackPrompt?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  nextStep?: 'BOOK' | 'LEAD_CAPTURE' | 'MESSAGE'
+}
+
 // HIGH-03: Replace the open-ended `Record<string, unknown>` fields type with an
 // explicit DTO that validates and caps every known card field.
 // Without this, an attacker can store arbitrarily large strings in any key
@@ -188,6 +209,12 @@ export class CardFieldsDto {
   @ValidateNested()
   @Type(() => CardActionsConfigDto)
   actions?: CardActionsConfigDto
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => WhatsappAutomationConfigDto)
+  whatsappAutomation?: WhatsappAutomationConfigDto
 
   @IsOptional()
   @IsArray()

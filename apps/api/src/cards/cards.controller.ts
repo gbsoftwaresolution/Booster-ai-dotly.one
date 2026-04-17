@@ -166,6 +166,23 @@ class ActivateProductCheckoutDto {
   txHash!: string
 }
 
+class CreateWhatsappHandoffDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  visitorName?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(254)
+  visitorEmail?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  contactId?: string
+}
+
 @ApiTags('cards')
 @Controller()
 export class CardsController {
@@ -217,6 +234,14 @@ export class CardsController {
   listProductOrders(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     return this.cardsService
       .listProductOrders(id, user.id)
+      .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
+  }
+
+  @ApiBearerAuth()
+  @Get('cards/:id/whatsapp-automation-messages')
+  listWhatsappAutomationMessages(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.cardsService
+      .listWhatsappAutomationMessages(id, user.id)
       .then((items): ItemsResponse<(typeof items)[number]> => ({ items }))
   }
 
@@ -393,6 +418,14 @@ export class CardsController {
     @Body() dto: ActivateProductCheckoutDto,
   ) {
     return this.cardsService.activateProductCheckout(handle, dto.paymentId, dto.txHash)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @Post('public/cards/:handle/whatsapp-handoff')
+  createWhatsappHandoff(@Param('handle') handle: string, @Body() dto: CreateWhatsappHandoffDto) {
+    return this.cardsService.createWhatsappAutomationHandoff(handle, dto)
   }
 
   @Public()

@@ -11,6 +11,7 @@ import { LinksTab } from '@/components/card-builder/LinksTab'
 import { ActionsTab } from '@/components/card-builder/ActionsTab'
 import { ServicesTab } from '@/components/card-builder/ServicesTab'
 import { StoreTab } from '@/components/card-builder/StoreTab'
+import { WhatsappAutomationTab } from '@/components/card-builder/WhatsappAutomationTab'
 import { MediaTab } from '@/components/card-builder/MediaTab'
 import { ThemeTab } from '@/components/card-builder/ThemeTab'
 import { PublishBar } from '@/components/card-builder/PublishBar'
@@ -28,6 +29,7 @@ import {
   Eye,
   BriefcaseBusiness,
   Store,
+  MessageCircleMore,
   QrCode,
   BarChart2,
   CheckCircle2,
@@ -43,6 +45,7 @@ import { cn } from '@/lib/cn'
 type Tab =
   | 'profile'
   | 'actions'
+  | 'whatsapp'
   | 'services'
   | 'store'
   | 'links'
@@ -55,6 +58,7 @@ type Tab =
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'actions', label: 'Actions', icon: MousePointerClick },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircleMore },
   { id: 'services', label: 'Services', icon: BriefcaseBusiness },
   { id: 'store', label: 'Store', icon: Store },
   { id: 'links', label: 'Links', icon: Link2 },
@@ -232,6 +236,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
     updateActions,
     updateServices,
     updateProducts,
+    updateWhatsappAutomation,
     updateHandle,
     updateTheme,
     updateTemplate,
@@ -512,6 +517,12 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                   )}
                   {activeTab === 'actions' && (
                     <ActionsTab fields={card.fields} onActionsChange={updateActions} />
+                  )}
+                  {activeTab === 'whatsapp' && (
+                    <WhatsappAutomationTab
+                      fields={card.fields}
+                      onChange={updateWhatsappAutomation}
+                    />
                   )}
                   {activeTab === 'services' && (
                     <ServicesTab fields={card.fields} onServicesChange={updateServices} />

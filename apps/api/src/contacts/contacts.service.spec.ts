@@ -70,7 +70,7 @@ describe('ContactsService.createFromLead', () => {
       phone: '+1 555 000 0000',
     })
 
-    expect(result).toEqual({ success: true })
+    expect(result).toEqual({ success: true, contactId: 'contact_1' })
     expect(leadSubmissionCreate).toHaveBeenCalledWith({
       data: {
         leadFormId: 'lead_form_1',
@@ -82,5 +82,117 @@ describe('ContactsService.createFromLead', () => {
         },
       },
     })
+  })
+
+  it('creates an automation follow-up task for public WhatsApp automation events', async () => {
+    const contactTaskCreate = jest
+      .fn()
+      .mockResolvedValue({ id: 'task_1', title: 'Reply to automated WhatsApp handoff' })
+    const contactTimelineCreate = jest.fn().mockResolvedValue({ id: 'timeline_1' })
+    const prisma = {
+      contact: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'contact_1', ownerUserId: 'owner_1' }),
+      },
+      contactAutomationRule: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      contactTask: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: contactTaskCreate,
+      },
+      contactTimeline: {
+        create: contactTimelineCreate,
+      },
+    }
+
+    const service = new ContactsService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      { sendNewLeadNotification: jest.fn() } as never,
+      { sendPushNotification: jest.fn() } as never,
+      { getClient: jest.fn() } as never,
+      { fanOut: jest.fn() } as never,
+      { add: jest.fn() } as never,
+    )
+
+    await service.recordPublicTimelineEvent({
+      contactId: 'contact_1',
+      event: 'WHATSAPP_AUTOMATION_TRIGGERED',
+      metadata: { nextStep: 'BOOK' },
+    })
+
+    expect(contactTaskCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contactId: 'contact_1',
+          ownerUserId: 'owner_1',
+          title: 'Reply to automated WhatsApp handoff',
+          type: 'FOLLOW_UP',
+          priority: 'HIGH',
+        }),
+      }),
+    )
+    expect(contactTimelineCreate).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses persisted automation rules to control delayed follow-up creation', async () => {
+    const contactTaskCreate = jest
+      .fn()
+      .mockResolvedValue({ id: 'task_2', title: 'Call high-intent lead' })
+    const contactTimelineCreate = jest.fn().mockResolvedValue({ id: 'timeline_2' })
+    const automationRuleFindFirst = jest.fn().mockResolvedValue({
+      id: 'rule_1',
+      taskTitle: 'Call high-intent lead',
+      taskPriority: 'URGENT',
+      taskType: 'CALL',
+      delayMinutes: 15,
+    })
+    const prisma = {
+      contact: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'contact_1', ownerUserId: 'owner_1' }),
+      },
+      contactAutomationRule: {
+        findFirst: automationRuleFindFirst,
+      },
+      contactTask: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: contactTaskCreate,
+      },
+      contactTimeline: {
+        create: contactTimelineCreate,
+      },
+    }
+
+    const service = new ContactsService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      { sendNewLeadNotification: jest.fn() } as never,
+      { sendPushNotification: jest.fn() } as never,
+      { getClient: jest.fn() } as never,
+      { fanOut: jest.fn() } as never,
+      { add: jest.fn() } as never,
+    )
+
+    const before = Date.now()
+    await service.recordPublicTimelineEvent({
+      contactId: 'contact_1',
+      event: 'LEAD_CAPTURED',
+      metadata: { sourceHandle: 'alice' },
+    })
+    const after = Date.now()
+
+    expect(automationRuleFindFirst).toHaveBeenCalled()
+    expect(contactTaskCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Call high-intent lead',
+          type: 'CALL',
+          priority: 'URGENT',
+        }),
+      }),
+    )
+    const dueAt = (contactTaskCreate.mock.calls[0]?.[0] as { data: { dueAt: Date } }).data.dueAt
+    expect(dueAt.getTime()).toBeGreaterThanOrEqual(before + 15 * 60_000)
+    expect(dueAt.getTime()).toBeLessThanOrEqual(after + 15 * 60_000 + 1000)
   })
 })

@@ -65,6 +65,12 @@ Booking, WhatsApp, lead capture, and later payment are the core actions.
 Paid subscriptions already support crypto checkout today. The product roadmap extends that same
 payment direction into booking deposits and fixed service checkout later.
 
+### 4.5 WhatsApp Automation As Guided Handoff
+
+WhatsApp is currently the first chat CTA, but the product direction is not a raw outbound link forever.
+Dotly.one is moving toward guided WhatsApp handoff: generate the right reply, log the intent in CRM,
+and push the visitor toward booking, lead capture, or continued chat depending on the card owner's goal.
+
 ### 5. Shared Renderer And Monorepo Velocity
 
 A shared `packages/ui` card renderer ensures pixel-identical rendering across the web dashboard,
@@ -159,6 +165,7 @@ Dotly.one/
 - Time-series chart: views and saves over 7 / 30 / 90 days
 - Lead capture submission table with export (Pro+)
 - Product direction: richer action attribution for booking, chat, and revenue events
+- WhatsApp automation direction: lightweight guided handoff today, WhatsApp Business API delivery later
 
 ### 6. Contact Exchange / Lead Capture
 
@@ -257,6 +264,11 @@ Pricing note:
 
 6. **Security first** — JWT validation on every API route, row-level data scoping by `user_id`,
    signed Cloudflare R2 URLs for all media, Smart Contract billing webhook/event verification.
+
+7. **WhatsApp automation is progressive** — the current implementation enriches the CTA handoff,
+   inbox, and CRM timeline without pretending to be a full bot. A later WhatsApp Business API layer
+   should reuse the same owner/card automation config and event semantics rather than introducing a
+   separate messaging product.
 
 ---
 

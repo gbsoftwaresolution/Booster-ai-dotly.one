@@ -160,6 +160,7 @@ model User {
   emailTemplates     EmailTemplate[]
   deals              Deal[]
   contactTasks       ContactTask[]
+  contactAutomationRules ContactAutomationRule[]
   appointmentTypes   AppointmentType[]
   bookings           Booking[]
   bookingDeposits    BookingDeposit[]
@@ -887,6 +888,18 @@ enum TaskType {
   FOLLOW_UP
 }
 
+enum AutomationTriggerEvent {
+  WHATSAPP_CLICKED
+  WHATSAPP_AUTOMATION_TRIGGERED
+  LEAD_CAPTURED
+  BOOKING_COMPLETED
+  PAYMENT_COMPLETED
+}
+
+enum AutomationActionType {
+  CREATE_TASK
+}
+
 // Tasks / reminders (Gap 7)
 model ContactTask {
   id          String        @id @default(cuid())
@@ -907,6 +920,26 @@ model ContactTask {
   @@index([contactId])
   @@index([ownerUserId, completed])
   @@map("contact_tasks")
+}
+
+model ContactAutomationRule {
+  id                String                 @id @default(cuid())
+  ownerUserId       String
+  name              String                 @db.VarChar(160)
+  triggerEvent      AutomationTriggerEvent
+  actionType        AutomationActionType   @default(CREATE_TASK)
+  taskTitle         String                 @db.VarChar(500)
+  taskPriority      TaskPriority           @default(MEDIUM)
+  taskType          TaskType               @default(FOLLOW_UP)
+  delayMinutes      Int                    @default(1440)
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, isActive])
+  @@map("contact_automation_rules")
 }
 
 // ─── In-App Scheduling (Calendly replacement) ────────────────────────────────

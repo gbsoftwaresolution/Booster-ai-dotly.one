@@ -30,6 +30,7 @@ import type {
   CardActionType,
   CardServiceOffer,
   CardStoreProduct,
+  WhatsappAutomationConfig,
 } from '@dotly/types'
 
 const ERC20_TRANSFER_EVENT_ABI = [
@@ -106,6 +107,35 @@ function sanitizeActionsConfig(value: unknown): CardActionsConfig | undefined {
   return {
     ...(primary ? { primary } : {}),
     ...(secondary.length > 0 ? { secondary } : {}),
+  }
+}
+
+function sanitizeWhatsappAutomationConfig(value: unknown): WhatsappAutomationConfig | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const record = value as Record<string, unknown>
+  const enabled = typeof record['enabled'] === 'boolean' ? record['enabled'] : undefined
+  const autoReplyTemplate =
+    typeof record['autoReplyTemplate'] === 'string'
+      ? record['autoReplyTemplate'].trim().slice(0, 500)
+      : ''
+  const fallbackPrompt =
+    typeof record['fallbackPrompt'] === 'string'
+      ? record['fallbackPrompt'].trim().slice(0, 160)
+      : ''
+  const nextStep =
+    record['nextStep'] === 'BOOK' ||
+    record['nextStep'] === 'LEAD_CAPTURE' ||
+    record['nextStep'] === 'MESSAGE'
+      ? record['nextStep']
+      : undefined
+
+  if (enabled === undefined && !autoReplyTemplate && !fallbackPrompt && !nextStep) return undefined
+
+  return {
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(autoReplyTemplate ? { autoReplyTemplate } : {}),
+    ...(fallbackPrompt ? { fallbackPrompt } : {}),
+    ...(nextStep ? { nextStep } : {}),
   }
 }
 
@@ -368,6 +398,13 @@ export class CardsService {
       record['actions'] = actions as unknown as Prisma.InputJsonValue
     } else {
       delete record['actions']
+    }
+
+    const whatsappAutomation = sanitizeWhatsappAutomationConfig(record['whatsappAutomation'])
+    if (whatsappAutomation) {
+      record['whatsappAutomation'] = whatsappAutomation as unknown as Prisma.InputJsonValue
+    } else {
+      delete record['whatsappAutomation']
     }
 
     const services = sanitizeServiceOffers(record['services'])
@@ -734,6 +771,25 @@ export class CardsService {
         createdAt: true,
         verifiedAt: true,
         completedAt: true,
+      },
+    })
+  }
+
+  async listWhatsappAutomationMessages(cardId: string, userId: string) {
+    await this.findById(cardId, userId)
+    return this.prisma.cardMessage.findMany({
+      where: {
+        cardId,
+        message: { startsWith: '[WhatsApp automation]' },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        senderName: true,
+        senderEmail: true,
+        message: true,
+        read: true,
+        createdAt: true,
       },
     })
   }
@@ -1167,6 +1223,79 @@ export class CardsService {
       txHash,
       productId: order.productId,
       productName: order.productName,
+    }
+  }
+
+  async createWhatsappAutomationHandoff(
+    handle: string,
+    dto: { visitorName?: string; visitorEmail?: string; contactId?: string },
+  ) {
+    const card = await this.prisma.card.findUnique({
+      where: { handle, isActive: true },
+      select: {
+        id: true,
+        userId: true,
+        fields: true,
+      },
+    })
+    if (!card) throw new NotFoundException('Card not found')
+
+    const fields = (card.fields as Record<string, unknown> | null) ?? {}
+    const automation = sanitizeWhatsappAutomationConfig(fields['whatsappAutomation'])
+    const fallbackAction = sanitizeActionConfig(
+      ((fields['actions'] as Record<string, unknown> | null)?.['primary'] as Record<
+        string,
+        unknown
+      > | null) ?? null,
+    )
+    const ownerName = typeof fields['name'] === 'string' ? fields['name'].trim() : 'this seller'
+    const visitorName = dto.visitorName?.trim() || 'there'
+    const visitorEmail = dto.visitorEmail?.trim().toLowerCase() || ''
+    const nextStep = automation?.nextStep ?? 'MESSAGE'
+
+    const generatedMessage =
+      automation?.enabled && automation.autoReplyTemplate
+        ? automation.autoReplyTemplate
+            .replaceAll('{visitorName}', visitorName)
+            .replaceAll('{ownerName}', ownerName)
+            .replaceAll('{nextStep}', nextStep.toLowerCase())
+        : `Hi ${visitorName}, thanks for reaching out to ${ownerName} on Dotly. The fastest next step is ${nextStep.toLowerCase()}.`
+
+    await this.prisma.cardMessage.create({
+      data: {
+        cardId: card.id,
+        senderName: visitorName,
+        senderEmail: visitorEmail || null,
+        message: `[WhatsApp automation] ${generatedMessage}`,
+      },
+    })
+
+    if (dto.contactId?.trim()) {
+      await this.prisma.contactTimeline.create({
+        data: {
+          contactId: dto.contactId.trim(),
+          event: 'WHATSAPP_AUTOMATION_TRIGGERED',
+          metadata: {
+            cardId: card.id,
+            handle,
+            nextStep,
+            fallbackPrompt: automation?.fallbackPrompt ?? null,
+          },
+        },
+      })
+    }
+
+    return {
+      enabled: !!automation?.enabled,
+      generatedMessage,
+      fallbackPrompt:
+        automation?.fallbackPrompt ??
+        (fallbackAction?.type === 'BOOK'
+          ? 'Prefer a call? Book directly from the card.'
+          : fallbackAction?.type === 'LEAD_CAPTURE'
+            ? 'Prefer async? Leave your details on the card.'
+            : 'Send your message directly in WhatsApp.'),
+      nextStep,
     }
   }
 

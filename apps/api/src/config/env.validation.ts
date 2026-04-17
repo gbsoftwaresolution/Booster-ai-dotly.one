@@ -93,6 +93,13 @@ class EnvironmentVariables {
   @IsOptional() @IsUrl() POLYGON_RPC_URL?: string
   @IsOptional() @IsUrl() BASE_RPC_URL?: string
 
+  // Future WhatsApp Business API integration — optional until server-to-server
+  // delivery is implemented. These are documented now so the eventual integration
+  // can land without changing config shape again.
+  @IsOptional() @IsString() WHATSAPP_BUSINESS_PHONE_NUMBER_ID?: string
+  @IsOptional() @IsString() WHATSAPP_BUSINESS_ACCESS_TOKEN?: string
+  @IsOptional() @IsString() WHATSAPP_BUSINESS_VERIFY_TOKEN?: string
+
   // F-25: SWAGGER_ENABLED controls Swagger UI mount in production.
   // Validated as an optional boolean string ("true"/"false") so that
   // NODE_ENV=production + SWAGGER_ENABLED=true correctly unlocks docs.

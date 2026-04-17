@@ -6,6 +6,7 @@ import type {
   CardActionsConfig,
   CardServiceOffer,
   CardStoreProduct,
+  WhatsappAutomationConfig,
   CardEditorResponse,
   PartialCardFields,
   CardThemeData,
@@ -309,6 +310,34 @@ export function useCardBuilder(cardId: string) {
     [triggerAutoSave],
   )
 
+  const updateWhatsappAutomation = useCallback(
+    (config: WhatsappAutomationConfig | undefined) => {
+      setState((prev) => {
+        if (!prev.card) return prev
+        const nextFields = { ...prev.card.fields }
+        if (
+          config &&
+          (config.enabled || config.autoReplyTemplate || config.fallbackPrompt || config.nextStep)
+        ) {
+          nextFields.whatsappAutomation = config
+        } else {
+          delete nextFields.whatsappAutomation
+        }
+        latestFieldsRef.current = nextFields
+        return {
+          ...prev,
+          card: { ...prev.card, fields: nextFields },
+        }
+      })
+      pendingFieldChanges.current = {
+        ...pendingFieldChanges.current,
+        whatsappAutomation: config ?? null,
+      }
+      triggerAutoSave()
+    },
+    [triggerAutoSave],
+  )
+
   const updateHandle = useCallback(
     (handle: string) => {
       const previousHandle = state.card?.handle ?? null
@@ -476,6 +505,7 @@ export function useCardBuilder(cardId: string) {
     updateActions,
     updateServices,
     updateProducts,
+    updateWhatsappAutomation,
     updateHandle,
     updateTheme,
     updateTemplate,

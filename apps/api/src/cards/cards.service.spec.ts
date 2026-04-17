@@ -20,6 +20,8 @@ describe('CardsService service checkout', () => {
     productOrderCreate?: jest.Mock
     productOrderFindUnique?: jest.Mock
     productOrderUpdate?: jest.Mock
+    cardMessageCreate?: jest.Mock
+    contactTimelineCreate?: jest.Mock
   }) {
     const cardFindUnique = overrides?.cardFindUnique ?? jest.fn()
     const serviceOrderCreate = overrides?.serviceOrderCreate ?? jest.fn()
@@ -28,6 +30,8 @@ describe('CardsService service checkout', () => {
     const productOrderCreate = overrides?.productOrderCreate ?? jest.fn()
     const productOrderFindUnique = overrides?.productOrderFindUnique ?? jest.fn()
     const productOrderUpdate = overrides?.productOrderUpdate ?? jest.fn()
+    const cardMessageCreate = overrides?.cardMessageCreate ?? jest.fn()
+    const contactTimelineCreate = overrides?.contactTimelineCreate ?? jest.fn()
 
     const prisma = {
       user: { findUnique: jest.fn().mockResolvedValue({ id: 'owner_1' }) },
@@ -45,6 +49,12 @@ describe('CardsService service checkout', () => {
         findUnique: productOrderFindUnique,
         update: productOrderUpdate,
         findMany: jest.fn().mockResolvedValue([]),
+      },
+      cardMessage: {
+        create: cardMessageCreate,
+      },
+      contactTimeline: {
+        create: contactTimelineCreate,
       },
     }
 
@@ -88,6 +98,8 @@ describe('CardsService service checkout', () => {
       productOrderCreate,
       productOrderFindUnique,
       productOrderUpdate,
+      cardMessageCreate,
+      contactTimelineCreate,
     }
   }
 
@@ -314,6 +326,57 @@ describe('CardsService service checkout', () => {
       expect.objectContaining({
         where: { paymentId: 'prd_payment' },
         data: expect.objectContaining({ status: 'COMPLETED' }),
+      }),
+    )
+  })
+
+  it('creates a WhatsApp automation handoff and records inbox/timeline events', async () => {
+    const cardFindUnique = jest.fn().mockResolvedValue({
+      id: 'card_1',
+      userId: 'owner_1',
+      fields: {
+        name: 'Alice Seller',
+        whatsappAutomation: {
+          enabled: true,
+          autoReplyTemplate:
+            'Hi {visitorName}, thanks for contacting {ownerName}. Best next step: {nextStep}.',
+          fallbackPrompt: 'Prefer a call? Book directly from the card.',
+          nextStep: 'BOOK',
+        },
+      },
+    })
+    const cardMessageCreate = jest.fn().mockResolvedValue({ id: 'msg_1' })
+    const contactTimelineCreate = jest.fn().mockResolvedValue({ id: 'tl_1' })
+    const { service } = createService({
+      cardFindUnique,
+      cardMessageCreate,
+      contactTimelineCreate,
+    })
+
+    const result = await service.createWhatsappAutomationHandoff('alice', {
+      visitorName: 'Sam',
+      visitorEmail: 'sam@example.com',
+      contactId: 'contact_1',
+    })
+
+    expect(result.enabled).toBe(true)
+    expect(result.nextStep).toBe('BOOK')
+    expect(result.generatedMessage).toContain('Hi Sam')
+    expect(cardMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cardId: 'card_1',
+          senderName: 'Sam',
+          senderEmail: 'sam@example.com',
+        }),
+      }),
+    )
+    expect(contactTimelineCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contactId: 'contact_1',
+          event: 'WHATSAPP_AUTOMATION_TRIGGERED',
+        }),
       }),
     )
   })

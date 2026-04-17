@@ -643,6 +643,99 @@ class TasksQuery {
   status?: string
 }
 
+class CreateAutomationRuleDto {
+  @IsString()
+  @MaxLength(160)
+  name!: string
+
+  @IsString()
+  @IsIn([
+    'WHATSAPP_CLICKED',
+    'WHATSAPP_AUTOMATION_TRIGGERED',
+    'LEAD_CAPTURED',
+    'BOOKING_COMPLETED',
+    'PAYMENT_COMPLETED',
+  ])
+  triggerEvent!:
+    | 'WHATSAPP_CLICKED'
+    | 'WHATSAPP_AUTOMATION_TRIGGERED'
+    | 'LEAD_CAPTURED'
+    | 'BOOKING_COMPLETED'
+    | 'PAYMENT_COMPLETED'
+
+  @IsString()
+  @MaxLength(500)
+  taskTitle!: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+  taskPriority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['CALL', 'EMAIL', 'MEETING', 'TODO', 'FOLLOW_UP'])
+  taskType?: 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  delayMinutes?: number
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean
+}
+
+class UpdateAutomationRuleDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  name?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn([
+    'WHATSAPP_CLICKED',
+    'WHATSAPP_AUTOMATION_TRIGGERED',
+    'LEAD_CAPTURED',
+    'BOOKING_COMPLETED',
+    'PAYMENT_COMPLETED',
+  ])
+  triggerEvent?:
+    | 'WHATSAPP_CLICKED'
+    | 'WHATSAPP_AUTOMATION_TRIGGERED'
+    | 'LEAD_CAPTURED'
+    | 'BOOKING_COMPLETED'
+    | 'PAYMENT_COMPLETED'
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  taskTitle?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+  taskPriority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['CALL', 'EMAIL', 'MEETING', 'TODO', 'FOLLOW_UP'])
+  taskType?: 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  delayMinutes?: number
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean
+}
+
 class DealsQuery {
   @IsOptional()
   @Type(() => Number)
@@ -1370,6 +1463,45 @@ export class ContactsController {
   async getTasksSummary(@CurrentUser() user: { id: string }) {
     await this.assertFullCrmAccess(user.id)
     return this.contactsService.getTasksSummary(user.id)
+  }
+
+  @ApiBearerAuth()
+  @Get('crm/automation-rules')
+  @ApiOperation({ summary: 'Get CRM automation rules for the authenticated user' })
+  async getAutomationRules(@CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
+    return this.contactsService.getAutomationRules(user.id)
+  }
+
+  @ApiBearerAuth()
+  @Post('crm/automation-rules')
+  @ApiOperation({ summary: 'Create a CRM automation rule' })
+  async createAutomationRule(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateAutomationRuleDto,
+  ) {
+    await this.assertFullCrmAccess(user.id)
+    return this.contactsService.createAutomationRule(user.id, dto)
+  }
+
+  @ApiBearerAuth()
+  @Patch('crm/automation-rules/:ruleId')
+  @ApiOperation({ summary: 'Update a CRM automation rule' })
+  async updateAutomationRule(
+    @Param('ruleId') ruleId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateAutomationRuleDto,
+  ) {
+    await this.assertFullCrmAccess(user.id)
+    return this.contactsService.updateAutomationRule(ruleId, user.id, dto)
+  }
+
+  @ApiBearerAuth()
+  @Delete('crm/automation-rules/:ruleId')
+  @ApiOperation({ summary: 'Delete a CRM automation rule' })
+  async deleteAutomationRule(@Param('ruleId') ruleId: string, @CurrentUser() user: { id: string }) {
+    await this.assertFullCrmAccess(user.id)
+    return this.contactsService.deleteAutomationRule(ruleId, user.id)
   }
 
   @ApiBearerAuth()

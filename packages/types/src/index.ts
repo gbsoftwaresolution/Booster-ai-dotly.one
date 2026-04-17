@@ -79,6 +79,13 @@ export interface CardServiceOffer {
   highlighted?: boolean
 }
 
+export interface WhatsappAutomationConfig {
+  enabled?: boolean
+  autoReplyTemplate?: string
+  fallbackPrompt?: string
+  nextStep?: 'BOOK' | 'LEAD_CAPTURE' | 'MESSAGE'
+}
+
 export interface CardStoreProduct {
   id: string
   name: string
@@ -176,6 +183,7 @@ export interface CardFields {
   logoUrl: string
   bookingAppointmentSlug?: string
   actions?: CardActionsConfig
+  whatsappAutomation?: WhatsappAutomationConfig
   services?: CardServiceOffer[]
   products?: CardStoreProduct[]
 }
@@ -512,6 +520,15 @@ export type ContactTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 
 export type ContactTaskType = 'CALL' | 'EMAIL' | 'MEETING' | 'TODO' | 'FOLLOW_UP'
 
+export type ContactAutomationTriggerEvent =
+  | 'WHATSAPP_CLICKED'
+  | 'WHATSAPP_AUTOMATION_TRIGGERED'
+  | 'LEAD_CAPTURED'
+  | 'BOOKING_COMPLETED'
+  | 'PAYMENT_COMPLETED'
+
+export type ContactAutomationActionType = 'CREATE_TASK'
+
 export interface ContactTaskResponse {
   id: string
   title: string
@@ -526,6 +543,20 @@ export interface ContactTaskResponse {
     id: string
     name: string
   }
+}
+
+export interface ContactAutomationRuleResponse {
+  id: string
+  name: string
+  triggerEvent: ContactAutomationTriggerEvent
+  actionType: ContactAutomationActionType
+  taskTitle: string
+  taskPriority: ContactTaskPriority
+  taskType: ContactTaskType
+  delayMinutes: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export type DealStage = 'PROSPECT' | 'PROPOSAL' | 'NEGOTIATION' | 'CLOSED_WON' | 'CLOSED_LOST'
@@ -674,6 +705,8 @@ export function relativeTimeLabel(dateStr: string, nowMs = Date.now()): string {
 
 export function contactTimelineEventColor(event: ContactTimelineEventResponse): string {
   switch (event.event) {
+    case 'AUTOMATION_TASK_CREATED':
+      return '#14b8a6'
     case 'ENRICHMENT_FAILED':
       return '#ef4444'
     case 'ENRICHMENT_COMPLETED':
@@ -691,6 +724,10 @@ export function contactTimelineEventColor(event: ContactTimelineEventResponse): 
 
 export function contactTimelineEventLabel(event: ContactTimelineEventResponse): string {
   switch (event.event) {
+    case 'AUTOMATION_TASK_CREATED':
+      return event.metadata?.title
+        ? `Automation task created: ${String(event.metadata.title)}`
+        : 'Automation follow-up task created'
     case 'LEAD_CAPTURED':
       return `Lead captured${event.metadata?.sourceHandle ? ` from @${String(event.metadata.sourceHandle)}` : ''}`
     case 'STAGE_CHANGED':

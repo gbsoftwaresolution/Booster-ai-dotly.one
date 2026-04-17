@@ -586,32 +586,62 @@ function ActionButton({
 
   if (action.type === 'WHATSAPP_CHAT' && whatsappNumber) {
     const whatsappMessage = action.whatsappMessage?.trim() || DEFAULT_WHATSAPP_MESSAGE
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
     return (
-      <a
-        href={whatsappUrl}
-        target="_blank"
-        rel="noreferrer"
+      <button
+        type="button"
         onClick={() => {
-          onAnalytics('CLICK', {
-            surface: 'primary_cta',
-            action: 'whatsapp_clicked',
-            ctaType: 'WHATSAPP_CHAT',
-            source: 'card_public_page',
-            status: 'outbound',
-            ...(capturedContactId ? { contactId: capturedContactId } : {}),
-          })
-          if (capturedContactId) {
-            void recordPublicContactEvent({
-              contactId: capturedContactId,
-              event: 'WHATSAPP_CLICKED',
-              metadata: {
-                source: 'card_public_page',
-                cardHandle,
-                ctaType: 'WHATSAPP_CHAT',
-              },
+          void (async () => {
+            let generatedMessage = whatsappMessage
+            let automationEnabled = false
+            let nextStep: string | undefined
+            try {
+              const res = await fetch(`${API_URL}/public/cards/${cardHandle}/whatsapp-handoff`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contactId: capturedContactId ?? undefined }),
+              })
+              if (res.ok) {
+                const data = (await res.json()) as {
+                  enabled: boolean
+                  generatedMessage: string
+                  nextStep?: string
+                }
+                generatedMessage = data.generatedMessage || generatedMessage
+                automationEnabled = data.enabled
+                nextStep = data.nextStep
+              }
+            } catch {
+              // fall back to the static WhatsApp message
+            }
+
+            onAnalytics('CLICK', {
+              surface: 'primary_cta',
+              action: 'whatsapp_clicked',
+              ctaType: 'WHATSAPP_CHAT',
+              source: 'card_public_page',
+              status: automationEnabled ? 'automated' : 'outbound',
+              ...(nextStep ? { campaign: nextStep } : {}),
+              ...(capturedContactId ? { contactId: capturedContactId } : {}),
             })
-          }
+            if (capturedContactId) {
+              void recordPublicContactEvent({
+                contactId: capturedContactId,
+                event: 'WHATSAPP_CLICKED',
+                metadata: {
+                  source: 'card_public_page',
+                  cardHandle,
+                  ctaType: 'WHATSAPP_CHAT',
+                  automationEnabled,
+                  ...(nextStep ? { nextStep } : {}),
+                },
+              })
+            }
+            window.open(
+              `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(generatedMessage)}`,
+              '_blank',
+              'noreferrer',
+            )
+          })()
         }}
         className={ctaClassName(primary)}
       >
@@ -629,7 +659,7 @@ function ActionButton({
         >
           WhatsApp
         </span>
-      </a>
+      </button>
     )
   }
 

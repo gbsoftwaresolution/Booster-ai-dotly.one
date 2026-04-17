@@ -84,6 +84,15 @@ interface ProductOrderItem {
   completedAt: string | null
 }
 
+interface WhatsappAutomationMessageItem {
+  id: string
+  senderName: string
+  senderEmail: string | null
+  message: string
+  read: boolean
+  createdAt: string
+}
+
 const RANGES = [
   { label: '7d', days: 7 },
   { label: '30d', days: 30 },
@@ -283,6 +292,9 @@ export default function CardAnalyticsPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [serviceOrders, setServiceOrders] = useState<ServiceOrderItem[]>([])
   const [productOrders, setProductOrders] = useState<ProductOrderItem[]>([])
+  const [whatsappAutomationMessages, setWhatsappAutomationMessages] = useState<
+    WhatsappAutomationMessageItem[]
+  >([])
   const [refreshing, setRefreshing] = useState(false)
   // Ref to cancel in-flight requests when range changes or component unmounts
   const abortRef = useRef<AbortController | null>(null)
@@ -301,31 +313,38 @@ export default function CardAnalyticsPage(): JSX.Element {
         const token = await getAccessToken()
         const from = isoFrom(range.days)
         const to = isoTo()
-        const [result, cardData, ordersData, productOrdersData] = await Promise.all([
-          apiGet<AnalyticsData>(
-            `/cards/${id}/analytics?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-            token,
-            controller.signal,
-          ),
-          cardInfo
-            ? Promise.resolve(null)
-            : apiGet<any>(`/cards/${id}`, token, controller.signal).catch(() => null),
-          apiGet<{ items: ServiceOrderItem[] }>(
-            `/cards/${id}/service-orders`,
-            token,
-            controller.signal,
-          ),
-          apiGet<{ items: ProductOrderItem[] }>(
-            `/cards/${id}/product-orders`,
-            token,
-            controller.signal,
-          ),
-        ])
+        const [result, cardData, ordersData, productOrdersData, whatsappMessagesData] =
+          await Promise.all([
+            apiGet<AnalyticsData>(
+              `/cards/${id}/analytics?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+              token,
+              controller.signal,
+            ),
+            cardInfo
+              ? Promise.resolve(null)
+              : apiGet<any>(`/cards/${id}`, token, controller.signal).catch(() => null),
+            apiGet<{ items: ServiceOrderItem[] }>(
+              `/cards/${id}/service-orders`,
+              token,
+              controller.signal,
+            ),
+            apiGet<{ items: ProductOrderItem[] }>(
+              `/cards/${id}/product-orders`,
+              token,
+              controller.signal,
+            ),
+            apiGet<{ items: WhatsappAutomationMessageItem[] }>(
+              `/cards/${id}/whatsapp-automation-messages`,
+              token,
+              controller.signal,
+            ),
+          ])
         // Only update state if this request wasn't superseded
         if (!controller.signal.aborted) {
           setData(result)
           setServiceOrders(ordersData.items ?? [])
           setProductOrders(productOrdersData.items ?? [])
+          setWhatsappAutomationMessages(whatsappMessagesData.items ?? [])
           if (cardData) {
             const fields = cardData.fields || {}
             setCardInfo({
@@ -604,6 +623,55 @@ export default function CardAnalyticsPage(): JSX.Element {
           </span>
         </div>
         <DayChart data={charts.viewsByDay} color="#0ea5e9" />
+      </div>
+
+      <div className="app-panel rounded-[28px] p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">WhatsApp automation</h3>
+            <p className="text-xs text-gray-400">
+              Recent guided WhatsApp handoffs recorded for this card
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-gray-400">
+            {whatsappAutomationMessages.length} total
+          </span>
+        </div>
+        {whatsappAutomationMessages.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            No automation handoffs yet. Enable WhatsApp automation in the card editor to guide chat
+            visitors.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {whatsappAutomationMessages.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{item.senderName}</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {item.senderEmail || 'No email provided'}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-gray-500">
+                      {item.message.replace('[WhatsApp automation] ', '')}
+                    </p>
+                    <p className="mt-2 text-xs text-gray-400">
+                      {new Date(item.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      'rounded-full px-3 py-1 text-[10px] font-semibold',
+                      item.read ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                    )}
+                  >
+                    {item.read ? 'Read' : 'Unread'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Clicks over time */}
