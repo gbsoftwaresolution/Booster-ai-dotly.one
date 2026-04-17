@@ -54,6 +54,11 @@ class ForgotPasswordDto {
   mobile?: boolean
 }
 
+class ResendVerificationDto {
+  @IsEmail()
+  email!: string
+}
+
 class ResetPasswordDto {
   @IsString()
   @MaxLength(4000)
@@ -132,6 +137,27 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() body: ResetPasswordDto) {
     await this.authService.updatePasswordFromResetToken(body.token, body.password)
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('resend-verification')
+  async resendVerification(@Body() body: ResendVerificationDto) {
+    await this.authService.resendVerificationEmail(body.email)
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('verify-email')
+  async verifyEmail(@Body() body: { token: string }) {
+    await this.authService.verifyEmail(body.token)
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('confirm-email-change')
+  async confirmEmailChange(@Body() body: { token: string }) {
+    await this.authService.confirmEmailChange(body.token)
   }
 
   @Public()

@@ -126,6 +126,7 @@ enum DealStage {
 model User {
   id            String  @id @default(cuid())
   email         String  @unique
+  emailVerifiedAt DateTime?
   name          String?
   avatarUrl     String?
   plan          Plan    @default(FREE)
@@ -165,6 +166,8 @@ model User {
   contactMemories    ContactMemory[]
   authSessions       AuthSession[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  pendingEmailChanges     PendingEmailChange[]
 
   @@map("users")
 }
@@ -199,6 +202,39 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model PendingEmailChange {
+  id            String   @id @default(cuid())
+  userId        String
+  newEmail      String
+  tokenHash     String   @unique
+  expiresAt     DateTime
+  verifiedAt    DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([newEmail])
+  @@map("pending_email_changes")
 }
 
 model Card {

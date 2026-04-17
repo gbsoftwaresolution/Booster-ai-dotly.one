@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import { createHash, createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto'
@@ -10,6 +16,8 @@ import type { GoogleProfile } from './auth.types'
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 15
 const REFRESH_TOKEN_TTL_DAYS = 30
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000
+const EMAIL_TOKEN_TTL_MS = 60 * 60 * 1000
+const RECENT_AUTH_WINDOW_MS = 24 * 60 * 60 * 1000
 const PASSWORD_ITERATIONS = 210_000
 const PASSWORD_KEYLEN = 64
 const PASSWORD_DIGEST = 'sha512'
@@ -62,6 +70,50 @@ export class AuthService {
 
   private hashValue(value: string): string {
     return createHash('sha256').update(value).digest('hex')
+  }
+
+  private createOpaqueToken(): string {
+    return randomBytes(32).toString('base64url')
+  }
+
+  private async findRecentSession(refreshToken: string | null | undefined) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Recent authentication is required.')
+    }
+
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        refreshTokenHash: this.hashValue(refreshToken),
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+      },
+    })
+
+    if (!session || Date.now() - session.createdAt.getTime() > RECENT_AUTH_WINDOW_MS) {
+      throw new UnauthorizedException('Recent authentication is required.')
+    }
+
+    return session
+  }
+
+  private async issueEmailVerification(user: { id: string; email: string; name: string | null }) {
+    const rawToken = this.createOpaqueToken()
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashValue(rawToken),
+        expiresAt: new Date(Date.now() + EMAIL_TOKEN_TTL_MS),
+      },
+    })
+
+    const verificationUrl = `${this.webUrl}/auth/verify-email?token=${encodeURIComponent(rawToken)}`
+    await this.email.sendEmailVerificationEmail(
+      user.email,
+      user.name ?? user.email.split('@')[0] ?? user.email,
+      verificationUrl,
+    )
   }
 
   private encodePassword(password: string): string {
@@ -130,9 +182,9 @@ export class AuthService {
     meta?: SessionMeta
   }): Promise<{
     user: { id: string; email: string; name: string | null }
-    accessToken: string
-    refreshToken: string
-    expiresIn: number
+    accessToken: string | null
+    refreshToken: string | null
+    expiresIn: number | null
   }> {
     const email = params.email.trim().toLowerCase()
     if (params.password.length < 8) {
@@ -161,8 +213,18 @@ export class AuthService {
         )
       })
 
-    const session = await this.createSession(user, params.meta)
-    return { user, ...session }
+    void this.issueEmailVerification(user).catch((error) => {
+      this.logger.warn(
+        `Verification email failed for ${user.email.replace(/^[^@]+/, '***')}: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    })
+
+    return {
+      user,
+      accessToken: null,
+      refreshToken: null,
+      expiresIn: null,
+    }
   }
 
   async signIn(params: { email: string; password: string; meta?: SessionMeta }): Promise<{
@@ -174,11 +236,18 @@ export class AuthService {
     const email = params.email.trim().toLowerCase()
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, name: true, passwordHash: true },
+      select: { id: true, email: true, name: true, passwordHash: true, emailVerifiedAt: true },
     })
 
     if (!user || !this.verifyPassword(params.password, user.passwordHash)) {
       throw new UnauthorizedException('Invalid email or password.')
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new ForbiddenException({
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Verify your email address before signing in.',
+      })
     }
 
     const session = await this.createSession(user, params.meta)
@@ -244,6 +313,17 @@ export class AuthService {
       }),
       this.prisma.authSession.deleteMany({ where: { userId: record.userId } }),
     ])
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { email: true, name: true },
+    })
+    if (user) {
+      await this.email.sendPasswordChangedEmail(
+        user.email,
+        user.name ?? user.email.split('@')[0] ?? user.email,
+      )
+    }
   }
 
   async sendPasswordResetEmail(emailInput: string, mobile = false): Promise<void> {
@@ -266,19 +346,7 @@ export class AuthService {
     const path = mobile ? '/auth/mobile-reset' : '/auth/reset-password'
     const resetUrl = `${this.webUrl}${path}?token=${encodeURIComponent(rawToken)}`
 
-    await this.email.send({
-      to: user.email,
-      subject: 'Reset your Dotly password',
-      html: `
-        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
-          <h1 style="color:#0ea5e9">Reset your password</h1>
-          <p>Use the link below to choose a new password for your Dotly account.</p>
-          <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">Reset password</a>
-          <p style="color:#64748b;font-size:13px;margin-top:24px">This link expires in 1 hour.</p>
-        </div>
-      `,
-      text: `Reset your Dotly password: ${resetUrl}`,
-    })
+    await this.email.sendPasswordResetEmail(user.email, resetUrl)
   }
 
   private signGoogleState(payload: { next: string; mobile: boolean }): string {
@@ -391,6 +459,7 @@ export class AuthService {
           name: profile.name?.trim() || null,
           googleId: profile.id,
           avatarUrl: profile.picture ?? null,
+          emailVerifiedAt: new Date(),
         },
         select: { id: true, email: true, name: true },
       })
@@ -441,15 +510,187 @@ export class AuthService {
 
   async getUserByAccessToken(
     token: string,
-  ): Promise<{ id: string; email: string; name: string | null }> {
+  ): Promise<{ id: string; email: string; name: string | null; emailVerifiedAt: Date | null }> {
     const payload = await this.validateAccessToken(token)
     const user = await this.prisma.user.findUnique({
       where: { id: payload.id },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, emailVerifiedAt: true },
     })
     if (!user) {
       throw new UnauthorizedException('User not found')
     }
     return user
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    const record = await this.prisma.emailVerificationToken.findFirst({
+      where: {
+        tokenHash: this.hashValue(token),
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    })
+
+    if (!record) {
+      throw new BadRequestException('This verification link is invalid or has expired.')
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { emailVerifiedAt: new Date() },
+      }),
+      this.prisma.emailVerificationToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ])
+  }
+
+  async resendVerificationEmail(emailInput: string): Promise<void> {
+    const email = emailInput.trim().toLowerCase()
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, emailVerifiedAt: true },
+    })
+    if (!user || user.emailVerifiedAt) return
+
+    await this.issueEmailVerification(user)
+  }
+
+  async changePassword(params: {
+    userId: string
+    currentPassword: string
+    newPassword: string
+    refreshToken?: string | null
+  }): Promise<void> {
+    if (params.newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters.')
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { id: true, email: true, name: true, passwordHash: true },
+    })
+    if (!user || !this.verifyPassword(params.currentPassword, user.passwordHash)) {
+      throw new UnauthorizedException('Current password is incorrect.')
+    }
+
+    await this.findRecentSession(params.refreshToken)
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: this.encodePassword(params.newPassword) },
+      }),
+      this.prisma.authSession.deleteMany({ where: { userId: user.id } }),
+    ])
+
+    await this.email.sendPasswordChangedEmail(
+      user.email,
+      user.name ?? user.email.split('@')[0] ?? user.email,
+    )
+  }
+
+  async requestEmailChange(params: {
+    userId: string
+    newEmail: string
+    currentPassword: string
+    refreshToken?: string | null
+  }): Promise<void> {
+    const newEmail = params.newEmail.trim().toLowerCase()
+    const user = await this.prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { id: true, email: true, name: true, passwordHash: true },
+    })
+
+    if (!user || !this.verifyPassword(params.currentPassword, user.passwordHash)) {
+      throw new UnauthorizedException('Current password is incorrect.')
+    }
+    if (user.email === newEmail) {
+      throw new BadRequestException('Your new email must be different.')
+    }
+
+    await this.findRecentSession(params.refreshToken)
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: newEmail },
+      select: { id: true },
+    })
+    if (existing) {
+      throw new BadRequestException('An account with that email already exists.')
+    }
+
+    const rawToken = this.createOpaqueToken()
+    await this.prisma.$transaction([
+      this.prisma.pendingEmailChange.updateMany({
+        where: { userId: user.id, verifiedAt: null, cancelledAt: null },
+        data: { cancelledAt: new Date() },
+      }),
+      this.prisma.pendingEmailChange.create({
+        data: {
+          userId: user.id,
+          newEmail,
+          tokenHash: this.hashValue(rawToken),
+          expiresAt: new Date(Date.now() + EMAIL_TOKEN_TTL_MS),
+        },
+      }),
+    ])
+
+    const verificationUrl = `${this.webUrl}/auth/confirm-email-change?token=${encodeURIComponent(rawToken)}`
+    await Promise.all([
+      this.email.sendEmailChangeVerificationEmail(
+        newEmail,
+        user.name ?? user.email.split('@')[0] ?? user.email,
+        verificationUrl,
+      ),
+      this.email.sendEmailChangeAlertEmail(
+        user.email,
+        user.name ?? user.email.split('@')[0] ?? user.email,
+        newEmail,
+      ),
+    ])
+  }
+
+  async confirmEmailChange(token: string): Promise<void> {
+    const record = await this.prisma.pendingEmailChange.findFirst({
+      where: {
+        tokenHash: this.hashValue(token),
+        verifiedAt: null,
+        cancelledAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+      },
+    })
+
+    if (!record) {
+      throw new BadRequestException('This email change link is invalid or has expired.')
+    }
+
+    const emailInUse = await this.prisma.user.findUnique({
+      where: { email: record.newEmail },
+      select: { id: true },
+    })
+    if (emailInUse && emailInUse.id !== record.userId) {
+      throw new BadRequestException('That email address is already in use.')
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { email: record.newEmail, emailVerifiedAt: new Date() },
+      }),
+      this.prisma.pendingEmailChange.update({
+        where: { id: record.id },
+        data: { verifiedAt: new Date() },
+      }),
+    ])
+
+    await this.email.sendEmailChangedConfirmationEmail(
+      record.newEmail,
+      record.user.name ?? record.newEmail.split('@')[0] ?? record.newEmail,
+    )
   }
 }

@@ -27,23 +27,47 @@ export function storeClientSession(session: { accessToken: string; refreshToken:
   window.localStorage.setItem(REFRESH_STORAGE_KEY, session.refreshToken)
 }
 
+async function syncServerSession(session: { accessToken: string; refreshToken: string } | null) {
+  if (typeof window === 'undefined') return
+  await fetch('/api/auth/session', {
+    method: session ? 'POST' : 'DELETE',
+    headers: session ? { 'Content-Type': 'application/json' } : undefined,
+    body: session ? JSON.stringify(session) : undefined,
+    credentials: 'same-origin',
+    cache: 'no-store',
+  })
+}
+
+export async function persistSession(session: {
+  accessToken: string
+  refreshToken: string
+}): Promise<void> {
+  storeClientSession(session)
+  await syncServerSession(session)
+}
+
 export function clearClientSession(): void {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(ACCESS_STORAGE_KEY)
   window.localStorage.removeItem(REFRESH_STORAGE_KEY)
 }
 
+export async function clearPersistedSession(): Promise<void> {
+  clearClientSession()
+  await syncServerSession(null)
+}
+
 async function refreshClientSession(refreshToken: string): Promise<string | undefined> {
   try {
     const refreshed = await apiPost<SessionResponse>('/auth/refresh', { refreshToken })
-    storeClientSession({
+    await persistSession({
       accessToken: refreshed.accessToken,
       refreshToken: refreshed.refreshToken,
     })
     return refreshed.accessToken
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 401) {
-      clearClientSession()
+      await clearPersistedSession()
       return undefined
     }
     throw error
@@ -65,6 +89,6 @@ export async function signOut(): Promise<void> {
   try {
     await apiPost('/auth/sign-out', { refreshToken })
   } finally {
-    clearClientSession()
+    await clearPersistedSession()
   }
 }

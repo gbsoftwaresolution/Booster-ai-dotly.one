@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import Image from 'next/image'
 import { apiGet, apiPost } from '@/lib/api'
-import { getAccessToken, storeClientSession } from '@/lib/auth/client'
+import { getAccessToken, persistSession } from '@/lib/auth/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -110,7 +110,7 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
         email: trimmedEmail,
         password,
       })
-      storeClientSession(session)
+      await persistSession(session)
       const token = session.accessToken
       await apiGet(`/teams/${team.id}`, token)
       router.push(teamNext)

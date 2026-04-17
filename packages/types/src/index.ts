@@ -257,6 +257,7 @@ export interface DeletedResponse {
 export interface UserMeResponse {
   id: string
   email: string
+  emailVerifiedAt: string | null
   name: string | null
   avatarUrl: string | null
   plan: string

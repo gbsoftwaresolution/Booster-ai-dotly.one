@@ -81,7 +81,10 @@ export async function middleware(request: NextRequest) {
     })
   }
 
-  const hasSession = Boolean(request.cookies.get('dotly_access_token')?.value)
+  const hasSession = Boolean(
+    request.cookies.get('dotly_access_token')?.value ||
+    request.cookies.get('dotly_refresh_token')?.value,
+  )
 
   const isDashboardRoute =
     request.nextUrl.pathname.startsWith('/onboarding') ||

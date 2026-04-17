@@ -314,35 +314,71 @@ export function ProfileTabContent({
   profileLoading,
   name,
   email,
+  emailVerified,
+  verifyEmailStatus,
+  passwordStatus,
+  emailChangeStatus,
+  currentPassword,
+  newPassword,
+  confirmPassword,
+  pendingEmail,
   country,
   timezone,
   profileFieldErrors,
   profileStatus,
   profileLoadError,
   profileSaving,
+  verifyEmailLoading,
+  passwordSaving,
+  emailChangeSaving,
   onNameChange,
+  onCurrentPasswordChange,
+  onNewPasswordChange,
+  onConfirmPasswordChange,
+  onPendingEmailChange,
   onCountryChange,
   onTimezoneChange,
+  onResendVerification,
+  onChangePassword,
+  onRequestEmailChange,
   onRetry,
   onSave,
 }: {
   profileLoading: boolean
   name: string
   email: string
+  emailVerified: boolean
+  verifyEmailStatus: string | null
+  passwordStatus: string | null
+  emailChangeStatus: string | null
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+  pendingEmail: string
   country: string
   timezone: string
   profileFieldErrors: ProfileFieldErrors
   profileStatus: 'idle' | 'saved' | 'error'
   profileLoadError: string | null
   profileSaving: boolean
+  verifyEmailLoading: boolean
+  passwordSaving: boolean
+  emailChangeSaving: boolean
   onNameChange: (value: string) => void
+  onCurrentPasswordChange: (value: string) => void
+  onNewPasswordChange: (value: string) => void
+  onConfirmPasswordChange: (value: string) => void
+  onPendingEmailChange: (value: string) => void
   onCountryChange: (value: string) => void
   onTimezoneChange: (value: string) => void
+  onResendVerification: () => void
+  onChangePassword: () => void
+  onRequestEmailChange: () => void
   onRetry: () => void
   onSave: () => void
 }): JSX.Element {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h2 className="text-base font-semibold text-gray-900">Profile Information</h2>
 
       {profileLoading ? (
@@ -380,9 +416,29 @@ export function ProfileTabContent({
               readOnly
               className="mt-1 block w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400"
             />
-            <p className="mt-1 text-xs text-gray-400">
-              Email is managed by your sign-in provider and cannot be changed here.
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-2.5 py-1 font-semibold',
+                  emailVerified ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700',
+                )}
+              >
+                {emailVerified ? 'Verified' : 'Verification pending'}
+              </span>
+              {!emailVerified ? (
+                <button
+                  type="button"
+                  onClick={onResendVerification}
+                  disabled={verifyEmailLoading}
+                  className="font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50"
+                >
+                  {verifyEmailLoading ? 'Sending…' : 'Resend verification email'}
+                </button>
+              ) : null}
+            </div>
+            {verifyEmailStatus ? (
+              <p className="mt-1 text-xs text-gray-500">{verifyEmailStatus}</p>
+            ) : null}
           </div>
 
           <div>
@@ -442,6 +498,79 @@ export function ProfileTabContent({
       >
         {profileSaving ? 'Saving...' : 'Save changes'}
       </button>
+
+      <div className="grid gap-6 border-t border-gray-100 pt-6 lg:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Change password</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Requires your current password and a recent login session.
+            </p>
+          </div>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(event) => onCurrentPasswordChange(event.target.value)}
+            placeholder="Current password"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(event) => onNewPasswordChange(event.target.value)}
+            placeholder="New password"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => onConfirmPasswordChange(event.target.value)}
+            placeholder="Confirm new password"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          {passwordStatus ? <p className="text-xs text-gray-500">{passwordStatus}</p> : null}
+          <button
+            type="button"
+            onClick={onChangePassword}
+            disabled={passwordSaving}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+          >
+            {passwordSaving ? 'Updating…' : 'Update password'}
+          </button>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Change email</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              We will verify the new email before applying the change.
+            </p>
+          </div>
+          <input
+            type="email"
+            value={pendingEmail}
+            onChange={(event) => onPendingEmailChange(event.target.value)}
+            placeholder="New email address"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(event) => onCurrentPasswordChange(event.target.value)}
+            placeholder="Current password"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          {emailChangeStatus ? <p className="text-xs text-gray-500">{emailChangeStatus}</p> : null}
+          <button
+            type="button"
+            onClick={onRequestEmailChange}
+            disabled={emailChangeSaving}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+          >
+            {emailChangeSaving ? 'Sending…' : 'Send email change link'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

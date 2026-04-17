@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAccessToken } from '@/lib/auth/client'
-import { apiGet, apiPatch } from '@/lib/api'
+import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { enqueueNotificationPrefsMutation } from '@/lib/pwa/queue'
 import type { BillingSummaryResponse, UserMeResponse } from '@dotly/types'
 import {
@@ -37,11 +37,22 @@ export default function SettingsPage(): JSX.Element {
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [emailVerified, setEmailVerified] = useState(false)
   const [country, setCountry] = useState('')
   const [timezone, setTimezone] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileStatus, setProfileStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [profileFieldErrors, setProfileFieldErrors] = useState<ProfileFieldErrors>({})
+  const [verifyEmailLoading, setVerifyEmailLoading] = useState(false)
+  const [verifyEmailStatus, setVerifyEmailStatus] = useState<string | null>(null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordStatus, setPasswordStatus] = useState<string | null>(null)
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [emailChangeSaving, setEmailChangeSaving] = useState(false)
+  const [emailChangeStatus, setEmailChangeStatus] = useState<string | null>(null)
 
   const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(getInitialNotifPrefs)
   const [notifSaving, setNotifSaving] = useState(false)
@@ -78,6 +89,8 @@ export default function SettingsPage(): JSX.Element {
       if (!user) throw new Error('User profile missing')
       setName(user.name ?? '')
       setEmail(user.email ?? '')
+      setEmailVerified(Boolean(user.emailVerifiedAt))
+      setPendingEmail(user.email ?? '')
       setCountry(user.country ?? detectBrowserCountry())
       setTimezone(user.timezone ?? detectBrowserTimezone())
       setNotifPrefs({
@@ -181,11 +194,7 @@ export default function SettingsPage(): JSX.Element {
       }
 
       const token = await getToken()
-      await apiPatch(
-        '/users/me',
-        payload,
-        token,
-      )
+      await apiPatch('/users/me', payload, token)
 
       try {
         localStorage.setItem('dotly:notification_prefs', JSON.stringify(notifPrefs))
@@ -217,6 +226,99 @@ export default function SettingsPage(): JSX.Element {
     }
   }, [notifPrefs])
 
+  const handleResendVerification = useCallback(async () => {
+    setVerifyEmailLoading(true)
+    setVerifyEmailStatus(null)
+    try {
+      await apiPost('/auth/resend-verification', { email })
+      setVerifyEmailStatus('Verification email sent. Check your inbox.')
+    } catch (error) {
+      setVerifyEmailStatus(
+        error instanceof Error ? error.message : 'Could not resend verification email.',
+      )
+    } finally {
+      setVerifyEmailLoading(false)
+    }
+  }, [email])
+
+  const handleChangePassword = useCallback(async () => {
+    setPasswordStatus(null)
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordStatus('Fill in all password fields.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setPasswordStatus('New password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus('New password and confirmation do not match.')
+      return
+    }
+
+    setPasswordSaving(true)
+    try {
+      const refreshToken =
+        typeof window !== 'undefined'
+          ? (window.localStorage.getItem('dotly_refresh_token') ?? undefined)
+          : undefined
+      const token = await getToken()
+      await apiPatch(
+        '/users/me/password',
+        {
+          currentPassword,
+          newPassword,
+          refreshToken,
+        },
+        token,
+      )
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPasswordStatus('Password updated. Please sign in again on other devices if needed.')
+    } catch (error) {
+      setPasswordStatus(error instanceof Error ? error.message : 'Could not update password.')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }, [confirmPassword, currentPassword, newPassword])
+
+  const handleRequestEmailChange = useCallback(async () => {
+    setEmailChangeStatus(null)
+    const nextEmail = pendingEmail.trim().toLowerCase()
+    if (!nextEmail) {
+      setEmailChangeStatus('Enter your new email address.')
+      return
+    }
+    if (!currentPassword) {
+      setEmailChangeStatus('Enter your current password to continue.')
+      return
+    }
+
+    setEmailChangeSaving(true)
+    try {
+      const refreshToken =
+        typeof window !== 'undefined'
+          ? (window.localStorage.getItem('dotly_refresh_token') ?? undefined)
+          : undefined
+      const token = await getToken()
+      await apiPost(
+        '/users/me/email-change',
+        {
+          newEmail: nextEmail,
+          currentPassword,
+          refreshToken,
+        },
+        token,
+      )
+      setEmailChangeStatus('Check your new email inbox to confirm the change.')
+    } catch (error) {
+      setEmailChangeStatus(error instanceof Error ? error.message : 'Could not start email change.')
+    } finally {
+      setEmailChangeSaving(false)
+    }
+  }, [currentPassword, pendingEmail])
+
   return (
     <div className="space-y-6">
       <SettingsHero
@@ -244,16 +346,31 @@ export default function SettingsPage(): JSX.Element {
             profileLoading={profileLoading}
             name={name}
             email={email}
+            emailVerified={emailVerified}
+            verifyEmailStatus={verifyEmailStatus}
+            passwordStatus={passwordStatus}
+            emailChangeStatus={emailChangeStatus}
+            currentPassword={currentPassword}
+            newPassword={newPassword}
+            confirmPassword={confirmPassword}
+            pendingEmail={pendingEmail}
             country={country}
             timezone={timezone}
             profileFieldErrors={profileFieldErrors}
             profileStatus={profileStatus}
             profileLoadError={profileLoadError}
             profileSaving={profileSaving}
+            verifyEmailLoading={verifyEmailLoading}
+            passwordSaving={passwordSaving}
+            emailChangeSaving={emailChangeSaving}
             onNameChange={(value) => {
               setName(value)
               setProfileFieldErrors((prev) => ({ ...prev, name: undefined }))
             }}
+            onCurrentPasswordChange={setCurrentPassword}
+            onNewPasswordChange={setNewPassword}
+            onConfirmPasswordChange={setConfirmPassword}
+            onPendingEmailChange={setPendingEmail}
             onCountryChange={(value) => {
               setCountry(value)
               setProfileFieldErrors((prev) => ({ ...prev, country: undefined }))
@@ -262,6 +379,9 @@ export default function SettingsPage(): JSX.Element {
               setTimezone(value)
               setProfileFieldErrors((prev) => ({ ...prev, timezone: undefined }))
             }}
+            onResendVerification={() => void handleResendVerification()}
+            onChangePassword={() => void handleChangePassword()}
+            onRequestEmailChange={() => void handleRequestEmailChange()}
             onRetry={() => void loadProfile()}
             onSave={() => void handleProfileSave()}
           />

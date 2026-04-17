@@ -6,8 +6,8 @@ import { BrandLogo } from '@/components/BrandLogo'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { getAuthCallbackUrl, sanitizeNextPath } from '@/lib/app-url'
-import { apiPost } from '@/lib/api'
-import { storeClientSession } from '@/lib/auth/client'
+import { apiPost, isApiError } from '@/lib/api'
+import { persistSession } from '@/lib/auth/client'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -28,6 +28,8 @@ function AuthPageContent(): JSX.Element {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+  const [resendingVerification, setResendingVerification] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = useMemo(
@@ -91,6 +93,7 @@ function AuthPageContent(): JSX.Element {
     setEmail(trimmedEmail)
     setError(null)
     setSuccessMessage(null)
+    setUnverifiedEmail(null)
     setLoading(true)
 
     try {
@@ -104,26 +107,47 @@ function AuthPageContent(): JSX.Element {
           accessToken: string
           refreshToken: string
         }>('/auth/sign-in', { email: trimmedEmail, password })
-        storeClientSession(session)
+        await persistSession(session)
         router.push(next)
         router.refresh()
       } else {
-        const session = await apiPost<{
-          accessToken: string
-          refreshToken: string
+        await apiPost<{
+          accessToken: string | null
+          refreshToken: string | null
         }>('/auth/sign-up', {
           name: name.trim() || undefined,
           email: trimmedEmail,
           password,
         })
-        storeClientSession(session)
-        router.push(next)
-        router.refresh()
+        setMode('signin')
+        setUnverifiedEmail(trimmedEmail)
+        setSuccessMessage(
+          'Account created. Check your email to verify your address before signing in.',
+        )
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+      if (isApiError(err) && err.code === 'EMAIL_NOT_VERIFIED') {
+        setUnverifiedEmail(trimmedEmail)
+        setError('Verify your email address before signing in.')
+      } else {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!unverifiedEmail || resendingVerification) return
+    setResendingVerification(true)
+    setError(null)
+    try {
+      await apiPost('/auth/resend-verification', { email: unverifiedEmail })
+      setSuccessMessage('Verification email sent. Check your inbox.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not resend verification email.')
+    } finally {
+      setResendingVerification(false)
     }
   }
 
@@ -353,6 +377,19 @@ function AuthPageContent(): JSX.Element {
                 <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-600">
                   {successMessage}
                 </p>
+              )}
+              {unverifiedEmail && mode === 'signin' && (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <p>Verification is still pending for `{unverifiedEmail}`.</p>
+                  <button
+                    type="button"
+                    onClick={() => void handleResendVerification()}
+                    disabled={resendingVerification}
+                    className="mt-2 font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                  >
+                    {resendingVerification ? 'Sending…' : 'Resend verification email'}
+                  </button>
+                </div>
               )}
 
               <button

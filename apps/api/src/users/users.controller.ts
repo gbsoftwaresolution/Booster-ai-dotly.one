@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Delete,
   Body,
   HttpCode,
@@ -9,10 +10,20 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger'
-import { IsString, MaxLength, IsOptional, Matches, Length, IsBoolean } from 'class-validator'
+import {
+  IsString,
+  MaxLength,
+  IsOptional,
+  Matches,
+  Length,
+  IsBoolean,
+  IsEmail,
+  MinLength,
+} from 'class-validator'
 import type { SuccessResponse } from '@dotly/types'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { UsersService } from './users.service'
+import { AuthService } from '../auth/auth.service'
 
 class SavePushTokenDto {
   @IsString()
@@ -61,11 +72,44 @@ class DeleteAccountDto {
   confirm!: string
 }
 
+class ChangePasswordDto {
+  @IsString()
+  @MaxLength(200)
+  currentPassword!: string
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  newPassword!: string
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  refreshToken?: string
+}
+
+class RequestEmailChangeDto {
+  @IsEmail()
+  newEmail!: string
+
+  @IsString()
+  @MaxLength(200)
+  currentPassword!: string
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  refreshToken?: string
+}
+
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly authService: AuthService,
+  ) {}
 
   // Use findById so that a deleted account is not silently recreated.
   @Get('me')
@@ -111,6 +155,31 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async clearPushToken(@CurrentUser() user: { id: string }): Promise<void> {
     await this.usersService.clearPushToken(user.id)
+  }
+
+  @Patch('me/password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async changePassword(@CurrentUser() user: { id: string }, @Body() body: ChangePasswordDto) {
+    await this.authService.changePassword({
+      userId: user.id,
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
+      refreshToken: body.refreshToken,
+    })
+  }
+
+  @Post('me/email-change')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async requestEmailChange(
+    @CurrentUser() user: { id: string },
+    @Body() body: RequestEmailChangeDto,
+  ) {
+    await this.authService.requestEmailChange({
+      userId: user.id,
+      newEmail: body.newEmail,
+      currentPassword: body.currentPassword,
+      refreshToken: body.refreshToken,
+    })
   }
 
   @ApiOperation({ summary: 'GDPR — export all user data as JSON' })

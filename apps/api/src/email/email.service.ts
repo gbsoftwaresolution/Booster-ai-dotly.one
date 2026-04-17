@@ -259,11 +259,125 @@ export class EmailService {
         <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
           <h1 style="color:#0ea5e9">Welcome to Dotly.one!</h1>
           <p>Hi ${safeName},</p>
-          <p>You're all set. Create your first digital business card in minutes — it takes less than 3 minutes.</p>
-          <a href="${this.webUrl}/cards/create" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">Create my card →</a>
+          <p>You're all set. Complete onboarding and create your first digital business card in minutes.</p>
+          <a href="${this.webUrl}/onboarding" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">Finish setup →</a>
           <p style="color:#9ca3af;font-size:12px;margin-top:32px">Dotly.one — Tap. Share. Convert.</p>
         </div>
       `,
+    })
+  }
+
+  async sendEmailVerificationEmail(
+    to: string,
+    name: string,
+    verificationUrl: string,
+  ): Promise<boolean> {
+    const safeName = this.escHtml(name || 'there')
+    const safeUrl = this.escHtml(verificationUrl)
+    return this.send({
+      to,
+      subject: 'Verify your Dotly email address',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h1 style="color:#0ea5e9">Verify your email</h1>
+          <p>Hi ${safeName},</p>
+          <p>Please confirm your email address to secure your Dotly account.</p>
+          <a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">Verify email</a>
+          <p style="color:#64748b;font-size:13px;margin-top:24px">This link expires in 1 hour.</p>
+        </div>
+      `,
+      text: `Verify your Dotly email address: ${verificationUrl}`,
+    })
+  }
+
+  async sendPasswordResetEmail(to: string, resetUrl: string): Promise<boolean> {
+    const safeUrl = this.escHtml(resetUrl)
+    return this.send({
+      to,
+      subject: 'Reset your Dotly password',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h1 style="color:#0ea5e9">Reset your password</h1>
+          <p>Use the link below to choose a new password for your Dotly account.</p>
+          <a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">Reset password</a>
+          <p style="color:#64748b;font-size:13px;margin-top:24px">This link expires in 1 hour.</p>
+        </div>
+      `,
+      text: `Reset your Dotly password: ${resetUrl}`,
+    })
+  }
+
+  async sendPasswordChangedEmail(to: string, name: string): Promise<boolean> {
+    const safeName = this.escHtml(name || 'there')
+    return this.send({
+      to,
+      subject: 'Your Dotly password was changed',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h1 style="color:#0ea5e9">Password changed</h1>
+          <p>Hi ${safeName},</p>
+          <p>Your Dotly account password was changed successfully.</p>
+          <p>If this was not you, reset your password immediately and contact support.</p>
+        </div>
+      `,
+      text: 'Your Dotly account password was changed successfully. If this was not you, reset your password immediately and contact support.',
+    })
+  }
+
+  async sendEmailChangeVerificationEmail(
+    to: string,
+    name: string,
+    verificationUrl: string,
+  ): Promise<boolean> {
+    const safeName = this.escHtml(name || 'there')
+    const safeUrl = this.escHtml(verificationUrl)
+    return this.send({
+      to,
+      subject: 'Confirm your new Dotly email address',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h1 style="color:#0ea5e9">Confirm your new email</h1>
+          <p>Hi ${safeName},</p>
+          <p>Use the link below to confirm this email address for your Dotly account.</p>
+          <a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:#0ea5e9;color:white;text-decoration:none;border-radius:8px;margin-top:16px">Confirm new email</a>
+          <p style="color:#64748b;font-size:13px;margin-top:24px">This link expires in 1 hour.</p>
+        </div>
+      `,
+      text: `Confirm your new Dotly email address: ${verificationUrl}`,
+    })
+  }
+
+  async sendEmailChangeAlertEmail(to: string, name: string, newEmail: string): Promise<boolean> {
+    const safeName = this.escHtml(name || 'there')
+    const safeEmail = this.escHtml(newEmail)
+    return this.send({
+      to,
+      subject: 'A Dotly email change was requested',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h1 style="color:#0ea5e9">Email change requested</h1>
+          <p>Hi ${safeName},</p>
+          <p>A request was made to change your Dotly account email to <strong>${safeEmail}</strong>.</p>
+          <p>If this was not you, reset your password immediately and contact support.</p>
+        </div>
+      `,
+      text: `A request was made to change your Dotly account email to ${newEmail}. If this was not you, reset your password immediately and contact support.`,
+    })
+  }
+
+  async sendEmailChangedConfirmationEmail(to: string, name: string): Promise<boolean> {
+    const safeName = this.escHtml(name || 'there')
+    return this.send({
+      to,
+      subject: 'Your Dotly email address was changed',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h1 style="color:#0ea5e9">Email updated</h1>
+          <p>Hi ${safeName},</p>
+          <p>Your Dotly account email address was updated successfully.</p>
+        </div>
+      `,
+      text: 'Your Dotly account email address was updated successfully.',
     })
   }
 
