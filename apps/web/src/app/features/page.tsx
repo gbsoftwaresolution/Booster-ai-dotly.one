@@ -9,9 +9,9 @@ import { absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 export const metadata: Metadata = createMarketingMetadata({
   title: 'Features',
   description:
-    'Explore Dotly.one features available today: NFC and QR sharing, analytics, CRM, portfolio blocks, scheduling, and the currently published plan surface.',
+    'Explore how Dotly.one turns scans into bookings, WhatsApp conversations, leads, and crypto-ready follow-up workflows.',
   path: '/features',
-  keywords: ['product features', 'nfc sharing', 'analytics dashboard', 'crm features'],
+  keywords: ['product features', 'booking funnel', 'WhatsApp lead capture', 'crm features'],
 })
 
 // ─── Feature detail sections ──────────────────────────────────────────────────
@@ -19,15 +19,15 @@ export const metadata: Metadata = createMarketingMetadata({
 const SECTIONS = [
   {
     id: 'nfc-qr',
-    tag: 'Share instantly',
-    title: 'NFC tap & QR code',
+    tag: 'Start the loop',
+    title: 'QR, NFC, and public card sharing',
     description:
-      'Your card is always one tap or scan away. Write your profile URL to any ISO 14443-A NFC tag and hand it out. Anyone with a modern smartphone can view your full card without downloading anything. Generate a QR code to include in email signatures, slide decks, or print media.',
+      'Dotly is built for the first seconds after a conversation. Share with QR, NFC, or your public link so the next action happens immediately instead of getting lost in a contact list.',
     bullets: [
-      'Works with any NFC-compatible phone (iOS 13+ / Android 4.4+)',
-      'QR codes are dynamically generated — update your info without reprinting',
-      'Fallback URL for devices without NFC',
-      'Branded short link: dotly.one/yourname',
+      'Works with modern NFC-compatible phones and QR scans',
+      'QR codes stay live even when your card content changes',
+      'Branded short link gives every lead one clear destination',
+      'Built for events, meetings, WhatsApp bios, and social profiles',
     ],
     icon: (
       <svg
@@ -48,15 +48,15 @@ const SECTIONS = [
   },
   {
     id: 'analytics',
-    tag: 'Know your audience',
-    title: 'Real-time engagement analytics',
+    tag: 'Know what converts',
+    title: 'Real-time intent tracking',
     description:
-      'See every interaction with your card the moment it happens. Understand which links get clicked, how people found you, and which events generate the most taps. Use the data to optimise your card content and follow-up timing.',
+      'See which scans, clicks, bookings, and lead captures are actually moving contacts toward conversion so your follow-up stays focused on real intent.',
     bullets: [
-      'Tap & scan events with timestamp and location (city-level)',
-      'Per-link click tracking across all social and custom links',
-      'Lead capture conversion rate',
-      'Analytics history from 7 days (Free) up to unlimited (Agency/Enterprise)',
+      'Tap and scan events with source context',
+      'CTA click tracking across booking, WhatsApp, and card actions',
+      'Lead capture and booking conversion signals',
+      'Analytics history scales by plan',
     ],
     icon: (
       <svg
@@ -77,15 +77,15 @@ const SECTIONS = [
   },
   {
     id: 'crm',
-    tag: 'Built-in CRM',
-    title: 'Turn scans into relationships',
+    tag: 'Follow up faster',
+    title: 'Turn scans into CRM-ready leads',
     description:
-      'Every contact who taps your card and saves their details lands automatically in your CRM. No manual data entry. Add private notes, set follow-up reminders, tag contacts by event or category, and export your full contact list to CSV at any time.',
+      'Every captured contact lands in Dotly so you can follow up while intent is still warm. Add notes, tag context, and keep your next action clear.',
     bullets: [
-      'Auto-populated lead cards from the contact capture form',
-      'Tags, notes, and follow-up workflows inside the CRM',
-      'CSV export (Pro and above)',
-      'Integrations via Zapier and webhooks (coming soon)',
+      'Lead capture submissions become contacts automatically',
+      'Tags, notes, reminders, and follow-up workflows stay in one system',
+      'CSV export on supported paid plans',
+      'Built to support richer conversion attribution over time',
     ],
     icon: (
       <svg
@@ -106,15 +106,15 @@ const SECTIONS = [
   },
   {
     id: 'scheduling',
-    tag: 'Stay in motion',
-    title: 'Scheduling and follow-up that keep momentum alive',
+    tag: 'Move to revenue',
+    title: 'Booking, follow-up, and crypto-ready checkout',
     description:
-      'Move from first tap to next conversation without losing context. Share booking links, keep outreach organized, and use Dotly as the system that turns introductions into ongoing relationships.',
+      'Use booking links to move a lead into the next conversation, then keep follow-up organized in the same workflow. Paid upgrades currently support crypto checkout for subscription billing, with public payment flows planned next.',
     bullets: [
-      'Booking links connect your card to the next action',
-      'Inbox, reminders, and templates keep follow-up organized',
-      'Scheduling helps remove friction after a strong first impression',
-      'Dotly keeps contact history and engagement in one workflow',
+      'Booking links connect scans directly to meetings',
+      'Reminders and outreach tools help prevent leads from going cold',
+      'Current paid checkout is crypto-only',
+      'Dotly keeps contact history and engagement tied together',
     ],
     icon: (
       <svg
@@ -162,18 +162,18 @@ export default function FeaturesPage() {
       <section className="border-b border-gray-100 px-6 py-16 text-center">
         <p className="text-sm font-semibold uppercase tracking-wider text-brand-500">Product</p>
         <h1 className="mt-2 text-5xl font-extrabold tracking-tight text-gray-900">
-          Everything in one card
+          Dotly is a contact-to-customer engine
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-gray-500">
-          NFC sharing, analytics, CRM, portfolio blocks, and scheduling — built for professionals
-          who take networking seriously.
+          Share once, trigger the next action, capture intent, and keep follow-up moving from one
+          system built for salespeople, freelancers, and small businesses.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link
             href="/auth"
             className="rounded-xl bg-brand-500 px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-brand-600"
           >
-            Get started free
+            Get your Dotly free
           </Link>
           <Link
             href="/pricing"

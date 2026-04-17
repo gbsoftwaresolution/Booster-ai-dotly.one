@@ -8,9 +8,9 @@ import { SITE_DESCRIPTION, SITE_NAME, absoluteUrl, createMarketingMetadata } fro
 export const metadata: Metadata = createMarketingMetadata({
   title: 'About',
   description:
-    'Learn about Dotly.one, the team behind its digital business cards, and the product principles shaping NFC sharing, analytics, CRM, and scheduling.',
+    'Learn about Dotly.one, the team behind its contact-to-customer product, and the principles shaping booking, lead capture, CRM, and revenue workflows.',
   path: '/about',
-  keywords: ['about dotly', 'digital business card company', 'networking platform'],
+  keywords: ['about dotly', 'contact to customer company', 'networking platform'],
 })
 
 const VALUES = [
@@ -27,12 +27,12 @@ const VALUES = [
   {
     title: 'Results you can measure',
     description:
-      'A digital card should do more than look good. Dotly helps you measure engagement, capture leads, and turn introductions into follow-up opportunities.',
+      'A card should do more than look polished. Dotly helps you measure intent, capture leads, and turn introductions into booked conversations and revenue.',
   },
   {
-    title: 'Built for scale',
+    title: 'Built around action',
     description:
-      "Whether you're a solo freelancer or a 500-person enterprise, the same card infrastructure handles your team with zero config.",
+      'The public experience should always answer one question quickly: can this contact book, chat, or convert right now?',
   },
 ]
 
@@ -52,7 +52,7 @@ const aboutStructuredData = [
     name: 'About Dotly.one',
     url: absoluteUrl('/about'),
     description:
-      'Learn about the mission and product philosophy behind Dotly.one digital business cards.',
+      'Learn about the mission and product philosophy behind Dotly.one as a contact-to-customer platform.',
   },
   {
     '@context': 'https://schema.org',
@@ -77,17 +77,17 @@ export default function AboutPage() {
             Our mission
           </p>
           <h1 className="mt-2 text-5xl font-extrabold tracking-tight text-gray-900">
-            Networking should be effortless
+            Every contact should have a clear path to conversion
           </h1>
           <p className="mx-auto mt-6 text-lg text-gray-500 leading-relaxed">
-            Paper cards get lost. LinkedIn requests get ignored. Dotly.one gives every professional
-            a living, shareable identity that works with a single tap — and keeps working after the
-            handshake.
+            Paper cards get lost. Contact details get buried. Dotly.one gives every salesperson,
+            freelancer, and small business a faster path from scan to booking, conversation, and
+            follow-up.
           </p>
           <p className="mt-4 text-base text-gray-500 leading-relaxed">
-            We started Dotly.one because we were tired of carrying stacks of paper cards to events,
-            only to have contacts forget who we were three days later. A digital card with real-time
-            analytics and a built-in CRM changes that entirely.
+            We started Dotly.one because most digital card tools stop at sharing. We believe the
+            real product begins after the scan, when a contact needs one obvious next action and the
+            owner needs a system to track and convert it.
           </p>
         </div>
       </section>

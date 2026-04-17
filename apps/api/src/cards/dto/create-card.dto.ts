@@ -1,15 +1,49 @@
 import {
   IsEnum,
   IsOptional,
+  IsBoolean,
   IsString,
   Matches,
   MaxLength,
   ValidateNested,
   IsObject,
+  IsArray,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
-import { CardTemplate } from '@dotly/types'
+import { CardActionType, CardTemplate } from '@dotly/types'
+
+class CardActionConfigDto {
+  @IsEnum(['BOOK', 'WHATSAPP_CHAT', 'LEAD_CAPTURE'] satisfies CardActionType[])
+  type!: CardActionType
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  label?: string
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  whatsappMessage?: string
+}
+
+class CardActionsConfigDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CardActionConfigDto)
+  primary?: CardActionConfigDto
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CardActionConfigDto)
+  secondary?: CardActionConfigDto[]
+}
 
 // HIGH-03: Replace the open-ended `Record<string, unknown>` fields type with an
 // explicit DTO that validates and caps every known card field.
@@ -77,6 +111,12 @@ export class CardFieldsDto {
   @IsString()
   @MaxLength(120)
   bookingAppointmentSlug?: string
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CardActionsConfigDto)
+  actions?: CardActionsConfigDto
 }
 
 export class CreateCardDto {

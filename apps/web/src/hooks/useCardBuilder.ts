@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type {
   CardData,
+  CardActionsConfig,
   CardEditorResponse,
   PartialCardFields,
   CardThemeData,
@@ -231,6 +232,28 @@ export function useCardBuilder(cardId: string) {
     [triggerAutoSave],
   )
 
+  const updateActions = useCallback(
+    (actions: CardActionsConfig | undefined) => {
+      setState((prev) => {
+        if (!prev.card) return prev
+        const nextFields = { ...prev.card.fields }
+        if (actions && (actions.primary || (actions.secondary?.length ?? 0) > 0)) {
+          nextFields.actions = actions
+        } else {
+          delete nextFields.actions
+        }
+        latestFieldsRef.current = nextFields
+        return {
+          ...prev,
+          card: { ...prev.card, fields: nextFields },
+        }
+      })
+      pendingFieldChanges.current = { ...pendingFieldChanges.current, actions: actions ?? null }
+      triggerAutoSave()
+    },
+    [triggerAutoSave],
+  )
+
   const updateHandle = useCallback(
     (handle: string) => {
       const previousHandle = state.card?.handle ?? null
@@ -395,6 +418,7 @@ export function useCardBuilder(cardId: string) {
   return {
     ...state,
     updateField,
+    updateActions,
     updateHandle,
     updateTheme,
     updateTemplate,

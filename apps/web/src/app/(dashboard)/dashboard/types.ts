@@ -10,6 +10,15 @@ export interface DashboardAnalyticsSummary {
   totalViews: number
   totalClicks: number
   totalLeads: number
+  totalBookingsStarted: number
+  totalBookingsCompleted: number
+  totalWhatsappClicks: number
+  totalLeadCaptureOpens: number
+  totalLeadSubmissions: number
+  totalDepositStarts: number
+  totalDepositCompletions: number
+  totalPaymentStarts: number
+  totalPaymentCompletions: number
   totalCards: number
   activeCards: number
   openDealsCount: number

@@ -17,6 +17,18 @@ interface AnalyticsEventPayload {
   referrer?: string
 }
 
+interface AnalyticsActionSummary {
+  totalBookingsStarted: number
+  totalBookingsCompleted: number
+  totalWhatsappClicks: number
+  totalLeadCaptureOpens: number
+  totalLeadSubmissions: number
+  totalDepositStarts: number
+  totalDepositCompletions: number
+  totalPaymentStarts: number
+  totalPaymentCompletions: number
+}
+
 export interface NameValuePair {
   name: string
   value: number
@@ -36,6 +48,61 @@ function collectInteractionBreakdown(
   return Object.entries(interactionsByAction)
     .sort((a, b) => b[1] - a[1])
     .map(([name, value]) => ({ name, value }))
+}
+
+function summarizeActions(
+  events: Array<{ type: string; metadata: Prisma.JsonValue | null }>,
+): AnalyticsActionSummary {
+  const summary: AnalyticsActionSummary = {
+    totalBookingsStarted: 0,
+    totalBookingsCompleted: 0,
+    totalWhatsappClicks: 0,
+    totalLeadCaptureOpens: 0,
+    totalLeadSubmissions: 0,
+    totalDepositStarts: 0,
+    totalDepositCompletions: 0,
+    totalPaymentStarts: 0,
+    totalPaymentCompletions: 0,
+  }
+
+  events.forEach((event) => {
+    const meta = (event.metadata ?? {}) as Record<string, unknown>
+    const action = typeof meta['action'] === 'string' ? meta['action'] : ''
+    switch (action) {
+      case 'open_booking_page':
+      case 'booking_started':
+        summary.totalBookingsStarted += 1
+        break
+      case 'booking_completed':
+        summary.totalBookingsCompleted += 1
+        break
+      case 'whatsapp_clicked':
+        summary.totalWhatsappClicks += 1
+        break
+      case 'open_lead_capture':
+        summary.totalLeadCaptureOpens += 1
+        break
+      case 'lead_submitted':
+        summary.totalLeadSubmissions += 1
+        break
+      case 'deposit_started':
+        summary.totalDepositStarts += 1
+        break
+      case 'deposit_completed':
+        summary.totalDepositCompletions += 1
+        break
+      case 'payment_started':
+        summary.totalPaymentStarts += 1
+        break
+      case 'payment_completed':
+        summary.totalPaymentCompletions += 1
+        break
+      default:
+        break
+    }
+  })
+
+  return summary
 }
 
 interface QueuedEvent {
@@ -315,7 +382,22 @@ export class AnalyticsService {
       new Date(),
     )
 
-    return { totalViews, totalClicks, totalLeads, viewsByDay, clicksByDay }
+    const recentInteractionEvents = await this.prisma.analyticsEvent.findMany({
+      where: {
+        cardId,
+        type: { in: ['CLICK', 'SAVE', 'LEAD_SUBMIT'] },
+      },
+      select: {
+        type: true,
+        metadata: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    })
+
+    const actionSummary = summarizeActions(recentInteractionEvents)
+
+    return { totalViews, totalClicks, totalLeads, viewsByDay, clicksByDay, ...actionSummary }
   }
 
   async getAnalytics(
@@ -434,6 +516,7 @@ export class AnalyticsService {
     // We intentionally use both CLICK and SAVE because newer public-card actions
     // are stored as metadata on those existing event types to avoid a schema migration.
     const interactionsByAction = collectInteractionBreakdown(allEvents)
+    const actionSummary = summarizeActions(allEvents)
 
     return {
       summary: {
@@ -441,6 +524,7 @@ export class AnalyticsService {
         totalClicks,
         totalLeads: contacts,
         uniqueVisitors,
+        ...actionSummary,
         // Use accurate SQL counts for conversion rate so high-traffic cards with
         // >5000 events in range get the right ratio, not one from a truncated set.
         conversionRate: totalViews > 0 ? Math.round((contacts / totalViews) * 1000) / 10 : 0,
@@ -480,6 +564,15 @@ export class AnalyticsService {
     totalViews: number
     totalClicks: number
     totalLeads: number
+    totalBookingsStarted: number
+    totalBookingsCompleted: number
+    totalWhatsappClicks: number
+    totalLeadCaptureOpens: number
+    totalLeadSubmissions: number
+    totalDepositStarts: number
+    totalDepositCompletions: number
+    totalPaymentStarts: number
+    totalPaymentCompletions: number
     totalCards: number
     activeCards: number
     openDealsCount: number
@@ -565,10 +658,13 @@ export class AnalyticsService {
 
     const countByType = new Map(eventCounts.map((r) => [r.type, r._count._all]))
 
+    const actionSummary = summarizeActions(recentEvents)
+
     const result = {
       totalViews: countByType.get('VIEW') ?? 0,
       totalClicks: countByType.get('CLICK') ?? 0,
       totalLeads: leadCount,
+      ...actionSummary,
       totalCards,
       activeCards,
       openDealsCount: openDeals._count._all,

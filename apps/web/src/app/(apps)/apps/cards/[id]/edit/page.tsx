@@ -8,6 +8,7 @@ import { CardRenderer } from '@dotly/ui'
 import { useCardBuilder } from '@/hooks/useCardBuilder'
 import { ProfileTab } from '@/components/card-builder/ProfileTab'
 import { LinksTab } from '@/components/card-builder/LinksTab'
+import { ActionsTab } from '@/components/card-builder/ActionsTab'
 import { MediaTab } from '@/components/card-builder/MediaTab'
 import { ThemeTab } from '@/components/card-builder/ThemeTab'
 import { PublishBar } from '@/components/card-builder/PublishBar'
@@ -29,15 +30,17 @@ import {
   AlertCircle,
   Loader2,
   ClipboardList,
+  MousePointerClick,
   Trash2,
   AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type Tab = 'profile' | 'links' | 'media' | 'theme' | 'qr' | 'form' | 'preview'
+type Tab = 'profile' | 'actions' | 'links' | 'media' | 'theme' | 'qr' | 'form' | 'preview'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
+  { id: 'actions', label: 'Actions', icon: MousePointerClick },
   { id: 'links', label: 'Links', icon: Link2 },
   { id: 'media', label: 'Media', icon: Image },
   { id: 'theme', label: 'Theme', icon: Palette },
@@ -69,6 +72,11 @@ interface AnalyticsSummary {
   totalViews: number
   totalClicks: number
   totalLeads: number
+  totalBookingsStarted: number
+  totalBookingsCompleted: number
+  totalWhatsappClicks: number
+  totalLeadCaptureOpens: number
+  totalLeadSubmissions: number
 }
 
 // ─── Focus-trapping confirm dialog ───────────────────────────────────────────
@@ -205,6 +213,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
     loading,
     error,
     updateField,
+    updateActions,
     updateHandle,
     updateTheme,
     updateTemplate,
@@ -428,7 +437,12 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                           : 'text-gray-500 hover:bg-white/50 hover:text-gray-700',
                       )}
                     >
-                      <Icon className={cn('h-4 w-4 transition-transform duration-300', active && 'scale-110')} />
+                      <Icon
+                        className={cn(
+                          'h-4 w-4 transition-transform duration-300',
+                          active && 'scale-110',
+                        )}
+                      />
                       <span
                         className={cn(
                           'text-[10px] font-bold tracking-wide uppercase',
@@ -448,7 +462,10 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
               {activeTab === 'preview' ? (
                 /* ── Mobile inline preview ── */
                 <div className="flex min-h-full items-start justify-center bg-transparent p-2 pt-4">
-                  <div className="relative w-full max-w-[340px]" style={{ animation: 'create-fade 0.5s ease-out both' }}>
+                  <div
+                    className="relative w-full max-w-[340px]"
+                    style={{ animation: 'create-fade 0.5s ease-out both' }}
+                  >
                     <div className="mx-auto overflow-hidden rounded-[40px] border-[8px] border-gray-900 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] bg-white relative">
                       <div className="absolute top-0 inset-x-0 h-6 bg-gray-900 z-50 flex justify-center rounded-b-xl max-w-[120px] mx-auto">
                         <div className="mt-1 h-1.5 w-16 rounded-full bg-gray-800" />
@@ -461,10 +478,7 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                 </div>
               ) : (
                 <div
-                  className={cn(
-                    'px-4 py-4',
-                    'pb-32 lg:pb-8',
-                  )}
+                  className={cn('px-4 py-4', 'pb-32 lg:pb-8')}
                   style={{ animation: 'create-fade 0.3s ease-out both' }}
                 >
                   {activeTab === 'profile' && (
@@ -477,6 +491,9 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                       onHandleChange={updateHandle}
                       onVcardPolicyChange={updateVcardPolicy}
                     />
+                  )}
+                  {activeTab === 'actions' && (
+                    <ActionsTab fields={card.fields} onActionsChange={updateActions} />
                   )}
                   {activeTab === 'links' && (
                     <LinksTab
@@ -521,7 +538,10 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
           {/* ── Right preview panel — desktop only ── */}
           <div className="relative hidden flex-1 items-start justify-center overflow-y-auto bg-slate-50/40 lg:flex shadow-inner">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.06)_0%,transparent_60%)] pointer-events-none" />
-            <div className="sticky top-10" style={{ animation: 'create-fade 0.6s cubic-bezier(0.16, 1, 0.3, 1) both' }}>
+            <div
+              className="sticky top-10"
+              style={{ animation: 'create-fade 0.6s cubic-bezier(0.16, 1, 0.3, 1) both' }}
+            >
               {/* Phone frame mock */}
               <div className="relative w-[380px]">
                 {/* Physical buttons */}
@@ -534,14 +554,16 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
                   {/* Notch / Dynamic Island */}
                   <div className="absolute top-0 inset-x-0 h-7 flex justify-center z-50">
                     <div className="w-[120px] h-[30px] bg-gray-900 rounded-b-3xl relative">
-                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-3">
-                         <div className="w-2.5 h-2.5 rounded-full bg-slate-800/80 border border-slate-700/50 shadow-inner" />
-                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-900/40" />
-                       </div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-3">
+                        <div className="w-2.5 h-2.5 rounded-full bg-slate-800/80 border border-slate-700/50 shadow-inner" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-900/40" />
+                      </div>
                     </div>
                   </div>
                   <div className="max-h-[680px] overflow-y-auto w-full h-[680px]">
-                    <div className="pt-2"><CardRenderer {...rendererProps} /></div>
+                    <div className="pt-2">
+                      <CardRenderer {...rendererProps} />
+                    </div>
                   </div>
                 </div>
                 {/* Stunning soft ground reflection */}
@@ -549,7 +571,10 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
               </div>
 
               {/* Status Pill */}
-              <div className="mt-12 flex justify-center" style={{ animation: 'create-fade 0.8s ease-out both' }}>
+              <div
+                className="mt-12 flex justify-center"
+                style={{ animation: 'create-fade 0.8s ease-out both' }}
+              >
                 <span
                   className={cn(
                     'inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[11px] font-bold tracking-wide uppercase',
@@ -576,7 +601,8 @@ export default function CardEditPage({ params }: EditPageProps): JSX.Element {
       {actionError && (
         <div
           role="alert"
-          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+72px)] left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 px-4 py-3 shadow-lg max-w-sm w-full mx-4 lg:bottom-6" style={{ animation: 'create-fade 0.3s ease-out both' }}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+72px)] left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 px-4 py-3 shadow-lg max-w-sm w-full mx-4 lg:bottom-6"
+          style={{ animation: 'create-fade 0.3s ease-out both' }}
         >
           <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
           <p className="flex-1 text-sm text-red-700">{actionError}</p>

@@ -49,6 +49,22 @@ export enum AnalyticsEventType {
   LEAD_SUBMIT = 'LEAD_SUBMIT',
 }
 
+export type AnalyticsActionType =
+  | 'card_viewed'
+  | 'open_booking_page'
+  | 'booking_started'
+  | 'booking_completed'
+  | 'whatsapp_clicked'
+  | 'open_lead_capture'
+  | 'lead_submitted'
+  | 'deposit_started'
+  | 'deposit_completed'
+  | 'payment_started'
+  | 'payment_completed'
+  | 'save_contact_attempt'
+  | 'vcard_downloaded'
+  | 'social_link_click'
+
 export enum SocialPlatform {
   LINKEDIN = 'LINKEDIN',
   TWITTER = 'TWITTER',
@@ -105,6 +121,20 @@ export interface UpdateCardDto {
   isActive?: boolean
 }
 
+export type CardActionType = 'BOOK' | 'WHATSAPP_CHAT' | 'LEAD_CAPTURE'
+
+export interface CardActionConfig {
+  type: CardActionType
+  label?: string
+  enabled?: boolean
+  whatsappMessage?: string
+}
+
+export interface CardActionsConfig {
+  primary?: CardActionConfig | null
+  secondary?: CardActionConfig[]
+}
+
 export interface CardFields {
   name: string
   title: string
@@ -119,6 +149,7 @@ export interface CardFields {
   avatarUrl: string
   logoUrl: string
   bookingAppointmentSlug?: string
+  actions?: CardActionsConfig
 }
 
 export type ButtonStyle = 'icon' | 'filled-icon' | 'icon-text' | 'filled-icon-text'
@@ -579,6 +610,8 @@ export interface AppointmentTypeResponse {
   location: string | null
   isActive: boolean
   timezone: string
+  depositEnabled?: boolean
+  depositAmountUsdt?: string | null
   availabilityRules?: AppointmentAvailabilityRuleResponse[]
   questions?: AppointmentQuestionResponse[]
   _count?: { bookings: number }

@@ -22,6 +22,7 @@ import * as path from 'path'
 import { randomBytes } from 'crypto'
 import { AuthService } from '../auth/auth.service'
 import { assertSafeUrl } from '../common/utils/ssrf-guard'
+import type { CardActionConfig, CardActionsConfig, CardActionType } from '@dotly/types'
 
 // F-26: Single source of truth for plan limits used in card creation.
 // BillingService.getPlanLimits() is the canonical source for all other plan
@@ -39,6 +40,50 @@ const PLAN_CARD_LIMITS: Record<string, number> = {
   BUSINESS: 10,
   AGENCY: 50,
   ENTERPRISE: Infinity,
+}
+
+const ALLOWED_CARD_ACTION_TYPES: readonly CardActionType[] = [
+  'BOOK',
+  'WHATSAPP_CHAT',
+  'LEAD_CAPTURE',
+]
+
+function sanitizeActionConfig(value: unknown): CardActionConfig | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const type = typeof record['type'] === 'string' ? record['type'].trim() : ''
+  if (!ALLOWED_CARD_ACTION_TYPES.includes(type as CardActionType)) return null
+
+  const label = typeof record['label'] === 'string' ? record['label'].trim().slice(0, 60) : ''
+  const whatsappMessage =
+    typeof record['whatsappMessage'] === 'string'
+      ? record['whatsappMessage'].trim().slice(0, 500)
+      : ''
+
+  return {
+    type: type as CardActionType,
+    ...(label ? { label } : {}),
+    ...(typeof record['enabled'] === 'boolean' ? { enabled: record['enabled'] } : {}),
+    ...(whatsappMessage ? { whatsappMessage } : {}),
+  }
+}
+
+function sanitizeActionsConfig(value: unknown): CardActionsConfig | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const record = value as Record<string, unknown>
+  const primary = sanitizeActionConfig(record['primary'])
+  const secondaryRaw = Array.isArray(record['secondary']) ? record['secondary'] : []
+  const secondary = secondaryRaw
+    .map((item) => sanitizeActionConfig(item))
+    .filter((item): item is CardActionConfig => item !== null)
+    .slice(0, 2)
+
+  if (!primary && secondary.length === 0) return undefined
+
+  return {
+    ...(primary ? { primary } : {}),
+    ...(secondary.length > 0 ? { secondary } : {}),
+  }
 }
 
 // F-04: Magic-byte signatures for the MIME types we allow.
@@ -145,6 +190,13 @@ export class CardsService {
       } else {
         record['bookingAppointmentSlug'] = normalizedBookingSlug
       }
+    }
+
+    const actions = sanitizeActionsConfig(record['actions'])
+    if (actions) {
+      record['actions'] = actions as unknown as Prisma.InputJsonValue
+    } else {
+      delete record['actions']
     }
     return record as Prisma.InputJsonValue
   }

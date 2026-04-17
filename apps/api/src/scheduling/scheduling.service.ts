@@ -15,7 +15,25 @@ import { SetAvailabilityDto } from './dto/set-availability.dto'
 import { CreateBookingDto } from './dto/create-booking.dto'
 import { SetBookingQuestionsDto } from './dto/manage-booking-questions.dto'
 import { BookingStatus } from '@dotly/database'
+import { Prisma } from '@dotly/database'
 import { ConfigService } from '@nestjs/config'
+import { AuditService } from '../audit/audit.service'
+import { createPublicClient, decodeEventLog, erc20Abi, http, type Address, type Hash } from 'viem'
+import { arbitrum } from 'viem/chains'
+
+const ERC20_TRANSFER_EVENT_ABI = [
+  {
+    type: 'event',
+    name: 'Transfer',
+    inputs: [
+      { indexed: true, name: 'from', type: 'address' },
+      { indexed: true, name: 'to', type: 'address' },
+      { indexed: false, name: 'value', type: 'uint256' },
+    ],
+  },
+] as const
+
+const BOOKING_DEPOSIT_REUSE_WINDOW_MS = 30 * 60_000
 
 // Day-of-week index: 0=Sunday, 1=Monday, ... 6=Saturday (JS Date.getDay())
 const DOW_MAP: Record<string, number> = {
@@ -186,6 +204,7 @@ export class SchedulingService {
     private readonly googleCalendar: GoogleCalendarService,
     private readonly config: ConfigService,
     private readonly contactsService: ContactsService,
+    private readonly audit: AuditService,
   ) {
     const r2Url = this.config.get<string>('R2_PUBLIC_URL') ?? 'https://cdn.dotly.one'
     const allowedAssetHosts = new Set<string>(['cdn.dotly.one'])
@@ -196,6 +215,38 @@ export class SchedulingService {
       /* ignore invalid config */
     }
     this.allowedAssetHosts = allowedAssetHosts
+  }
+
+  private getUsdtAddress(): Address {
+    const address = this.config.get<string>('DOTLY_USDT_ADDRESS')
+    if (!address) throw new BadRequestException('USDT token is not configured')
+    return address as Address
+  }
+
+  private getArbitrumClient() {
+    const rpcUrl = this.config.get<string>('ARBITRUM_RPC_URL')
+    if (!rpcUrl) throw new BadRequestException('Arbitrum RPC URL is not configured')
+    return createPublicClient({ chain: arbitrum, transport: http(rpcUrl) })
+  }
+
+  private normalizeDepositAmount(value: string | null | undefined): string | null {
+    if (!value) return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const numeric = Number(trimmed)
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      throw new BadRequestException('Deposit amount must be greater than zero')
+    }
+    return numeric.toFixed(2)
+  }
+
+  private parseUsdtAmountRaw(amountUsdt: string): bigint {
+    const [whole, decimals = ''] = amountUsdt.split('.')
+    return BigInt(whole ?? '0') * 1_000_000n + BigInt(decimals.padEnd(6, '0').slice(0, 6))
+  }
+
+  private generateDepositPaymentId(): string {
+    return `dep_${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36)}`
   }
 
   private sanitizeAvatarUrl(value: string | null | undefined): string | null {
@@ -233,6 +284,10 @@ export class SchedulingService {
         location: dto.location,
         isActive: dto.isActive ?? true,
         timezone: dto.timezone ?? 'UTC',
+        depositEnabled: dto.depositEnabled ?? false,
+        depositAmountUsdt: dto.depositEnabled
+          ? this.normalizeDepositAmount(dto.depositAmountUsdt)
+          : null,
       },
     })
   }
@@ -317,6 +372,11 @@ export class SchedulingService {
     if (dto.location !== undefined) data['location'] = dto.location
     if (dto.isActive !== undefined) data['isActive'] = dto.isActive
     if (dto.timezone !== undefined) data['timezone'] = dto.timezone
+    if (dto.depositEnabled !== undefined) data['depositEnabled'] = dto.depositEnabled
+    if (dto.depositEnabled === false) data['depositAmountUsdt'] = null
+    if (dto.depositAmountUsdt !== undefined) {
+      data['depositAmountUsdt'] = this.normalizeDepositAmount(dto.depositAmountUsdt)
+    }
 
     return this.prisma.appointmentType.update({ where: { id }, data })
   }
@@ -528,6 +588,250 @@ export class SchedulingService {
 
   // ── Bookings ────────────────────────────────────────────────────────────────
 
+  async createBookingDepositIntent(
+    ownerUserId: string,
+    slug: string,
+    dto: { guestName: string; guestEmail: string; walletAddress: string; startAt: string },
+  ) {
+    const apt = await this.prisma.appointmentType.findUnique({
+      where: { ownerUserId_slug: { ownerUserId, slug } },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        deletedAt: true,
+        depositEnabled: true,
+        depositAmountUsdt: true,
+        durationMins: true,
+        bufferAfterMins: true,
+        bufferDays: true,
+        timezone: true,
+        availabilityRules: true,
+      },
+    })
+    if (!apt || !apt.isActive || apt.deletedAt !== null) throw new NotFoundException()
+    if (!apt.depositEnabled || !apt.depositAmountUsdt) {
+      throw new BadRequestException('This appointment type does not require a deposit')
+    }
+
+    const startAt = new Date(dto.startAt)
+    if (isNaN(startAt.getTime())) throw new BadRequestException('Invalid startAt')
+    if (!isSlotInAvailability(startAt, apt)) {
+      throw new BadRequestException('The requested time slot is not within the available schedule')
+    }
+    if (!isWithinBufferWindow(startAt, apt.bufferDays)) {
+      throw new BadRequestException(
+        `Bookings can only be made up to ${apt.bufferDays} days in advance`,
+      )
+    }
+    if (startAt <= new Date()) {
+      throw new BadRequestException('Cannot book a slot in the past')
+    }
+
+    const owner = await this.prisma.user.findUnique({
+      where: { id: ownerUserId },
+      select: { walletAddress: true },
+    })
+    const recipientAddress = owner?.walletAddress?.toLowerCase()
+    if (!recipientAddress) {
+      throw new BadRequestException('Booking deposits are not configured for this host')
+    }
+
+    const depositPaymentId = this.generateDepositPaymentId()
+    const amountUsdt = this.normalizeDepositAmount(apt.depositAmountUsdt)
+    if (!amountUsdt) {
+      throw new BadRequestException('Deposit amount is not configured')
+    }
+    const amountRaw = this.parseUsdtAmountRaw(amountUsdt)
+
+    await this.prisma.bookingDeposit.create({
+      data: {
+        paymentId: depositPaymentId,
+        appointmentTypeId: apt.id,
+        ownerUserId,
+        guestName: dto.guestName.trim(),
+        guestEmail: dto.guestEmail.trim().toLowerCase(),
+        walletAddress: dto.walletAddress.toLowerCase(),
+        recipientAddress,
+        startAt,
+        amountUsdt,
+        amountRaw: amountRaw.toString(),
+        tokenAddress: this.getUsdtAddress(),
+        chainId: arbitrum.id,
+      },
+    })
+
+    await this.audit.log({
+      userId: ownerUserId,
+      action: 'scheduling.deposit.intent.created',
+      resourceType: 'booking_deposit',
+      resourceId: depositPaymentId,
+      metadata: {
+        appointmentTypeId: apt.id,
+        appointmentTypeName: apt.name,
+        slug,
+        guestName: dto.guestName.trim(),
+        guestEmail: dto.guestEmail.trim().toLowerCase(),
+        walletAddress: dto.walletAddress.toLowerCase(),
+        recipientAddress,
+        startAt: startAt.toISOString(),
+        amountUsdt,
+        amountRaw: amountRaw.toString(),
+        tokenAddress: this.getUsdtAddress(),
+        chainId: arbitrum.id,
+        status: 'intent_created',
+      },
+    })
+
+    return {
+      depositPaymentId,
+      amountUsdt,
+      amountRaw: amountRaw.toString(),
+      tokenAddress: this.getUsdtAddress(),
+      recipientAddress,
+      chainId: arbitrum.id,
+    }
+  }
+
+  async activateBookingDeposit(
+    ownerUserId: string,
+    slug: string,
+    depositPaymentId: string,
+    txHash: string,
+  ) {
+    const apt = await this.prisma.appointmentType.findUnique({
+      where: { ownerUserId_slug: { ownerUserId, slug } },
+      select: { id: true, isActive: true, deletedAt: true, depositEnabled: true },
+    })
+    if (!apt || !apt.isActive || apt.deletedAt !== null) throw new NotFoundException()
+    if (!apt.depositEnabled)
+      throw new BadRequestException('This appointment type does not require a deposit')
+
+    await this.assertBookingDepositVerified(ownerUserId, slug, depositPaymentId, txHash)
+
+    return { success: true, depositPaymentId, txHash }
+  }
+
+  private async assertBookingDepositVerified(
+    ownerUserId: string,
+    slug: string,
+    depositPaymentId: string,
+    txHash: string,
+  ): Promise<{
+    amountUsdt: string
+    recipientAddress: string
+    walletAddress: string
+    startAt: string
+  }> {
+    const deposit = await this.prisma.bookingDeposit.findUnique({
+      where: { paymentId: depositPaymentId },
+      select: {
+        ownerUserId: true,
+        appointmentType: { select: { slug: true } },
+        walletAddress: true,
+        recipientAddress: true,
+        amountUsdt: true,
+        amountRaw: true,
+        startAt: true,
+        tokenAddress: true,
+        status: true,
+        txHash: true,
+        createdAt: true,
+      },
+    })
+    if (!deposit || deposit.ownerUserId !== ownerUserId) {
+      throw new BadRequestException('Deposit intent not found')
+    }
+    if (deposit.appointmentType.slug !== slug) {
+      throw new BadRequestException('Deposit intent does not match this appointment type')
+    }
+
+    if (deposit.status === 'USED') {
+      throw new BadRequestException('Deposit has already been applied to a booking')
+    }
+
+    if (
+      deposit.status === 'EXPIRED' ||
+      (deposit.status === 'INTENT_CREATED' &&
+        Date.now() - deposit.createdAt.getTime() > BOOKING_DEPOSIT_REUSE_WINDOW_MS)
+    ) {
+      await this.prisma.bookingDeposit.update({
+        where: { paymentId: depositPaymentId },
+        data: { status: 'EXPIRED' },
+      })
+      throw new BadRequestException(
+        'Deposit intent has expired. Start again from the booking page.',
+      )
+    }
+
+    const walletAddress = deposit.walletAddress.toLowerCase()
+    const recipientAddress = deposit.recipientAddress.toLowerCase()
+    const amountUsdt = deposit.amountUsdt
+    const amountRaw = deposit.amountRaw
+    const startAt = deposit.startAt.toISOString()
+    const tokenAddress = deposit.tokenAddress.toLowerCase() as Address
+
+    if (deposit.status === 'VERIFIED') {
+      if (deposit.txHash?.toLowerCase() === txHash.toLowerCase()) {
+        return { amountUsdt, recipientAddress, walletAddress, startAt }
+      }
+      throw new BadRequestException('Deposit was already activated with a different transaction')
+    }
+
+    const client = this.getArbitrumClient()
+    const receipt = await client.getTransactionReceipt({ hash: txHash as Hash })
+    const matchesTransfer = receipt.logs.some((log) => {
+      if (log.address.toLowerCase() !== tokenAddress) return false
+      try {
+        const decoded = decodeEventLog({
+          abi: ERC20_TRANSFER_EVENT_ABI,
+          data: log.data,
+          topics: log.topics,
+        })
+        if (decoded.eventName !== 'Transfer') return false
+        return (
+          decoded.args.from.toLowerCase() === walletAddress &&
+          decoded.args.to.toLowerCase() === recipientAddress &&
+          decoded.args.value === BigInt(amountRaw)
+        )
+      } catch {
+        return false
+      }
+    })
+
+    if (!matchesTransfer) {
+      throw new BadRequestException('Deposit transaction could not be verified on-chain')
+    }
+
+    await this.prisma.bookingDeposit.update({
+      where: { paymentId: depositPaymentId },
+      data: {
+        txHash,
+        status: 'VERIFIED',
+        verifiedAt: new Date(),
+      },
+    })
+
+    await this.audit.log({
+      userId: ownerUserId,
+      action: 'scheduling.deposit.activated',
+      resourceType: 'booking_deposit',
+      resourceId: depositPaymentId,
+      metadata: {
+        slug,
+        txHash,
+        amountUsdt,
+        amountRaw,
+        walletAddress,
+        recipientAddress,
+        tokenAddress,
+        status: 'verified',
+      },
+    })
+
+    return { amountUsdt, recipientAddress, walletAddress, startAt }
+  }
+
   async createBooking(ownerUserId: string, slug: string, dto: CreateBookingDto) {
     const apt = await this.prisma.appointmentType.findUnique({
       where: { ownerUserId_slug: { ownerUserId, slug } },
@@ -571,6 +875,31 @@ export class SchedulingService {
     const conflictWindowStart = new Date(startAt.getTime() - apt.bufferAfterMins * 60_000)
 
     const answers = dto.answers ?? []
+
+    let verifiedDeposit: {
+      amountUsdt: string
+      recipientAddress: string
+      walletAddress: string
+      startAt: string
+    } | null = null
+
+    if (apt.depositEnabled) {
+      if (!dto.depositPaymentId || !dto.depositTxHash) {
+        throw new BadRequestException('This booking requires a verified crypto deposit')
+      }
+      verifiedDeposit = await this.assertBookingDepositVerified(
+        ownerUserId,
+        slug,
+        dto.depositPaymentId,
+        dto.depositTxHash,
+      )
+      if (verifiedDeposit.startAt !== startAt.toISOString()) {
+        throw new BadRequestException(
+          'Deposit verification does not match the requested booking slot',
+        )
+      }
+    }
+
     const normalizedQuestions = apt.questions.map((question) =>
       this.serializeQuestionOptions(question),
     )
@@ -629,6 +958,9 @@ export class SchedulingService {
               guestName: dto.guestName,
               guestEmail: dto.guestEmail,
               guestNotes: dto.guestNotes,
+              depositPaymentId: verifiedDeposit ? dto.depositPaymentId : null,
+              depositTxHash: verifiedDeposit ? dto.depositTxHash : null,
+              depositAmountUsdt: verifiedDeposit ? verifiedDeposit.amountUsdt : null,
               // HIGH-4: Token expires 24 h after the appointment starts so that
               // cancel/reschedule links become invalid once the meeting has passed.
               tokenExpiresAt: new Date(startAt.getTime() + 24 * 60 * 60_000),
@@ -643,6 +975,16 @@ export class SchedulingService {
                 value: answer.value.trim(),
               })),
               skipDuplicates: true,
+            })
+          }
+
+          if (verifiedDeposit && dto.depositPaymentId) {
+            await tx.bookingDeposit.update({
+              where: { paymentId: dto.depositPaymentId },
+              data: {
+                status: 'USED',
+                usedAt: new Date(),
+              },
             })
           }
 
@@ -712,6 +1054,36 @@ export class SchedulingService {
         if (message.includes('already exists')) return
         this.logger.warn(`create CRM contact from booking failed: ${message}`)
       })
+
+    void (async () => {
+      try {
+        const contact = await this.prisma.contact.findFirst({
+          where: {
+            ownerUserId,
+            email: dto.guestEmail,
+          },
+          select: { id: true },
+        })
+        if (!contact) return
+
+        await this.prisma.contactTimeline.create({
+          data: {
+            contactId: contact.id,
+            event: 'BOOKING_COMPLETED',
+            metadata: {
+              bookingId: booking.id,
+              appointmentTypeId: apt.id,
+              appointmentName: apt.name,
+              startAt: booking.startAt.toISOString(),
+            } as Prisma.InputJsonValue,
+          },
+        })
+      } catch (err) {
+        this.logger.warn(
+          `booking completion timeline write failed: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    })()
 
     return booking
   }
@@ -1007,6 +1379,8 @@ export class SchedulingService {
       color: apt.color,
       location: apt.location,
       timezone: apt.timezone,
+      depositEnabled: apt.depositEnabled,
+      depositAmountUsdt: apt.depositAmountUsdt,
       isActive: apt.isActive,
       availabilityRules: apt.availabilityRules,
       questions: apt.questions.map((question) => this.serializeQuestionOptions(question)),

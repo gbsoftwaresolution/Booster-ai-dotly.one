@@ -45,6 +45,10 @@ interface DashboardSummary {
   totalViews: number
   totalClicks: number
   totalLeads: number
+  totalBookingsStarted: number
+  totalWhatsappClicks: number
+  totalLeadSubmissions: number
+  totalPaymentCompletions: number
   totalCards: number
   activeCards: number
   truncated: boolean
@@ -564,6 +568,10 @@ export default function CardsDashboard(): JSX.Element {
   const totalViews = summary?.totalViews ?? null
   const totalClicks = summary?.totalClicks ?? null
   const totalLeads = summary?.totalLeads ?? null
+  const totalBookingsStarted = summary?.totalBookingsStarted ?? null
+  const totalWhatsappClicks = summary?.totalWhatsappClicks ?? null
+  const totalLeadSubmissions = summary?.totalLeadSubmissions ?? null
+  const totalPaymentCompletions = summary?.totalPaymentCompletions ?? null
   const isTruncated = summary?.truncated ?? false
 
   return (
@@ -613,7 +621,7 @@ export default function CardsDashboard(): JSX.Element {
           </div>
         ) : (
           !fetchFailed && (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-8">
               {/* totalCards from backend — accurate even when user has >100 cards */}
               <StatCard
                 label="Total Cards"
@@ -639,6 +647,30 @@ export default function CardsDashboard(): JSX.Element {
                 value={fmt(totalLeads)}
                 icon={Users}
                 color="bg-orange-400"
+              />
+              <StatCard
+                label="Bookings"
+                value={fmt(totalBookingsStarted)}
+                icon={Mail}
+                color="bg-cyan-500"
+              />
+              <StatCard
+                label="WhatsApp"
+                value={fmt(totalWhatsappClicks)}
+                icon={Inbox}
+                color="bg-emerald-500"
+              />
+              <StatCard
+                label="Lead Submits"
+                value={fmt(totalLeadSubmissions)}
+                icon={FileSignature}
+                color="bg-fuchsia-500"
+              />
+              <StatCard
+                label="Payments"
+                value={fmt(totalPaymentCompletions)}
+                icon={Zap}
+                color="bg-amber-500"
               />
             </div>
           )

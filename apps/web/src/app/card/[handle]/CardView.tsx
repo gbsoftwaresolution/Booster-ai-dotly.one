@@ -2,12 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { CardRenderer } from '@dotly/ui'
-import type { CardRendererProps } from '@dotly/types'
+import type {
+  CardRendererProps,
+  CardActionConfig,
+  CardActionsConfig,
+  CardActionType,
+} from '@dotly/types'
 import Link from 'next/link'
 import { getAccessToken } from '@/lib/auth/client'
 import { apiPost } from '@/lib/api'
 import { sanitizeNextPath } from '@/lib/app-url'
 import { getPublicApiUrl } from '@/lib/public-env'
+import { cn } from '@/lib/cn'
 import { AnalyticsBeacon } from './AnalyticsBeacon'
 import { LeadCaptureModal } from './LeadCaptureModal'
 import { ShareBar } from './ShareBar'
@@ -26,6 +32,72 @@ interface CardViewProps extends CardRendererProps {
 
 const API_URL = getPublicApiUrl()
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://dotly.one'
+
+const DEFAULT_WHATSAPP_MESSAGE = 'Hi, I saw your Dotly and want to know more about your service.'
+
+function actionDefaultLabel(type: CardActionType): string {
+  switch (type) {
+    case 'BOOK':
+      return 'Book call'
+    case 'WHATSAPP_CHAT':
+      return 'Chat now'
+    case 'LEAD_CAPTURE':
+      return 'Leave details'
+  }
+}
+
+function normalizeConfiguredActions(
+  actions: CardActionsConfig | undefined,
+  hasBooking: boolean,
+  hasWhatsapp: boolean,
+): CardActionConfig[] {
+  const fromConfig = [actions?.primary, ...(actions?.secondary ?? [])].filter(
+    (action): action is CardActionConfig => !!action?.type,
+  )
+
+  const uniqueConfigured = fromConfig.filter(
+    (action, index, all) =>
+      action.enabled !== false &&
+      all.findIndex((item) => item.type === action.type) === index &&
+      (action.type !== 'BOOK' || hasBooking) &&
+      (action.type !== 'WHATSAPP_CHAT' || hasWhatsapp),
+  )
+
+  if (uniqueConfigured.length > 0) {
+    return uniqueConfigured.slice(0, 3).map((action) => ({
+      ...action,
+      label: action.label?.trim() || actionDefaultLabel(action.type),
+    }))
+  }
+
+  const fallback: CardActionConfig[] = []
+  if (hasBooking) fallback.push({ type: 'BOOK', label: actionDefaultLabel('BOOK') })
+  if (hasWhatsapp) {
+    fallback.push({
+      type: 'WHATSAPP_CHAT',
+      label: actionDefaultLabel('WHATSAPP_CHAT'),
+      whatsappMessage: DEFAULT_WHATSAPP_MESSAGE,
+    })
+  }
+  fallback.push({ type: 'LEAD_CAPTURE', label: actionDefaultLabel('LEAD_CAPTURE') })
+  return fallback.slice(0, 3)
+}
+
+function normalizeWhatsappNumber(value: string): string {
+  return value.replace(/[^\d]/g, '')
+}
+
+async function recordPublicContactEvent(body: Record<string, unknown>) {
+  try {
+    await fetch(`${API_URL}/public/contact-events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    // Best effort only.
+  }
+}
 
 function postAnalytics(body: Record<string, unknown>) {
   fetch(`${API_URL}/public/analytics`, {
@@ -68,12 +140,19 @@ export function CardView({
   ...rendererProps
 }: CardViewProps) {
   const [leadModalOpen, setLeadModalOpen] = useState(false)
+  const [capturedContactId, setCapturedContactId] = useState<string | null>(null)
   const [isAuth, setIsAuth] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [vcardBlocked, setVcardBlocked] = useState(false) // shown when MEMBERS_ONLY + not auth
   const [vcardError, setVcardError] = useState<string | null>(null)
   const tokenRef = useRef<string | null>(null)
   const allowAnonymousExport = vcardPolicy !== 'MEMBERS_ONLY'
+  const normalizedWhatsapp = normalizeWhatsappNumber(rendererProps.card.fields.whatsapp ?? '')
+  const configuredActions = normalizeConfiguredActions(
+    rendererProps.card.fields.actions,
+    !!bookableAppointment,
+    normalizedWhatsapp.length > 0,
+  )
 
   // Resolve auth token once on mount and cache it.
   // tokenRef is used as a fast-path cache; handleSaveContact always calls
@@ -180,12 +259,14 @@ export function CardView({
         </div>
       )}
 
-      {bookableAppointment && (
-        <BookMeetingBar
+      {configuredActions.length > 0 && (
+        <PrimaryActionStack
+          actions={configuredActions}
           cardHandle={cardHandle}
-          appointmentName={bookableAppointment.name}
-          appointmentSlug={bookableAppointment.slug}
-          durationMins={bookableAppointment.durationMins}
+          bookableAppointment={bookableAppointment}
+          whatsappNumber={normalizedWhatsapp}
+          capturedContactId={capturedContactId}
+          onLeadCapture={() => setLeadModalOpen(true)}
           onAnalytics={trackInteraction}
         />
       )}
@@ -208,6 +289,7 @@ export function CardView({
           isAuth={isAuth && authChecked}
           authToken={tokenRef.current}
           onAnalytics={trackInteraction}
+          onLeadCaptured={setCapturedContactId}
           onClose={() => setLeadModalOpen(false)}
         />
       )}
@@ -230,46 +312,196 @@ export function CardView({
   )
 }
 
-function BookMeetingBar({
+function PrimaryActionStack({
+  actions,
   cardHandle,
-  appointmentName,
-  appointmentSlug,
-  durationMins,
+  bookableAppointment,
+  whatsappNumber,
+  capturedContactId,
+  onLeadCapture,
   onAnalytics,
 }: {
+  actions: CardActionConfig[]
   cardHandle: string
-  appointmentName: string
-  appointmentSlug: string
-  durationMins: number
+  bookableAppointment: CardViewProps['bookableAppointment']
+  whatsappNumber: string
+  capturedContactId: string | null
+  onLeadCapture: () => void
   onAnalytics: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
 }) {
-  const bookingUrl = `${SITE_URL}/book/${encodeURIComponent(cardHandle)}/${encodeURIComponent(appointmentSlug)}`
-
   return (
     <div className="px-4 pb-3 pt-3">
+      <div className="rounded-[28px] border border-sky-100 bg-white/90 p-3 shadow-sm backdrop-blur">
+        <div className="mb-3 px-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-sky-600">
+            Contact to customer
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Choose the fastest next step from this card.
+          </p>
+        </div>
+        <div className="space-y-2">
+          {actions.map((action, index) => (
+            <ActionButton
+              key={`${action.type}-${index}`}
+              action={action}
+              cardHandle={cardHandle}
+              bookableAppointment={bookableAppointment}
+              whatsappNumber={whatsappNumber}
+              capturedContactId={capturedContactId}
+              primary={index === 0}
+              onLeadCapture={onLeadCapture}
+              onAnalytics={onAnalytics}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ActionButton({
+  action,
+  cardHandle,
+  bookableAppointment,
+  whatsappNumber,
+  capturedContactId,
+  primary,
+  onLeadCapture,
+  onAnalytics,
+}: {
+  action: CardActionConfig
+  cardHandle: string
+  bookableAppointment: CardViewProps['bookableAppointment']
+  whatsappNumber: string
+  capturedContactId: string | null
+  primary: boolean
+  onLeadCapture: () => void
+  onAnalytics: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
+}) {
+  const label = action.label?.trim() || actionDefaultLabel(action.type)
+
+  if (action.type === 'BOOK' && bookableAppointment) {
+    const bookingUrl = `${SITE_URL}/book/${encodeURIComponent(cardHandle)}/${encodeURIComponent(bookableAppointment.slug)}`
+    return (
       <a
         href={bookingUrl}
         onClick={() => {
           onAnalytics('CLICK', {
-            surface: 'booking_bar',
+            surface: 'primary_cta',
             action: 'open_booking_page',
-            status: appointmentSlug,
+            ctaType: 'BOOK',
+            source: 'card_public_page',
+            status: bookableAppointment.slug,
+            appointmentTypeId: bookableAppointment.slug,
           })
         }}
-        className="flex items-center justify-between rounded-2xl border border-sky-100 bg-white/90 px-4 py-3 shadow-sm backdrop-blur"
+        className={ctaClassName(primary)}
       >
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-900">Book a meeting</p>
-          <p className="truncate text-xs text-slate-500">
-            {appointmentName} · {durationMins} min
+          <p className="truncate text-sm font-bold">{label}</p>
+          <p className={cn('truncate text-xs', primary ? 'text-sky-100/85' : 'text-slate-500')}>
+            {bookableAppointment.name} · {bookableAppointment.durationMins} min
           </p>
         </div>
-        <span className="rounded-xl bg-sky-500 px-3 py-2 text-xs font-bold text-white">
-          Book now
+        <span
+          className={cn(
+            'rounded-xl px-3 py-2 text-xs font-bold',
+            primary ? 'bg-white/15 text-white' : 'bg-sky-500 text-white',
+          )}
+        >
+          Book
         </span>
       </a>
-    </div>
+    )
+  }
+
+  if (action.type === 'WHATSAPP_CHAT' && whatsappNumber) {
+    const whatsappMessage = action.whatsappMessage?.trim() || DEFAULT_WHATSAPP_MESSAGE
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
+    return (
+      <a
+        href={whatsappUrl}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => {
+          onAnalytics('CLICK', {
+            surface: 'primary_cta',
+            action: 'whatsapp_clicked',
+            ctaType: 'WHATSAPP_CHAT',
+            source: 'card_public_page',
+            status: 'outbound',
+            ...(capturedContactId ? { contactId: capturedContactId } : {}),
+          })
+          if (capturedContactId) {
+            void recordPublicContactEvent({
+              contactId: capturedContactId,
+              event: 'WHATSAPP_CLICKED',
+              metadata: {
+                source: 'card_public_page',
+                cardHandle,
+                ctaType: 'WHATSAPP_CHAT',
+              },
+            })
+          }
+        }}
+        className={ctaClassName(primary)}
+      >
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold">{label}</p>
+          <p className={cn('truncate text-xs', primary ? 'text-sky-100/85' : 'text-slate-500')}>
+            Starts a prefilled WhatsApp conversation
+          </p>
+        </div>
+        <span
+          className={cn(
+            'rounded-xl px-3 py-2 text-xs font-bold',
+            primary ? 'bg-white/15 text-white' : 'bg-emerald-500 text-white',
+          )}
+        >
+          WhatsApp
+        </span>
+      </a>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onAnalytics('CLICK', {
+          surface: 'primary_cta',
+          action: 'open_lead_capture',
+          ctaType: 'LEAD_CAPTURE',
+          source: 'card_public_page',
+          status: 'modal',
+        })
+        onLeadCapture()
+      }}
+      className={ctaClassName(primary)}
+    >
+      <div className="min-w-0 text-left">
+        <p className="truncate text-sm font-bold">{label}</p>
+        <p className={cn('truncate text-xs', primary ? 'text-sky-100/85' : 'text-slate-500')}>
+          Leave your details and continue the conversation later
+        </p>
+      </div>
+      <span
+        className={cn(
+          'rounded-xl px-3 py-2 text-xs font-bold',
+          primary ? 'bg-white/15 text-white' : 'bg-slate-900 text-white',
+        )}
+      >
+        Capture
+      </span>
+    </button>
   )
+}
+
+function ctaClassName(primary: boolean): string {
+  return primary
+    ? 'flex items-center justify-between rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 px-4 py-3 text-white shadow-[0_18px_40px_-24px_rgba(14,165,233,0.65)]'
+    : 'flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm'
 }
 
 // ─── Members-only gate sheet ──────────────────────────────────────────────────

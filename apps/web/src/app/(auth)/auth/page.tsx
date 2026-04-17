@@ -168,14 +168,14 @@ function AuthPageContent(): JSX.Element {
           <div className="max-w-xl">
             <div className="app-shell-surface inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-sky-700">
               <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-              Premium digital identity for modern teams
+              Contact-to-customer workspace for modern teams
             </div>
             <h1 className="mt-6 text-5xl font-extrabold tracking-[-0.04em] text-gray-950 xl:text-6xl">
-              Sign in to the cleanest way to share who you are.
+              Sign in to the fastest way to turn a contact into action.
             </h1>
             <p className="mt-5 text-lg leading-8 text-gray-600">
-              Dotly gives your team polished digital cards, richer follow-up, and better lead
-              capture in one workspace that feels fast on desktop and mobile.
+              Dotly helps your team share one link, trigger bookings or WhatsApp conversations, and
+              keep every lead moving from the same workspace.
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -197,11 +197,11 @@ function AuthPageContent(): JSX.Element {
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">
-                      Everything synced in one place
+                      One workflow, not ten separate tools
                     </p>
                     <p className="mt-1 text-sm text-gray-500">
-                      Cards, CRM, scheduling, and follow-up stay visually clean and operationally
-                      connected.
+                      Cards, CRM, scheduling, and crypto-ready billing stay connected while Dotly
+                      evolves into a full contact-to-revenue system.
                     </p>
                   </div>
                 </div>
@@ -214,7 +214,7 @@ function AuthPageContent(): JSX.Element {
           <div className="text-center lg:text-left">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-gray-500 backdrop-blur-sm lg:hidden">
               <Sparkles className="h-3.5 w-3.5 text-sky-500" />
-              Polished workspace access
+              Revenue workflow access
             </div>
             <div className="flex justify-center lg:justify-start">
               <BrandLogo

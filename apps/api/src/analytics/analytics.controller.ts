@@ -24,13 +24,30 @@ import {
   ValidateNested,
   IsObject,
   MaxLength,
+  IsNumber,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import type { Request } from 'express'
-import { Plan, type SuccessResponse } from '@dotly/types'
+import { Plan, type AnalyticsActionType, type SuccessResponse } from '@dotly/types'
 
 const VALID_EVENT_TYPES = ['VIEW', 'CLICK', 'SAVE', 'LEAD_SUBMIT'] as const
 type EventType = (typeof VALID_EVENT_TYPES)[number]
+const VALID_ACTION_TYPES = [
+  'card_viewed',
+  'open_booking_page',
+  'booking_started',
+  'booking_completed',
+  'whatsapp_clicked',
+  'open_lead_capture',
+  'lead_submitted',
+  'deposit_started',
+  'deposit_completed',
+  'payment_started',
+  'payment_completed',
+  'save_contact_attempt',
+  'vcard_downloaded',
+  'social_link_click',
+] as const satisfies readonly AnalyticsActionType[]
 
 // HIGH-02: Strict allowlisted metadata schema for the @Public analytics endpoint.
 // The previous `Record<string, unknown>` accepted arbitrary data of any shape and
@@ -61,6 +78,7 @@ class EventMetadataDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
+  @IsIn(VALID_ACTION_TYPES)
   action?: string
 
   @IsOptional()
@@ -72,6 +90,40 @@ class EventMetadataDto {
   @IsString()
   @MaxLength(100)
   status?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  ctaType?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  source?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  campaign?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  appointmentTypeId?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  offerId?: string
+
+  @IsOptional()
+  @IsNumber()
+  amount?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(12)
+  currency?: string
 }
 
 class RecordEventDto {

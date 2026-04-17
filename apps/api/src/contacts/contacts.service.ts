@@ -95,6 +95,26 @@ function trimRequiredTemplateField(value: string, fieldName: string): string {
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
 
+  async recordPublicTimelineEvent(input: {
+    contactId: string
+    event: string
+    metadata?: Record<string, unknown>
+  }): Promise<void> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: input.contactId },
+      select: { id: true },
+    })
+    if (!contact) throw new NotFoundException('Contact not found')
+
+    await this.prisma.contactTimeline.create({
+      data: {
+        contactId: input.contactId,
+        event: input.event,
+        metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
+      },
+    })
+  }
+
   private async requireOwnedContact(contactId: string, userId: string) {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact || contact.ownerUserId !== userId) throw new NotFoundException('Contact not found')
@@ -352,9 +372,7 @@ export class ContactsService {
       .add('enrich', { contactId: contact.id }, { delay: 5000 })
       .catch((err: unknown) => this.logger.warn('Enrichment queue push failed', err))
 
-    // Keep the public response generic so unauthenticated callers do not learn
-    // or correlate internal CRM contact identifiers.
-    return { success: true }
+    return { success: true, contactId: contact.id }
   }
 
   async create(userId: string, dto: CreateContactDto) {

@@ -15,9 +15,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'NFC & QR sharing',
+    title: 'Start more conversations',
     description:
-      'One tap with any NFC-enabled phone or scan your QR code. No app download required for the person receiving your card.',
+      'Use QR, NFC, and your public link to move real-world introductions straight into a measurable customer journey.',
   },
   {
     icon: (
@@ -35,9 +35,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'Real-time analytics',
+    title: 'See buying intent early',
     description:
-      'See every tap, scan, link click, and contact save. Know who engaged, when, and from where with the analytics surfaces available in the app today.',
+      'Track scans, clicks, saves, bookings, and lead capture so you know which contacts deserve follow-up first.',
   },
   {
     icon: (
@@ -55,9 +55,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'Built-in CRM',
+    title: 'Keep every lead moving',
     description:
-      'Every lead captured from your card lands in a structured contact list. Add notes, tags, follow-up reminders, and export to CSV any time.',
+      'Every captured lead lands in Dotly so you can add notes, tag context, and keep momentum after the first conversation.',
   },
   {
     icon: (
@@ -75,9 +75,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'Portfolio & media',
+    title: 'Build trust fast',
     description:
-      'Add project showcases, video reels, testimonials, and custom blocks. Your card is a full micro-site, not just a name and number.',
+      'Add proof, portfolio, and media that help a lead decide quickly instead of forcing them to hunt for context.',
   },
   {
     icon: (
@@ -95,9 +95,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'Scheduling & follow-up',
+    title: 'Convert interest into meetings',
     description:
-      'Turn interest into action with booking links, follow-up workflows, and the tools you need to stay top of mind after the first meeting.',
+      'Turn interest into booked meetings with public scheduling, follow-up workflows, and less friction after the first tap.',
   },
   {
     icon: (
@@ -115,9 +115,9 @@ const FEATURES = [
         />
       </svg>
     ),
-    title: 'Team & multi-workspace',
+    title: 'Scale the same revenue flow',
     description:
-      'Team management is being rolled out in stages. Advanced multi-workspace, white-label, and SSO controls are not published yet.',
+      'Team features are rolling out in stages so larger groups can share the same contact-to-customer playbook across multiple cards.',
   },
 ]
 
@@ -127,14 +127,14 @@ export function Features() {
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-brand-500">
-            Everything you need
+            Outcomes first
           </p>
           <h2 className="mt-2 text-4xl font-extrabold tracking-tight text-gray-900">
-            One card. Infinite possibilities.
+            A card that drives action, not browsing
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-gray-500">
-            From the first tap to a signed deal — Dotly.one handles every touchpoint between you and
-            your next client.
+            Dotly is built to help salespeople, freelancers, and small businesses turn every new
+            contact into a booked call, a live conversation, or a qualified lead.
           </p>
         </div>
 

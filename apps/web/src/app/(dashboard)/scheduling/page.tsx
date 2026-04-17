@@ -31,6 +31,7 @@ import {
   SchedulingConfirmDialog,
 } from './components'
 import { ALL_DAYS, API_URL, copyToClipboard, statusColors } from './helpers'
+import type { SubscriptionData } from '../settings/billing/types'
 import type {
   AppointmentType,
   Booking,
@@ -70,6 +71,7 @@ export default function SchedulingPage(): JSX.Element {
   const [appointmentTypesError, setAppointmentTypesError] = useState<string | null>(null)
   const [bookingsError, setBookingsError] = useState<string | null>(null)
   const [cardsError, setCardsError] = useState<string | null>(null)
+  const [hostWalletAddress, setHostWalletAddress] = useState<string | null>(null)
 
   // Tab: 'types' | 'bookings'
   const [tab, setTab] = useState<'types' | 'bookings'>('types')
@@ -202,7 +204,7 @@ export default function SchedulingPage(): JSX.Element {
     setCardsError(null)
     try {
       const token = await getAccessToken()
-      const [types, bkgs, cardsResp, gStatus] = await Promise.allSettled([
+      const [types, bkgs, cardsResp, gStatus, billingResp] = await Promise.allSettled([
         apiGet<ItemsResponse<AppointmentType>>('/scheduling/appointment-types', token ?? undefined),
         apiGet<ItemsResponse<Booking>>(
           `/scheduling/bookings${showAllBookings ? '' : '?upcoming=true'}`,
@@ -217,6 +219,7 @@ export default function SchedulingPage(): JSX.Element {
           message:
             error instanceof Error ? error.message : 'Google Calendar status is unavailable.',
         })),
+        apiGet<SubscriptionData>('/billing', token ?? undefined).catch(() => null),
       ])
       if (loadRequestIdRef.current !== requestId) return
       if (types.status === 'fulfilled') {
@@ -260,6 +263,10 @@ export default function SchedulingPage(): JSX.Element {
         }
       } else {
         setGoogleStatus({ state: 'unavailable', message: 'Google Calendar status is unavailable.' })
+      }
+
+      if (billingResp.status === 'fulfilled') {
+        setHostWalletAddress(billingResp.value?.walletAddress ?? null)
       }
 
       if (
@@ -363,6 +370,8 @@ export default function SchedulingPage(): JSX.Element {
     location: string
     isActive: boolean
     timezone: string
+    depositEnabled: boolean
+    depositAmountUsdt: string
   }) {
     try {
       const token = await getToken()
@@ -500,6 +509,8 @@ export default function SchedulingPage(): JSX.Element {
   }
 
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL || ''
+  const depositEnabledWithoutWallet =
+    aptTypes.some((apt) => apt.depositEnabled) && !hostWalletAddress && !loading
 
   return (
     <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-out fill-mode-both">
@@ -741,6 +752,13 @@ export default function SchedulingPage(): JSX.Element {
         )}
         {bookingsError && <StatusNotice tone="warning" message={bookingsError} liveMode="polite" />}
         {cardsError && <StatusNotice tone="warning" message={cardsError} liveMode="polite" />}
+        {depositEnabledWithoutWallet && (
+          <StatusNotice
+            tone="warning"
+            message="Crypto deposits are enabled on at least one appointment type, but your billing wallet is not set. Add your wallet in Settings > Billing before sharing deposit-required booking links."
+            liveMode="polite"
+          />
+        )}
 
         {/* ── Card selector for booking links ───────────────────────────────── */}
         {allCards.length > 1 && !cardsError && (

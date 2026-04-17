@@ -7,7 +7,9 @@ import { useParams } from 'next/navigation'
 import {
   ArrowLeft,
   BarChart2,
+  Calendar,
   Eye,
+  MessageCircleMore,
   MousePointerClick,
   Users,
   TrendingUp,
@@ -34,6 +36,11 @@ interface AnalyticsData {
     totalClicks: number
     totalLeads: number
     uniqueVisitors: number
+    totalBookingsStarted: number
+    totalBookingsCompleted: number
+    totalWhatsappClicks: number
+    totalLeadCaptureOpens: number
+    totalLeadSubmissions: number
     conversionRate: number
   }
   charts: {
@@ -234,7 +241,14 @@ export default function CardAnalyticsPage(): JSX.Element {
 
   const [range, setRange] = useState<(typeof RANGES)[number]>(RANGES[1]!)
   const [data, setData] = useState<AnalyticsData | null>(null)
-  const [cardInfo, setCardInfo] = useState<{ name: string; title: string; company: string; handle: string; avatarUrl: string; isActive: boolean } | null>(null)
+  const [cardInfo, setCardInfo] = useState<{
+    name: string
+    title: string
+    company: string
+    handle: string
+    avatarUrl: string
+    isActive: boolean
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -409,7 +423,12 @@ export default function CardAnalyticsPage(): JSX.Element {
               style={{ background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)' }}
               aria-hidden="true"
             >
-              {(cardInfo.name || 'C').split(' ').map(n => n[0] || '').slice(0, 2).join('').toUpperCase()}
+              {(cardInfo.name || 'C')
+                .split(' ')
+                .map((n) => n[0] || '')
+                .slice(0, 2)
+                .join('')
+                .toUpperCase()}
             </div>
           )}
 
@@ -420,9 +439,7 @@ export default function CardAnalyticsPage(): JSX.Element {
                 {[cardInfo.title, cardInfo.company].filter(Boolean).join(' \u00b7 ')}
               </p>
             )}
-            <p className="truncate text-[11px] text-gray-300 mt-0.5">
-              dotly.one/{cardInfo.handle}
-            </p>
+            <p className="truncate text-[11px] text-gray-300 mt-0.5">dotly.one/{cardInfo.handle}</p>
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-2">
@@ -434,7 +451,7 @@ export default function CardAnalyticsPage(): JSX.Element {
             >
               {cardInfo.isActive ? 'Live' : 'Draft'}
             </span>
-            
+
             <a
               href={`https://dotly.one/${cardInfo.handle}`}
               target="_blank"
@@ -474,7 +491,7 @@ export default function CardAnalyticsPage(): JSX.Element {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         <StatCard
           icon={Eye}
           label="Views"
@@ -500,6 +517,34 @@ export default function CardAnalyticsPage(): JSX.Element {
           value={`${summary.conversionRate}%`}
           sub="views → leads"
           color="bg-orange-50 text-orange-500"
+        />
+        <StatCard
+          icon={Calendar}
+          label="Bookings"
+          value={fmtNum(summary.totalBookingsStarted)}
+          sub="Booking CTA opens"
+          color="bg-cyan-50 text-cyan-500"
+        />
+        <StatCard
+          icon={MessageCircleMore}
+          label="WhatsApp"
+          value={fmtNum(summary.totalWhatsappClicks)}
+          sub="Chat CTA starts"
+          color="bg-emerald-50 text-emerald-500"
+        />
+        <StatCard
+          icon={MousePointerClick}
+          label="Lead Opens"
+          value={fmtNum(summary.totalLeadCaptureOpens)}
+          sub="Lead form opens"
+          color="bg-violet-50 text-violet-500"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Lead Submits"
+          value={fmtNum(summary.totalLeadSubmissions)}
+          sub="Completed lead forms"
+          color="bg-fuchsia-50 text-fuchsia-500"
         />
       </div>
 

@@ -6,6 +6,11 @@ import { useParams } from 'next/navigation'
 import { getPublicApiUrl } from '@/lib/public-env'
 import { SelectField } from '@/components/ui/SelectField'
 import {
+  ARBITRUM_CHAIN_ID,
+  ensureWalletChain,
+  waitForReceipt,
+} from '@/app/(dashboard)/settings/billing/helpers'
+import {
   Calendar,
   Clock,
   MapPin,
@@ -18,6 +23,8 @@ import {
   Mail,
   FileText,
 } from 'lucide-react'
+
+const ERC20_TRANSFER_SELECTOR = '0xa9059cbb'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,8 +49,19 @@ interface AptType {
   color: string
   location: string | null
   timezone: string
+  depositEnabled?: boolean
+  depositAmountUsdt?: string | null
   owner: { name: string | null; avatarUrl: string | null }
   questions: BookingQuestion[]
+}
+
+interface BookingDepositIntentResponse {
+  depositPaymentId: string
+  amountUsdt: string
+  amountRaw: string
+  tokenAddress: string
+  recipientAddress: string
+  chainId: number
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -166,10 +184,11 @@ function googleCalUrl(apt: AptType, startAt: string): string {
 
 // ── Step Indicator ─────────────────────────────────────────────────────────────
 
-function StepIndicator({ step }: { step: 'date' | 'form' | 'confirmed' }): JSX.Element {
+function StepIndicator({ step }: { step: Step }): JSX.Element {
   const steps = [
     { key: 'date', label: 'Pick a time' },
     { key: 'form', label: 'Your details' },
+    { key: 'deposit', label: 'Deposit' },
     { key: 'confirmed', label: 'Confirmed' },
   ]
   const idx = steps.findIndex((s) => s.key === step)
@@ -289,7 +308,14 @@ function CalendarPicker({ selected, onSelect }: CalendarPickerProps): JSX.Elemen
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Step = 'date' | 'form' | 'confirmed'
+type Step = 'date' | 'form' | 'deposit' | 'confirmed'
+
+interface PreparedBookingSubmission {
+  guestName: string
+  guestEmail: string
+  guestNotes?: string
+  answers: { questionId: string; value: string }[]
+}
 
 export default function BookingPage(): JSX.Element {
   const params = useParams() as { handle: string; slug: string }
@@ -317,6 +343,20 @@ export default function BookingPage(): JSX.Element {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmedBooking, setConfirmedBooking] = useState<{ startAt: string } | null>(null)
+  const [preparedBooking, setPreparedBooking] = useState<PreparedBookingSubmission | null>(null)
+  const [depositIntent, setDepositIntent] = useState<BookingDepositIntentResponse | null>(null)
+  const [depositTxHash, setDepositTxHash] = useState<string | null>(null)
+  const [depositing, setDepositing] = useState(false)
+  const [depositError, setDepositError] = useState<string | null>(null)
+  const [depositStep, setDepositStep] = useState<string | null>(null)
+
+  const resetDepositState = useCallback(() => {
+    setPreparedBooking(null)
+    setDepositIntent(null)
+    setDepositTxHash(null)
+    setDepositError(null)
+    setDepositStep(null)
+  }, [])
 
   // Load appointment type
   useEffect(() => {
@@ -384,7 +424,54 @@ export default function BookingPage(): JSX.Element {
 
   function handleDateSelect(date: Date) {
     setSelectedDate(date)
+    resetDepositState()
     void loadSlots(date)
+  }
+
+  async function submitBooking(prepared: PreparedBookingSubmission) {
+    if (!selectedSlot) return
+
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const res = await fetch(`${API_URL}/scheduling/public/${handle}/${slug}/book`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startAt: selectedSlot,
+          guestName: prepared.guestName,
+          guestEmail: prepared.guestEmail,
+          guestNotes: prepared.guestNotes,
+          depositPaymentId: apt?.depositEnabled ? depositIntent?.depositPaymentId : undefined,
+          depositTxHash: apt?.depositEnabled ? (depositTxHash ?? undefined) : undefined,
+          answers: prepared.answers,
+        }),
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+        throw new Error(typeof err['message'] === 'string' ? err['message'] : `Error ${res.status}`)
+      }
+      const booking = (await res.json()) as { startAt: string }
+      if (apt?.cardId) {
+        postAnalytics({
+          cardId: apt.cardId,
+          type: 'SAVE',
+          metadata: {
+            surface: 'booking_page',
+            action: 'booking_completed',
+            ctaType: 'BOOK',
+            source: 'booking_page',
+            status: slug,
+          },
+        })
+      }
+      setConfirmedBooking(booking)
+      setStep('confirmed')
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Booking failed')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function handleSubmitBooking(e: React.FormEvent) {
@@ -438,48 +525,138 @@ export default function BookingPage(): JSX.Element {
     }
 
     setFieldErrors({})
-    setSubmitting(true)
-    setSubmitError(null)
+    const prepared: PreparedBookingSubmission = {
+      guestName: trimmedGuestName,
+      guestEmail: trimmedGuestEmail,
+      guestNotes: trimmedGuestNotes || undefined,
+      answers:
+        apt?.questions
+          ?.map((q) => ({
+            questionId: q.id,
+            value: nextAnswers[q.id] ?? (q.type === 'CHECKBOX' ? 'false' : ''),
+          }))
+          .filter((a) => a.value !== '' && a.value !== 'false') ?? [],
+    }
+
+    setPreparedBooking(prepared)
+    if (apt?.depositEnabled && (!depositIntent?.depositPaymentId || !depositTxHash)) {
+      setStep('deposit')
+      return
+    }
+
+    await submitBooking(prepared)
+  }
+
+  async function handleCryptoDeposit() {
+    if (!apt || !selectedSlot) return
+    if (!window.ethereum) {
+      setDepositError('Open this page inside a wallet browser such as MetaMask or Trust Wallet.')
+      return
+    }
+
+    setDepositing(true)
+    setDepositError(null)
     try {
-      const res = await fetch(`${API_URL}/scheduling/public/${handle}/${slug}/book`, {
+      const accounts = (await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      })) as string[]
+      const walletAddress = accounts[0]
+      if (!walletAddress) throw new Error('No wallet account was returned.')
+      if (!preparedBooking) throw new Error('Enter your booking details before paying the deposit.')
+
+      setDepositStep('Preparing crypto deposit…')
+      const intent = await fetch(`${API_URL}/scheduling/public/${handle}/${slug}/deposit-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          guestName: preparedBooking.guestName,
+          guestEmail: preparedBooking.guestEmail,
+          walletAddress,
           startAt: selectedSlot,
-          guestName: trimmedGuestName,
-          guestEmail: trimmedGuestEmail,
-          guestNotes: trimmedGuestNotes || undefined,
-          answers:
-            apt?.questions
-              ?.map((q) => ({
-                questionId: q.id,
-                value: nextAnswers[q.id] ?? (q.type === 'CHECKBOX' ? 'false' : ''),
-              }))
-              .filter((a) => a.value !== '' && a.value !== 'false') ?? [],
         }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+          throw new Error(
+            typeof err['message'] === 'string' ? err['message'] : `Error ${res.status}`,
+          )
+        }
+        return (await res.json()) as BookingDepositIntentResponse
       })
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
-        throw new Error(typeof err['message'] === 'string' ? err['message'] : `Error ${res.status}`)
+      setDepositIntent(intent)
+
+      if (apt.cardId) {
+        postAnalytics({
+          cardId: apt.cardId,
+          type: 'CLICK',
+          metadata: {
+            surface: 'booking_page',
+            action: 'deposit_started',
+            ctaType: 'BOOK',
+            source: 'booking_page',
+            status: slug,
+            amount: Number(intent.amountUsdt),
+            currency: 'USDT',
+          },
+        })
       }
-      const booking = (await res.json()) as { startAt: string }
-      if (apt?.cardId) {
+
+      await ensureWalletChain(intent.chainId || ARBITRUM_CHAIN_ID)
+      setDepositStep('Sending USDT deposit…')
+
+      const transferData =
+        ERC20_TRANSFER_SELECTOR +
+        intent.recipientAddress.slice(2).padStart(64, '0') +
+        BigInt(intent.amountRaw).toString(16).padStart(64, '0')
+
+      const txHash = (await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: walletAddress, to: intent.tokenAddress, data: transferData }],
+      })) as string
+
+      setDepositTxHash(txHash)
+      setDepositStep('Waiting for on-chain confirmation…')
+      await waitForReceipt(txHash)
+
+      setDepositStep('Verifying deposit with Dotly…')
+      const activateRes = await fetch(
+        `${API_URL}/scheduling/public/${handle}/${slug}/deposit-activate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ depositPaymentId: intent.depositPaymentId, txHash }),
+        },
+      )
+      if (!activateRes.ok) {
+        const err = (await activateRes.json().catch(() => ({}))) as Record<string, unknown>
+        throw new Error(
+          typeof err['message'] === 'string' ? err['message'] : `Error ${activateRes.status}`,
+        )
+      }
+
+      if (apt.cardId) {
         postAnalytics({
           cardId: apt.cardId,
           type: 'SAVE',
           metadata: {
             surface: 'booking_page',
-            action: 'booking_submitted',
+            action: 'deposit_completed',
+            ctaType: 'BOOK',
+            source: 'booking_page',
             status: slug,
+            amount: Number(intent.amountUsdt),
+            currency: 'USDT',
           },
         })
       }
-      setConfirmedBooking(booking)
-      setStep('confirmed')
+
+      setDepositStep('Confirming booking…')
+      await submitBooking(preparedBooking)
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Booking failed')
+      setDepositError(e instanceof Error ? e.message : 'Crypto deposit failed')
     } finally {
-      setSubmitting(false)
+      setDepositing(false)
+      setDepositStep(null)
     }
   }
 
@@ -688,7 +865,26 @@ export default function BookingPage(): JSX.Element {
                   </div>
                   {selectedSlot && (
                     <button
-                      onClick={() => setStep('form')}
+                      onClick={() => {
+                        if (apt?.cardId && selectedSlot) {
+                          postAnalytics({
+                            cardId: apt.cardId,
+                            type: 'CLICK',
+                            metadata: {
+                              surface: 'booking_page',
+                              action: 'booking_started',
+                              ctaType: 'BOOK',
+                              source: 'booking_page',
+                              status: slug,
+                            },
+                          })
+                        }
+                        if (apt?.depositEnabled) {
+                          setStep('form')
+                        } else {
+                          setStep('form')
+                        }
+                      }}
                       className="mt-4 w-full rounded-2xl bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-700 transition-colors shadow-[0_20px_44px_-26px_rgba(2,132,199,0.72)]"
                     >
                       Next: Your details
@@ -696,6 +892,71 @@ export default function BookingPage(): JSX.Element {
                   )}
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {step === 'deposit' && (
+          <div className="mx-auto flex w-full max-w-3xl flex-col px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-xl">
+              <div className="app-panel rounded-[30px] p-6">
+                <h2 className="text-2xl font-bold text-gray-900">Pay your booking deposit</h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  This booking requires a crypto deposit of{' '}
+                  <strong>{apt.depositAmountUsdt} USDT</strong> on Arbitrum before we confirm your
+                  slot.
+                </p>
+                <div className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm text-sky-900">
+                  <p>
+                    Booking: <strong>{apt.name}</strong>
+                  </p>
+                  <p className="mt-1">
+                    Slot:{' '}
+                    <strong>
+                      {selectedSlot
+                        ? new Date(selectedSlot).toLocaleString(undefined, {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            timeZone: guestTz,
+                          })
+                        : 'Not selected'}
+                    </strong>
+                  </p>
+                </div>
+                {depositStep && (
+                  <p className="mt-4 text-sm font-medium text-sky-700">{depositStep}</p>
+                )}
+                {depositError && (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {depositError}
+                  </div>
+                )}
+                {depositTxHash && (
+                  <p className="mt-4 break-all rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600">
+                    Deposit tx: {depositTxHash}
+                  </p>
+                )}
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => setStep('form')}
+                    className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCryptoDeposit()}
+                    disabled={depositing}
+                    className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {depositing ? 'Processing…' : `Pay ${apt.depositAmountUsdt} USDT`}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -736,6 +997,7 @@ export default function BookingPage(): JSX.Element {
                   required
                   value={guestName}
                   onChange={(e) => {
+                    resetDepositState()
                     setGuestName(e.target.value)
                     setFieldErrors((prev) => clearErrorKey(prev, 'guestName'))
                   }}
@@ -761,6 +1023,7 @@ export default function BookingPage(): JSX.Element {
                   type="email"
                   value={guestEmail}
                   onChange={(e) => {
+                    resetDepositState()
                     setGuestEmail(e.target.value)
                     setFieldErrors((prev) => clearErrorKey(prev, 'guestEmail'))
                   }}
@@ -785,6 +1048,7 @@ export default function BookingPage(): JSX.Element {
                 <textarea
                   value={guestNotes}
                   onChange={(e) => {
+                    resetDepositState()
                     setGuestNotes(e.target.value)
                     setFieldErrors((prev) => clearErrorKey(prev, 'guestNotes'))
                   }}
@@ -815,6 +1079,7 @@ export default function BookingPage(): JSX.Element {
                         required={q.required}
                         value={answers[q.id] ?? ''}
                         onChange={(e) => {
+                          resetDepositState()
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                           setFieldErrors((prev) => clearErrorKey(prev, q.id))
                         }}
@@ -829,6 +1094,7 @@ export default function BookingPage(): JSX.Element {
                         required={q.required}
                         value={answers[q.id] ?? ''}
                         onChange={(e) => {
+                          resetDepositState()
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                           setFieldErrors((prev) => clearErrorKey(prev, q.id))
                         }}
@@ -850,6 +1116,7 @@ export default function BookingPage(): JSX.Element {
                           required={q.required}
                           checked={answers[q.id] === 'true'}
                           onChange={(e) => {
+                            resetDepositState()
                             setAnswers((prev) => ({
                               ...prev,
                               [q.id]: e.target.checked ? 'true' : 'false',
@@ -868,6 +1135,7 @@ export default function BookingPage(): JSX.Element {
                         required={q.required}
                         value={answers[q.id] ?? ''}
                         onChange={(e) => {
+                          resetDepositState()
                           setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                           setFieldErrors((prev) => clearErrorKey(prev, q.id))
                         }}

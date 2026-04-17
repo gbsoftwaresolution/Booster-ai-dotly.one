@@ -72,6 +72,11 @@ interface LeadForm {
   fields: LeadField[]
 }
 
+interface PublicLeadResponse {
+  success: true
+  contactId?: string
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_REGEX = /^[+]?[0-9()\-\s]{7,20}$/
 
@@ -439,6 +444,7 @@ interface LeadCaptureModalProps {
   onAnalytics?: (type: 'CLICK' | 'SAVE', metadata: Record<string, unknown>) => void
   /** When provided, the modal is always visible and this callback closes it */
   onClose?: () => void
+  onLeadCaptured?: (contactId: string) => void
 }
 
 export function LeadCaptureModal({
@@ -449,6 +455,7 @@ export function LeadCaptureModal({
   authToken = null,
   onAnalytics,
   onClose,
+  onLeadCaptured,
 }: LeadCaptureModalProps) {
   const isControlled = !!onClose
   const [open, setOpen] = useState(false) // always starts closed — trigger button opens it
@@ -606,11 +613,14 @@ export function LeadCaptureModal({
         const body = (await res.json().catch(() => ({}))) as { message?: string }
         setError(body.message ?? 'Something went wrong. Please try again.')
       } else {
+        const body = (await res.json().catch(() => ({ success: true }))) as PublicLeadResponse
         onAnalytics?.('SAVE', {
           surface: 'lead_modal',
           action: 'lead_submitted',
           status: 'success',
+          ...(body.contactId ? { contactId: body.contactId } : {}),
         })
+        if (body.contactId) onLeadCaptured?.(body.contactId)
         setSuccess(true)
         // Auto-dismiss after 3s — long enough to read, not annoying
         if (successTimerRef.current) clearTimeout(successTimerRef.current)

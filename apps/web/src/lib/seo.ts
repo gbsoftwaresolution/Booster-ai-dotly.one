@@ -4,18 +4,18 @@ import { getAppUrl } from '@/lib/app-url'
 export const SITE_NAME = 'Dotly.one'
 export const SITE_TAGLINE = 'Tap. Share. Convert.'
 export const SITE_DESCRIPTION =
-  'Dotly.one helps professionals share digital business cards, capture leads, track engagement analytics, and manage follow-up from one platform.'
+  'Dotly.one turns every contact into a customer with shareable cards, booking, WhatsApp lead capture, analytics, CRM, and crypto-ready checkout workflows.'
 export const SITE_KEYWORDS = [
-  'digital business card',
-  'digital business cards',
+  'contact to customer platform',
+  'contact to revenue platform',
   'NFC business card',
   'QR business card',
-  'business card with analytics',
-  'digital networking platform',
+  'booking and lead capture',
+  'sales funnel card',
   'lead capture',
   'contactless networking',
   'business card CRM',
-  'professional profile',
+  'WhatsApp lead capture',
   'sales networking tool',
 ]
 

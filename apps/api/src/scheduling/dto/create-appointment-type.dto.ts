@@ -8,6 +8,7 @@ import {
   MaxLength,
   MinLength,
   Matches,
+  ValidateIf,
 } from 'class-validator'
 import { Transform } from 'class-transformer'
 import { IsIANATimezone } from '../../common/validators/is-iana-timezone.validator'
@@ -74,4 +75,16 @@ export class CreateAppointmentTypeDto {
   // MED-5: Validate as a real IANA timezone identifier (not just any string ≤64 chars)
   @IsIANATimezone()
   timezone?: string
+
+  @IsOptional()
+  @IsBoolean()
+  depositEnabled?: boolean
+
+  @ValidateIf((o: CreateAppointmentTypeDto) => o.depositEnabled === true)
+  @IsString()
+  @Matches(/^\d+(?:\.\d{1,2})?$/, {
+    message: 'depositAmountUsdt must be a valid USDT amount with up to 2 decimals',
+  })
+  @MaxLength(32)
+  depositAmountUsdt?: string
 }

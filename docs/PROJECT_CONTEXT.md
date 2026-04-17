@@ -2,41 +2,42 @@
 
 ## Vision
 
-Dotly.one is a world-class Digital Smart Business Card platform that goes beyond simple contact sharing.
-Where every competitor stops at sharing a card, Dotly.one closes the loop — turning connections into
-pipeline, and pipeline into customers.
+Dotly.one is a contact-to-customer platform built around one simple idea: every new contact should
+have a clear path to conversion.
+
+Where most digital card products stop at sharing, Dotly.one is designed to carry the full loop:
+scan -> action -> follow-up -> customer.
 
 **Tagline:** _Tap. Share. Convert._
 
-**Core belief:** A business card is not just an introduction. It is the first step of a sales relationship.
-Dotly.one is the only digital card platform that treats it that way — with a built-in CRM pipeline,
-rich media embeds, and deep analytics baked in from day one.
+**Core belief:** A card should not behave like a profile page. It should behave like a mini sales
+funnel that helps people book, chat, buy, and stay in your pipeline.
 
 ---
 
 ## The Problem
 
-Current digital business card tools (HiHello, Blinq, Popl, BusinessBay) all stop at sharing contact
-info and routing leads out to third-party CRMs. This creates friction:
+Current digital business card tools (HiHello, Blinq, Popl, BusinessBay) mostly stop at sharing
+contact info and routing leads out to third-party CRMs. This creates friction:
 
-- SMBs and solopreneurs do not want to pay for HubSpot just to track card-scan leads
-- Freelancers and consultants want their card to function as a micro landing page, not just a vCard
-- Agencies want to white-label a card solution for clients without building one from scratch
-- Sales teams want to know who viewed their card, clicked a link, and whether to follow up
+- Salespeople need a faster way to move from handshake to booked meeting
+- Freelancers and consultants need one card that can capture demand and later collect payment
+- Small businesses need QR-driven inquiry, booking, and follow-up without stitching ten tools together
+- Teams want to know who engaged, what action they took, and which leads deserve attention first
 
-Dotly.one solves all of this in a single platform.
+Dotly.one solves this by turning every card into a contact-to-revenue surface.
 
 ---
 
 ## Target Audience
 
-| Segment                       | Pain Point Solved                                              |
-| ----------------------------- | -------------------------------------------------------------- |
-| Solopreneurs & freelancers    | Rich card with video, portfolio, and booking link in one place |
-| Consultants & coaches         | Lead capture + inbuilt pipeline to track prospects             |
-| Small sales teams (2–20 reps) | Team card management + CRM without separate tool costs         |
-| Agencies                      | White-label resell to clients                                  |
-| SMBs (10–200 employees)       | Team cards + analytics + branded experience                    |
+| Segment                   | Pain Point Solved                                          |
+| ------------------------- | ---------------------------------------------------------- |
+| Salespeople               | QR/NFC sharing that turns meetings into booked follow-up   |
+| Freelancers & consultants | Bookings, lead capture, and later fixed service checkout   |
+| Small businesses          | Inquiry, booking, and conversion from one public card      |
+| Small sales teams (2–20)  | Shared contact-to-customer workflow without tool sprawl    |
+| Agencies                  | White-label and reusable card-led conversion systems later |
 
 ---
 
@@ -44,33 +45,30 @@ Dotly.one solves all of this in a single platform.
 
 Dotly.one differentiates from the market in five specific ways:
 
-### 1. Inbuilt CRM Pipeline (Unique in market)
+### 1. Contact To Customer Loop
 
-No competitor offers a built-in Kanban pipeline. HiHello, Blinq, and Popl all route leads to
-external CRMs. Dotly.one keeps the full loop — card scan → lead → pipeline stage → closed — in
-one product. Targeted at users who do not want another SaaS tool.
+Instead of stopping at profile sharing, Dotly.one is designed around the loop:
+share -> book/chat/capture -> follow up -> convert.
 
-### 2. Rich Media Card Page
+### 2. Built-in CRM Pipeline
 
-Dotly.one cards support embedded YouTube/Vimeo videos, image portfolio galleries, and Calendly/Cal.com
-booking buttons. Competitors render plain profile + links. Dotly.one turns the card into a
-micro landing page.
+HiHello, Blinq, and Popl mostly route leads to external tools. Dotly.one keeps the scan -> lead ->
+pipeline flow in one product for users who do not want another SaaS stack.
 
-### 3. Custom Domain Support
+### 3. Action-First Public Card
 
-HiHello, Blinq, and Popl do not offer custom domains. Dotly.one allows paid users to point
-`yourname.com` or `team.yourcompany.com` to their card.
+Dotly.one public cards are being positioned as mini sales funnels, not passive profile pages.
+Booking, WhatsApp, lead capture, and later payment are the core actions.
 
-### 4. White Label for Agencies
+### 4. Crypto Billing Today, Revenue Flows Next
 
-Enterprise tier supports full white labeling — custom branding, own domain, and resale to clients.
-No major competitor offers this clearly.
+Paid subscriptions already support crypto checkout today. The product roadmap extends that same
+payment direction into booking deposits and fixed service checkout later.
 
-### 5. Monorepo Shared Renderer
+### 5. Shared Renderer And Monorepo Velocity
 
 A shared `packages/ui` card renderer ensures pixel-identical rendering across the web dashboard,
-public card page, and React Native mobile app — something competitors typically fail at due to
-divergent codebases.
+public card page, and React Native mobile app.
 
 ---
 
@@ -89,7 +87,7 @@ divergent codebases.
 | File Storage  | Cloudflare R2                                    | S3-compatible object storage for avatars, logos, portfolio images, QR exports                                     |
 | Cache / Queue | Redis                                            | Analytics event queue, session cache — Local Redis: localhost:6379                                                |
 | Email         | Mailgun (primary) + Amazon SES (fallback)        | Transactional email with automatic failover (lead notifications, billing)                                         |
-| Payments      | Smart Contract (EVM/Solidity on Polygon or Base) | Crypto-based subscription billing with USDC/ETH, on-chain plan verification                                       |
+| Payments      | Smart Contract (EVM/Solidity on Polygon or Base) | Crypto-based subscription billing today, with future card-linked revenue checkout flows                           |
 | Deployment    | Vercel (web), Railway (API + Redis)              | Zero-config deploy, auto SSL                                                                                      |
 | Monitoring    | Sentry + PostHog                                 | Error tracking, product analytics                                                                                 |
 
@@ -142,6 +140,8 @@ Dotly.one/
 - "Save to Contacts" button — generates `.vcf` file
 - Custom domain routing via Next.js middleware + DNS TXT record verification
 - Optional lead capture form (visitor leaves their details)
+- Booking CTA via appointment type linking
+- WhatsApp and action-first CTA model evolving from social/profile patterns
 
 ### 4. Social Links & Media Embeds
 
@@ -158,6 +158,7 @@ Dotly.one/
 - Device type, country, and referrer breakdown
 - Time-series chart: views and saves over 7 / 30 / 90 days
 - Lead capture submission table with export (Pro+)
+- Product direction: richer action attribution for booking, chat, and revenue events
 
 ### 6. Contact Exchange / Lead Capture
 
@@ -185,11 +186,11 @@ Dotly.one/
 
 ## Monetization
 
-| Plan    | Price                                             | Cards | Key Features                                                                                       |
-| ------- | ------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------- |
-| Free    | `0 USDT`                                          | 1     | Public card page, QR sharing, basic lead capture, 7-day analytics                                  |
-| Starter | `10 USDT/mo`, `50 USDT/6 months`, `99 USDT/year`  | 1     | 30-day analytics, richer card setup, basic CRM, email signature, email templates, basic scheduling |
-| Pro     | `20 USDT/mo`, `99 USDT/6 months`, `199 USDT/year` | 3     | 90-day analytics, CSV export, custom domains, webhooks, fuller CRM and scheduling workflows        |
+| Plan    | Price                                             | Cards | Key Features                                                                                  |
+| ------- | ------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------- |
+| Free    | `0 USDT`                                          | 1     | Public card page, QR sharing, booking/lead capture basics, 7-day analytics                    |
+| Starter | `10 USDT/mo`, `50 USDT/6 months`, `99 USDT/year`  | 1     | 30-day analytics, richer card setup, CRM basics, email signature, email templates, scheduling |
+| Pro     | `20 USDT/mo`, `99 USDT/6 months`, `199 USDT/year` | 3     | 90-day analytics, CSV export, custom domains, webhooks, fuller CRM and scheduling workflows   |
 
 Plans reserved for later:
 
@@ -200,6 +201,7 @@ Plans reserved for later:
 Pricing note:
 
 - Current published pricing is `Free`, `Starter`, and `Pro` only.
+- Paid upgrades currently use crypto checkout.
 - See `PRICING_SPEC.md` and `PRICING_FEATURE_MATRIX.md` for deeper pricing and feature details.
 
 ---

@@ -32,6 +32,8 @@ export interface AppointmentType {
   location: string | null
   isActive: boolean
   timezone: string
+  depositEnabled?: boolean
+  depositAmountUsdt?: string | null
   availabilityRules: AvailabilityRule[]
   questions: BookingQuestion[]
   _count: { bookings: number }

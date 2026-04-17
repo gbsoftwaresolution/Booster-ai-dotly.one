@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { cn } from '@/lib/cn'
 
 function HeroDesktop() {
   return (
@@ -7,20 +6,20 @@ function HeroDesktop() {
       <div className="text-left">
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-white/85 px-4 py-2 text-xs font-semibold text-sky-700 shadow-[0_18px_40px_-24px_rgba(14,165,233,0.45)] backdrop-blur-sm">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
-          Built for modern professionals
+          Contact-to-customer flow for modern teams
         </div>
 
         <h1 className="mx-0 max-w-4xl text-7xl xl:text-[5.3rem] font-extrabold tracking-[-0.04em] text-gray-950">
-          Tap once.
+          Turn every contact
           <br />
           <span className="bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 bg-clip-text text-transparent drop-shadow-sm">
-            Look unforgettable.
+            into a customer.
           </span>
         </h1>
 
         <p className="mx-0 mt-6 max-w-2xl text-xl leading-8 text-gray-600">
-          A digital business card platform that feels premium from the first tap. Share faster,
-          capture warmer leads, and run follow-up from one polished workspace.
+          Share one QR or link. Let people book, start a WhatsApp conversation, or leave their
+          details instantly, then track every lead in one workspace.
         </p>
 
         <div className="mt-10 flex flex-row items-center justify-start gap-4">
@@ -28,7 +27,7 @@ function HeroDesktop() {
             href="/auth"
             className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-gradient-to-b from-sky-400 to-indigo-500 px-8 py-3.5 text-base font-bold text-white shadow-[0_24px_45px_-22px_rgba(14,165,233,0.7)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_32px_50px_-20px_rgba(14,165,233,0.8)]"
           >
-            Create your free card
+            Get your Dotly free
           </Link>
           <Link
             href="/features"
@@ -43,10 +42,10 @@ function HeroDesktop() {
             Free forever plan
           </span>
           <span className="rounded-full border border-sky-100 bg-sky-50/50 px-4 py-1.5 font-medium text-sky-800">
-            No credit card required
+            Book, chat, capture
           </span>
           <span className="rounded-full border border-sky-100 bg-sky-50/50 px-4 py-1.5 font-medium text-sky-800">
-            NFC and QR ready
+            Crypto checkout on paid plans
           </span>
         </div>
       </div>
@@ -54,16 +53,16 @@ function HeroDesktop() {
       <div className="relative mx-auto w-full max-w-[460px]">
         <div className="absolute -left-12 top-20 z-20 rounded-[28px] border border-white/80 bg-white/60 p-4 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.15)] backdrop-blur-xl transition-transform hover:-translate-y-1">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-emerald-500">
-            Lead Capture
+            Booking
           </p>
-          <p className="mt-1 text-sm font-bold text-slate-800">+42% more warm intros</p>
+          <p className="mt-1 text-sm font-bold text-slate-800">Call booked in 22 seconds</p>
         </div>
 
         <div className="absolute -right-8 bottom-20 z-20 rounded-[26px] border border-white/80 bg-white/60 p-4 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.15)] backdrop-blur-xl transition-transform hover:-translate-y-1">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-sky-500">
-            Analytics
+            Revenue Loop
           </p>
-          <p className="mt-1 text-sm font-bold text-slate-800">Views, taps & saves live</p>
+          <p className="mt-1 text-sm font-bold text-slate-800">Scan, chat, follow up, close</p>
         </div>
 
         <div className="relative rounded-[40px] border border-white/60 bg-white/30 p-4 shadow-[0_24px_60px_-16px_rgba(15,23,42,0.1)] backdrop-blur-xl">
@@ -73,11 +72,11 @@ function HeroDesktop() {
             <div className="relative flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-sky-300/80">
-                  Digital Card
+                  Revenue Card
                 </p>
                 <p className="mt-5 text-3xl font-bold text-white tracking-tight">Alex Johnson</p>
                 <p className="mt-1.5 text-[15px] font-medium text-sky-100/70">
-                  Lead Designer at Dotly
+                  Sales consultant at Dotly
                 </p>
               </div>
 
@@ -95,12 +94,12 @@ function HeroDesktop() {
                 </div>
                 <div>
                   <p className="text-[15px] font-bold tracking-tight text-white">dotly.one/alex</p>
-                  <p className="text-[12px] font-medium text-slate-400">Tap or scan to share</p>
+                  <p className="text-[12px] font-medium text-slate-400">Scan to book or chat</p>
                 </div>
               </div>
 
               <div className="mt-6 grid grid-cols-3 gap-3">
-                {['LinkedIn', 'X', 'Instagram'].map((s) => (
+                {['Book call', 'Chat now', 'Leave details'].map((s) => (
                   <span
                     key={s}
                     className="rounded-[16px] border border-white/10 bg-white/5 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-white/10"
@@ -126,20 +125,19 @@ function HeroMobile() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75"></span>
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-sky-500"></span>
           </span>
-          Next Gen Cards
+          Contact To Customer
         </div>
 
         <h1 className="max-w-[12em] text-[13vw] leading-[1.05] sm:text-6xl font-black tracking-tighter text-slate-900 drop-shadow-sm">
-          Tap once.
+          Turn every contact
           <br />
           <span className="bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-600 bg-clip-text text-transparent">
-            Stand out.
+            into a customer.
           </span>
         </h1>
 
         <p className="mt-6 max-w-[20em] text-[17px] font-medium leading-relaxed text-slate-500 px-4">
-          A digital business card that feels strictly premium. Share faster and capture warmer leads
-          instantly.
+          Share once. Let people book, chat on WhatsApp, or leave their details instantly.
         </p>
 
         <div className="mt-10 w-full px-6 flex flex-col gap-3">
@@ -148,7 +146,7 @@ function HeroMobile() {
             className="group relative flex w-full items-center justify-center overflow-hidden rounded-[24px] bg-gradient-to-r from-sky-400 to-indigo-500 px-8 py-5 text-[17px] font-bold text-white shadow-[0_16px_32px_-12px_rgba(79,70,229,0.5)] transition-all hover:scale-[1.02] active:scale-95"
           >
             <div className="absolute inset-0 bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
-            Create your free card
+            Get your Dotly free
           </Link>
           <Link
             href="/features"
@@ -179,25 +177,25 @@ function HeroMobile() {
                 Alex Johnson
               </h3>
               <p className="text-center text-[13px] font-medium text-slate-400 mt-1">
-                Lead Designer @ Dotly
+                Sales consultant @ Dotly
               </p>
 
               <div className="mt-8 flex flex-col gap-3">
                 <div className="flex items-center justify-between rounded-[20px] bg-white/10 p-4 backdrop-blur-md border border-white/5">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-[14px] bg-indigo-500/20 flex items-center justify-center text-indigo-400 line-clamp-1">
-                      in
+                      B
                     </div>
-                    <span className="text-[14px] font-bold text-white">LinkedIn</span>
+                    <span className="text-[14px] font-bold text-white">Book Call</span>
                   </div>
                   <div className="h-6 w-6 rounded-full bg-white/10" />
                 </div>
                 <div className="flex items-center justify-between rounded-[20px] bg-white/10 p-4 backdrop-blur-md border border-white/5">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-[14px] bg-sky-500/20 flex items-center justify-center text-sky-400 line-clamp-1">
-                      𝕏
+                      WA
                     </div>
-                    <span className="text-[14px] font-bold text-white">Twitter / X</span>
+                    <span className="text-[14px] font-bold text-white">Chat Now</span>
                   </div>
                   <div className="h-6 w-6 rounded-full bg-white/10" />
                 </div>
@@ -205,7 +203,7 @@ function HeroMobile() {
 
               <div className="mt-6 flex gap-3 pb-2">
                 <button className="flex-1 rounded-[18px] bg-white text-slate-900 py-3.5 text-[14px] font-bold tracking-wide shadow-[0_8px_24px_-8px_rgba(255,255,255,0.3)]">
-                  Save Contact
+                  Leave Details
                 </button>
               </div>
             </div>
@@ -215,15 +213,15 @@ function HeroMobile() {
         {/* Floating Badges */}
         <div className="absolute -left-6 top-24 z-20 animate-float rounded-[20px] border border-white/60 bg-white/70 p-3 shadow-[0_16px_32px_-12px_rgba(15,23,42,0.15)] backdrop-blur-xl">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-500">
-            New Lead
+            New Booking
           </p>
-          <p className="mt-0.5 text-[12px] font-bold text-slate-800">Captured ✨</p>
+          <p className="mt-0.5 text-[12px] font-bold text-slate-800">Confirmed ✨</p>
         </div>
         <div className="absolute -right-4 bottom-24 z-20 animate-float-delayed rounded-[20px] border border-white/60 bg-white/70 p-3 shadow-[0_16px_32px_-12px_rgba(15,23,42,0.15)] backdrop-blur-xl">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-sky-500">
-            Analytics
+            Follow-up
           </p>
-          <p className="mt-0.5 text-[12px] font-bold text-slate-800">2.4k Views</p>
+          <p className="mt-0.5 text-[12px] font-bold text-slate-800">WhatsApp started</p>
         </div>
       </div>
     </div>

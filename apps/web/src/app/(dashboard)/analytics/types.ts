@@ -10,6 +10,15 @@ export interface AnalyticsData {
     totalClicks: number
     totalLeads: number
     uniqueVisitors: number
+    totalBookingsStarted: number
+    totalBookingsCompleted: number
+    totalWhatsappClicks: number
+    totalLeadCaptureOpens: number
+    totalLeadSubmissions: number
+    totalDepositStarts: number
+    totalDepositCompletions: number
+    totalPaymentStarts: number
+    totalPaymentCompletions: number
     conversionRate: number
   }
   charts: {
@@ -26,6 +35,15 @@ export interface DashboardSummary {
   totalViews: number
   totalClicks: number
   totalLeads: number
+  totalBookingsStarted: number
+  totalBookingsCompleted: number
+  totalWhatsappClicks: number
+  totalLeadCaptureOpens: number
+  totalLeadSubmissions: number
+  totalDepositStarts: number
+  totalDepositCompletions: number
+  totalPaymentStarts: number
+  totalPaymentCompletions: number
   totalCards: number
   activeCards: number
   interactionsByAction: { name: string; value: number }[]

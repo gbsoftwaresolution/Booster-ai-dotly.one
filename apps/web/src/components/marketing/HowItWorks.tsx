@@ -1,21 +1,21 @@
 const STEPS = [
   {
     number: '01',
-    title: 'Create your card',
+    title: 'Share your Dotly',
     description:
-      'Sign up free, pick a username, and fill in your details: name, title, photo, social links, portfolio blocks. Takes under 5 minutes.',
+      'Open your public card with a QR code, link, or NFC tap so every real-world contact lands on one clear next step.',
   },
   {
     number: '02',
-    title: 'Share with a tap or scan',
+    title: 'Trigger an action',
     description:
-      'Write your card to an NFC tag or print your QR code. Anyone with a phone can view your full profile — no app needed.',
+      'Instead of browsing a profile, visitors can book, start a WhatsApp conversation, or leave their details in seconds.',
   },
   {
     number: '03',
-    title: 'Capture leads & close deals',
+    title: 'Track and convert',
     description:
-      'Every scan creates a contact in your CRM. Follow up faster, track engagement in real time, and keep momentum after every introduction.',
+      'Dotly captures intent, keeps the lead in your CRM, and helps you follow up before interest goes cold.',
   },
 ]
 
@@ -25,10 +25,10 @@ export function HowItWorks() {
       <div className="mx-auto max-w-5xl">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-brand-500">
-            Simple by design
+            Revenue loop
           </p>
           <h2 className="mt-2 text-4xl font-extrabold tracking-tight text-gray-900">
-            Up and running in minutes
+            From scan to follow-up in minutes
           </h2>
         </div>
 

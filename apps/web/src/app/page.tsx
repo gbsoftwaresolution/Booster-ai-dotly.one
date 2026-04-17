@@ -14,11 +14,16 @@ import { getServerAccessToken } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = createMarketingMetadata({
-  title: 'Tap. Share. Convert.',
+  title: 'Turn Every Contact Into a Customer',
   description:
-    'Digital business cards with NFC tap, QR code, real-time analytics, built-in CRM, and scheduling. Free forever plan available.',
+    'Share one QR or link. Let people book, chat, or leave their details instantly, then track every lead and revenue action in one place.',
   path: '/',
-  keywords: ['digital business cards', 'nfc cards', 'qr cards', 'crm for networking'],
+  keywords: [
+    'contact to customer',
+    'qr sales funnel',
+    'booking and lead capture',
+    'crm for networking',
+  ],
 })
 
 const homeStructuredData = [

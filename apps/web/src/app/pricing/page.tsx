@@ -77,12 +77,12 @@ const PLANS: Plan[] = [
   {
     id: 'STARTER',
     name: 'Starter',
-    tagline: 'For individuals, freelancers, and solo professionals.',
+    tagline: 'For people proving that one booked call can pay for Dotly.',
     prices: BILLING_PLAN_PRICES.STARTER!,
     features: [
-      '1 premium card',
+      '1 revenue card',
       '30-day analytics',
-      'Lead capture',
+      'Booking, WhatsApp, and lead capture',
       'Basic CRM access',
       'Email signature',
       'Email templates',
@@ -93,7 +93,7 @@ const PLANS: Plan[] = [
   {
     id: 'PRO',
     name: 'Pro',
-    tagline: 'For power users running their full follow-up workflow.',
+    tagline: 'For operators running a full contact-to-customer workflow.',
     prices: BILLING_PLAN_PRICES.PRO!,
     highlight: true,
     features: [
@@ -197,24 +197,24 @@ export default function PricingPage() {
             USD pricing
           </div>
           <h1 className="mt-8 text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-gray-900 to-gray-600 sm:text-6xl lg:text-[4.5rem] leading-[1.1]">
-            Simple pricing for professionals who want better follow-up.
+            Pricing for people who want every contact to turn into revenue.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg sm:text-xl leading-relaxed text-gray-500 font-medium">
-            Start free, then upgrade when you need richer sharing, stronger analytics, and a more
-            complete CRM workflow.
+            Start free, prove your booking and lead capture flow, then upgrade when you need deeper
+            analytics, stronger CRM, and more conversion power.
           </p>
           <p className="mt-3 text-sm text-gray-500">
-            All plans are priced in USD. Available payment methods are shown during checkout.
+            All plans are priced in USD. Paid upgrades currently use crypto checkout.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs font-medium text-gray-500">
             <span className="rounded-full border border-white/60 bg-white/40 px-4 py-2 shadow-sm backdrop-blur-md">
               Start free
             </span>
             <span className="rounded-full border border-white/60 bg-white/40 px-4 py-2 shadow-sm backdrop-blur-md">
-              7-day refund window on paid upgrades
+              Crypto checkout available today
             </span>
             <span className="rounded-full border border-white/60 bg-white/40 px-4 py-2 shadow-sm backdrop-blur-md">
-              Cancel before renewal
+              7-day refund window on eligible upgrades
             </span>
           </div>
           <p className="mt-3 text-sm font-medium text-brand-600">
@@ -231,7 +231,7 @@ export default function PricingPage() {
                   'relative flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-500',
                   duration === d
                     ? 'bg-gradient-to-b from-gray-800 to-gray-950 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.1)_inset] scale-[1.02]'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-sm active:scale-[0.98]'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-sm active:scale-[0.98]',
                 )}
               >
                 {DURATION_LABELS[d]}
@@ -256,13 +256,21 @@ export default function PricingPage() {
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-950">Free</h2>
-                <p className="mt-1 text-sm text-gray-500">Try Dotly with the essentials.</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Launch your first contact-to-customer flow.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-600">
-                  <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">1 digital card</span>
-                  <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">3 social links</span>
-                  <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">7-day analytics</span>
                   <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">
-                    Basic lead capture
+                    1 revenue card
+                  </span>
+                  <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">
+                    3 social links
+                  </span>
+                  <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">
+                    7-day analytics
+                  </span>
+                  <span className="rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition-colors group-hover:bg-white">
+                    Book, chat, and lead capture
                   </span>
                 </div>
               </div>
@@ -332,7 +340,10 @@ export default function PricingPage() {
 
                   <ul className="relative mt-6 space-y-3 text-sm text-gray-700">
                     {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3 transition-colors group-hover:text-gray-900">
+                      <li
+                        key={feature}
+                        className="flex items-start gap-3 transition-colors group-hover:text-gray-900"
+                      >
                         <span className="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 shadow-sm">
                           <Check className="h-3.5 w-3.5" />
                         </span>
@@ -363,56 +374,66 @@ export default function PricingPage() {
         <div className="mx-auto max-w-6xl">
           <h2 className="text-center text-2xl font-bold text-gray-950">Feature comparison</h2>
           <p className="mt-3 text-center text-sm text-gray-500">
-            Published plans today: Free, Starter, and Pro.
+            Published plans today: Free, Starter, and Pro. Paid upgrades are crypto-only for now.
           </p>
 
           <div className="mt-12 overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-2 sm:p-4 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5">
             <div className="overflow-x-auto overflow-y-hidden rounded-[32px] bg-white/60 shadow-inner">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm px-4">
-                  <th className="px-5 py-4 font-semibold text-gray-700">Feature</th>
-                  <th className="px-4 py-4 text-center font-semibold text-gray-500">
-                    <div>Free</div>
-                    <div className="font-normal text-xs text-gray-400 mt-0.5">$0 / mo</div>
-                  </th>
-                  <th className="px-4 py-4 text-center font-semibold text-gray-700">
-                    <div>Starter</div>
-                    <div className="font-normal text-xs text-gray-500 mt-0.5">
-                      ${formatMonthlyEquivalent(BILLING_PLAN_PRICES.STARTER?.[duration] ?? 0, duration)} / mo
-                    </div>
-                  </th>
-                  <th className="bg-brand-50/40 px-4 py-4 text-center font-semibold text-brand-700">
-                    <div>Pro</div>
-                    <div className="font-normal text-xs text-brand-600/80 mt-0.5">
-                      ${formatMonthlyEquivalent(BILLING_PLAN_PRICES.PRO?.[duration] ?? 0, duration)} / mo
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {FEATURES.map((row, index) => (
-                  <tr
-                    key={row.label}
-                    className={cn(
-                      "transition-colors duration-200 hover:bg-white/80",
-                      index % 2 === 0 ? "bg-white/40" : "bg-gray-50/20"
-                    )}
-                  >
-                    <td className="px-5 py-4 font-medium text-gray-700">{row.label}</td>
-                    <td className="px-4 py-4">
-                      <FeatureValue value={row.free} />
-                    </td>
-                    <td className="px-4 py-4">
-                      <FeatureValue value={row.starter} />
-                    </td>
-                    <td className="bg-brand-50/20 px-4 py-4">
-                      <FeatureValue value={row.pro} />
-                    </td>
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200/60 bg-gray-100/50 backdrop-blur-sm px-4">
+                    <th className="px-5 py-4 font-semibold text-gray-700">Feature</th>
+                    <th className="px-4 py-4 text-center font-semibold text-gray-500">
+                      <div>Free</div>
+                      <div className="font-normal text-xs text-gray-400 mt-0.5">$0 / mo</div>
+                    </th>
+                    <th className="px-4 py-4 text-center font-semibold text-gray-700">
+                      <div>Starter</div>
+                      <div className="font-normal text-xs text-gray-500 mt-0.5">
+                        $
+                        {formatMonthlyEquivalent(
+                          BILLING_PLAN_PRICES.STARTER?.[duration] ?? 0,
+                          duration,
+                        )}{' '}
+                        / mo
+                      </div>
+                    </th>
+                    <th className="bg-brand-50/40 px-4 py-4 text-center font-semibold text-brand-700">
+                      <div>Pro</div>
+                      <div className="font-normal text-xs text-brand-600/80 mt-0.5">
+                        $
+                        {formatMonthlyEquivalent(
+                          BILLING_PLAN_PRICES.PRO?.[duration] ?? 0,
+                          duration,
+                        )}{' '}
+                        / mo
+                      </div>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {FEATURES.map((row, index) => (
+                    <tr
+                      key={row.label}
+                      className={cn(
+                        'transition-colors duration-200 hover:bg-white/80',
+                        index % 2 === 0 ? 'bg-white/40' : 'bg-gray-50/20',
+                      )}
+                    >
+                      <td className="px-5 py-4 font-medium text-gray-700">{row.label}</td>
+                      <td className="px-4 py-4">
+                        <FeatureValue value={row.free} />
+                      </td>
+                      <td className="px-4 py-4">
+                        <FeatureValue value={row.starter} />
+                      </td>
+                      <td className="bg-brand-50/20 px-4 py-4">
+                        <FeatureValue value={row.pro} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -427,10 +448,11 @@ export default function PricingPage() {
           <h3 className="text-lg font-bold text-gray-950">Billing clarity</h3>
           <p className="mt-3 text-sm leading-7 text-gray-500">
             Dotly is sold as a SaaS subscription. Pricing is listed in USD so teams and individual
-            professionals can compare plans clearly before they choose a payment method at checkout.
+            operators can compare plans clearly, while current paid upgrades are processed through
+            crypto checkout.
           </p>
           <p className="mt-2 text-sm leading-7 text-gray-500">
-            Start on the free plan, upgrade when you need more power, and use the 7-day refund
+            Start on the free plan, upgrade when your flow is working, and use the 7-day refund
             window on eligible paid upgrades if Dotly is not the right fit.
           </p>
         </div>

@@ -303,6 +303,20 @@ class UpdateStageDto {
   stage!: string
 }
 
+class PublicTimelineEventDto {
+  @IsString()
+  @MaxLength(100)
+  contactId!: string
+
+  @IsString()
+  @MaxLength(100)
+  event!: string
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>
+}
+
 class PaginationQuery {
   @IsOptional()
   @Type(() => Number)
@@ -813,6 +827,20 @@ export class ContactsController {
   @ApiOperation({ summary: 'Create a contact from public lead capture form (no auth)' })
   createFromLead(@Body() dto: CreateLeadDto) {
     return this.contactsService.createFromLead(dto)
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @Post('public/contact-events')
+  @ApiOperation({ summary: 'Record a lightweight public contact timeline event' })
+  async recordPublicTimelineEvent(@Body() dto: PublicTimelineEventDto) {
+    await this.contactsService.recordPublicTimelineEvent({
+      contactId: dto.contactId,
+      event: dto.event,
+      metadata: dto.metadata,
+    })
+    return { success: true }
   }
 
   @ApiBearerAuth()

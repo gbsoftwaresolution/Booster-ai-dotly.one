@@ -525,9 +525,12 @@ export function DashboardContent({
   pipelineValue,
   sectionErrors,
   tasks,
+  totalBookingsStarted,
   totalClicks,
   totalLeads,
+  totalLeadSubmissions,
   totalViews,
+  totalWhatsappClicks,
 }: {
   activeCards: number
   appointmentTypes: AppointmentType[]
@@ -542,9 +545,12 @@ export function DashboardContent({
   pipelineValue: number
   sectionErrors: string[]
   tasks: TaskItem[]
+  totalBookingsStarted: number
   totalClicks: number
   totalLeads: number
+  totalLeadSubmissions: number
   totalViews: number
+  totalWhatsappClicks: number
 }): JSX.Element {
   const followUpActionCount = contacts.length + tasks.length + appointmentTypes.length
   const momentumItems = [
@@ -608,7 +614,7 @@ export function DashboardContent({
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
         <StatCard
           label="Card Views"
           value={loading ? '—' : totalViews}
@@ -658,6 +664,33 @@ export function DashboardContent({
                 : 'Everything on track'
           }
           href="/tasks"
+        />
+        <StatCard
+          label="Bookings Started"
+          value={loading ? '—' : totalBookingsStarted}
+          icon={Calendar}
+          color="text-cyan-600"
+          bg="bg-cyan-50"
+          hint={loading ? 'Loading booking actions' : 'Booking CTA clicks from your cards'}
+          href="/apps/cards/analytics"
+        />
+        <StatCard
+          label="WhatsApp Starts"
+          value={loading ? '—' : totalWhatsappClicks}
+          icon={Hand}
+          color="text-emerald-600"
+          bg="bg-emerald-50"
+          hint={loading ? 'Loading chat actions' : 'Conversations started from your cards'}
+          href="/apps/cards/analytics"
+        />
+        <StatCard
+          label="Lead Submits"
+          value={loading ? '—' : totalLeadSubmissions}
+          icon={TrendingUp}
+          color="text-violet-600"
+          bg="bg-violet-50"
+          hint={loading ? 'Loading form conversions' : 'Completed lead capture submissions'}
+          href="/leads"
         />
       </div>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

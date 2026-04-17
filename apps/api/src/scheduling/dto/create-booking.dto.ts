@@ -8,6 +8,7 @@ import {
   IsArray,
   ValidateNested,
   ArrayMaxSize,
+  Matches,
 } from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 
@@ -50,4 +51,16 @@ export class CreateBookingDto {
   @Type(() => BookingAnswerDto)
   @ArrayMaxSize(20)
   answers?: BookingAnswerDto[]
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  depositPaymentId?: string
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'depositTxHash must be a valid 32-byte hex transaction hash prefixed with 0x',
+  })
+  depositTxHash?: string
 }

@@ -44,6 +44,40 @@ class SlotsQueryDto {
   tz?: string
 }
 
+class CreateBookingDepositIntentDto {
+  @IsString()
+  @MaxLength(120)
+  guestName!: string
+
+  @IsString()
+  @MaxLength(254)
+  guestEmail!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{40}$/i, {
+    message: 'walletAddress must be a valid EVM address',
+  })
+  walletAddress!: string
+
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}T/, {
+    message: 'startAt must be an ISO-8601 datetime string',
+  })
+  startAt!: string
+}
+
+class ActivateBookingDepositDto {
+  @IsString()
+  @MaxLength(100)
+  depositPaymentId!: string
+
+  @IsString()
+  @Matches(/^0x[a-fA-F0-9]{64}$/, {
+    message: 'txHash must be a valid 32-byte hex transaction hash prefixed with 0x',
+  })
+  txHash!: string
+}
+
 @ApiTags('scheduling')
 @Controller('scheduling')
 export class SchedulingController {
@@ -241,6 +275,35 @@ export class SchedulingController {
    * Creates a booking (public — no auth required).
    * MED-1: Tighter per-IP throttle (10/min) to limit booking spam.
    */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('public/:handle/:slug/deposit-intent')
+  async createBookingDepositIntent(
+    @Param('handle') handle: string,
+    @Param('slug') slug: string,
+    @Body() dto: CreateBookingDepositIntentDto,
+  ) {
+    const ownerUserId = await this.schedulingService.resolveOwnerByHandle(handle)
+    return this.schedulingService.createBookingDepositIntent(ownerUserId, slug, dto)
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('public/:handle/:slug/deposit-activate')
+  async activateBookingDeposit(
+    @Param('handle') handle: string,
+    @Param('slug') slug: string,
+    @Body() dto: ActivateBookingDepositDto,
+  ) {
+    const ownerUserId = await this.schedulingService.resolveOwnerByHandle(handle)
+    return this.schedulingService.activateBookingDeposit(
+      ownerUserId,
+      slug,
+      dto.depositPaymentId,
+      dto.txHash,
+    )
+  }
+
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('public/:handle/:slug/book')

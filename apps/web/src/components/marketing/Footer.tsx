@@ -12,9 +12,7 @@ const FOOTER_LINKS = {
     { label: 'Privacy Policy', href: '/privacy' },
     { label: 'Terms of Service', href: '/terms' },
   ],
-  Connect: [
-    { label: 'Contact', href: 'mailto:hello@dotly.one' },
-  ],
+  Connect: [{ label: 'Contact', href: 'mailto:hello@dotly.one' }],
 }
 
 export function Footer() {
@@ -35,7 +33,8 @@ export function Footer() {
               />
             </Link>
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
-              Digital business cards with NFC, QR, analytics, CRM, and scheduling.
+              Turn every contact into a customer with QR sharing, booking, WhatsApp, CRM, and
+              crypto-ready follow-up.
             </p>
           </div>
 

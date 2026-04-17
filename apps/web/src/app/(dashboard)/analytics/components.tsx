@@ -19,8 +19,11 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  Calendar,
+  Coins,
   Download,
   Eye,
+  MessageCircleMore,
   MousePointerClick,
   Percent,
   RefreshCw,
@@ -128,11 +131,15 @@ function AnalyticsHeroDesktop({
       detail: 'Leads collected from card activity',
     },
     {
-      label: 'Cards working',
+      label: 'Actions started',
       value: cardsLoading
         ? '—'
-        : formatImpactStat(dashboardSummary?.activeCards ?? 0, 'active card'),
-      detail: 'Profiles currently helping you get discovered',
+        : formatImpactStat(
+            (dashboardSummary?.totalBookingsStarted ?? 0) +
+              (dashboardSummary?.totalWhatsappClicks ?? 0),
+            'conversion action',
+          ),
+      detail: 'Bookings and WhatsApp conversations started from your cards',
     },
   ]
 
@@ -149,6 +156,14 @@ function AnalyticsHeroDesktop({
     {
       label: 'Total Leads',
       value: cardsLoading ? '—' : (dashboardSummary?.totalLeads ?? 0),
+    },
+    {
+      label: 'Bookings Started',
+      value: cardsLoading ? '—' : (dashboardSummary?.totalBookingsStarted ?? 0),
+    },
+    {
+      label: 'WhatsApp Starts',
+      value: cardsLoading ? '—' : (dashboardSummary?.totalWhatsappClicks ?? 0),
     },
   ]
 
@@ -540,7 +555,11 @@ export function AnalyticsSummarySection({
   if (!analyticsData || renderedRequestKey !== activeRequestKey) return null
 
   const savedLeads = analyticsData.summary.totalLeads
-  const followUpSignal = analyticsData.summary.totalClicks + analyticsData.summary.totalLeads
+  const followUpSignal =
+    analyticsData.summary.totalClicks +
+    analyticsData.summary.totalLeads +
+    analyticsData.summary.totalBookingsStarted +
+    analyticsData.summary.totalWhatsappClicks
 
   if (
     analyticsData.summary.totalViews === 0 &&
@@ -593,7 +612,7 @@ export function AnalyticsSummarySection({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
         <StatCard
           label="Total Views"
           value={analyticsData.summary.totalViews}
@@ -623,6 +642,24 @@ export function AnalyticsSummarySection({
           value={`${analyticsData.summary.conversionRate}%`}
           icon={Percent}
           color="bg-violet-500"
+        />
+        <StatCard
+          label="Bookings Started"
+          value={analyticsData.summary.totalBookingsStarted}
+          icon={Calendar}
+          color="bg-cyan-500"
+        />
+        <StatCard
+          label="WhatsApp Starts"
+          value={analyticsData.summary.totalWhatsappClicks}
+          icon={MessageCircleMore}
+          color="bg-emerald-500"
+        />
+        <StatCard
+          label="Payments Completed"
+          value={analyticsData.summary.totalPaymentCompletions}
+          icon={Coins}
+          color="bg-amber-500"
         />
       </div>
     </div>

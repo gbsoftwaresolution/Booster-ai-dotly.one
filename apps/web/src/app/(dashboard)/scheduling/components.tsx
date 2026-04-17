@@ -42,9 +42,21 @@ interface AptTypeFormProps {
     location: string
     isActive: boolean
     timezone: string
+    depositEnabled: boolean
+    depositAmountUsdt: string
   }) => Promise<void>
   onClose: () => void
 }
+
+type AppointmentTypeFieldErrorKey =
+  | 'name'
+  | 'slug'
+  | 'description'
+  | 'durationMins'
+  | 'bufferDays'
+  | 'bufferAfterMins'
+  | 'location'
+  | 'depositAmountUsdt'
 
 interface QuestionsBuilderProps {
   appointmentTypeId: string
@@ -246,22 +258,13 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
   const [timezone, setTimezone] = useState(
     initial?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
   )
+  const [depositEnabled, setDepositEnabled] = useState(initial?.depositEnabled ?? false)
+  const [depositAmountUsdt, setDepositAmountUsdt] = useState(initial?.depositAmountUsdt ?? '')
   const [slugTouched, setSlugTouched] = useState(!!initial?.slug)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<
-    Partial<
-      Record<
-        | 'name'
-        | 'slug'
-        | 'description'
-        | 'durationMins'
-        | 'bufferDays'
-        | 'bufferAfterMins'
-        | 'location',
-        string
-      >
-    >
+    Partial<Record<AppointmentTypeFieldErrorKey, string>>
   >({})
 
   const inputClass = (field?: keyof typeof fieldErrors) =>
@@ -301,18 +304,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
       .replace(/^-|-$/g, '')
     const trimmedDescription = description.trim()
     const trimmedLocation = location.trim()
-    const nextFieldErrors: Partial<
-      Record<
-        | 'name'
-        | 'slug'
-        | 'description'
-        | 'durationMins'
-        | 'bufferDays'
-        | 'bufferAfterMins'
-        | 'location',
-        string
-      >
-    > = {}
+    const nextFieldErrors: Partial<Record<AppointmentTypeFieldErrorKey, string>> = {}
 
     if (!trimmedName) nextFieldErrors.name = 'Name is required.'
     else if (trimmedName.length < 2) nextFieldErrors.name = 'Name must be at least 2 characters.'
@@ -332,6 +324,14 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
       nextFieldErrors.bufferAfterMins = 'Buffer after must be between 0 and 240 minutes.'
     if (trimmedLocation.length > 500)
       nextFieldErrors.location = 'Location must be 500 characters or less.'
+    if (depositEnabled) {
+      const normalizedDeposit = depositAmountUsdt.trim()
+      if (!normalizedDeposit) {
+        nextFieldErrors.depositAmountUsdt = 'Deposit amount is required when deposits are enabled.'
+      } else if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedDeposit)) {
+        nextFieldErrors.depositAmountUsdt = 'Use a valid USDT amount with up to 2 decimals.'
+      }
+    }
 
     if (!timezone || !ALL_TIMEZONES.includes(timezone)) {
       setError('Select a valid timezone.')
@@ -360,6 +360,8 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
         location: trimmedLocation,
         isActive,
         timezone,
+        depositEnabled,
+        depositAmountUsdt: depositEnabled ? depositAmountUsdt.trim() : '',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save appointment type.')
@@ -408,7 +410,9 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {error && <StatusNotice message={error} />}
             <div>
-              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Name</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                Name
+              </label>
               <input
                 required
                 minLength={2}
@@ -430,7 +434,9 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               )}
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Slug (URL)</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                Slug (URL)
+              </label>
               <input
                 required
                 pattern="[a-z0-9-]+"
@@ -461,7 +467,9 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               )}
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Description</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                Description
+              </label>
               <textarea
                 value={description}
                 maxLength={2000}
@@ -512,7 +520,9 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                 )}
               </div>
               <div>
-                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Color</label>
+                <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                  Color
+                </label>
                 <input
                   type="color"
                   value={color}
@@ -544,7 +554,9 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               )}
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">Timezone</label>
+              <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                Timezone
+              </label>
               <SelectField
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
@@ -622,6 +634,54 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
               />
               <span className="text-sm text-slate-700">Active (bookable by guests)</span>
             </label>
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={depositEnabled}
+                  onChange={(e) => {
+                    clearFieldError('depositAmountUsdt')
+                    setDepositEnabled(e.target.checked)
+                  }}
+                  className="rounded border-slate-300"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  Require crypto deposit before booking confirmation
+                </span>
+              </label>
+              <p className="mt-2 text-xs text-slate-500">
+                Guests will pay this deposit in USDT on Arbitrum before the booking is created.
+              </p>
+              {depositEnabled && (
+                <div className="mt-3">
+                  <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                    Deposit (USDT)
+                  </label>
+                  <input
+                    value={depositAmountUsdt}
+                    inputMode="decimal"
+                    onChange={(e) => {
+                      clearFieldError('depositAmountUsdt')
+                      setDepositAmountUsdt(e.target.value)
+                    }}
+                    aria-invalid={fieldErrors.depositAmountUsdt ? 'true' : 'false'}
+                    aria-describedby={
+                      fieldErrors.depositAmountUsdt ? 'apt-deposit-error' : 'apt-deposit-help'
+                    }
+                    className={inputClass('depositAmountUsdt')}
+                    placeholder="10.00"
+                  />
+                  <p id="apt-deposit-help" className="mt-1 text-xs text-slate-400">
+                    Crypto deposits are currently USDT only.
+                  </p>
+                  {fieldErrors.depositAmountUsdt && (
+                    <p id="apt-deposit-error" className="mt-1 text-xs text-red-600">
+                      {fieldErrors.depositAmountUsdt}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex flex-shrink-0 justify-end gap-3 border-t border-slate-100 p-5">
             <button

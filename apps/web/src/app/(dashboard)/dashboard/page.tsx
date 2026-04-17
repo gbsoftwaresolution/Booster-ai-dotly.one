@@ -73,6 +73,9 @@ async function DashboardWidgetsLoader({
   const totalViews = analyticsSummary?.totalViews ?? 0
   const totalClicks = analyticsSummary?.totalClicks ?? 0
   const totalLeads = analyticsSummary?.totalLeads ?? 0
+  const totalBookingsStarted = analyticsSummary?.totalBookingsStarted ?? 0
+  const totalLeadSubmissions = analyticsSummary?.totalLeadSubmissions ?? 0
+  const totalWhatsappClicks = analyticsSummary?.totalWhatsappClicks ?? 0
   const overdueTasksCount = analyticsSummary?.overdueTasksCount ?? overdueTasks.length
 
   return (
@@ -90,9 +93,12 @@ async function DashboardWidgetsLoader({
       pipelineValue={pipelineValue}
       sectionErrors={data.sectionErrors}
       tasks={data.tasks}
+      totalBookingsStarted={totalBookingsStarted}
       totalClicks={totalClicks}
       totalLeads={totalLeads}
+      totalLeadSubmissions={totalLeadSubmissions}
       totalViews={totalViews}
+      totalWhatsappClicks={totalWhatsappClicks}
     />
   )
 }
