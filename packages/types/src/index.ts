@@ -324,6 +324,7 @@ export interface DeletedResponse {
 export interface UserMeResponse {
   id: string
   email: string
+  username: string | null
   emailVerifiedAt: string | null
   name: string | null
   avatarUrl: string | null

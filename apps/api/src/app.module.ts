@@ -28,6 +28,7 @@ import { WalletPassesModule } from './wallet-passes/wallet-passes.module'
 import { SchedulingModule } from './scheduling/scheduling.module'
 import { InboxModule } from './inbox/inbox.module'
 import { SalesLinkModule } from './sales-link/sales-link.module'
+import { PaymentAccountsModule } from './payment-accounts/payment-accounts.module'
 import { validate } from './config/env.validation'
 
 @Module({
@@ -82,6 +83,7 @@ import { validate } from './config/env.validation'
     SchedulingModule,
     InboxModule,
     SalesLinkModule,
+    PaymentAccountsModule,
   ],
   providers: [
     // ThrottlerGuard MUST run first (before JwtAuthGuard) so that every

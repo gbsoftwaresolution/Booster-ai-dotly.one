@@ -143,6 +143,7 @@ export class UsersService {
     return {
       id: user.id,
       email: user.email,
+      username: user.username ?? null,
       emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       name: user.name,
       avatarUrl: user.avatarUrl,

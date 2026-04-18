@@ -100,6 +100,11 @@ class EnvironmentVariables {
   @IsOptional() @IsString() WHATSAPP_BUSINESS_ACCESS_TOKEN?: string
   @IsOptional() @IsString() WHATSAPP_BUSINESS_VERIFY_TOKEN?: string
 
+  @IsOptional() @IsString() STRIPE_MODE?: string
+  @IsOptional() @IsString() STRIPE_SECRET_KEY?: string
+  @IsOptional() @IsString() STRIPE_WEBHOOK_SECRET?: string
+  @IsOptional() @IsString() STRIPE_BILLING_WEBHOOK_SECRET?: string
+
   // F-25: SWAGGER_ENABLED controls Swagger UI mount in production.
   // Validated as an optional boolean string ("true"/"false") so that
   // NODE_ENV=production + SWAGGER_ENABLED=true correctly unlocks docs.

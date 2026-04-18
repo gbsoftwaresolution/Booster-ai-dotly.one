@@ -45,7 +45,14 @@ async function bootstrap() {
   // F-08: Enforce a hard body-size cap so large payloads are rejected before
   // NestJS DTO validation runs.  The UploadAvatarDto allows up to 7 MB base64;
   // 8 MB gives a small margin while still being far below Express's 100 MB default.
-  app.use(express.json({ limit: '8mb' }))
+  app.use(
+    express.json({
+      limit: '8mb',
+      verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
+        req.rawBody = Buffer.from(buf)
+      },
+    }),
+  )
   app.use(express.urlencoded({ extended: true, limit: '8mb' }))
 
   app.use(

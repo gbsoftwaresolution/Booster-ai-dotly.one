@@ -23,6 +23,7 @@ import type { BillingSummaryResponse } from '@dotly/types'
 import { DURATION_IDS, PaymentVaultQuotes, PLAN_IDS } from './payment-vault-quotes'
 import { isCryptoBlockedForCountry } from './crypto-country-policy'
 import { EmailService } from '../email/email.service'
+import Stripe from 'stripe'
 
 const DOTLY_PAYMENT_VAULT_ABI = [
   {
@@ -67,6 +68,7 @@ const DOTLY_PAYMENT_VAULT_ABI = [
 ] as const
 
 const CHAIN_ID = 42161
+const STRIPE_PRO_MONTHLY_AMOUNT = 1500
 
 type RecordedPaymentState = {
   paymentId: string
@@ -84,6 +86,7 @@ type RecordedPaymentState = {
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name)
+  private readonly stripe: Stripe | null
 
   constructor(
     private prisma: PrismaService,
@@ -91,7 +94,180 @@ export class BillingService {
     private config: ConfigService,
     private paymentVaultQuotes: PaymentVaultQuotes,
     private email: EmailService,
-  ) {}
+  ) {
+    const stripeMode = this.config.get<'enabled' | 'disabled'>('STRIPE_MODE') ?? 'disabled'
+    const stripeKey = this.config.get<string>('STRIPE_SECRET_KEY')
+    this.stripe = stripeMode === 'enabled' && stripeKey ? new Stripe(stripeKey) : null
+  }
+
+  private isStripeEnabled(): boolean {
+    return !!this.stripe
+  }
+
+  private async syncStripeSubscription(params: {
+    userId: string
+    stripeCustomerId?: string | null
+    subscription: Stripe.Subscription
+  }): Promise<void> {
+    const stripeSubscription = params.subscription as Stripe.Subscription & {
+      current_period_end?: number
+    }
+    const isActive = ['active', 'trialing', 'past_due'].includes(params.subscription.status)
+    const currentPeriodEnd = stripeSubscription.current_period_end
+      ? new Date(stripeSubscription.current_period_end * 1000)
+      : null
+
+    await this.prisma.subscription.upsert({
+      where: { userId: params.userId },
+      create: {
+        userId: params.userId,
+        plan: isActive ? SharedPlan.PRO : SharedPlan.FREE,
+        status: isActive ? 'ACTIVE' : 'CANCELLED',
+        currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        stripeCustomerId: params.stripeCustomerId ?? null,
+        stripeSubscriptionId: params.subscription.id,
+      },
+      update: {
+        plan: isActive ? SharedPlan.PRO : SharedPlan.FREE,
+        status: isActive ? 'ACTIVE' : 'CANCELLED',
+        currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        stripeCustomerId: params.stripeCustomerId ?? undefined,
+        stripeSubscriptionId: params.subscription.id,
+      },
+    })
+
+    await this.prisma.user.update({
+      where: { id: params.userId },
+      data: { plan: isActive ? SharedPlan.PRO : SharedPlan.FREE },
+    })
+  }
+
+  async createStripeSubscriptionCheckout(userId: string, requestedPlan: SharedPlan) {
+    if (!this.isStripeEnabled() || !this.stripe) {
+      throw new BadRequestException('Stripe subscriptions are not configured right now')
+    }
+
+    if (requestedPlan !== SharedPlan.PRO) {
+      throw new BadRequestException('Only the Pro plan is available in this upgrade flow')
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        plan: true,
+      },
+    })
+
+    if (!user) {
+      throw new BadRequestException('User not found')
+    }
+
+    if (user.plan !== SharedPlan.FREE) {
+      throw new BadRequestException('Your account is already on a paid plan')
+    }
+
+    const webUrl = this.config.getOrThrow<string>('WEB_URL').replace(/\/$/, '')
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer_email: user.email,
+      success_url: `${webUrl}/upgrade?checkout=success`,
+      cancel_url: `${webUrl}/upgrade?checkout=cancelled`,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Dotly Pro',
+              description: 'Unlimited leads, payments, full dashboard, and no Dotly branding.',
+            },
+            recurring: { interval: 'month' },
+            unit_amount: STRIPE_PRO_MONTHLY_AMOUNT,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        userId,
+        plan: SharedPlan.PRO,
+        source: 'dotly_upgrade',
+      },
+      subscription_data: {
+        metadata: {
+          userId,
+          plan: SharedPlan.PRO,
+          source: 'dotly_upgrade',
+        },
+      },
+    })
+
+    return { url: session.url }
+  }
+
+  async handleStripeBillingWebhook(rawBody?: Buffer, signature?: string) {
+    if (!this.isStripeEnabled() || !this.stripe) {
+      return { received: true as const }
+    }
+
+    const webhookSecret =
+      this.config.get<string>('STRIPE_BILLING_WEBHOOK_SECRET') ??
+      this.config.get<string>('STRIPE_WEBHOOK_SECRET')
+
+    if (!webhookSecret || !rawBody || !signature) {
+      throw new BadRequestException('Stripe billing webhook is not configured')
+    }
+
+    const event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session
+      const userId = session.metadata?.userId
+      const subscriptionId =
+        typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
+      const stripeCustomerId =
+        typeof session.customer === 'string' ? session.customer : session.customer?.id
+
+      if (userId && subscriptionId) {
+        const subscription = await this.stripe.subscriptions.retrieve(subscriptionId)
+        await this.syncStripeSubscription({
+          userId,
+          stripeCustomerId,
+          subscription,
+        })
+      }
+    }
+
+    if (
+      event.type === 'customer.subscription.updated' ||
+      event.type === 'customer.subscription.deleted'
+    ) {
+      const subscription = event.data.object as Stripe.Subscription
+      const metadataUserId = subscription.metadata?.userId
+      const existing = metadataUserId
+        ? { userId: metadataUserId }
+        : await this.prisma.subscription.findFirst({
+            where: { stripeSubscriptionId: subscription.id },
+            select: { userId: true },
+          })
+
+      if (existing?.userId) {
+        const stripeCustomerId =
+          typeof subscription.customer === 'string'
+            ? subscription.customer
+            : subscription.customer?.id
+        await this.syncStripeSubscription({
+          userId: existing.userId,
+          stripeCustomerId,
+          subscription,
+        })
+      }
+    }
+
+    return { received: true as const }
+  }
 
   private formatError(error: unknown): string {
     return error instanceof Error ? error.message : String(error)

@@ -6,9 +6,19 @@ import { SalesLinkClient } from './SalesLinkClient'
 export const revalidate = 0
 
 interface SalesLinkProfile {
+  username: string
   name: string | null
   pitch: string | null
   phone: string | null
+  showBranding: boolean
+}
+
+interface SalesLinkSettings {
+  stripeEnabled: boolean
+  provider: string | null
+  country: string | null
+  upgradeRequired: boolean
+  message: string | null
 }
 
 async function getSalesLinkProfile(username: string): Promise<SalesLinkProfile | null> {
@@ -23,6 +33,25 @@ async function getSalesLinkProfile(username: string): Promise<SalesLinkProfile |
   }
 
   return (await res.json()) as SalesLinkProfile
+}
+
+async function getSalesLinkSettings(username: string): Promise<SalesLinkSettings> {
+  const apiUrl = getServerApiUrl()
+  const res = await fetch(`${apiUrl}/payment/config/${encodeURIComponent(username)}`, {
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    return {
+      stripeEnabled: false,
+      provider: null,
+      country: null,
+      upgradeRequired: false,
+      message: null,
+    }
+  }
+
+  return (await res.json()) as SalesLinkSettings
 }
 
 export async function generateMetadata({
@@ -45,11 +74,24 @@ export async function generateMetadata({
 
 export default async function SalesLinkPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params
-  const profile = await getSalesLinkProfile(username)
+  const [profile, settings] = await Promise.all([
+    getSalesLinkProfile(username),
+    getSalesLinkSettings(username),
+  ])
 
   if (!profile) {
     notFound()
   }
 
-  return <SalesLinkClient profile={profile} />
+  return (
+    <SalesLinkClient
+      profile={profile}
+      username={username}
+      stripeEnabled={settings.stripeEnabled}
+      paymentProvider={settings.provider}
+      paymentCountry={settings.country}
+      paymentUpgradeRequired={settings.upgradeRequired}
+      paymentUpgradeMessage={settings.message}
+    />
+  )
 }

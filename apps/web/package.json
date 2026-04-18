@@ -7,7 +7,7 @@
     "build": "next build && node ./scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/apps/web/server.js",
     "lint": "next lint",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "rm -rf .next && CI=1 next build >/dev/null && tsc --noEmit",
     "analyze": "ANALYZE=true next build",
     "verify": "npm run typecheck && npm run build",
     "test:e2e": "playwright test",

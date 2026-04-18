@@ -113,6 +113,24 @@ enum CustomFieldType {
   SELECT
 }
 
+enum PaymentProvider {
+  STRIPE_CONNECT
+  UPI_LINK
+  CASH_ON_DELIVERY
+}
+
+enum PaymentAccountType {
+  COMPANY
+  INDIVIDUAL
+}
+
+enum PaymentAccountStatus {
+  NOT_STARTED
+  PENDING_ONBOARDING
+  ACTIVE
+  DISABLED
+}
+
 enum DealStage {
   PROSPECT
   PROPOSAL
@@ -140,6 +158,7 @@ model User {
   phone         String?
   /// ISO 3166-1 alpha-2 country code, e.g. "US", "GB", "IN"
   country       String? @db.VarChar(2)
+  defaultPaymentProvider PaymentProvider?
   /// IANA timezone identifier, e.g. "America/New_York", "Asia/Kolkata"
   timezone      String? @db.VarChar(64)
   /// Notification preferences
@@ -170,6 +189,7 @@ model User {
   serviceOrders      ServiceOrder[]
   productOrders      ProductOrder[]
   googleCalendar     GoogleCalendarConnection?
+  paymentAccounts    PaymentAccount[]
   contactMemories    ContactMemory[]
   authSessions       AuthSession[]
   passwordResetTokens PasswordResetToken[]
@@ -434,13 +454,112 @@ model AnalyticsEvent {
   @@map("analytics_events")
 }
 
-model ClickEvent {
+model Lead {
+  id        String      @id @default(uuid())
+  username  String
+  source    String?
+  status    String      @default("new")
+  note      String?
+  followUpFlag Boolean  @default(false)
+  createdAt DateTime    @default(now())
+
+  events   LeadEvent[]
+  bookings SalesLinkBooking[]
+  payments Payment[]
+
+  @@index([username, status])
+  @@index([username, createdAt])
+  @@map("leads")
+}
+
+model LeadEvent {
   id        String   @id @default(uuid())
+  leadId    String
   action    String
+  intent    String?
+  ctaVariant String?
   createdAt DateTime @default(now())
 
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([action])
+  @@index([intent])
+  @@index([ctaVariant])
   @@index([createdAt])
-  @@map("click_events")
+  @@index([leadId, createdAt])
+  @@map("lead_events")
+}
+
+model SalesLinkBooking {
+  id        String   @id @default(uuid())
+  username  String
+  leadId    String
+  name      String?
+  slot      String
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([username, createdAt])
+  @@index([leadId])
+  @@unique([username, slot])
+  @@map("sales_link_bookings")
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  username  String
+  leadId    String?
+  provider  PaymentProvider?
+  providerAccountId String?
+  amount    Int
+  currency  String   @default("usd")
+  status    String
+  stripeId  String?  @unique
+  createdAt DateTime @default(now())
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([username, createdAt])
+  @@index([leadId])
+  @@index([status])
+  @@map("payments")
+}
+
+model PaymentAccount {
+  id                String   @id @default(uuid())
+  userId            String
+  provider          PaymentProvider
+  accountType       PaymentAccountType
+  country           String?  @db.VarChar(2)
+  status            PaymentAccountStatus
+  providerAccountId String?  @unique
+  onboardingComplete Boolean @default(false)
+  detailsSubmitted   Boolean @default(false)
+  chargesEnabled     Boolean @default(false)
+  payoutsEnabled     Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([provider])
+  @@unique([userId, provider])
+  @@map("payment_accounts")
+}
+
+model PaymentProviderRegistry {
+  id                String          @id @default(uuid())
+  provider          PaymentProvider @unique
+  displayName       String
+  enabled           Boolean         @default(true)
+  supportedCountries String[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@map("payment_provider_registry")
 }
 
 model Contact {
@@ -511,6 +630,8 @@ model Subscription {
   plan                   Plan               @default(FREE)
   status                 SubscriptionStatus @default(PENDING)
   contractSubscriptionId String? // on-chain subscription ID
+  stripeCustomerId       String?            @unique
+  stripeSubscriptionId   String?            @unique
   txHash                 String? // on-chain activation transaction hash
   chainId                Int? // 137 = Polygon, 8453 = Base
   currentPeriodEnd       DateTime?
@@ -532,6 +653,7 @@ model Subscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([boosterAiOrderId])
+  @@index([stripeSubscriptionId])
   @@map("subscriptions")
 }
 

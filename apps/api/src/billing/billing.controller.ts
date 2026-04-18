@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Query, UseGuards } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Query,
+  UseGuards,
+  Headers,
+  RawBodyRequest,
+  Req,
+} from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import {
@@ -15,6 +26,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Plan, BillingDuration } from '@dotly/types'
 import { Public } from '../auth/decorators/public.decorator'
 import { DotlySupportOpsGuard } from './dotly-support-ops.guard'
+import type { Request } from 'express'
 
 interface AuthUser {
   id: string
@@ -95,6 +107,12 @@ class AdminRefundDto {
   paymentId!: string
 }
 
+class CreateStripeSubscriptionDto {
+  @IsOptional()
+  @IsEnum(['PRO'])
+  plan?: 'PRO'
+}
+
 @ApiTags('billing')
 @ApiBearerAuth()
 @Controller('billing')
@@ -138,6 +156,25 @@ export class BillingController {
       ref: dto.ref,
       countryCode: dto.countryCode,
     })
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('create-subscription')
+  createStripeSubscription(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateStripeSubscriptionDto,
+  ) {
+    return this.billingService.createStripeSubscriptionCheckout(user.id, Plan.PRO)
+  }
+
+  @Public()
+  @Post('webhook')
+  handleStripeBillingWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('stripe-signature') signature?: string,
+  ) {
+    return this.billingService.handleStripeBillingWebhook(req.rawBody, signature)
   }
 
   /**

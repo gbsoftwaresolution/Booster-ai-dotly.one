@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerAccessToken } from '@/lib/auth/session'
 import { apiGet } from '@/lib/api'
+import type { UserMeResponse } from '@dotly/types'
 
 export async function getServerUserOrRedirect(authPath = '/auth') {
   try {
@@ -9,10 +10,7 @@ export async function getServerUserOrRedirect(authPath = '/auth') {
       redirect(authPath)
     }
 
-    const user = await apiGet<{ id: string; email: string; name?: string | null }>(
-      '/users/me',
-      token,
-    )
+    const user = await apiGet<UserMeResponse | null>('/users/me', token)
 
     if (!user) {
       redirect(authPath)
@@ -40,9 +38,7 @@ export async function getServerSessionAccessTokenOrRedirect(authPath = '/auth') 
 export async function getServerUserAndTokenOrRedirect(authPath = '/auth') {
   try {
     const token = await getServerAccessToken()
-    const user = token
-      ? await apiGet<{ id: string; email: string; name?: string | null }>('/users/me', token)
-      : null
+    const user = token ? await apiGet<UserMeResponse | null>('/users/me', token) : null
 
     if (!user || !token) {
       redirect(authPath)

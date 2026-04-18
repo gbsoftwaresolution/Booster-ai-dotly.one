@@ -7,6 +7,27 @@
 import { BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Plan } from '@dotly/types'
+
+const createSubscriptionCheckoutSessionMock = jest.fn()
+const constructEventMock = jest.fn()
+const retrieveSubscriptionMock = jest.fn()
+
+jest.mock('stripe', () => {
+  return jest.fn().mockImplementation(() => ({
+    checkout: {
+      sessions: {
+        create: createSubscriptionCheckoutSessionMock,
+      },
+    },
+    subscriptions: {
+      retrieve: retrieveSubscriptionMock,
+    },
+    webhooks: {
+      constructEvent: constructEventMock,
+    },
+  }))
+})
+
 import { BillingService } from './billing.service'
 
 function makeBillingService() {
@@ -15,9 +36,11 @@ function makeBillingService() {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      upsert: jest.fn(),
     },
     user: {
       update: jest.fn(),
+      findUnique: jest.fn(),
     },
     auditLog: {
       findFirst: jest.fn(),
@@ -189,5 +212,122 @@ describe('refund downgrade flow', () => {
     expect(summary.status).toBe('CANCELLED')
     expect(summary.refund?.status).toBe('REFUNDED')
     expect(audit.log).toHaveBeenCalled()
+  })
+})
+
+describe('stripe upgrade flow', () => {
+  function makeStripeBillingService() {
+    const { prisma, audit } = makeBillingService()
+    const config = {
+      get: jest.fn((key: string) => {
+        switch (key) {
+          case 'DOTLY_CONTRACT_ADDRESS':
+            return '0x0000000000000000000000000000000000000001'
+          case 'ARBITRUM_RPC_URL':
+            return 'https://arb.example'
+          case 'STRIPE_MODE':
+            return 'enabled'
+          case 'STRIPE_SECRET_KEY':
+            return 'sk_test_123'
+          case 'STRIPE_BILLING_WEBHOOK_SECRET':
+            return 'whsec_billing'
+          default:
+            return undefined
+        }
+      }),
+      getOrThrow: jest.fn((key: string) => {
+        if (key === 'WEB_URL') return 'http://localhost:3000'
+        throw new Error(`Missing config for ${key}`)
+      }),
+    } as unknown as ConfigService
+    const paymentVaultQuotes = {} as never
+    const email = {
+      sendRefundReviewRequestNotification: jest.fn().mockResolvedValue(true),
+    } as never
+
+    return {
+      prisma,
+      service: new BillingService(
+        prisma as never,
+        audit as never,
+        config,
+        paymentVaultQuotes,
+        email,
+      ),
+    }
+  }
+
+  it('creates a Stripe subscription checkout session for a free user', async () => {
+    const { prisma, service } = makeStripeBillingService()
+
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user_1',
+      email: 'user@example.com',
+      plan: 'FREE',
+    })
+    createSubscriptionCheckoutSessionMock.mockResolvedValueOnce({
+      url: 'https://checkout.stripe.com/c/pay_pro',
+    })
+
+    await expect(service.createStripeSubscriptionCheckout('user_1', Plan.PRO)).resolves.toEqual({
+      url: 'https://checkout.stripe.com/c/pay_pro',
+    })
+  })
+
+  it('activates the user plan from the Stripe billing webhook', async () => {
+    const { prisma, service } = makeStripeBillingService()
+
+    constructEventMock.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'user_1' },
+          subscription: 'sub_123',
+          customer: 'cus_123',
+        },
+      },
+    })
+    retrieveSubscriptionMock.mockResolvedValueOnce({
+      id: 'sub_123',
+      status: 'active',
+      current_period_end: 1780000000,
+    })
+
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.subscription.upsert).toHaveBeenCalled()
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user_1' },
+      data: { plan: Plan.PRO },
+    })
+  })
+
+  it('downgrades the user plan when the Stripe subscription is deleted', async () => {
+    const { prisma, service } = makeStripeBillingService()
+
+    constructEventMock.mockReturnValueOnce({
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_123',
+          status: 'canceled',
+          current_period_end: 1780000000,
+          customer: 'cus_123',
+          metadata: {},
+        },
+      },
+    })
+    prisma.subscription.findFirst.mockResolvedValueOnce({ userId: 'user_1' })
+
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user_1' },
+      data: { plan: Plan.FREE },
+    })
   })
 })
