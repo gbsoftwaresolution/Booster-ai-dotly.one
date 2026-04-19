@@ -61,7 +61,7 @@ export function ServicesTab({ fields, onServicesChange }: ServicesTabProps): JSX
                   next[index] = { ...service, priceUsdt: e.target.value.slice(0, 32) }
                   updateServices(next)
                 }}
-                placeholder="Price in USDT"
+                placeholder="Price"
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
               />
             </div>

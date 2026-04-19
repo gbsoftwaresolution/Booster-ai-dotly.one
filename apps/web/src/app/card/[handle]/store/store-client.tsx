@@ -108,7 +108,7 @@ export function StoreClientPage({
               <Image src={featured.imageUrl} alt={featured.name} fill className="object-cover" />
             ) : (
               <div className="flex h-full items-center justify-center p-8 text-center text-sm font-semibold uppercase tracking-[0.22em] text-fuchsia-400">
-                {featured.priceUsdt} USDT
+                {featured.priceUsdt}
               </div>
             )}
           </div>
@@ -127,7 +127,7 @@ export function StoreClientPage({
                   <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm font-semibold uppercase tracking-[0.2em] text-fuchsia-300">
-                    {product.priceUsdt} USDT
+                    {product.priceUsdt}
                   </div>
                 )}
               </div>
@@ -135,7 +135,7 @@ export function StoreClientPage({
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-lg font-bold text-slate-950">{product.name}</p>
                   <div className="rounded-2xl bg-slate-950 px-3 py-2 text-sm font-bold text-white">
-                    {product.priceUsdt} USDT
+                    {product.priceUsdt}
                   </div>
                 </div>
                 {product.description && (

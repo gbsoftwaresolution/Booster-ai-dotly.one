@@ -39,7 +39,7 @@ export async function generateMetadata({
   const name = stringField(card.fields, 'name') || handle
   return {
     title: `${name} Store — Dotly.one`,
-    description: `Browse and buy products from ${name}'s crypto storefront on Dotly.one.`,
+    description: `Browse and buy products from ${name}'s storefront on Dotly.one.`,
     alternates: { canonical: `${SITE_URL}/card/${encodeURIComponent(handle)}/store` },
   }
 }
@@ -81,8 +81,8 @@ export default async function CardStorePage({ params }: { params: Promise<{ hand
                 Shop products from {ownerName}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                A lightweight crypto storefront for products, bundles, and packaged goods, separate
-                from the main card and the services page.
+                A lightweight storefront for products, bundles, and packaged goods, separate from
+                the main card and the services page.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 rounded-[28px] bg-slate-950 p-4 text-white shadow-[0_20px_50px_-20px_rgba(15,23,42,0.55)]">
@@ -92,7 +92,7 @@ export default async function CardStorePage({ params }: { params: Promise<{ hand
               </div>
               <div>
                 <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Payment</p>
-                <p className="mt-2 text-2xl font-bold">USDT</p>
+                <p className="mt-2 text-2xl font-bold">Available</p>
               </div>
             </div>
           </div>

@@ -60,7 +60,7 @@ export function BillingHero({
     { label: 'Plan', value: currentPlan },
     { label: 'Status', value: currentStatus },
     {
-      label: 'Crypto Checkout',
+      label: 'Checkout',
       value: cryptoBlocked
         ? 'Blocked'
         : walletAddress
@@ -86,7 +86,7 @@ export function BillingHero({
         ? `Disabled for billing country${billingCountry ? ` ${billingCountry}` : ''}`
         : walletAddress
           ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
-          : 'Crypto checkout is available today',
+          : 'Checkout is available today',
       tone: cryptoBlocked
         ? 'bg-red-50 text-red-600'
         : walletAddress
@@ -321,9 +321,7 @@ export function CurrentPlanCard({
       {subscription?.amountUsdt && (
         <p className="mt-1 text-sm text-gray-500">
           Amount charged:{' '}
-          <span className="font-medium text-gray-700">
-            ${subscription.amountUsdt} via crypto checkout
-          </span>
+          <span className="font-medium text-gray-700">${subscription.amountUsdt} via checkout</span>
         </p>
       )}
       {subscription?.boosterAiOrderId && (
@@ -374,10 +372,10 @@ export function WalletCard({
 }): JSX.Element {
   return (
     <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] ring-1 ring-black/5 w-full min-w-0">
-      <h2 className="text-base font-semibold text-gray-900">Crypto Checkout</h2>
+      <h2 className="text-base font-semibold text-gray-900">Checkout</h2>
       <p className="mt-1 text-sm text-gray-500">
-        Dotly plans are priced in USD. Crypto checkout is available today if you want to pay with a
-        supported wallet.
+        Dotly plans are priced in USD. Use the currently supported checkout method to complete your
+        upgrade.
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center xl:justify-start gap-2 text-xs font-medium text-gray-600">
         <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5">
@@ -394,12 +392,12 @@ export function WalletCard({
               : 'border-emerald-200 bg-emerald-50 text-emerald-700',
           )}
         >
-          {cryptoBlocked ? 'Crypto unavailable here' : 'Crypto available now'}
+          {cryptoBlocked ? 'Unavailable here' : 'Available now'}
         </span>
       </div>
       {cryptoBlocked && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          Crypto checkout is unavailable for your billing country
+          Checkout is unavailable for your billing country
           {billingCountry ? ` (${billingCountry})` : ''}.
         </div>
       )}
@@ -426,13 +424,13 @@ export function WalletCard({
         ) : hasWallet === false ? (
           <div className="space-y-3">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              No wallet detected in this browser. You can still use crypto checkout from a wallet
-              app by entering your wallet address below and generating payment links.
+              No payment app was detected in this browser. You can still continue from a supported
+              app by entering your payment address below and generating payment links.
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-0 flex-1">
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Your crypto wallet address
+                  Your payment address
                 </label>
                 <input
                   type="text"
@@ -447,7 +445,7 @@ export function WalletCard({
                 rel="noreferrer"
                 className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
               >
-                Get wallet app
+                Get payment app
               </a>
             </div>
           </div>
@@ -776,7 +774,7 @@ export function UpgradePlanCard({
               </div>
             </div>
 
-            {/* Crypto */}
+            {/* Current method */}
             <div
               className={cn(
                 'group relative flex flex-col justify-between rounded-[20px] border p-4 text-left transition-all duration-300',
@@ -802,7 +800,7 @@ export function UpgradePlanCard({
                     cryptoBlocked ? 'text-red-900' : 'text-indigo-950',
                   )}
                 >
-                  Crypto
+                  Checkout
                 </div>
               </div>
               <div className="mt-4 flex items-center justify-between">
@@ -849,8 +847,8 @@ export function UpgradePlanCard({
             Amount: <span className="font-semibold text-gray-900">${selectedPrice ?? '—'} USD</span>
           </p>
           <p className="mt-2 text-xs text-gray-500">
-            Crypto checkout settles on Arbitrum One. If you use crypto, your wallet will ask you to
-            approve the payment and then confirm the transaction.
+            Checkout may require an approval step before payment confirmation, depending on the
+            active method.
           </p>
           <p className="mt-2 text-xs text-gray-500">
             The refund window and renewal terms shown in Dotly apply to your subscription after
@@ -877,7 +875,7 @@ export function UpgradePlanCard({
 
         {!cryptoBlocked && noWalletOrder && (
           <div className="rounded-[24px] border border-blue-200/80 bg-blue-50/90 p-4 shadow-sm">
-            <p className="text-sm font-semibold text-blue-900">Wallet app crypto checkout</p>
+            <p className="text-sm font-semibold text-blue-900">Hosted checkout link</p>
             <p className="text-xs text-blue-700">
               Copy this checkout link into your wallet app browser. Dotly will guide approval and
               payment there. Amount: <strong>${noWalletOrder.amountUsdt} USD equivalent</strong> on
@@ -939,9 +937,8 @@ export function UpgradePlanCard({
                 </a>
               )}
               <p className="text-[11px] text-blue-700">
-                Open this inside MetaMask, Trust Wallet, or another web3 browser. The hosted
-                checkout will ask for approval first, then payment, and will try to activate your
-                plan automatically.
+                Open this inside a supported payment app. The hosted checkout will guide payment and
+                try to activate your plan automatically.
               </p>
               {(hostedLinkExpired || noWalletOrder.lastStatus === 'EXPIRED') && (
                 <button
@@ -983,8 +980,7 @@ export function UpgradePlanCard({
 
         {cryptoBlocked ? (
           <p className="text-xs text-gray-400">
-            Crypto checkout is disabled for your billing country. Update your profile country if
-            needed.
+            Checkout is disabled for your billing country. Update your profile country if needed.
           </p>
         ) : (
           !noWalletOrder && (
@@ -1018,12 +1014,12 @@ export function UpgradePlanCard({
                 {subscribing
                   ? (subscribeStep ?? 'Processing…')
                   : hasWallet === false
-                    ? 'Pay with crypto — generate payment links'
+                    ? 'Generate payment links'
                     : !walletAddress
-                      ? 'Connect wallet to pay with crypto'
+                      ? 'Connect payment account'
                       : onOpenCheckout
-                        ? 'Continue to crypto checkout'
-                        : 'Pay with crypto'}
+                        ? 'Continue to checkout'
+                        : 'Pay now'}
               </button>
             </>
           )
@@ -1084,7 +1080,7 @@ function formatRefundStatusLabel(
     case 'PAID_ESCROW':
       return 'Refund window open'
     case 'REFUNDED':
-      return 'Refunded on chain'
+      return 'Refunded'
     case 'FINALIZED':
       return 'Refund window closed'
     default:
@@ -1144,7 +1140,7 @@ export function RefundCard({
       <div className="relative overflow-hidden rounded-[32px] sm:rounded-[40px] border border-white/60 bg-white/40 p-4 sm:p-8 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5 w-full min-w-0">
         <h2 className="text-base font-semibold text-gray-900">Refund Status</h2>
         <p className="mt-2 text-sm text-gray-500">
-          Refund details appear here after a paid crypto subscription has been activated.
+          Refund details appear here after a paid subscription has been activated.
         </p>
       </div>
     )
@@ -1161,8 +1157,7 @@ export function RefundCard({
         <div>
           <h2 className="text-base font-semibold text-gray-900">Refund Status</h2>
           <p className="mt-2 text-sm text-gray-500">
-            Dotly refunds are executed against the on-chain payment record for your latest paid
-            subscription.
+            Dotly refunds are executed against the latest payment record for your subscription.
           </p>
         </div>
         <span
@@ -1207,15 +1202,15 @@ export function RefundCard({
 
       {refund.status === 'PAID_ESCROW' && (
         <p className="mt-4 text-sm text-gray-600">
-          The refund window is still open. You can submit the refund on chain from the original
-          paying wallet, or log a manual review request for support fallback.
+          The refund window is still open. You can submit the refund from the original payment
+          account, or log a manual review request for support fallback.
         </p>
       )}
 
       {refund.status === 'REFUNDED' && (
         <p className="mt-4 text-sm text-green-700">
-          This payment has already been refunded on chain. Billing access is downgraded after the
-          next sync and is also refreshed when this page reloads.
+          This payment has already been refunded. Billing access is downgraded after the next sync
+          and is also refreshed when this page reloads.
         </p>
       )}
 

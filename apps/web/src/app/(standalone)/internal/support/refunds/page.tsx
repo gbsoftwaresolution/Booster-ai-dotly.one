@@ -185,7 +185,7 @@ export default async function InternalRefundQueuePage({
                   Refund review and admin refund console
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                  Review manual refund requests, inspect on-chain status, and execute owner refunds
+                  Review manual refund requests, inspect payment status, and execute owner refunds
                   when the escrow window is still open.
                 </p>
               </div>
@@ -324,7 +324,7 @@ export default async function InternalRefundQueuePage({
                         {item.canAdminRefund
                           ? 'The refund is still in escrow and can be executed with the configured owner key.'
                           : item.refund?.status === 'REFUNDED'
-                            ? 'Refund already completed on-chain.'
+                            ? 'Refund already completed.'
                             : 'This payment cannot be admin-refunded from the current state.'}
                       </p>
                     </div>

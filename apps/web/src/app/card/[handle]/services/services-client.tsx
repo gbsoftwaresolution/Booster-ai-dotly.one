@@ -67,7 +67,7 @@ export function ServicesClientPage({
             </div>
             <div className="rounded-[26px] bg-white/10 px-5 py-4 text-right backdrop-blur">
               <p className="text-xs uppercase tracking-[0.22em] text-indigo-100/80">Price</p>
-              <p className="mt-2 text-2xl font-bold">{featuredService.priceUsdt} USDT</p>
+              <p className="mt-2 text-2xl font-bold">{featuredService.priceUsdt}</p>
             </div>
           </div>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
@@ -108,7 +108,7 @@ export function ServicesClientPage({
                   <p className="text-lg font-bold text-slate-950">{service.name}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">
-                  {service.priceUsdt} USDT
+                  {service.priceUsdt}
                 </div>
               </div>
               {service.description && (

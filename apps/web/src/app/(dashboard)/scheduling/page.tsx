@@ -755,7 +755,7 @@ export default function SchedulingPage(): JSX.Element {
         {depositEnabledWithoutWallet && (
           <StatusNotice
             tone="warning"
-            message="Crypto deposits are enabled on at least one appointment type, but your billing wallet is not set. Add your wallet in Settings > Billing before sharing deposit-required booking links."
+            message="Deposits are enabled on at least one appointment type, but your payment destination is not set. Add it in Settings > Billing before sharing deposit-required booking links."
             liveMode="polite"
           />
         )}

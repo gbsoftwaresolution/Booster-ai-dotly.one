@@ -204,14 +204,15 @@ export default function PricingPage() {
             analytics, stronger CRM, and more conversion power.
           </p>
           <p className="mt-3 text-sm text-gray-500">
-            All plans are priced in USD. Paid upgrades currently use crypto checkout.
+            All plans are priced in USD. Paid upgrades are currently available in supported checkout
+            flows.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs font-medium text-gray-500">
             <span className="rounded-full border border-white/60 bg-white/40 px-4 py-2 shadow-sm backdrop-blur-md">
               Start free
             </span>
             <span className="rounded-full border border-white/60 bg-white/40 px-4 py-2 shadow-sm backdrop-blur-md">
-              Crypto checkout available today
+              Paid upgrades available today
             </span>
             <span className="rounded-full border border-white/60 bg-white/40 px-4 py-2 shadow-sm backdrop-blur-md">
               7-day refund window on eligible upgrades
@@ -374,7 +375,7 @@ export default function PricingPage() {
         <div className="mx-auto max-w-6xl">
           <h2 className="text-center text-2xl font-bold text-gray-950">Feature comparison</h2>
           <p className="mt-3 text-center text-sm text-gray-500">
-            Published plans today: Free, Starter, and Pro. Paid upgrades are crypto-only for now.
+            Published plans today: Free, Starter, and Pro. Paid upgrades are in limited rollout.
           </p>
 
           <div className="mt-12 overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-2 sm:p-4 backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-black/5">
@@ -449,7 +450,7 @@ export default function PricingPage() {
           <p className="mt-3 text-sm leading-7 text-gray-500">
             Dotly is sold as a SaaS subscription. Pricing is listed in USD so teams and individual
             operators can compare plans clearly, while current paid upgrades are processed through
-            crypto checkout.
+            Dotly checkout.
           </p>
           <p className="mt-2 text-sm leading-7 text-gray-500">
             Start on the free plan, upgrade when your flow is working, and use the 7-day refund

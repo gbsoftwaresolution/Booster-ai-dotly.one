@@ -39,7 +39,7 @@ function HostedCryptoCheckoutContent(): JSX.Element {
 
     const loadQuote = async () => {
       if (!paymentId) {
-        setError('This crypto checkout link is incomplete or invalid.')
+        setError('This checkout link is incomplete or invalid.')
         setLoading(false)
         return
       }
@@ -74,12 +74,12 @@ function HostedCryptoCheckoutContent(): JSX.Element {
 
   const handlePay = async () => {
     if (!params) {
-      setError('This crypto checkout link is incomplete or invalid.')
+      setError('This checkout link is incomplete or invalid.')
       return
     }
 
     if (!window.ethereum) {
-      setError('Open this page inside a web3 wallet browser such as MetaMask or Trust Wallet.')
+      setError('Open this page inside a supported payment app.')
       return
     }
 
@@ -105,7 +105,7 @@ function HostedCryptoCheckoutContent(): JSX.Element {
 
       await ensureWalletChain(params.chainId)
 
-      setStep('Approving USDT payment…')
+      setStep('Approving payment…')
       const approveData =
         ERC20_APPROVE_SELECTOR +
         params.paymentVaultAddress.slice(2).padStart(64, '0') +
@@ -139,7 +139,7 @@ function HostedCryptoCheckoutContent(): JSX.Element {
       })) as string
 
       setTxHash(payTxHash)
-      setStep('Waiting for on-chain payment confirmation…')
+      setStep('Waiting for payment confirmation…')
       await waitForReceipt(payTxHash)
 
       setStep('Activating your Dotly plan…')
@@ -226,7 +226,7 @@ function HostedCryptoCheckoutContent(): JSX.Element {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
         <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 text-slate-600">
-          Loading crypto checkout…
+          Loading checkout…
         </div>
       </main>
     )
@@ -236,7 +236,7 @@ function HostedCryptoCheckoutContent(): JSX.Element {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
         <div className="w-full rounded-3xl border border-red-200 bg-red-50 p-6 text-red-800">
-          {error ?? 'Invalid or incomplete crypto checkout link.'}
+          {error ?? 'Invalid or incomplete checkout link.'}
         </div>
       </main>
     )
@@ -246,11 +246,11 @@ function HostedCryptoCheckoutContent(): JSX.Element {
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
       <div className="w-full rounded-[32px] border border-indigo-100 bg-white p-6 shadow-[0_20px_60px_-20px_rgba(79,70,229,0.25)]">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500">
-          Dotly Crypto Checkout
+          Dotly Checkout
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-950">Pay in your wallet browser</h1>
+        <h1 className="mt-2 text-2xl font-bold text-slate-950">Complete your payment</h1>
         <p className="mt-2 text-sm text-slate-600">
-          This checkout will ask for USDT approval first and then request the subscription payment.
+          This checkout will guide the required approval and payment steps for your subscription.
         </p>
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -261,12 +261,12 @@ function HostedCryptoCheckoutContent(): JSX.Element {
             Duration: <span className="font-semibold text-slate-950">{params.duration}</span>
           </p>
           <p className="mt-1">
-            Amount: <span className="font-semibold text-slate-950">${params.amountUsdt} USDT</span>
+            Amount: <span className="font-semibold text-slate-950">${params.amountUsdt}</span>
           </p>
           <p className="mt-1">
             Network:{' '}
             <span className="font-semibold text-slate-950">
-              Arbitrum One ({params.chainId || ARBITRUM_CHAIN_ID})
+              {params.chainId || ARBITRUM_CHAIN_ID}
             </span>
           </p>
           <p className="mt-1 break-all font-mono text-xs text-slate-500">
@@ -328,7 +328,7 @@ export default function HostedCryptoCheckoutPage(): JSX.Element {
     <Suspense
       fallback={
         <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16 text-sm text-slate-500">
-          Loading crypto checkout…
+          Loading checkout…
         </main>
       }
     >

@@ -59,6 +59,7 @@ Primary references:
 - `pnpm --filter @dotly/web test:e2e:core-flow` passed locally on 2026-04-19 (`6 passed`)
 - core money path is covered locally for public link, lead capture, WhatsApp CTA tracking, booking, payment, and upgrade
 - replay/retry behavior is covered in API webhook tests
+- current payment evidence is still tied to the existing hosted-payment/webhook flow in repo, not a crypto-only on-chain confirmation path
 
 Primary references:
 
@@ -99,6 +100,20 @@ Important nuance:
 
 - webhook burst validation measures route availability under real local verification responses (`200/201/400/404/429`), not successful live Stripe signature verification
 
+## Crypto-Only Payment Reality Check
+
+- The current sales-link payment implementation is still Stripe-first in code:
+  - `apps/api/src/sales-link/sales-link.service.ts` creates Stripe Checkout sessions for the active Stripe provider
+  - `apps/api/src/sales-link/sales-link.controller.ts` exposes `POST /payment/webhook` for Stripe payment events
+  - `packages/database/prisma/schema.prisma` stores `stripeId` on `Payment` and does not yet model network and tx-hash verification for this flow
+- Because of that, this repo should not be described as crypto-payment production ready today for the sales-link launch path.
+- A crypto-only launch requires, at minimum:
+  - on-chain transaction verification
+  - network/token/amount/recipient validation
+  - confirmation depth enforcement
+  - idempotent `txHash` handling
+  - explicit wrong-payment policy and UX warnings
+
 Primary references:
 
 - `docs/LAUNCH_CHECKLIST.md`
@@ -114,6 +129,7 @@ Primary references:
 3. Run `pnpm observability:smoke` against deployed environments.
 4. Run the three launch-path load tests against staging or production-like infra.
 5. Verify one full production owner funnel after deploy.
+6. If launch payments are crypto-only, replace Stripe-dependent sales-link payment confirmation with verified on-chain confirmation before launch.
 
 ## Recommended Signoff Language
 

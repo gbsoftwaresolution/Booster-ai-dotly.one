@@ -47,7 +47,7 @@ export function ServiceCheckoutSheet({
 
   async function handlePay() {
     if (!window.ethereum) {
-      setError('Open this page inside a wallet browser such as MetaMask or Trust Wallet.')
+      setError('Open this page in a supported browser to complete payment.')
       return
     }
 
@@ -90,7 +90,7 @@ export function ServiceCheckoutSheet({
       })
 
       await ensureWalletChain(intent.chainId || ARBITRUM_CHAIN_ID)
-      setStep('Sending USDT payment…')
+      setStep('Sending payment…')
 
       const iface = new Interface(['function transfer(address to,uint256 value)'])
       const transferData = iface.encodeFunctionData('transfer', [
@@ -104,7 +104,7 @@ export function ServiceCheckoutSheet({
       })) as string
 
       setTxHash(paymentTxHash)
-      setStep('Waiting for on-chain confirmation…')
+      setStep('Waiting for payment confirmation…')
       await waitForReceipt(paymentTxHash)
 
       setStep('Verifying payment with Dotly…')
@@ -171,15 +171,13 @@ export function ServiceCheckoutSheet({
         <div className="space-y-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-500">
-              Crypto service checkout
+              Service checkout
             </p>
             <h3 className="mt-2 text-xl font-bold text-slate-950">{service.name}</h3>
             {service.description && (
               <p className="mt-1 text-sm text-slate-500">{service.description}</p>
             )}
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {service.priceUsdt} USDT on Arbitrum
-            </p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{service.priceUsdt}</p>
           </div>
 
           <input
@@ -235,7 +233,7 @@ export function ServiceCheckoutSheet({
               disabled={submitting}
               className="flex-1 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
             >
-              {submitting ? 'Processing…' : `Pay ${service.priceUsdt} USDT`}
+              {submitting ? 'Processing…' : `Pay ${service.priceUsdt}`}
             </button>
           </div>
         </div>

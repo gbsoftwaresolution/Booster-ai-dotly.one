@@ -148,8 +148,8 @@ export default function BillingSettingsPage(): JSX.Element {
 
         setSuccessMsg(
           refreshed?.boosterAiOrderId === paymentId && refreshed?.status === 'ACTIVE'
-            ? 'Crypto payment confirmed and your plan is active.'
-            : 'Crypto payment submitted. Billing has been refreshed.',
+            ? 'Payment confirmed and your plan is active.'
+            : 'Payment submitted. Billing has been refreshed.',
         )
         setTimeout(() => setSuccessMsg(null), 6_000)
       } catch {
@@ -193,7 +193,7 @@ export default function BillingSettingsPage(): JSX.Element {
         )
 
         if (status.activated || status.status === 'ACTIVE') {
-          setSuccessMsg('Crypto payment confirmed and your plan is active.')
+          setSuccessMsg('Payment confirmed and your plan is active.')
           setTimeout(() => setSuccessMsg(null), 6_000)
           setNoWalletOrder(null)
           void fetchSubscription()
@@ -218,7 +218,7 @@ export default function BillingSettingsPage(): JSX.Element {
             if (cancelled) return
 
             if (activated.status === 'ACTIVE') {
-              setSuccessMsg('Crypto payment confirmed and your plan is active.')
+              setSuccessMsg('Payment confirmed and your plan is active.')
               setTimeout(() => setSuccessMsg(null), 6_000)
               setNoWalletOrder(null)
               void fetchSubscription()
@@ -254,7 +254,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
   const connectWallet = async () => {
     if (!window.ethereum) {
-      setError('No wallet detected. Install MetaMask or use the mobile deep-link flow below.')
+      setError('No payment account detected. Use the supported payment flow below.')
       return
     }
     setConnectingWallet(true)
@@ -280,7 +280,7 @@ export default function BillingSettingsPage(): JSX.Element {
   const handleNoWalletSubscribe = async (walletAddr: string) => {
     setSubscribing(true)
     setError(null)
-    setSubscribeStep('Preparing crypto checkout…')
+    setSubscribeStep('Preparing checkout…')
     try {
       const token = await getToken()
       if (!token) throw new Error('Not authenticated.')
@@ -366,13 +366,13 @@ export default function BillingSettingsPage(): JSX.Element {
       return
     }
     if (!window.ethereum) {
-      setError('MetaMask is not installed.')
+      setError('A supported payment app is not available in this browser.')
       return
     }
 
     setSubscribing(true)
     setError(null)
-    setSubscribeStep('Preparing crypto checkout…')
+    setSubscribeStep('Preparing checkout…')
 
     try {
       const token = await getToken()
@@ -409,7 +409,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
       await ensureWalletChain(requiredChainId)
 
-      setSubscribeStep('Approving crypto payment…')
+      setSubscribeStep('Approving payment…')
 
       const approveData =
         ERC20_APPROVE_SELECTOR +
@@ -500,7 +500,7 @@ export default function BillingSettingsPage(): JSX.Element {
       return
     }
     if (!window.ethereum) {
-      setError('MetaMask is not installed.')
+      setError('A supported payment app is not available in this browser.')
       return
     }
 
@@ -520,7 +520,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
       await waitForReceipt(txHash)
       await fetchSubscription()
-      setSuccessMsg('Refund confirmed on chain and billing status has been refreshed.')
+      setSuccessMsg('Refund confirmed and billing status has been refreshed.')
       setTimeout(() => setSuccessMsg(null), 6_000)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Refund transaction failed.'

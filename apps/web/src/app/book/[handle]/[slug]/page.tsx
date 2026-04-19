@@ -547,10 +547,10 @@ export default function BookingPage(): JSX.Element {
     await submitBooking(prepared)
   }
 
-  async function handleCryptoDeposit() {
+  async function handleDepositPayment() {
     if (!apt || !selectedSlot) return
     if (!window.ethereum) {
-      setDepositError('Open this page inside a wallet browser such as MetaMask or Trust Wallet.')
+      setDepositError('Open this page in a supported browser to complete payment.')
       return
     }
 
@@ -564,7 +564,7 @@ export default function BookingPage(): JSX.Element {
       if (!walletAddress) throw new Error('No wallet account was returned.')
       if (!preparedBooking) throw new Error('Enter your booking details before paying the deposit.')
 
-      setDepositStep('Preparing crypto deposit…')
+      setDepositStep('Preparing deposit…')
       const intent = await fetch(`${API_URL}/scheduling/public/${handle}/${slug}/deposit-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -602,7 +602,7 @@ export default function BookingPage(): JSX.Element {
       }
 
       await ensureWalletChain(intent.chainId || ARBITRUM_CHAIN_ID)
-      setDepositStep('Sending USDT deposit…')
+      setDepositStep('Sending deposit…')
 
       const transferData =
         ERC20_TRANSFER_SELECTOR +
@@ -615,7 +615,7 @@ export default function BookingPage(): JSX.Element {
       })) as string
 
       setDepositTxHash(txHash)
-      setDepositStep('Waiting for on-chain confirmation…')
+      setDepositStep('Waiting for payment confirmation…')
       await waitForReceipt(txHash)
 
       setDepositStep('Verifying deposit with Dotly…')
@@ -653,7 +653,7 @@ export default function BookingPage(): JSX.Element {
       setDepositStep('Confirming booking…')
       await submitBooking(preparedBooking)
     } catch (e) {
-      setDepositError(e instanceof Error ? e.message : 'Crypto deposit failed')
+      setDepositError(e instanceof Error ? e.message : 'Deposit payment failed')
     } finally {
       setDepositing(false)
       setDepositStep(null)
@@ -902,9 +902,8 @@ export default function BookingPage(): JSX.Element {
               <div className="app-panel rounded-[30px] p-6">
                 <h2 className="text-2xl font-bold text-gray-900">Pay your booking deposit</h2>
                 <p className="mt-2 text-sm text-gray-600">
-                  This booking requires a crypto deposit of{' '}
-                  <strong>{apt.depositAmountUsdt} USDT</strong> on Arbitrum before we confirm your
-                  slot.
+                  This booking requires a deposit of <strong>{apt.depositAmountUsdt}</strong> before
+                  we confirm your slot.
                 </p>
                 <div className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm text-sky-900">
                   <p>
@@ -949,11 +948,11 @@ export default function BookingPage(): JSX.Element {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleCryptoDeposit()}
+                    onClick={() => void handleDepositPayment()}
                     disabled={depositing}
                     className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {depositing ? 'Processing…' : `Pay ${apt.depositAmountUsdt} USDT`}
+                    {depositing ? 'Processing…' : `Pay ${apt.depositAmountUsdt}`}
                   </button>
                 </div>
               </div>

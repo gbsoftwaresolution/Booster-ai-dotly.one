@@ -329,7 +329,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
       if (!normalizedDeposit) {
         nextFieldErrors.depositAmountUsdt = 'Deposit amount is required when deposits are enabled.'
       } else if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedDeposit)) {
-        nextFieldErrors.depositAmountUsdt = 'Use a valid USDT amount with up to 2 decimals.'
+        nextFieldErrors.depositAmountUsdt = 'Use a valid amount with up to 2 decimals.'
       }
     }
 
@@ -646,16 +646,16 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                   className="rounded border-slate-300"
                 />
                 <span className="text-sm font-medium text-slate-700">
-                  Require crypto deposit before booking confirmation
+                  Require deposit before booking confirmation
                 </span>
               </label>
               <p className="mt-2 text-xs text-slate-500">
-                Guests will pay this deposit in USDT on Arbitrum before the booking is created.
+                Guests will pay this deposit before the booking is created.
               </p>
               {depositEnabled && (
                 <div className="mt-3">
                   <label className="mb-1.5 block text-[13px] font-bold uppercase tracking-wider text-slate-500">
-                    Deposit (USDT)
+                    Deposit amount
                   </label>
                   <input
                     value={depositAmountUsdt}
@@ -672,7 +672,7 @@ export function AptTypeForm({ initial, onSave, onClose }: AptTypeFormProps): JSX
                     placeholder="10.00"
                   />
                   <p id="apt-deposit-help" className="mt-1 text-xs text-slate-400">
-                    Crypto deposits are currently USDT only.
+                    Deposits use the currently configured payment flow.
                   </p>
                   {fieldErrors.depositAmountUsdt && (
                     <p id="apt-deposit-error" className="mt-1 text-xs text-red-600">

@@ -376,7 +376,7 @@ function StoreTeaserSection({
               )}
             </div>
             <div className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">
-              {featured.priceUsdt} USDT
+              {featured.priceUsdt}
             </div>
           </div>
         </div>
@@ -443,7 +443,7 @@ function ServiceOffersSection({
                   )}
                 </div>
                 <div className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">
-                  {service.priceUsdt} USDT
+                  {service.priceUsdt}
                 </div>
               </div>
             </div>

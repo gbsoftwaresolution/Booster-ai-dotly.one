@@ -39,6 +39,29 @@
 - [ ] Uptime monitor configured (UptimeRobot or Better Uptime for /health)
 - [ ] PagerDuty or similar on-call rotation set up
 
+## Payments (Crypto)
+
+- [ ] Launch payment path is crypto-only by deliberate choice; Stripe Checkout and Stripe webhooks are not part of the production flow
+- [ ] Unique payment reference is created per payment request
+- [ ] Wallet address generation or assignment is working for the selected network
+- [ ] Blockchain verification service is live for the production chain
+- [ ] Verification enforces correct recipient wallet address
+- [ ] Verification enforces exact supported token
+- [ ] Verification enforces exact supported network
+- [ ] Verification enforces exact expected amount
+- [ ] Minimum confirmation depth is enforced before payment becomes `confirmed`
+- [ ] Duplicate `txHash` is rejected or ignored idempotently
+- [ ] Dashboard revenue reflects confirmed on-chain payments only
+- [ ] Wrong-chain, wrong-token, and wrong-amount behavior is explicitly defined for ops and support
+- [ ] Payment screen warns users to send the exact amount on the exact supported network
+- [ ] Safe-mode scope is enforced for V1: one token and one chain only
+- [ ] Team can answer yes to: `If a user sends crypto, can we 100% detect and confirm it?`
+
+### Crypto Launch Blocker
+
+- The current repo is not yet crypto-payment ready for the sales-link flow if it still depends on hosted Stripe checkout or Stripe webhook confirmation anywhere in the production path.
+- Do not launch crypto payments until on-chain verification replaces user-asserted payment success and replaces Stripe webhook dependence for that path.
+
 ## App Store
 
 - [ ] iOS: App Privacy labels filled in
@@ -73,6 +96,11 @@
 - Sprint 13: `pass` - core money-path E2E is green, including WhatsApp CTA visibility in owner funnel evidence
 - Sprint 14: `partial` - logs/metrics/alerts/runbooks/Sentry wiring exist, but runtime Sentry provider evidence is still pending env rollout
 - Sprint 15: `pass` - launch-path performance, simplification, and local load validation are green
+
+## Payment Architecture Reality Check
+
+- The current sales-link payment flow in the repo still contains Stripe Checkout and Stripe webhook handling.
+- If launch requirements change to crypto-only payments, the current payment path should be treated as `not production ready` until on-chain verification, confirmation depth checks, tx hash idempotency, and wrong-payment handling are implemented and tested.
 
 ## Post-Launch (T+7 days)
 

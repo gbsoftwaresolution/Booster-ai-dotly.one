@@ -86,7 +86,7 @@ export default async function CardServicesPage({
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
                 Browse clearly packaged services without cluttering the main card. Checkout stays
-                crypto-only on Arbitrum.
+                focused on one clear payment flow.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 rounded-[28px] bg-slate-950 p-4 text-white shadow-[0_20px_50px_-20px_rgba(15,23,42,0.55)]">
@@ -96,7 +96,7 @@ export default async function CardServicesPage({
               </div>
               <div>
                 <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Payment</p>
-                <p className="mt-2 text-2xl font-bold">USDT</p>
+                <p className="mt-2 text-2xl font-bold">Available</p>
               </div>
             </div>
           </div>

@@ -221,8 +221,8 @@ function AuthPageContent(): JSX.Element {
                       One workflow, not ten separate tools
                     </p>
                     <p className="mt-1 text-sm text-gray-500">
-                      Cards, CRM, scheduling, and crypto-ready billing stay connected while Dotly
-                      evolves into a full contact-to-revenue system.
+                      Cards, CRM, scheduling, and billing stay connected while Dotly evolves into a
+                      full contact-to-revenue system.
                     </p>
                   </div>
                 </div>

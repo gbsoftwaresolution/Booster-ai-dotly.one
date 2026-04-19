@@ -829,7 +829,7 @@ export default function CardAnalyticsPage(): JSX.Element {
                       {order.customerName} · {order.customerEmail}
                     </p>
                     <p className="mt-1 text-xs text-gray-400">
-                      {new Date(order.createdAt).toLocaleString()} · {order.amountUsdt} USDT
+                      {new Date(order.createdAt).toLocaleString()} · Amount {order.amountUsdt}
                     </p>
                   </div>
                   <span className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold text-white">
@@ -870,7 +870,7 @@ export default function CardAnalyticsPage(): JSX.Element {
                       {order.customerName} · {order.customerEmail}
                     </p>
                     <p className="mt-1 text-xs text-gray-400">
-                      {new Date(order.createdAt).toLocaleString()} · {order.amountUsdt} USDT
+                      {new Date(order.createdAt).toLocaleString()} · Amount {order.amountUsdt}
                     </p>
                   </div>
                   <span className="rounded-full bg-fuchsia-600 px-3 py-1 text-[10px] font-semibold text-white">

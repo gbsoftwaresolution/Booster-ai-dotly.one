@@ -34,7 +34,7 @@ export function Footer() {
             </Link>
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
               Turn every contact into a customer with QR sharing, booking, WhatsApp, CRM, and
-              crypto-ready follow-up.
+              focused follow-up.
             </p>
           </div>
 

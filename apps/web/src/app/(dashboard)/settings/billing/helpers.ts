@@ -113,7 +113,7 @@ function parseWalletChainId(value: unknown): number | null {
 
 async function getWalletChainId(): Promise<number> {
   if (!window.ethereum) {
-    throw new Error('MetaMask is not installed.')
+    throw new Error('A supported payment app is not available in this browser.')
   }
 
   const chainId = parseWalletChainId(await window.ethereum.request({ method: 'eth_chainId' }))
@@ -143,7 +143,7 @@ export async function ensureWalletChain(requiredChainId: number): Promise<number
     }
     if (code === 4902) {
       throw new Error(
-        'Arbitrum One is not available in this wallet. Add the network and try again.',
+        'The required payment network is not available in this app. Add it and try again.',
       )
     }
   }
@@ -151,7 +151,7 @@ export async function ensureWalletChain(requiredChainId: number): Promise<number
   currentChainId = await getWalletChainId()
   if (currentChainId !== requiredChainId) {
     throw new Error(
-      `Please switch your wallet to chain ${requiredChainId} (Arbitrum One). Currently on ${currentChainId}.`,
+      `Please switch your payment app to chain ${requiredChainId}. Currently on ${currentChainId}.`,
     )
   }
 

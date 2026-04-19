@@ -4,7 +4,7 @@ import { getAppUrl } from '@/lib/app-url'
 export const SITE_NAME = 'Dotly.one'
 export const SITE_TAGLINE = 'Tap. Share. Convert.'
 export const SITE_DESCRIPTION =
-  'Dotly.one turns every contact into a customer with shareable cards, booking, WhatsApp lead capture, analytics, CRM, and crypto-ready checkout workflows.'
+  'Dotly.one turns every contact into a customer with shareable cards, booking, WhatsApp lead capture, analytics, CRM, and checkout workflows.'
 export const SITE_KEYWORDS = [
   'contact to customer platform',
   'contact to revenue platform',

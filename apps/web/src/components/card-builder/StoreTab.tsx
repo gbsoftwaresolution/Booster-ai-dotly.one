@@ -57,7 +57,7 @@ export function StoreTab({ cardId, fields, onProductsChange }: StoreTabProps): J
           Store surface
         </p>
         <h3 className="mt-2 text-lg font-bold tracking-tight text-slate-900">
-          Build a lightweight crypto storefront
+          Build a lightweight storefront
         </h3>
         <p className="mt-2 text-sm leading-6 text-slate-500">
           Add up to 6 products for your dedicated store page. Use this for packaged digital goods or
@@ -68,7 +68,7 @@ export function StoreTab({ cardId, fields, onProductsChange }: StoreTabProps): J
       <div className="rounded-[28px] border border-slate-200 bg-white/70 p-5 space-y-4">
         {products.length === 0 && (
           <p className="text-sm text-slate-500">
-            No products yet. Add your first store item to publish a simple crypto store.
+            No products yet. Add your first store item to publish a simple store.
           </p>
         )}
 
@@ -97,7 +97,7 @@ export function StoreTab({ cardId, fields, onProductsChange }: StoreTabProps): J
                   next[index] = { ...product, priceUsdt: e.target.value.slice(0, 32) }
                   updateProducts(next)
                 }}
-                placeholder="Price in USDT"
+                placeholder="Price"
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
               />
             </div>

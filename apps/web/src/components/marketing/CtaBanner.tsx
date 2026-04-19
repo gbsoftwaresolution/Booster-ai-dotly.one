@@ -10,7 +10,7 @@ export function CtaBanner() {
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg text-brand-100 leading-relaxed">
             Start free, launch your booking and WhatsApp funnel, and upgrade when you need deeper
-            CRM, analytics, and crypto checkout power.
+            CRM, analytics, and conversion power.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
@@ -27,7 +27,7 @@ export function CtaBanner() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-brand-200">
-            Free plan available forever &mdash; crypto checkout available on paid upgrades today
+            Free plan available forever &mdash; paid upgrades available on supported plans
           </p>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { absoluteUrl, createMarketingMetadata } from '@/lib/seo'
 export const metadata: Metadata = createMarketingMetadata({
   title: 'Features',
   description:
-    'Explore how Dotly.one turns scans into bookings, WhatsApp conversations, leads, and crypto-ready follow-up workflows.',
+    'Explore how Dotly.one turns scans into bookings, WhatsApp conversations, leads, and follow-up workflows.',
   path: '/features',
   keywords: ['product features', 'booking funnel', 'WhatsApp lead capture', 'crm features'],
 })
@@ -107,13 +107,13 @@ const SECTIONS = [
   {
     id: 'scheduling',
     tag: 'Move to revenue',
-    title: 'Booking, follow-up, and crypto-ready checkout',
+    title: 'Booking, follow-up, and checkout',
     description:
-      'Use booking links to move a lead into the next conversation, then keep follow-up organized in the same workflow. Paid upgrades currently support crypto checkout for subscription billing, with public payment flows planned next.',
+      'Use booking links to move a lead into the next conversation, then keep follow-up organized in the same workflow. Paid upgrades support checkout for subscription billing, with public payment flows planned next.',
     bullets: [
       'Booking links connect scans directly to meetings',
       'Reminders and outreach tools help prevent leads from going cold',
-      'Current paid checkout is crypto-only',
+      'Current paid checkout is in limited rollout',
       'Dotly keeps contact history and engagement tied together',
     ],
     icon: (

@@ -45,7 +45,7 @@ function HeroDesktop() {
             Book, chat, capture
           </span>
           <span className="rounded-full border border-sky-100 bg-sky-50/50 px-4 py-1.5 font-medium text-sky-800">
-            Crypto checkout on paid plans
+            Paid upgrades available
           </span>
         </div>
       </div>

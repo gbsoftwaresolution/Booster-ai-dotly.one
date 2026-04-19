@@ -46,7 +46,7 @@ export function ProductCheckoutSheet({
 
   async function handlePay() {
     if (!window.ethereum) {
-      setError('Open this page inside a wallet browser such as MetaMask or Trust Wallet.')
+      setError('Open this page in a supported browser to complete payment.')
       return
     }
 
@@ -89,7 +89,7 @@ export function ProductCheckoutSheet({
       })
 
       await ensureWalletChain(intent.chainId || ARBITRUM_CHAIN_ID)
-      setStep('Sending USDT payment…')
+      setStep('Sending payment…')
 
       const iface = new Interface(['function transfer(address to,uint256 value)'])
       const transferData = iface.encodeFunctionData('transfer', [
@@ -102,7 +102,7 @@ export function ProductCheckoutSheet({
         params: [{ from: walletAddress, to: intent.tokenAddress, data: transferData }],
       })) as string
 
-      setStep('Waiting for on-chain confirmation…')
+      setStep('Waiting for payment confirmation…')
       await waitForReceipt(paymentTxHash)
 
       setStep('Verifying payment with Dotly…')
@@ -169,15 +169,13 @@ export function ProductCheckoutSheet({
         <div className="space-y-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-500">
-              Crypto store checkout
+              Store checkout
             </p>
             <h3 className="mt-2 text-xl font-bold text-slate-950">{product.name}</h3>
             {product.description && (
               <p className="mt-1 text-sm text-slate-500">{product.description}</p>
             )}
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {product.priceUsdt} USDT on Arbitrum
-            </p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{product.priceUsdt}</p>
           </div>
 
           <input
@@ -228,7 +226,7 @@ export function ProductCheckoutSheet({
               disabled={submitting}
               className="flex-1 rounded-xl bg-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:opacity-50"
             >
-              {submitting ? 'Processing…' : `Buy for ${product.priceUsdt} USDT`}
+              {submitting ? 'Processing…' : `Buy for ${product.priceUsdt}`}
             </button>
           </div>
         </div>
