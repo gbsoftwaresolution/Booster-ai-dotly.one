@@ -93,7 +93,7 @@ export function StoreClientPage({
                     status: featured.id,
                     offerId: featured.id,
                     amount: Number(featured.priceUsdt),
-                    currency: 'USDT',
+                    currency: 'PAYMENT',
                   })
                   setSelectedProduct(featured)
                 }}
@@ -170,7 +170,7 @@ export function StoreClientPage({
                         status: product.id,
                         offerId: product.id,
                         amount: Number(product.priceUsdt),
-                        currency: 'USDT',
+                        currency: 'PAYMENT',
                       })
                       setSelectedProduct(product)
                     }}

@@ -322,7 +322,7 @@ export default function BillingSettingsPage(): JSX.Element {
       const token = await getToken()
       if (!token) throw new Error('Not authenticated.')
       if (!noWalletOrder.txHash) {
-        throw new Error('Paste the payment transaction hash from your wallet app first.')
+        throw new Error('Paste the payment transaction hash first.')
       }
       let activated = false
       for (let i = 0; i < 5; i++) {
@@ -394,7 +394,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
       const {
         paymentVaultAddress,
-        usdtTokenAddress,
+        usdtTokenAddress: paymentTokenAddress,
         amountUsdt,
         amountRaw,
         userRef,
@@ -418,10 +418,10 @@ export default function BillingSettingsPage(): JSX.Element {
 
       const approveTxHash = (await window.ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ from: walletAddress, to: usdtTokenAddress, data: approveData }],
+        params: [{ from: walletAddress, to: paymentTokenAddress, data: approveData }],
       })) as string
 
-      setSubscribeStep('Waiting for wallet approval…')
+      setSubscribeStep('Waiting for approval…')
       await waitForReceipt(approveTxHash)
 
       setSubscribeStep('Confirming payment…')
@@ -563,7 +563,7 @@ export default function BillingSettingsPage(): JSX.Element {
 
   const selectedPrice = PLAN_PRICES[selectedPlan]?.[selectedDuration]
   const focusMessage = getFocusMessage({ loading, currentPlan, currentStatus, expiryDate })
-  const cryptoBlocked = subscription?.cryptoBlocked ?? false
+  const paymentMethodBlocked = subscription?.cryptoBlocked ?? false
   const billingCountry = subscription?.billingCountry ?? null
 
   return (
@@ -579,7 +579,7 @@ export default function BillingSettingsPage(): JSX.Element {
         expiryDate={expiryDate}
         focusMessage={focusMessage}
         loading={loading}
-        cryptoBlocked={cryptoBlocked}
+        paymentMethodBlocked={paymentMethodBlocked}
         billingCountry={billingCountry}
       />
 
@@ -603,7 +603,7 @@ export default function BillingSettingsPage(): JSX.Element {
               connectingWallet={connectingWallet}
               onConnectWallet={() => void connectWallet()}
               onManualWalletChange={(value) => setWalletAddress(value.trim() || null)}
-              cryptoBlocked={cryptoBlocked}
+              paymentMethodBlocked={paymentMethodBlocked}
               billingCountry={billingCountry}
             />
 
@@ -663,7 +663,7 @@ export default function BillingSettingsPage(): JSX.Element {
                   `/settings/billing/checkout?plan=${selectedPlan}&duration=${selectedDuration}`,
                 )
               }}
-              cryptoBlocked={cryptoBlocked}
+              paymentMethodBlocked={paymentMethodBlocked}
               billingCountry={billingCountry}
             />
           </div>

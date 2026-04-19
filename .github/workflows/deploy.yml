@@ -87,8 +87,27 @@ jobs:
             exit 1
           fi
 
+  observability-smoke:
+    needs: [deploy-api, deploy-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate production observability wiring
+        run: pnpm observability:smoke
+        env:
+          METRICS_BASE_URL: https://api.dotly.one
+          WEB_BASE_URL: https://dotly.one
+
   rollback-on-failure:
-    needs: smoke-test
+    needs: [smoke-test, observability-smoke]
     if: always() && failure()
     runs-on: ubuntu-latest
     environment: production

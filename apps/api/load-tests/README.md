@@ -68,8 +68,26 @@ k6 run apps/api/load-tests/health.js
 
 ## CI Integration
 
-Load tests run automatically on the `load-test` branch or when triggered manually.
-Pass threshold: p95 < 500ms, error rate < 1%
+Launch-path load tests run automatically in these repo-controlled paths:
+
+- `.github/workflows/load-test.yml`
+  - weekly on Sundays against staging
+  - manual `workflow_dispatch` against staging or production by `base_url`
+- `.github/workflows/deploy-staging.yml`
+  - after staging deploy smoke tests and observability smoke pass
+
+Current automated launch-path scenarios:
+
+- `public-sales-link.js`
+- `sales-link-booking.js`
+- `payment-webhook-burst.js`
+
+Pass thresholds:
+
+- default p95 < `500ms`
+- default p99 < `1000ms`
+- error rate < `1%`
+- webhook burst p95 < `750ms`
 
 ## Current Local Validation Notes
 

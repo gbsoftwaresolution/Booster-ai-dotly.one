@@ -130,7 +130,7 @@ export function ServiceCheckoutSheet({
         status: service.id,
         offerId: service.id,
         amount: Number(intent.amountUsdt),
-        currency: 'USDT',
+        currency: 'PAYMENT',
       })
       onAnalytics('SAVE', {
         surface: 'service_checkout',
@@ -139,7 +139,7 @@ export function ServiceCheckoutSheet({
         status: service.id,
         offerId: service.id,
         amount: Number(intent.amountUsdt),
-        currency: 'USDT',
+        currency: 'PAYMENT',
       })
       setSuccess(
         `Payment received for ${intent.serviceName}. The seller can now fulfill your order.`,

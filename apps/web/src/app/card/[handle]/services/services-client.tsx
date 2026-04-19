@@ -84,7 +84,7 @@ export function ServicesClientPage({
                   status: featuredService.id,
                   offerId: featuredService.id,
                   amount: Number(featuredService.priceUsdt),
-                  currency: 'USDT',
+                  currency: 'PAYMENT',
                 })
                 setSelectedService(featuredService)
               }}
@@ -128,7 +128,7 @@ export function ServicesClientPage({
                       status: service.id,
                       offerId: service.id,
                       amount: Number(service.priceUsdt),
-                      currency: 'USDT',
+                      currency: 'PAYMENT',
                     })
                     setSelectedService(service)
                   }}

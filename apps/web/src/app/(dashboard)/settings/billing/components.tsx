@@ -40,7 +40,7 @@ export function BillingHero({
   expiryDate,
   focusMessage,
   loading,
-  cryptoBlocked,
+  paymentMethodBlocked,
   billingCountry,
 }: {
   currentPlan: PlanId
@@ -53,7 +53,7 @@ export function BillingHero({
   expiryDate: string | null
   focusMessage: string
   loading: boolean
-  cryptoBlocked: boolean
+  paymentMethodBlocked: boolean
   billingCountry: string | null
 }): JSX.Element {
   const metrics = [
@@ -61,7 +61,7 @@ export function BillingHero({
     { label: 'Status', value: currentStatus },
     {
       label: 'Checkout',
-      value: cryptoBlocked
+      value: paymentMethodBlocked
         ? 'Blocked'
         : walletAddress
           ? 'Ready'
@@ -81,13 +81,13 @@ export function BillingHero({
     },
     {
       label: 'Checkout readiness',
-      value: cryptoBlocked ? 'Unavailable' : walletAddress ? 'Ready' : 'Needs setup',
-      detail: cryptoBlocked
+      value: paymentMethodBlocked ? 'Unavailable' : walletAddress ? 'Ready' : 'Needs setup',
+      detail: paymentMethodBlocked
         ? `Disabled for billing country${billingCountry ? ` ${billingCountry}` : ''}`
         : walletAddress
           ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
           : 'Checkout is available today',
-      tone: cryptoBlocked
+      tone: paymentMethodBlocked
         ? 'bg-red-50 text-red-600'
         : walletAddress
           ? 'bg-emerald-50 text-emerald-600'
@@ -359,7 +359,7 @@ export function WalletCard({
   connectingWallet,
   onConnectWallet,
   onManualWalletChange,
-  cryptoBlocked,
+  paymentMethodBlocked,
   billingCountry,
 }: {
   walletAddress: string | null
@@ -367,7 +367,7 @@ export function WalletCard({
   connectingWallet: boolean
   onConnectWallet: () => void
   onManualWalletChange: (value: string) => void
-  cryptoBlocked: boolean
+  paymentMethodBlocked: boolean
   billingCountry: string | null
 }): JSX.Element {
   return (
@@ -387,22 +387,22 @@ export function WalletCard({
         <span
           className={cn(
             'rounded-full border px-3 py-1.5',
-            cryptoBlocked
+            paymentMethodBlocked
               ? 'border-red-200 bg-red-50 text-red-700'
               : 'border-emerald-200 bg-emerald-50 text-emerald-700',
           )}
         >
-          {cryptoBlocked ? 'Unavailable here' : 'Available now'}
+          {paymentMethodBlocked ? 'Unavailable here' : 'Available now'}
         </span>
       </div>
-      {cryptoBlocked && (
+      {paymentMethodBlocked && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           Checkout is unavailable for your billing country
           {billingCountry ? ` (${billingCountry})` : ''}.
         </div>
       )}
       <div className="mt-4">
-        {cryptoBlocked ? (
+        {paymentMethodBlocked ? (
           <p className="text-sm text-gray-500">
             Update your profile country if it is incorrect. Card and bank payment methods will
             appear here when available.
@@ -489,7 +489,7 @@ export function UpgradePlanCard({
   onGeneratePaymentLinks,
   onSubscribe,
   onOpenCheckout,
-  cryptoBlocked,
+  paymentMethodBlocked,
   billingCountry,
 }: {
   currentPlan: PlanId
@@ -511,7 +511,7 @@ export function UpgradePlanCard({
   onGeneratePaymentLinks: () => void
   onSubscribe: () => void
   onOpenCheckout?: () => void
-  cryptoBlocked: boolean
+  paymentMethodBlocked: boolean
   billingCountry: string | null
 }): JSX.Element | null {
   const [copiedCheckoutLink, setCopiedCheckoutLink] = useState(false)
@@ -778,7 +778,7 @@ export function UpgradePlanCard({
             <div
               className={cn(
                 'group relative flex flex-col justify-between rounded-[20px] border p-4 text-left transition-all duration-300',
-                cryptoBlocked
+                paymentMethodBlocked
                   ? 'border-red-200/60 bg-red-50/50 shadow-sm opacity-70 cursor-not-allowed'
                   : 'border-indigo-500/30 bg-gradient-to-b from-indigo-50/50 to-indigo-100/50 shadow-[0_8px_24px_rgba(99,102,241,0.15)] ring-1 ring-indigo-400/20 scale-[1.02] z-10',
               )}
@@ -787,17 +787,21 @@ export function UpgradePlanCard({
                 <div
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-all duration-300',
-                    cryptoBlocked
+                    paymentMethodBlocked
                       ? 'border-red-200 bg-white text-red-500'
                       : 'border-indigo-600 bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]',
                   )}
                 >
-                  {cryptoBlocked ? <Ban className="h-4 w-4" /> : <Coins className="h-4 w-4" />}
+                  {paymentMethodBlocked ? (
+                    <Ban className="h-4 w-4" />
+                  ) : (
+                    <Coins className="h-4 w-4" />
+                  )}
                 </div>
                 <div
                   className={cn(
                     'font-bold text-[15px] tracking-wide',
-                    cryptoBlocked ? 'text-red-900' : 'text-indigo-950',
+                    paymentMethodBlocked ? 'text-red-900' : 'text-indigo-950',
                   )}
                 >
                   Checkout
@@ -807,14 +811,14 @@ export function UpgradePlanCard({
                 <div
                   className={cn(
                     'text-[10px] font-extrabold uppercase tracking-wider',
-                    cryptoBlocked ? 'text-red-500' : 'text-indigo-600',
+                    paymentMethodBlocked ? 'text-red-500' : 'text-indigo-600',
                   )}
                 >
-                  {cryptoBlocked
+                  {paymentMethodBlocked
                     ? `Unavailable${billingCountry ? ` in ${billingCountry}` : ''}`
                     : 'Selected'}
                 </div>
-                {!cryptoBlocked && (
+                {!paymentMethodBlocked && (
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm border border-indigo-400">
                     <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path
@@ -873,13 +877,13 @@ export function UpgradePlanCard({
           </div>
         )}
 
-        {!cryptoBlocked && noWalletOrder && (
+        {!paymentMethodBlocked && noWalletOrder && (
           <div className="rounded-[24px] border border-blue-200/80 bg-blue-50/90 p-4 shadow-sm">
             <p className="text-sm font-semibold text-blue-900">Hosted checkout link</p>
             <p className="text-xs text-blue-700">
-              Copy this checkout link into your wallet app browser. Dotly will guide approval and
-              payment there. Amount: <strong>${noWalletOrder.amountUsdt} USD equivalent</strong> on
-              chain {noWalletOrder.chainId}.
+              Copy this checkout link into your payment app. Dotly will guide approval and payment
+              there. Amount: <strong>${noWalletOrder.amountUsdt} USD equivalent</strong> on network{' '}
+              {noWalletOrder.chainId}.
             </p>
             <div className="mt-3 rounded-xl border border-blue-200 bg-white/80 px-3 py-2 text-xs text-blue-800">
               <p>
@@ -963,8 +967,8 @@ export function UpgradePlanCard({
                 className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs text-blue-900 placeholder:text-blue-300 focus:outline-none"
               />
               <p className="mt-1 text-[11px] text-blue-700">
-                Usually the hosted checkout activates automatically. Use this only if the wallet app
-                finishes payment but cannot return to Dotly.
+                Usually the hosted checkout activates automatically. Use this only if the payment
+                app finishes payment but cannot return to Dotly.
               </p>
             </div>
             <button
@@ -973,12 +977,12 @@ export function UpgradePlanCard({
               disabled={noWalletActivating}
               className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {noWalletActivating ? 'Checking…' : 'I already paid in my wallet app — confirm'}
+              {noWalletActivating ? 'Checking…' : 'I already paid — confirm'}
             </button>
           </div>
         )}
 
-        {cryptoBlocked ? (
+        {paymentMethodBlocked ? (
           <p className="text-xs text-gray-400">
             Checkout is disabled for your billing country. Update your profile country if needed.
           </p>
@@ -1005,7 +1009,7 @@ export function UpgradePlanCard({
 
                   onSubscribe()
                 }}
-                disabled={subscribing || cryptoBlocked}
+                disabled={subscribing || paymentMethodBlocked}
                 className={cn(
                   'w-full sm:w-auto rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 hover:shadow-[0_6px_20px_rgba(79,70,229,0.35)] active:scale-[0.98]',
                   'disabled:cursor-not-allowed disabled:opacity-50',

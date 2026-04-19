@@ -3,22 +3,24 @@
 ## Pre-Launch (T-7 days)
 
 - [x] Core launch path only: sales link, leads, bookings, payments, upgrade, auth
-- [ ] Staging environment deployed and smoke-tested
-- [ ] Load tests run against staging:
-- [ ] `k6 run apps/api/load-tests/public-sales-link.js`
-- [ ] `k6 run apps/api/load-tests/sales-link-booking.js`
-- [ ] `k6 run apps/api/load-tests/payment-webhook-burst.js`
-- [ ] Security scan (npm audit, OWASP ZAP basic scan)
+- [x] Staging deploy, smoke, observability smoke, and launch-path load-test workflows exist in repo (`.github/workflows/deploy-staging.yml`)
+- [x] Launch-path load tests are automated against staging in repo workflows
+- [ ] Latest successful staging run reviewed for:
+- [ ] `k6 run apps/api/load-tests/public-sales-link.js` against staging or production-like infra
+- [ ] `k6 run apps/api/load-tests/sales-link-booking.js` against staging or production-like infra
+- [ ] `k6 run apps/api/load-tests/payment-webhook-burst.js` against staging or production-like infra
+- [x] `pnpm audit --prod` runs in CI for dependency security
+- [ ] OWASP ZAP basic scan run against staging
 - [ ] First-party auth configured (Google OAuth client + redirect URLs set)
-- [ ] Mailgun domain verified (dotly.one)
+- [ ] Mailgun sending domain verified
 - [ ] Cloudflare R2 bucket created and CORS configured
-- [ ] All environment variables set in Vercel + Railway production
-- [ ] Pricing pages, billing flow, and feature gates reviewed against `PRICING_SPEC.md`
+- [ ] All production environment variables set in active deploy platforms (current deploy workflows target Railway services; Sentry/runtime rollout proof is still pending)
+- [ ] Pricing pages, billing flow, and feature gates reviewed against `PRICING_SPEC.md` (repo-side pricing alignment exists, runtime signoff still pending)
 - [ ] Upgrade prompts tested for gated features using `PRICING_GATE_CHECKLIST.md`
 
 ## DNS Setup
 
-- [ ] dotly.one → Vercel (A/CNAME)
+- [ ] dotly.one → active production web host (current deploy workflow targets Railway web service)
 - [ ] api.dotly.one → Railway (CNAME)
 - [ ] www.dotly.one → dotly.one (redirect)
 - [ ] Cloudflare proxied (orange cloud) for DDoS protection
@@ -27,21 +29,22 @@
 
 - [ ] SSL certificates valid
 - [ ] Security headers verified (securityheaders.com)
-- [ ] Rate limiting tested (429 response on excess requests)
-- [ ] `NEXT_PUBLIC_` vars don't expose secrets
-- [ ] `.env` not committed to git
-- [ ] `pnpm security:scan-history` reviewed with no proven live-secret hits
+- [x] Rate limiting tested locally (2026-04-19 load validation observed `429` responses on excess requests)
+- [x] `NEXT_PUBLIC_` vars are documented as public-only and current checked-in usage is URLs, flags, or public DSNs only
+- [x] `.env` not committed to git
+- [x] `pnpm security:scan-history` reviewed with no proven live-secret hits
 - [ ] All rotated production secrets stored only in platform secret managers
 
 ## Monitoring Setup
 
-- [ ] Sentry projects created (web + api), DSN added to env
+- [x] Observability smoke is enforced by deploy workflows once runtime envs are set (`pnpm observability:smoke`)
+- [ ] Sentry projects created (web + api), DSN added to env (deployed env proof still pending)
 - [ ] Uptime monitor configured (UptimeRobot or Better Uptime for /health)
 - [ ] PagerDuty or similar on-call rotation set up
 
 ## Payments (Crypto)
 
-- [ ] Launch payment path is crypto-only by deliberate choice; Stripe Checkout and Stripe webhooks are not part of the production flow
+- [ ] Launch payment path is crypto-only by deliberate choice; Stripe Checkout and Stripe webhooks are not part of the production flow (currently false in repo for the sales-link path)
 - [ ] Unique payment reference is created per payment request
 - [ ] Wallet address generation or assignment is working for the selected network
 - [ ] Blockchain verification service is live for the production chain
@@ -72,7 +75,7 @@
 ## Launch Day
 
 - [ ] Deploy to production (main branch push triggers deploy.yml)
-- [x] Smoke tests pass
+- [x] Launch-path smoke tests pass locally; `deploy.yml` also runs post-deploy smoke checks
 - [ ] Monitor Sentry for first 30 minutes
 - [ ] Check email delivery (sign up with real email, verify welcome email)
 - [ ] Verify sales link -> booking -> payment owner funnel once in prod
@@ -83,6 +86,11 @@
 - Verified locally on 2026-04-19: `GET /public-page/:username` responds from the live API runtime
 - Verified locally on 2026-04-19: `GET /health` returned database and redis `ok`
 - Verified locally on 2026-04-19: `pnpm --filter @dotly/web test:e2e:core-flow` passed (`6 passed`)
+- Verified from repo state on 2026-04-19: `.env` is git-ignored and `git ls-files ".env" ".env.*"` returns only `.env.example`
+- Verified from repo state on 2026-04-19: production deploy workflow is `.github/workflows/deploy.yml` and current staging deploy workflow is `.github/workflows/deploy-staging.yml`
+- Verified from repo state on 2026-04-19: dependency audit runs in CI via `pnpm audit --prod --audit-level=high`
+- Verified from repo state on 2026-04-19: staging deploy workflow now runs smoke checks, `pnpm observability:smoke`, and the three launch-path k6 scenarios
+- Verified from repo state on 2026-04-19: production deploy workflow now runs `pnpm observability:smoke` alongside post-deploy smoke checks
 - Added launch-path load-test scenarios: `apps/api/load-tests/public-sales-link.js`, `apps/api/load-tests/sales-link-booking.js`, `apps/api/load-tests/payment-webhook-burst.js`
 - Verified locally on 2026-04-19 via Docker `grafana/k6` image: `public-sales-link.js` passed with `http_req_failed=0.00%`, `p95=24.8ms`
 - Verified locally on 2026-04-19 via Docker `grafana/k6` image: `sales-link-booking.js` passed with `http_req_failed=0.00%`, `p95=16.44ms`

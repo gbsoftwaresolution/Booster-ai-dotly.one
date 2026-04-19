@@ -7,6 +7,10 @@ on:
         description: 'API base URL to test (must be the staging or production URL)'
         required: true
         default: 'https://api-staging.dotly.one'
+      test_username:
+        description: 'Public sales-link username used by the launch-path scenarios'
+        required: false
+        default: 'prouser'
   schedule:
     # Run load tests weekly on Sundays at 2am UTC against staging
     - cron: '0 2 * * 0'
@@ -23,11 +27,17 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update
           sudo apt-get install k6
-      - name: Run public card load test
-        run: k6 run apps/api/load-tests/public-card.js
+      - name: Run public sales-link load test
+        run: k6 run apps/api/load-tests/public-sales-link.js
         env:
           BASE_URL: ${{ github.event.inputs.base_url || 'https://api-staging.dotly.one' }}
-      - name: Run health spike test
-        run: k6 run apps/api/load-tests/health.js
+          TEST_USERNAME: ${{ github.event.inputs.test_username || 'prouser' }}
+      - name: Run sales-link booking load test
+        run: k6 run apps/api/load-tests/sales-link-booking.js
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://api-staging.dotly.one' }}
+          TEST_USERNAME: ${{ github.event.inputs.test_username || 'prouser' }}
+      - name: Run payment webhook burst load test
+        run: k6 run apps/api/load-tests/payment-webhook-burst.js
         env:
           BASE_URL: ${{ github.event.inputs.base_url || 'https://api-staging.dotly.one' }}

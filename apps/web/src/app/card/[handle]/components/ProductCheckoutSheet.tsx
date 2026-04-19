@@ -128,7 +128,7 @@ export function ProductCheckoutSheet({
         status: product.id,
         offerId: product.id,
         amount: Number(intent.amountUsdt),
-        currency: 'USDT',
+        currency: 'PAYMENT',
       })
       onAnalytics('SAVE', {
         surface: 'store_checkout',
@@ -137,7 +137,7 @@ export function ProductCheckoutSheet({
         status: product.id,
         offerId: product.id,
         amount: Number(intent.amountUsdt),
-        currency: 'USDT',
+        currency: 'PAYMENT',
       })
       setSuccess(
         `Payment received for ${intent.productName}. The seller can now fulfill your order.`,

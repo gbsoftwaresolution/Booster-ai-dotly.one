@@ -42,15 +42,15 @@ const ARBITRUM_CHAIN_ID_HEX = '0xa4b1'
 export const BILLING_DURATIONS: Duration[] = ['MONTHLY', 'SIX_MONTHS', 'ANNUAL']
 
 export function buildApproveDeepLink(params: {
-  usdtTokenAddress: string
+  paymentTokenAddress: string
   paymentVaultAddress: string
   amountRaw: bigint
   chainId: number
 }): string {
-  const { usdtTokenAddress, paymentVaultAddress, amountRaw, chainId } = params
+  const { paymentTokenAddress, paymentVaultAddress, amountRaw, chainId } = params
 
   return (
-    `ethereum:${usdtTokenAddress}@${chainId}/approve` +
+    `ethereum:${paymentTokenAddress}@${chainId}/approve` +
     `?address=${paymentVaultAddress}` +
     `&uint256=${amountRaw.toString()}`
   )
@@ -64,7 +64,7 @@ export function buildPayDeepLink(params: { paymentVaultAddress: string; chainId:
 export function buildHostedCheckoutUrl(params: { order: CreateOrderResponse }): string {
   const searchParams = new URLSearchParams({ paymentId: params.order.paymentId })
 
-  return `${getAppUrl()}/pay/crypto?${searchParams.toString()}`
+  return `${getAppUrl()}/pay/checkout?${searchParams.toString()}`
 }
 
 export function readRefCookie(): string | undefined {
@@ -74,7 +74,7 @@ export function readRefCookie(): string | undefined {
   return match?.[1]
 }
 
-export function parseUsdtAmount(amountStr: string): bigint {
+export function parsePaymentAmount(amountStr: string): bigint {
   const [intPart, decPart = ''] = amountStr.split('.')
   const dec = decPart.padEnd(6, '0').slice(0, 6)
   return BigInt(intPart ?? '0') * 1_000_000n + BigInt(dec)

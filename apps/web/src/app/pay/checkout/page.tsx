@@ -22,7 +22,7 @@ function parsePaymentId(searchParams: URLSearchParams): string | null {
   return paymentId && /^0x[a-fA-F0-9]{64}$/.test(paymentId) ? paymentId : null
 }
 
-function HostedCryptoCheckoutContent(): JSX.Element {
+function HostedCheckoutContent(): JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
   const paymentId = useMemo(() => parsePaymentId(searchParams), [searchParams])
@@ -323,7 +323,7 @@ function HostedCryptoCheckoutContent(): JSX.Element {
   )
 }
 
-export default function HostedCryptoCheckoutPage(): JSX.Element {
+export default function HostedCheckoutPage(): JSX.Element {
   return (
     <Suspense
       fallback={
@@ -332,7 +332,7 @@ export default function HostedCryptoCheckoutPage(): JSX.Element {
         </main>
       }
     >
-      <HostedCryptoCheckoutContent />
+      <HostedCheckoutContent />
     </Suspense>
   )
 }

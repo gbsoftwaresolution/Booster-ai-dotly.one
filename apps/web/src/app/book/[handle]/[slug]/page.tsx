@@ -596,7 +596,7 @@ export default function BookingPage(): JSX.Element {
             source: 'booking_page',
             status: slug,
             amount: Number(intent.amountUsdt),
-            currency: 'USDT',
+            currency: 'PAYMENT',
           },
         })
       }
@@ -645,7 +645,7 @@ export default function BookingPage(): JSX.Element {
             source: 'booking_page',
             status: slug,
             amount: Number(intent.amountUsdt),
-            currency: 'USDT',
+            currency: 'PAYMENT',
           },
         })
       }
