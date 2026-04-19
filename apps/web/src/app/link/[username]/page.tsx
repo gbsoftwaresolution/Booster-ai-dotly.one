@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getServerApiUrl } from '@/lib/server-api'
 import { SalesLinkClient } from './SalesLinkClient'
+import { createRequestId } from '@/lib/request-id'
 
 export const revalidate = 0
 
@@ -21,10 +22,16 @@ interface SalesLinkSettings {
   message: string | null
 }
 
-async function getSalesLinkProfile(username: string): Promise<SalesLinkProfile | null> {
+interface SalesLinkPageData {
+  profile: SalesLinkProfile
+  paymentConfig: SalesLinkSettings
+}
+
+async function getSalesLinkPageData(username: string): Promise<SalesLinkPageData | null> {
   const apiUrl = getServerApiUrl()
-  const res = await fetch(`${apiUrl}/public/${encodeURIComponent(username)}`, {
+  const res = await fetch(`${apiUrl}/public-page/${encodeURIComponent(username)}`, {
     cache: 'no-store',
+    headers: { 'x-request-id': createRequestId() },
   })
 
   if (res.status === 404) return null
@@ -32,26 +39,7 @@ async function getSalesLinkProfile(username: string): Promise<SalesLinkProfile |
     throw new Error(`Failed to load sales link (${res.status})`)
   }
 
-  return (await res.json()) as SalesLinkProfile
-}
-
-async function getSalesLinkSettings(username: string): Promise<SalesLinkSettings> {
-  const apiUrl = getServerApiUrl()
-  const res = await fetch(`${apiUrl}/payment/config/${encodeURIComponent(username)}`, {
-    cache: 'no-store',
-  })
-
-  if (!res.ok) {
-    return {
-      stripeEnabled: false,
-      provider: null,
-      country: null,
-      upgradeRequired: false,
-      message: null,
-    }
-  }
-
-  return (await res.json()) as SalesLinkSettings
+  return (await res.json()) as SalesLinkPageData
 }
 
 export async function generateMetadata({
@@ -60,7 +48,8 @@ export async function generateMetadata({
   params: Promise<{ username: string }>
 }): Promise<Metadata> {
   const { username } = await params
-  const profile = await getSalesLinkProfile(username)
+  const pageData = await getSalesLinkPageData(username)
+  const profile = pageData?.profile ?? null
 
   if (!profile) {
     return { title: 'Sales Link Not Found' }
@@ -74,12 +63,11 @@ export async function generateMetadata({
 
 export default async function SalesLinkPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params
-  const [profile, settings] = await Promise.all([
-    getSalesLinkProfile(username),
-    getSalesLinkSettings(username),
-  ])
+  const pageData = await getSalesLinkPageData(username)
+  const profile = pageData?.profile ?? null
+  const settings = pageData?.paymentConfig
 
-  if (!profile) {
+  if (!profile || !settings) {
     notFound()
   }
 

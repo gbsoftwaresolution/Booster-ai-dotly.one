@@ -171,7 +171,7 @@ function EditContactModal({ visible, contact, onClose, onSaved }: EditContactMod
     setTitle(contact.title ?? '')
     setWebsite(contact.website ?? '')
     setAddress(contact.address ?? '')
-  }, [contact.id])
+  }, [contact])
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -908,7 +908,7 @@ export default function ContactDetailScreen() {
     } finally {
       setEnriching(false)
     }
-  }, [id, contact])
+  }, [applyContactDetail, contact, id])
 
   const handleSaveCustomField = useCallback(
     async (fieldId: string, value: string) => {
@@ -923,7 +923,7 @@ export default function ContactDetailScreen() {
         setFieldSavingId(null)
       }
     },
-    [id],
+    [id, reloadContact],
   )
 
   const handleAssignPipeline = useCallback(

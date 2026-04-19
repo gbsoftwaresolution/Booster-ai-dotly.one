@@ -1,0 +1,125 @@
+{
+  "title": "Dotly Core Business Metrics",
+  "uid": "dotly-core-business-metrics",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["dotly", "core-flow", "observability"],
+  "panels": [
+    {
+      "title": "Sales Link Traffic",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(dotly_api_sales_link_views_total[5m]))",
+          "legendFormat": "views/sec"
+        }
+      ]
+    },
+    {
+      "title": "Lead Creation Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(dotly_api_sales_link_leads_created_total[5m]))",
+          "legendFormat": "leads/sec"
+        }
+      ]
+    },
+    {
+      "title": "Booking Creation Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(dotly_api_sales_link_bookings_created_total[5m]))",
+          "legendFormat": "bookings/sec"
+        }
+      ]
+    },
+    {
+      "title": "Payment Outcomes",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(dotly_api_sales_link_payments_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "title": "Upgrade Checkout Started vs Completed",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(dotly_api_upgrade_checkout_started_total[15m]))",
+          "legendFormat": "started"
+        },
+        {
+          "expr": "sum(rate(dotly_api_upgrade_checkout_completed_total{status=\"success\"}[15m]))",
+          "legendFormat": "completed"
+        }
+      ]
+    },
+    {
+      "title": "Webhook Latency P95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, source, event_type) (rate(dotly_api_webhook_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{source}} {{event_type}}"
+        }
+      ]
+    },
+    {
+      "title": "Webhook Failures",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum by (source, event_type) (rate(dotly_api_webhook_events_total{status=\"failure\"}[5m]))",
+          "legendFormat": "{{source}} {{event_type}}"
+        }
+      ]
+    },
+    {
+      "title": "Queue Backlog",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum by (queue, state) (dotly_api_queue_backlog_jobs)",
+          "legendFormat": "{{queue}} {{state}}"
+        }
+      ]
+    },
+    {
+      "title": "Auth Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum by (route, status_code, code) (rate(dotly_api_error_events_total{route=~\"/auth.*\"}[5m]))",
+          "legendFormat": "{{route}} {{status_code}} {{code}}"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum(rate(dotly_api_http_requests_total{status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(dotly_api_http_requests_total[5m])), 1)",
+          "legendFormat": "5xx ratio"
+        }
+      ]
+    }
+  ]
+}

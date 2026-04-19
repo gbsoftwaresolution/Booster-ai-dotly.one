@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import Stripe from 'stripe'
 import { PaymentAccountsService } from '../payment-accounts/payment-accounts.service'
 import { Plan } from '@dotly/types'
+import { Logger } from '@nestjs/common'
+import { ObservabilityService } from '../common/observability/observability.service'
 
 const LEAD_EVENT_ORDER = ['payment', 'booking', 'whatsapp', 'view'] as const
 const WHATSAPP_INTENTS = ['general', 'service'] as const
@@ -21,6 +23,9 @@ const SALES_LINK_PAYMENT_AMOUNT = 5000
 const LEAD_STATUSES = ['new', 'contacted', 'booked', 'paid', 'closed', 'lost'] as const
 const FREE_LEAD_LIMIT = 20
 const FREE_BOOKING_LIMIT = 5
+const DASHBOARD_PAYMENT_HISTORY_LIMIT = 8
+const DASHBOARD_BOOKING_HISTORY_LIMIT = 8
+const RECENT_LEADS_LIMIT = 6
 
 type LeadAction = 'view' | 'whatsapp' | 'booking' | 'payment'
 type LeadIntent = (typeof WHATSAPP_INTENTS)[number]
@@ -32,11 +37,13 @@ const RECENT_ACTIVITY_WINDOW_MINUTES = 60
 export class SalesLinkService {
   private readonly stripe: Stripe | null
   private readonly stripeMode: 'enabled' | 'disabled'
+  private readonly logger = new Logger(SalesLinkService.name)
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly paymentAccountsService: PaymentAccountsService,
+    private readonly observability: ObservabilityService,
   ) {
     this.stripeMode = this.config.get<'enabled' | 'disabled'>('STRIPE_MODE') ?? 'disabled'
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY')
@@ -48,58 +55,104 @@ export class SalesLinkService {
   }
 
   async getPublicProfile(username: string) {
-    return this.prisma.user
-      .findUnique({
-        where: { username },
-        select: {
-          username: true,
-          name: true,
-          pitch: true,
-          phone: true,
-          plan: true,
-        },
-      })
-      .then((profile) =>
-        profile
-          ? {
-              username: profile.username,
-              name: profile.name,
-              pitch: profile.pitch,
-              phone: profile.phone,
-              showBranding: profile.plan === Plan.FREE,
-            }
-          : null,
-      )
+    const profile = await this.prisma.user.findUnique({
+      where: { username },
+      select: {
+        username: true,
+        name: true,
+        pitch: true,
+        phone: true,
+        plan: true,
+      },
+    })
+
+    if (!profile?.username) return null
+
+    return this.mapPublicProfile({
+      username: profile.username,
+      name: profile.name,
+      pitch: profile.pitch,
+      phone: profile.phone,
+      plan: profile.plan,
+    })
   }
 
   getSlots() {
     return { slots: [...SALES_LINK_BOOKING_SLOTS] }
   }
 
-  async getPublicPaymentConfig(username: string) {
+  async getPublicPageData(username: string) {
     const owner = await this.prisma.user.findUnique({
       where: { username },
-      select: { plan: true },
+      select: {
+        username: true,
+        name: true,
+        pitch: true,
+        phone: true,
+        plan: true,
+        country: true,
+        defaultPaymentProvider: true,
+        paymentAccounts: {
+          select: {
+            provider: true,
+            providerAccountId: true,
+            country: true,
+            chargesEnabled: true,
+            detailsSubmitted: true,
+          },
+        },
+      },
     })
-    const provider = await this.paymentAccountsService.getActiveProviderForUsername(username)
 
-    if (!owner || owner.plan === Plan.FREE) {
+    if (!owner?.username) return null
+
+    const provider = await this.paymentAccountsService.resolveActiveProviderForUser({
+      country: owner.country,
+      defaultPaymentProvider: owner.defaultPaymentProvider,
+      paymentAccounts: owner.paymentAccounts,
+    })
+
+    return {
+      profile: this.mapPublicProfile({
+        username: owner.username,
+        name: owner.name,
+        pitch: owner.pitch,
+        phone: owner.phone,
+        plan: owner.plan,
+      }),
+      paymentConfig:
+        owner.plan === Plan.FREE
+          ? {
+              stripeEnabled: false,
+              provider: null,
+              country: provider.country,
+              upgradeRequired: true,
+              message: 'Payments unlock when this seller upgrades to Pro.',
+            }
+          : {
+              stripeEnabled: provider.provider === 'stripe_connect',
+              provider: provider.provider,
+              country: provider.country,
+              upgradeRequired: false,
+              message: null,
+            },
+    }
+  }
+
+  async getPublicPaymentConfig(username: string) {
+    const pageData = await this.getPublicPageData(username)
+
+    if (!pageData) {
       return {
         stripeEnabled: false,
         provider: null,
-        country: provider.country,
+        country: null,
         upgradeRequired: true,
         message: 'Payments unlock when this seller upgrades to Pro.',
       }
     }
 
-    return {
-      stripeEnabled: provider.provider === 'stripe_connect',
-      provider: provider.provider,
-      country: provider.country,
-      upgradeRequired: false,
-      message: null,
-    }
+    return pageData.paymentConfig
   }
 
   async createLead({ username, source }: { username: string; source?: string }) {
@@ -131,13 +184,29 @@ export class SalesLinkService {
       }
     }
 
-    return this.prisma.lead.create({
+    const lead = await this.prisma.lead.create({
       data: {
         username,
         source,
       },
       select: { id: true },
     })
+
+    this.observability.incrementCoreFlowCounter('sales_link_leads_created_total', {
+      username,
+      plan: owner.plan,
+    })
+    this.logger.log(
+      JSON.stringify({
+        event: 'sales_link_lead_created',
+        username,
+        plan: owner.plan,
+        leadId: lead.id,
+        source: source ?? 'direct',
+      }),
+    )
+
+    return lead
   }
 
   async trackEvent(leadId: string, action: LeadAction, intent?: LeadIntent, ctaVariant?: string) {
@@ -158,6 +227,18 @@ export class SalesLinkService {
         ctaVariant: action === 'whatsapp' ? ctaVariant?.trim() || null : null,
       },
     })
+
+    if (action === 'view') {
+      const ownerLead = await this.prisma.lead.findUnique({
+        where: { id: leadId },
+        select: { username: true },
+      })
+      if (ownerLead) {
+        this.observability.incrementCoreFlowCounter('sales_link_views_total', {
+          username: ownerLead.username,
+        })
+      }
+    }
   }
 
   async getRecentActivity(username: string, userId: string) {
@@ -208,8 +289,10 @@ export class SalesLinkService {
       whatsappIntentGroups,
       statusGroups,
       recentLeads,
-      bookings,
-      payments,
+      totalBookings,
+      recentBookings,
+      paymentSummary,
+      recentPaymentRecords,
     ] = await Promise.all([
       this.prisma.lead.count({ where: { username } }),
       this.prisma.leadEvent.groupBy({
@@ -233,7 +316,7 @@ export class SalesLinkService {
       this.prisma.lead.findMany({
         where: { username },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: RECENT_LEADS_LIMIT,
         select: {
           id: true,
           status: true,
@@ -249,10 +332,11 @@ export class SalesLinkService {
           },
         },
       }),
+      this.prisma.salesLinkBooking.count({ where: { username } }),
       this.prisma.salesLinkBooking.findMany({
         where: { username },
         orderBy: { createdAt: 'desc' },
-        take: 20,
+        take: DASHBOARD_BOOKING_HISTORY_LIMIT,
         select: {
           id: true,
           slot: true,
@@ -260,12 +344,22 @@ export class SalesLinkService {
           createdAt: true,
         },
       }),
+      this.prisma.payment.groupBy({
+        by: ['status'],
+        where: {
+          username,
+          status: { in: ['success', 'pending_collection'] },
+        },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
       this.prisma.payment.findMany({
         where: {
           username,
           status: { in: ['success', 'pending_collection'] },
         },
         orderBy: { createdAt: 'desc' },
+        take: DASHBOARD_PAYMENT_HISTORY_LIMIT,
         select: {
           id: true,
           amount: true,
@@ -315,21 +409,24 @@ export class SalesLinkService {
 
     return {
       totalLeads,
-      totalBookings: bookings.length,
-      revenue: payments.reduce(
-        (sum: number, payment: { amount: number; status: string }) =>
-          payment.status === 'success' ? sum + payment.amount : sum,
+      totalBookings,
+      revenue: paymentSummary.reduce(
+        (sum, payment) => (payment.status === 'success' ? sum + (payment._sum.amount ?? 0) : sum),
         0,
       ),
-      payments: payments.filter((payment: { status: string }) => payment.status === 'success')
-        .length,
-      pendingCollectionPayments: payments.filter(
-        (payment: { status: string }) => payment.status === 'pending_collection',
-      ).length,
+      payments: paymentSummary.reduce(
+        (sum, payment) => (payment.status === 'success' ? sum + payment._count._all : sum),
+        0,
+      ),
+      pendingCollectionPayments: paymentSummary.reduce(
+        (sum, payment) =>
+          payment.status === 'pending_collection' ? sum + payment._count._all : sum,
+        0,
+      ),
       stripeEnabled: this.isStripeEnabled(),
       pipeline,
       events,
-      paymentRecords: payments.map(
+      paymentRecords: recentPaymentRecords.map(
         (payment: {
           id: string
           amount: number
@@ -344,7 +441,7 @@ export class SalesLinkService {
           createdAt: payment.createdAt.toISOString(),
         }),
       ),
-      bookings: bookings.map((booking) => ({
+      bookings: recentBookings.map((booking) => ({
         id: booking.id,
         slot: booking.slot,
         name: booking.name,
@@ -374,8 +471,8 @@ export class SalesLinkService {
       monthLeads,
       totalBookings,
       monthBookings,
-      payments,
-      monthPayments,
+      paymentSummary,
+      monthPaymentSummary,
       groupedEvents,
       statusGroups,
     ] = await Promise.all([
@@ -383,17 +480,21 @@ export class SalesLinkService {
       this.prisma.lead.count({ where: { username, createdAt: { gte: startOfMonth } } }),
       this.prisma.salesLinkBooking.count({ where: { username } }),
       this.prisma.salesLinkBooking.count({ where: { username, createdAt: { gte: startOfMonth } } }),
-      this.prisma.payment.findMany({
+      this.prisma.payment.groupBy({
+        by: ['status'],
         where: { username, status: 'success' },
-        select: { amount: true },
+        _count: { _all: true },
+        _sum: { amount: true },
       }),
-      this.prisma.payment.findMany({
+      this.prisma.payment.groupBy({
+        by: ['status'],
         where: {
           username,
           status: 'success',
           createdAt: { gte: startOfMonth },
         },
-        select: { amount: true },
+        _count: { _all: true },
+        _sum: { amount: true },
       }),
       this.prisma.leadEvent.groupBy({
         by: ['action'],
@@ -439,9 +540,12 @@ export class SalesLinkService {
 
     return {
       plan: owner.plan,
-      totalRevenue: payments.reduce((sum, payment) => sum + payment.amount, 0),
-      totalPayments: payments.length,
-      thisMonthRevenue: monthPayments.reduce((sum, payment) => sum + payment.amount, 0),
+      totalRevenue: paymentSummary.reduce((sum, payment) => sum + (payment._sum.amount ?? 0), 0),
+      totalPayments: paymentSummary.reduce((sum, payment) => sum + payment._count._all, 0),
+      thisMonthRevenue: monthPaymentSummary.reduce(
+        (sum, payment) => sum + (payment._sum.amount ?? 0),
+        0,
+      ),
       totalLeads,
       totalBookings,
       conversion,
@@ -456,6 +560,21 @@ export class SalesLinkService {
         paymentsLocked: owner.plan === Plan.FREE,
         showBranding: owner.plan === Plan.FREE,
       },
+    }
+  }
+
+  async getLaunchDashboard(username: string, userId: string) {
+    const [dashboard, activity, payments] = await Promise.all([
+      this.getRevenueDashboard(username, userId),
+      this.getRecentActivity(username, userId),
+      this.getPaymentHistory(username, userId),
+    ])
+
+    return {
+      ...dashboard,
+      recentViews: activity.recentViews,
+      recentChats: activity.recentChats,
+      paymentHistory: payments.slice(0, DASHBOARD_PAYMENT_HISTORY_LIMIT),
     }
   }
 
@@ -692,6 +811,21 @@ export class SalesLinkService {
       },
     })
 
+    this.observability.incrementCoreFlowCounter('sales_link_payments_total', {
+      username,
+      provider: provider.provider ?? 'unknown',
+      status: provider.provider === 'cash_on_delivery' ? 'pending_collection' : 'pending',
+    })
+    this.logger.log(
+      JSON.stringify({
+        event: 'sales_link_payment_created',
+        username,
+        leadId,
+        provider: provider.provider,
+        amount,
+      }),
+    )
+
     return { url: session.url }
   }
 
@@ -736,10 +870,17 @@ export class SalesLinkService {
       await this.trackEvent(payment.leadId, 'payment')
     }
 
+    this.observability.incrementCoreFlowCounter('sales_link_payments_total', {
+      username: payment.username,
+      provider: 'cash_on_delivery',
+      status: 'success',
+    })
+
     return { success: true as const }
   }
 
   async handlePaymentWebhook(rawBody?: Buffer, signature?: string) {
+    const startedAt = process.hrtime.bigint()
     if (!this.isStripeEnabled() || !this.stripe) {
       return { received: true as const }
     }
@@ -771,8 +912,28 @@ export class SalesLinkService {
           await this.setLeadStatus(payment.leadId, 'paid')
           await this.trackEvent(payment.leadId, 'payment')
         }
+
+        const paymentRecord = await this.prisma.payment.findUnique({
+          where: { id: payment.id },
+          select: { username: true },
+        })
+        if (paymentRecord) {
+          this.observability.incrementCoreFlowCounter('sales_link_payments_total', {
+            username: paymentRecord.username,
+            provider: 'stripe_connect',
+            status: 'success',
+          })
+        }
       }
     }
+
+    const durationSeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000
+    this.observability.incrementCoreFlowCounter('webhook_events_total', {
+      source: 'sales_link_payment',
+      event_type: event.type,
+      status: 'success',
+    })
+    this.observability.observeWebhookLatency('sales_link_payment', event.type, durationSeconds)
 
     return { received: true as const }
   }
@@ -836,6 +997,19 @@ export class SalesLinkService {
         },
       })
       await this.setLeadStatus(leadId, 'booked')
+      this.observability.incrementCoreFlowCounter('sales_link_bookings_created_total', {
+        username,
+        plan: owner?.plan ?? 'UNKNOWN',
+      })
+      this.logger.log(
+        JSON.stringify({
+          event: 'sales_link_booking_created',
+          username,
+          leadId,
+          slot,
+          plan: owner?.plan,
+        }),
+      )
     } catch (error) {
       if (
         typeof error === 'object' &&
@@ -900,5 +1074,21 @@ export class SalesLinkService {
       where: { id: leadId },
       data: { status },
     })
+  }
+
+  private mapPublicProfile(profile: {
+    username: string
+    name: string | null
+    pitch: string | null
+    phone: string | null
+    plan: string
+  }) {
+    return {
+      username: profile.username,
+      name: profile.name,
+      pitch: profile.pitch,
+      phone: profile.phone,
+      showBranding: profile.plan === 'FREE',
+    }
   }
 }

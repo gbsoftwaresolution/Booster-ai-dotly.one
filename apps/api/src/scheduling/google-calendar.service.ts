@@ -46,9 +46,7 @@ export class GoogleCalendarService {
     const missingKeys = [
       !this.stateSecret ? 'GOOGLE_OAUTH_STATE_SECRET' : null,
       !this.config.get<string>('GOOGLE_OAUTH_CLIENT_ID') ? 'GOOGLE_OAUTH_CLIENT_ID' : null,
-      !this.config.get<string>('GOOGLE_OAUTH_CLIENT_SECRET')
-        ? 'GOOGLE_OAUTH_CLIENT_SECRET'
-        : null,
+      !this.config.get<string>('GOOGLE_OAUTH_CLIENT_SECRET') ? 'GOOGLE_OAUTH_CLIENT_SECRET' : null,
       !this.config.get<string>('API_URL') ? 'API_URL' : null,
     ].filter((key): key is string => key !== null)
 

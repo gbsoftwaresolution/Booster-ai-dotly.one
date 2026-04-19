@@ -1,4 +1,5 @@
 import { getPublicApiUrl } from './public-env'
+import { createRequestId } from './request-id'
 
 const API_TIMEOUT_MS = 15_000
 
@@ -82,7 +83,12 @@ async function fetchWithTimeout(input: string, init: RequestInit = {}): Promise<
   const combinedSignal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
 
   try {
-    return await fetch(input, { ...init, signal: combinedSignal })
+    const headers = new Headers(init.headers)
+    if (!headers.has('x-request-id')) {
+      headers.set('x-request-id', createRequestId())
+    }
+
+    return await fetch(input, { ...init, headers, signal: combinedSignal })
   } catch (error) {
     if (init.signal?.aborted && error instanceof DOMException && error.name === 'AbortError') {
       throw error

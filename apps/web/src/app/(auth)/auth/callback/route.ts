@@ -2,36 +2,6 @@ import { sanitizeNextPath } from '@/lib/app-url'
 import { NextRequest, NextResponse } from 'next/server'
 import { setServerSession } from '@/lib/auth/session'
 
-function renderSessionBootstrapHtml(params: {
-  accessToken: string
-  refreshToken: string
-  redirectTo: string
-}): string {
-  const accessToken = JSON.stringify(params.accessToken)
-  const refreshToken = JSON.stringify(params.refreshToken)
-  const redirectTo = JSON.stringify(params.redirectTo)
-
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="3;url=${params.redirectTo.replace(/&/g, '&amp;')}" />
-    <title>Completing sign-in...</title>
-  </head>
-  <body>
-    <p>Completing sign-in...</p>
-    <script>
-      try {
-        window.localStorage.setItem('dotly_access_token', ${accessToken});
-        window.localStorage.setItem('dotly_refresh_token', ${refreshToken});
-      } catch {}
-      window.location.replace(${redirectTo});
-    </script>
-  </body>
-</html>`
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const payload = searchParams.get('payload')
@@ -85,24 +55,22 @@ export async function GET(request: NextRequest) {
       const redirectTo = shouldUseDecisionPage(redirectPath)
         ? `${origin}/auth/continue?next=${encodeURIComponent(redirectPath)}`
         : `${origin}${redirectPath}`
-      return new NextResponse(
-        renderSessionBootstrapHtml({
-          accessToken: parsed.accessToken,
-          refreshToken: parsed.refreshToken,
-          redirectTo,
-        }),
-        {
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
-          },
+      return new NextResponse(null, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Location: redirectTo,
         },
-      )
+        status: 302,
+      })
     } catch {
       return redirectWithError('invalid_payload')
     }
   }
-  return redirectWithError('auth_callback_failed')
+
+  const redirectPath = shouldUseDecisionPage(next)
+    ? `${origin}/auth/continue?next=${encodeURIComponent(next)}`
+    : `${origin}${next}`
+  return NextResponse.redirect(redirectPath)
 }
 
 function shouldUseDecisionPage(next: string): boolean {

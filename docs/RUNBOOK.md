@@ -114,6 +114,42 @@
 
 ---
 
+### Secret exposure suspected
+
+**Symptoms:** real secrets appear in a local `.env`, CI log, screenshot, support paste, or a git history scan hit looks non-placeholder.
+
+**Steps:**
+
+1. Treat the secret as compromised immediately; do not wait for proof of active abuse.
+2. Rotate the secret in the provider dashboard first, then update Railway/Vercel/GitHub and any other runtime secret stores.
+3. Invalidate old credentials or sessions where the provider supports it.
+4. Confirm the repo is not currently tracking a real env file:
+   ```bash
+   pnpm release:preflight --mode=tracked-env
+   ```
+5. Run the repo history scan:
+   ```bash
+   pnpm security:scan-history
+   ```
+6. Review `secret-history-scan.txt` and separate real-looking hits from placeholders, localhost/test credentials, docs examples, and known fixtures.
+7. Only plan a git history rewrite when a real committed secret is proven.
+8. If a rewrite is required, coordinate with all collaborators before force-pushing rewritten history.
+
+**Rotation priorities:**
+
+1. Auth/session secrets: `AUTH_JWT_SECRET`, OAuth state secrets, Google OAuth client secret.
+2. Storage and webhook secrets: `R2_*`, `INBOX_UPLOAD_TOKEN_SECRET`, `WEBHOOK_SECRET_ENCRYPTION_KEY`.
+3. Billing/private keys: `DOTLY_PAYMENT_SIGNER_PRIVATE_KEY`, deployer/owner keys, chain provider keys.
+4. Third-party integrations: Mailgun, Sentry, BoosterAI, Supabase, DB/Redis credentials.
+
+**Rewrite conditions:**
+
+1. A non-example tracked file containing a real secret was committed.
+2. A tracked file history contains a likely live credential, private key, or non-localhost credential-bearing URL.
+3. A provider confirms the exposed value was valid and active when committed.
+
+---
+
 ## Deployment
 
 ### Web (Railway)

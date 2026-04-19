@@ -266,7 +266,7 @@ export default function EditCardScreen() {
     }
 
     router.replace(`/card/${id}`)
-  }, [router, saveChanges])
+  }, [id, router, saveChanges])
 
   useLayoutEffect(() => {
     navigation.setOptions({

@@ -258,20 +258,17 @@ export default function SettingsPage(): JSX.Element {
 
     setPasswordSaving(true)
     try {
-      const refreshToken =
-        typeof window !== 'undefined'
-          ? (window.localStorage.getItem('dotly_refresh_token') ?? undefined)
-          : undefined
-      const token = await getToken()
-      await apiPatch(
-        '/users/me/password',
-        {
-          currentPassword,
-          newPassword,
-          refreshToken,
-        },
-        token,
-      )
+      const response = await fetch('/api/users/me/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error ?? 'Could not update password.')
+      }
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
@@ -297,20 +294,17 @@ export default function SettingsPage(): JSX.Element {
 
     setEmailChangeSaving(true)
     try {
-      const refreshToken =
-        typeof window !== 'undefined'
-          ? (window.localStorage.getItem('dotly_refresh_token') ?? undefined)
-          : undefined
-      const token = await getToken()
-      await apiPost(
-        '/users/me/email-change',
-        {
-          newEmail: nextEmail,
-          currentPassword,
-          refreshToken,
-        },
-        token,
-      )
+      const response = await fetch('/api/users/me/email-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ newEmail: nextEmail, currentPassword }),
+      })
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error ?? 'Could not start email change.')
+      }
       setEmailChangeStatus('Check your new email inbox to confirm the change.')
     } catch (error) {
       setEmailChangeStatus(error instanceof Error ? error.message : 'Could not start email change.')

@@ -36,7 +36,7 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --only-verified
+          extra_args: --results=verified,unknown
 
   # M-05: Audit production dependencies for known high/critical CVEs.
   dependency-audit:
@@ -75,6 +75,7 @@ jobs:
 
   lint:
     name: Lint
+    needs: [secret-scan, dependency-audit, release-preflight]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +99,7 @@ jobs:
 
   typecheck:
     name: Typecheck
+    needs: [secret-scan, dependency-audit, release-preflight]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,6 +123,7 @@ jobs:
 
   unit-test:
     name: Unit Tests
+    needs: [secret-scan, dependency-audit, release-preflight]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -356,8 +359,168 @@ jobs:
           exit 1
       - name: Install Playwright browsers
         run: pnpm --filter @dotly/web exec playwright install --with-deps chromium
+      - name: Generate Playwright auth states
+        run: pnpm --filter @dotly/web test:e2e:auth-states
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_FREE_EMAIL: test@dotly.one
+          PLAYWRIGHT_FREE_PASSWORD: Dotly123!
+          PLAYWRIGHT_STARTER_EMAIL: starter@dotly.one
+          PLAYWRIGHT_STARTER_PASSWORD: Dotly123!
+          PLAYWRIGHT_PRO_EMAIL: pro@dotly.one
+          PLAYWRIGHT_PRO_PASSWORD: Dotly123!
       - name: Run E2E tests
         run: pnpm --filter @dotly/web test:e2e
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_FREE_STATE: .auth/free.json
+          PLAYWRIGHT_STARTER_STATE: .auth/starter.json
+          PLAYWRIGHT_PRO_STATE: .auth/pro.json
+          CI: true
+
+  core-flow-tests:
+    name: Core Flow Release Gate
+    runs-on: ubuntu-latest
+    needs: [build]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dotly_one
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter @dotly/database exec prisma generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+      - name: Run DB migrations
+        run: pnpm --filter @dotly/database exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+      - name: Seed test data
+        run: pnpm --filter @dotly/database db:seed
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+      - name: Run API core-flow integration tests
+        run: pnpm --filter @dotly/api test:core-flow
+      - name: Build API + web
+        run: pnpm turbo build --filter=@dotly/api --filter=@dotly/web
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          SUPABASE_JWT_SECRET: test-jwt-secret
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          WEB_URL: http://localhost:3000
+          CORS_ORIGINS: http://localhost:3000
+          R2_ACCOUNT_ID: placeholder
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
+          R2_PUBLIC_HOSTNAME: assets.dotly.one
+          MAILGUN_API_KEY: placeholder
+          MAILGUN_DOMAIN: placeholder.mailgun.org
+          MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
+          POLYGON_RPC_URL: https://polygon-rpc.com
+          DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
+          SUPABASE_URL: https://ci.supabase.example
+          SUPABASE_ANON_KEY: ci-anon-key
+          OPENAI_API_KEY: placeholder
+      - name: Start NestJS API
+        run: pnpm --filter @dotly/api start &
+        env:
+          PORT: 3001
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          REDIS_URL: redis://localhost:6379
+          SUPABASE_URL: https://ci.supabase.example
+          SUPABASE_ANON_KEY: ci-anon-key
+          SUPABASE_JWT_SECRET: test-jwt-secret
+          WEB_URL: http://127.0.0.1:3000
+          CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+          R2_ACCOUNT_ID: placeholder
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
+          MAILGUN_API_KEY: placeholder
+          MAILGUN_DOMAIN: placeholder.mailgun.org
+          MAILGUN_FROM_EMAIL: no-reply@placeholder.mailgun.org
+          POLYGON_RPC_URL: https://polygon-rpc.com
+          DOTLY_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000001'
+          OPENAI_API_KEY: placeholder
+      - name: Start Next.js server
+        run: pnpm --filter @dotly/web start &
+        env:
+          PORT: 3000
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dotly_one
+          API_URL: http://localhost:3001
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.example
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          R2_PUBLIC_HOSTNAME: assets.dotly.one
+      - name: Wait for API and Next.js to be ready
+        run: |
+          for i in $(seq 1 30); do
+            API_OK=0
+            WEB_OK=0
+            curl -sf http://localhost:3001/health > /dev/null 2>&1 && API_OK=1
+            curl -sf http://localhost:3000 > /dev/null 2>&1 && WEB_OK=1
+            if [[ "$API_OK" == "1" && "$WEB_OK" == "1" ]]; then
+              echo "API and Next.js are ready"
+              exit 0
+            fi
+            echo "Waiting... ($i/30) API=$API_OK WEB=$WEB_OK"
+            sleep 2
+          done
+          echo "Services did not start in time"
+          exit 1
+      - name: Install Playwright browsers
+        run: pnpm --filter @dotly/web exec playwright install --with-deps chromium
+      - name: Generate Playwright auth states
+        run: pnpm --filter @dotly/web test:e2e:auth-states
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_FREE_EMAIL: test@dotly.one
+          PLAYWRIGHT_FREE_PASSWORD: Dotly123!
+          PLAYWRIGHT_STARTER_EMAIL: starter@dotly.one
+          PLAYWRIGHT_STARTER_PASSWORD: Dotly123!
+          PLAYWRIGHT_PRO_EMAIL: pro@dotly.one
+          PLAYWRIGHT_PRO_PASSWORD: Dotly123!
+      - name: Run core-flow E2E tests
+        run: pnpm --filter @dotly/web test:e2e:core-flow
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_FREE_STATE: .auth/free.json
+          PLAYWRIGHT_STARTER_STATE: .auth/starter.json
+          PLAYWRIGHT_PRO_STATE: .auth/pro.json
           CI: true

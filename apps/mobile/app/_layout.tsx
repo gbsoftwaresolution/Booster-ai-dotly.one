@@ -7,7 +7,7 @@ import { View, ActivityIndicator } from 'react-native'
 import { registerForPushNotifications, setupNotificationListeners } from '../lib/notifications'
 import { savePushToken } from '../lib/api'
 import { AuthzProvider } from '../components/AuthzProvider'
-import { clearSession, getSession, setSession, type MobileSession } from '../lib/auth'
+import { getSession, setSession, type MobileSession } from '../lib/auth'
 
 export default function RootLayout() {
   const [session, setAuthSession] = useState<MobileSession | null>(null)
@@ -21,7 +21,7 @@ export default function RootLayout() {
       setAuthSession(session)
       setLoading(false)
     })
-  }, [])
+  }, [router])
 
   useEffect(() => {
     async function handleUrl(url: string) {

@@ -24,6 +24,7 @@ import { DURATION_IDS, PaymentVaultQuotes, PLAN_IDS } from './payment-vault-quot
 import { isCryptoBlockedForCountry } from './crypto-country-policy'
 import { EmailService } from '../email/email.service'
 import Stripe from 'stripe'
+import { ObservabilityService } from '../common/observability/observability.service'
 
 const DOTLY_PAYMENT_VAULT_ABI = [
   {
@@ -94,6 +95,7 @@ export class BillingService {
     private config: ConfigService,
     private paymentVaultQuotes: PaymentVaultQuotes,
     private email: EmailService,
+    private readonly observability: ObservabilityService,
   ) {
     const stripeMode = this.config.get<'enabled' | 'disabled'>('STRIPE_MODE') ?? 'disabled'
     const stripeKey = this.config.get<string>('STRIPE_SECRET_KEY')
@@ -204,10 +206,24 @@ export class BillingService {
       },
     })
 
+    this.observability.incrementCoreFlowCounter('upgrade_checkout_started_total', {
+      plan: requestedPlan,
+      provider: 'stripe_subscription',
+    })
+    this.logger.log(
+      JSON.stringify({
+        event: 'upgrade_checkout_started',
+        userId,
+        plan: requestedPlan,
+        provider: 'stripe_subscription',
+      }),
+    )
+
     return { url: session.url }
   }
 
   async handleStripeBillingWebhook(rawBody?: Buffer, signature?: string) {
+    const startedAt = process.hrtime.bigint()
     if (!this.isStripeEnabled() || !this.stripe) {
       return { received: true as const }
     }
@@ -237,6 +253,11 @@ export class BillingService {
           stripeCustomerId,
           subscription,
         })
+        this.observability.incrementCoreFlowCounter('upgrade_checkout_completed_total', {
+          plan: SharedPlan.PRO,
+          provider: 'stripe_subscription',
+          status: 'success',
+        })
       }
     }
 
@@ -265,6 +286,14 @@ export class BillingService {
         })
       }
     }
+
+    const durationSeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000
+    this.observability.incrementCoreFlowCounter('webhook_events_total', {
+      source: 'billing',
+      event_type: event.type,
+      status: 'success',
+    })
+    this.observability.observeWebhookLatency('billing', event.type, durationSeconds)
 
     return { received: true as const }
   }
@@ -1056,6 +1085,20 @@ export class BillingService {
       })
       .catch(() => void 0)
 
+    this.observability.incrementCoreFlowCounter('upgrade_checkout_started_total', {
+      plan: params.plan,
+      provider: 'crypto_hosted',
+    })
+    this.logger.log(
+      JSON.stringify({
+        event: 'upgrade_checkout_started',
+        userId,
+        plan: params.plan,
+        provider: 'crypto_hosted',
+        paymentId,
+      }),
+    )
+
     return {
       amountUsdt,
       amountRaw: amountRaw.toString(),
@@ -1190,6 +1233,22 @@ export class BillingService {
         },
       })
       .catch(() => void 0)
+
+    this.observability.incrementCoreFlowCounter('upgrade_checkout_completed_total', {
+      plan: expectedPlan,
+      provider: 'crypto_hosted',
+      status: 'success',
+    })
+    this.logger.log(
+      JSON.stringify({
+        event: 'upgrade_checkout_completed',
+        userId,
+        paymentId,
+        plan: expectedPlan,
+        provider: 'crypto_hosted',
+        txHash,
+      }),
+    )
 
     return { status: 'ACTIVE', plan: expectedPlan, currentPeriodEnd: periodEnd.toISOString() }
   }

@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { clearServerSession, setServerSession } from '@/lib/auth/session'
+import { clearServerSession, getServerAccessToken, setServerSession } from '@/lib/auth/session'
+
+export async function GET(): Promise<NextResponse> {
+  const accessToken = await getServerAccessToken()
+
+  if (!accessToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return NextResponse.json({ accessToken })
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json()) as {

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import type { BillingPlan } from '@/lib/billing-plans'
+import { isLaunchMode } from '@/lib/launch-mode'
 import {
   BarChart3,
   Calendar,
@@ -157,15 +158,30 @@ export const APPS: AppDefinition[] = [
       {
         title: 'Scheduling',
         items: [
-          { href: '/apps/scheduling', label: 'Overview', icon: LayoutDashboard, minPlan: 'STARTER' },
+          {
+            href: '/apps/scheduling',
+            label: 'Overview',
+            icon: LayoutDashboard,
+            minPlan: 'STARTER',
+          },
           {
             href: '/apps/scheduling/appointment-types',
             label: 'Appointment Types',
             icon: CalendarCheck,
             minPlan: 'STARTER',
           },
-          { href: '/apps/scheduling/availability', label: 'Availability', icon: Clock, minPlan: 'STARTER' },
-          { href: '/apps/scheduling/bookings', label: 'Bookings', icon: CalendarClock, minPlan: 'STARTER' },
+          {
+            href: '/apps/scheduling/availability',
+            label: 'Availability',
+            icon: Clock,
+            minPlan: 'STARTER',
+          },
+          {
+            href: '/apps/scheduling/bookings',
+            label: 'Bookings',
+            icon: CalendarClock,
+            minPlan: 'STARTER',
+          },
         ],
       },
     ],
@@ -244,3 +260,8 @@ export const APP_MOBILE_TABS = APPS.map((app) => ({
   label: app.label,
   icon: app.icon,
 }))
+
+export function getLaunchApps(): AppDefinition[] {
+  if (!isLaunchMode()) return APPS
+  return APPS.filter((app) => app.id === 'cards' || app.id === 'crm')
+}

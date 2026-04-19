@@ -56,7 +56,7 @@ export default function CardDetailScreen() {
   useEffect(() => {
     if (!id) return
     void loadCard()
-  }, [id])
+  }, [id, loadCard])
 
   if (loading) {
     return (

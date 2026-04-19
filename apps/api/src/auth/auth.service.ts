@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
 import { UsersService } from '../users/users.service'
 import type { GoogleProfile } from './auth.types'
+import { ObservabilityService } from '../common/observability/observability.service'
 
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 15
 const REFRESH_TOKEN_TTL_DAYS = 30
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly email: EmailService,
     private readonly usersService: UsersService,
+    private readonly observability: ObservabilityService,
   ) {}
 
   private get jwtSecret(): string {
@@ -251,6 +253,11 @@ export class AuthService {
     }
 
     const session = await this.createSession(user, params.meta)
+    this.observability.logOperationalEvent('auth_sign_in_succeeded', {
+      event: 'auth_sign_in_succeeded',
+      userId: user.id,
+      authMethod: 'password',
+    })
     return {
       user: { id: user.id, email: user.email, name: user.name },
       ...session,
@@ -274,6 +281,11 @@ export class AuthService {
 
     const next = await this.createSession(session.user, meta)
     await this.prisma.authSession.delete({ where: { id: session.id } })
+
+    this.observability.logOperationalEvent('auth_refresh_succeeded', {
+      event: 'auth_refresh_succeeded',
+      userId: session.user.id,
+    })
 
     return { user: session.user, ...next }
   }
@@ -478,6 +490,11 @@ export class AuthService {
     }
 
     const session = await this.createSession(user, meta)
+    this.observability.logOperationalEvent('auth_sign_in_succeeded', {
+      event: 'auth_sign_in_succeeded',
+      userId: user.id,
+      authMethod: 'google',
+    })
     return { user, ...session }
   }
 

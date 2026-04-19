@@ -30,6 +30,8 @@ import { InboxModule } from './inbox/inbox.module'
 import { SalesLinkModule } from './sales-link/sales-link.module'
 import { PaymentAccountsModule } from './payment-accounts/payment-accounts.module'
 import { validate } from './config/env.validation'
+import { ObservabilityModule } from './common/observability/observability.module'
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter'
 
 @Module({
   imports: [
@@ -62,6 +64,7 @@ import { validate } from './config/env.validation'
       }),
     }),
     LoggerModule,
+    ObservabilityModule,
     PrismaModule,
     RedisModule,
     EmailModule,
@@ -86,6 +89,7 @@ import { validate } from './config/env.validation'
     PaymentAccountsModule,
   ],
   providers: [
+    SentryExceptionFilter,
     // ThrottlerGuard MUST run first (before JwtAuthGuard) so that every
     // inbound request — authenticated or not — is rate-limited before any
     // token validation occurs.  This blocks JWT brute-force, credential

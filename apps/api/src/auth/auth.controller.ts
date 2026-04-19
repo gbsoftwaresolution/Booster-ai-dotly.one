@@ -10,6 +10,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import type { Request, Response } from 'express'
 import { Public } from './decorators/public.decorator'
@@ -82,7 +83,15 @@ class GoogleStartQueryDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private buildSessionCookie(name: string, value: string, maxAgeSeconds: number): string {
+    const secure = this.configService.get<string>('NODE_ENV') === 'production' ? '; Secure' : ''
+    return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`
+  }
 
   private getSessionMeta(req: Request) {
     return {
@@ -180,18 +189,23 @@ export class AuthController {
     const profile = await this.authService.getGoogleProfile(tokens.access_token)
     const session = await this.authService.signInWithGoogle(profile, this.getSessionMeta(req))
 
-    const payload = encodeURIComponent(
-      JSON.stringify({
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        next: state.next,
-      }),
-    )
-
     if (state.mobile) {
+      const payload = encodeURIComponent(
+        JSON.stringify({
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          next: state.next,
+        }),
+      )
       return res.redirect(`dotly://auth/callback?payload=${payload}`)
     }
 
-    return res.redirect(`${this.authService.publicWebUrl}/auth/callback?payload=${payload}`)
+    const callbackUrl = new URL('/auth/callback', this.authService.publicWebUrl)
+    callbackUrl.searchParams.set('next', state.next)
+    res.setHeader('Set-Cookie', [
+      this.buildSessionCookie('dotly_access_token', session.accessToken, 60 * 15),
+      this.buildSessionCookie('dotly_refresh_token', session.refreshToken, 60 * 60 * 24 * 30),
+    ])
+    return res.redirect(callbackUrl.toString())
   }
 }

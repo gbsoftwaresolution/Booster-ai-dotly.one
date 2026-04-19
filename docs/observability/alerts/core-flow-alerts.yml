@@ -1,0 +1,87 @@
+groups:
+  - name: dotly-core-flow
+    rules:
+      - alert: DotlyPaymentFlowBroken
+        expr: |
+          sum(rate(dotly_api_sales_link_payments_total{status="success"}[15m])) == 0
+          and
+          sum(rate(dotly_api_sales_link_payments_total{status=~"pending|pending_collection"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: page
+          service: revenue
+        annotations:
+          summary: Payment flow is broken
+          description: Payment attempts exist but no successful payments were recorded in the last 15 minutes.
+
+      - alert: DotlyUpgradeCheckoutConversionDrop
+        expr: |
+          sum(rate(dotly_api_upgrade_checkout_started_total[30m])) > 0
+          and
+          (
+            sum(rate(dotly_api_upgrade_checkout_completed_total{status="success"}[30m]))
+            /
+            clamp_min(sum(rate(dotly_api_upgrade_checkout_started_total[30m])), 1)
+          ) < 0.2
+        for: 20m
+        labels:
+          severity: warn
+          service: billing
+        annotations:
+          summary: Upgrade checkout conversion dropped
+          description: Upgrade starts are happening but completion rate is below 20% for 20 minutes.
+
+      - alert: DotlyAuthSpike
+        expr: |
+          sum(rate(dotly_api_error_events_total{route=~"/auth.*",status_code=~"401|403|500"}[5m])) > 2
+        for: 10m
+        labels:
+          severity: warn
+          service: auth
+        annotations:
+          summary: Auth error spike detected
+          description: Auth-related errors are elevated across sign-in, refresh, or callback flows.
+
+      - alert: DotlyWebhookFailures
+        expr: |
+          sum(rate(dotly_api_webhook_events_total{status="failure"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: page
+          service: webhooks
+        annotations:
+          summary: Webhook failures detected
+          description: One or more webhook sources are failing continuously.
+
+      - alert: DotlyWebhookLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(dotly_api_webhook_duration_seconds_bucket[10m]))) > 2
+        for: 15m
+        labels:
+          severity: warn
+          service: webhooks
+        annotations:
+          summary: Webhook latency is high
+          description: Webhook p95 latency is above 2 seconds for at least 15 minutes.
+
+      - alert: DotlyDbConnectionPressure
+        expr: |
+          sum(rate(dotly_api_error_events_total{code="internal_error",route!="/health"}[10m])) > 1
+        for: 15m
+        labels:
+          severity: warn
+          service: database
+        annotations:
+          summary: Database pressure or internal error spike
+          description: Internal errors are elevated and may indicate DB saturation or dependency pressure.
+
+      - alert: DotlyQueueBacklogGrowth
+        expr: |
+          max(dotly_api_queue_backlog_jobs{state="waiting"}) > 100
+        for: 15m
+        labels:
+          severity: warn
+          service: queues
+        annotations:
+          summary: Queue backlog is growing
+          description: One of the background queues has more than 100 waiting jobs for 15 minutes.

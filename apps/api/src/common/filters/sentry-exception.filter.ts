@@ -1,6 +1,8 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
 import * as Sentry from '@sentry/node'
 import { Request, Response } from 'express'
+import { getRequestContext } from '../observability/request-context'
+import { ObservabilityService } from '../observability/observability.service'
 
 function getErrorCode(status: number): string {
   switch (status) {
@@ -27,6 +29,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 @Catch()
 export class SentryExceptionFilter implements ExceptionFilter {
+  constructor(private readonly observability: ObservabilityService) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
@@ -36,7 +40,17 @@ export class SentryExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
 
     if (status >= 500) {
-      Sentry.captureException(exception)
+      const requestContext = getRequestContext()
+      Sentry.withScope((scope) => {
+        scope.setTag('request_id', requestContext?.requestId ?? 'unknown')
+        scope.setContext('request', {
+          method: request.method,
+          path: request.path,
+          requestId: requestContext?.requestId,
+          userId: requestContext?.userId,
+        })
+        Sentry.captureException(exception)
+      })
     }
 
     const exceptionResponse =
@@ -77,6 +91,8 @@ export class SentryExceptionFilter implements ExceptionFilter {
         message = exception.message
       }
     }
+
+    this.observability.recordErrorEvent(request.route?.path ?? request.path, status, code)
 
     response.status(status).json({
       statusCode: status,

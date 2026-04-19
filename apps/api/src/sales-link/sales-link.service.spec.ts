@@ -44,6 +44,7 @@ function createPrismaMock() {
     payment: {
       create: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
     },
@@ -74,6 +75,23 @@ function createConfigMock() {
   }
 }
 
+function createObservabilityMock() {
+  return {
+    incrementCoreFlowCounter: jest.fn(),
+    observeWebhookLatency: jest.fn(),
+    logOperationalEvent: jest.fn(),
+  }
+}
+
+function makeSalesLinkService(prisma = createPrismaMock()) {
+  return new SalesLinkService(
+    prisma as never,
+    createConfigMock() as never,
+    createPaymentAccountsServiceMock() as never,
+    createObservabilityMock() as never,
+  )
+}
+
 function createDisabledStripeConfigMock() {
   return {
     get: jest.fn((key: string) => {
@@ -91,10 +109,12 @@ describe('SalesLinkService', () => {
   it('creates a lead only for an existing username', async () => {
     const prisma = createPrismaMock()
     const paymentAccounts = createPaymentAccountsServiceMock()
+    const observability = createObservabilityMock()
     const service = new SalesLinkService(
       prisma as never,
       createConfigMock() as never,
       paymentAccounts as never,
+      observability as never,
     )
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'user_1', plan: 'FREE' })
@@ -116,11 +136,7 @@ describe('SalesLinkService', () => {
 
   it('returns the static sales-link booking slots', () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     expect(service.getSlots()).toEqual({
       slots: ['2026-04-20 10:00', '2026-04-20 12:00', '2026-04-20 15:00'],
@@ -129,11 +145,7 @@ describe('SalesLinkService', () => {
 
   it('rejects events for missing leads', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.lead.findUnique.mockResolvedValueOnce(null)
 
@@ -143,11 +155,7 @@ describe('SalesLinkService', () => {
 
   it('stores whatsapp intent and cta variant and clears them for non-whatsapp actions', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.lead.findUnique.mockResolvedValue({ id: 'lead_1' })
     prisma.leadEvent.create.mockResolvedValue({ id: 'event_1' })
@@ -175,11 +183,7 @@ describe('SalesLinkService', () => {
 
   it('returns the lightweight leads list for the owner', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1' })
     prisma.lead.findMany.mockResolvedValueOnce([
@@ -207,11 +211,7 @@ describe('SalesLinkService', () => {
 
   it('blocks free-plan lead creation when the monthly lead limit is reached', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1', plan: 'FREE' })
     prisma.lead.count.mockResolvedValueOnce(20)
@@ -223,11 +223,7 @@ describe('SalesLinkService', () => {
 
   it('returns lead detail with events, bookings, and payments', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.lead.findUnique.mockResolvedValueOnce({
       id: 'lead_1',
@@ -275,11 +271,7 @@ describe('SalesLinkService', () => {
 
   it('updates lead status, note, and follow-up flag for the owner', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1' })
@@ -306,11 +298,7 @@ describe('SalesLinkService', () => {
 
   it('creates a booking only when the lead belongs to the username and slot is valid', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
     prisma.user.findUnique.mockResolvedValueOnce({ plan: 'FREE' })
@@ -333,11 +321,7 @@ describe('SalesLinkService', () => {
 
   it('rejects duplicate bookings for the same username slot', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
     prisma.salesLinkBooking.create.mockRejectedValueOnce({ code: 'P2002' })
@@ -347,6 +331,19 @@ describe('SalesLinkService', () => {
     ).rejects.toBeInstanceOf(ConflictException)
   })
 
+  it('blocks free-plan bookings when the monthly booking limit is reached', async () => {
+    const prisma = createPrismaMock()
+    const service = makeSalesLinkService(prisma)
+
+    prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
+    prisma.user.findUnique.mockResolvedValueOnce({ plan: 'FREE' })
+    prisma.salesLinkBooking.count.mockResolvedValueOnce(5)
+
+    await expect(
+      service.createBooking({ username: 'john', leadId: 'lead_1', slot: '2026-04-20 10:00' }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
   it('creates a Stripe checkout session and persists a pending payment', async () => {
     const prisma = createPrismaMock()
     const paymentAccounts = createPaymentAccountsServiceMock()
@@ -354,6 +351,7 @@ describe('SalesLinkService', () => {
       prisma as never,
       createConfigMock() as never,
       paymentAccounts as never,
+      createObservabilityMock() as never,
     )
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
@@ -400,6 +398,7 @@ describe('SalesLinkService', () => {
       prisma as never,
       createDisabledStripeConfigMock() as never,
       paymentAccounts as never,
+      createObservabilityMock() as never,
     )
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
@@ -415,6 +414,47 @@ describe('SalesLinkService', () => {
     ).rejects.toBeInstanceOf(ConflictException)
   })
 
+  it('blocks payments when the seller is still on the free plan', async () => {
+    const prisma = createPrismaMock()
+    const paymentAccounts = createPaymentAccountsServiceMock()
+    const service = new SalesLinkService(
+      prisma as never,
+      createConfigMock() as never,
+      paymentAccounts as never,
+      createObservabilityMock() as never,
+    )
+
+    prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
+    prisma.user.findUnique.mockResolvedValueOnce({ plan: 'FREE' })
+
+    await expect(
+      service.createPayment({ username: 'john', leadId: 'lead_1', amount: 5000 }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('fails payment creation when no payment account is available for a paid seller', async () => {
+    const prisma = createPrismaMock()
+    const paymentAccounts = createPaymentAccountsServiceMock()
+    const service = new SalesLinkService(
+      prisma as never,
+      createConfigMock() as never,
+      paymentAccounts as never,
+      createObservabilityMock() as never,
+    )
+
+    prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
+    prisma.user.findUnique.mockResolvedValueOnce({ plan: 'PRO' })
+    paymentAccounts.getActiveProviderForUsername.mockResolvedValueOnce({
+      provider: null,
+      providerAccountId: null,
+      country: 'US',
+    })
+
+    await expect(
+      service.createPayment({ username: 'john', leadId: 'lead_1', amount: 5000 }),
+    ).rejects.toBeInstanceOf(ConflictException)
+  })
+
   it('creates a UPI payment link when the seller default provider is local', async () => {
     const prisma = createPrismaMock()
     const paymentAccounts = createPaymentAccountsServiceMock()
@@ -422,6 +462,7 @@ describe('SalesLinkService', () => {
       prisma as never,
       createConfigMock() as never,
       paymentAccounts as never,
+      createObservabilityMock() as never,
     )
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
@@ -468,6 +509,7 @@ describe('SalesLinkService', () => {
       prisma as never,
       createConfigMock() as never,
       paymentAccounts as never,
+      createObservabilityMock() as never,
     )
 
     prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
@@ -504,11 +546,7 @@ describe('SalesLinkService', () => {
 
   it('confirms a pending COD payment and tracks the payment event', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.payment.findUnique.mockResolvedValueOnce({
       id: 'payment_1',
@@ -533,11 +571,7 @@ describe('SalesLinkService', () => {
 
   it('marks payment success from the Stripe webhook and links the payment event to the lead', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     constructEventMock.mockReturnValueOnce({
       type: 'checkout.session.completed',
@@ -574,13 +608,127 @@ describe('SalesLinkService', () => {
     })
   })
 
-  it('returns recent activity counts for the owner', async () => {
+  it('ignores replayed Stripe payment webhooks after payment success is already recorded', async () => {
     const prisma = createPrismaMock()
+    const service = makeSalesLinkService(prisma)
+
+    constructEventMock.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_123',
+        },
+      },
+    })
+    prisma.payment.findUnique.mockResolvedValueOnce({
+      id: 'payment_1',
+      leadId: 'lead_1',
+      status: 'success',
+    })
+
+    await expect(
+      service.handlePaymentWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.payment.update).not.toHaveBeenCalled()
+    expect(prisma.leadEvent.create).not.toHaveBeenCalled()
+  })
+
+  it('returns received for non-checkout Stripe payment events without mutating state', async () => {
+    const prisma = createPrismaMock()
+    const service = makeSalesLinkService(prisma)
+
+    constructEventMock.mockReturnValueOnce({
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_test_123',
+        },
+      },
+    })
+
+    await expect(
+      service.handlePaymentWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.payment.findUnique).not.toHaveBeenCalled()
+    expect(prisma.payment.update).not.toHaveBeenCalled()
+    expect(prisma.leadEvent.create).not.toHaveBeenCalled()
+  })
+
+  it('retries cleanly after a transient payment update failure during webhook processing', async () => {
+    const prisma = createPrismaMock()
+    const service = makeSalesLinkService(prisma)
+
+    constructEventMock.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_retry',
+        },
+      },
+    })
+    prisma.payment.findUnique
+      .mockResolvedValueOnce({
+        id: 'payment_1',
+        leadId: 'lead_1',
+        status: 'pending',
+      })
+      .mockResolvedValueOnce({
+        id: 'payment_1',
+        leadId: 'lead_1',
+        status: 'pending',
+      })
+    prisma.payment.update
+      .mockRejectedValueOnce(new Error('temporary write failure'))
+      .mockResolvedValueOnce({ id: 'payment_1', status: 'success' })
+    prisma.lead.update.mockResolvedValue({ id: 'lead_1', status: 'paid' })
+    prisma.lead.findUnique.mockResolvedValue({ id: 'lead_1' })
+    prisma.leadEvent.create.mockResolvedValue({ id: 'event_1' })
+
+    await expect(
+      service.handlePaymentWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).rejects.toThrow('temporary write failure')
+
+    await expect(
+      service.handlePaymentWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.payment.update).toHaveBeenCalledTimes(2)
+    expect(prisma.leadEvent.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails payment creation when a duplicate Stripe session id would be recorded twice', async () => {
+    const prisma = createPrismaMock()
+    const paymentAccounts = createPaymentAccountsServiceMock()
     const service = new SalesLinkService(
       prisma as never,
       createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
+      paymentAccounts as never,
+      createObservabilityMock() as never,
     )
+
+    prisma.lead.findUnique.mockResolvedValueOnce({ id: 'lead_1', username: 'john' })
+    prisma.user.findUnique.mockResolvedValueOnce({ plan: 'PRO' })
+    paymentAccounts.getActiveProviderForUsername.mockResolvedValueOnce({
+      provider: 'stripe_connect',
+      providerAccountId: 'acct_123',
+      country: 'US',
+    })
+    paymentAccounts.createStripeCheckoutSession.mockResolvedValueOnce({
+      id: 'cs_test_duplicate',
+      url: 'https://checkout.stripe.com/pay/cs_test_duplicate',
+    })
+    prisma.payment.create.mockRejectedValueOnce({ code: 'P2002' })
+
+    await expect(
+      service.createPayment({ username: 'john', leadId: 'lead_1', amount: 5000 }),
+    ).rejects.toEqual(expect.objectContaining({ code: 'P2002' }))
+  })
+
+  it('returns recent activity counts for the owner', async () => {
+    const prisma = createPrismaMock()
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1' })
     prisma.leadEvent.count.mockResolvedValueOnce(5)
@@ -594,11 +742,7 @@ describe('SalesLinkService', () => {
 
   it('returns lead activity totals and recent lead last actions for the owner', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1' })
     prisma.lead.count.mockResolvedValueOnce(12)
@@ -647,6 +791,11 @@ describe('SalesLinkService', () => {
         name: null,
         createdAt: new Date('2026-04-18T11:00:00.000Z'),
       },
+    ])
+    prisma.salesLinkBooking.count.mockResolvedValueOnce(1)
+    prisma.payment.groupBy.mockResolvedValueOnce([
+      { status: 'success', _count: { _all: 1 }, _sum: { amount: 5000 } },
+      { status: 'pending_collection', _count: { _all: 1 }, _sum: { amount: 5000 } },
     ])
     prisma.payment.findMany.mockResolvedValueOnce([
       {
@@ -736,19 +885,19 @@ describe('SalesLinkService', () => {
 
   it('returns revenue dashboard aggregates for the owner', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1', plan: 'FREE' })
     prisma.lead.count.mockResolvedValueOnce(25)
     prisma.lead.count.mockResolvedValueOnce(12)
     prisma.salesLinkBooking.count.mockResolvedValueOnce(4)
     prisma.salesLinkBooking.count.mockResolvedValueOnce(2)
-    prisma.payment.findMany.mockResolvedValueOnce([{ amount: 5000 }, { amount: 10000 }])
-    prisma.payment.findMany.mockResolvedValueOnce([{ amount: 8000 }])
+    prisma.payment.groupBy.mockResolvedValueOnce([
+      { status: 'success', _count: { _all: 2 }, _sum: { amount: 15000 } },
+    ])
+    prisma.payment.groupBy.mockResolvedValueOnce([
+      { status: 'success', _count: { _all: 1 }, _sum: { amount: 8000 } },
+    ])
     prisma.leadEvent.groupBy.mockResolvedValueOnce([
       { action: 'view', _count: { _all: 100 } },
       { action: 'whatsapp', _count: { _all: 20 } },
@@ -798,11 +947,7 @@ describe('SalesLinkService', () => {
 
   it('returns payment history for the owner', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1' })
     prisma.payment.findMany.mockResolvedValueOnce([
@@ -826,11 +971,7 @@ describe('SalesLinkService', () => {
 
   it('rejects dashboard access for a different authenticated user', async () => {
     const prisma = createPrismaMock()
-    const service = new SalesLinkService(
-      prisma as never,
-      createConfigMock() as never,
-      createPaymentAccountsServiceMock() as never,
-    )
+    const service = makeSalesLinkService(prisma)
 
     prisma.user.findUnique.mockResolvedValueOnce({ id: 'owner_1' })
 

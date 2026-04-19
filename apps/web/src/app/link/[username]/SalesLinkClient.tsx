@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getPublicApiUrl } from '@/lib/public-env'
+import { createRequestId } from '@/lib/request-id'
 
 const API_URL = getPublicApiUrl()
 const CTA_VARIANTS = ['Chat Now', 'Get Help on WhatsApp', 'Message Me Instantly'] as const
@@ -24,7 +25,7 @@ async function createLead(username: string): Promise<string | null> {
   try {
     const response = await fetch(`${API_URL}/lead/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-request-id': createRequestId() },
       body: JSON.stringify({ username }),
     })
 
@@ -51,7 +52,7 @@ async function createLeadWithState(
   try {
     const response = await fetch(`${API_URL}/lead/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-request-id': createRequestId() },
       body: JSON.stringify({ username }),
     })
 
@@ -75,6 +76,7 @@ async function getBookingSlots(username: string): Promise<string[]> {
   try {
     const response = await fetch(`${API_URL}/booking/slots/${encodeURIComponent(username)}`, {
       cache: 'no-store',
+      headers: { 'x-request-id': createRequestId() },
     })
     if (!response.ok) return []
 
@@ -93,7 +95,7 @@ async function createBooking(
   try {
     const response = await fetch(`${API_URL}/booking/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-request-id': createRequestId() },
       body: JSON.stringify({ username, leadId, slot }),
     })
 
@@ -117,7 +119,7 @@ async function createPaymentSession(
   try {
     const response = await fetch(`${API_URL}/payment/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-request-id': createRequestId() },
       body: JSON.stringify({
         username,
         leadId,
@@ -150,7 +152,7 @@ async function trackEvent(
   try {
     await fetch(`${API_URL}/track`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-request-id': createRequestId() },
       body: JSON.stringify({
         action,
         leadId,
@@ -230,6 +232,7 @@ export function SalesLinkClient({
   const [ctaVariant, setCtaVariant] = useState<string>(CTA_VARIANTS[0])
   const [showHint, setShowHint] = useState(false)
   const [limitMessage, setLimitMessage] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
   const name = profile.name?.trim() || 'Dotly seller'
   const pitch = profile.pitch?.trim() || 'Helping buyers move faster with one clear next step.'
   const description = 'Choose one fast next step and keep the conversation moving.'
@@ -253,6 +256,10 @@ export function SalesLinkClient({
 
     return leadPromiseRef.current
   }, [username])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     setCtaVariant(pickSessionCtaVariant(username))
@@ -376,6 +383,7 @@ export function SalesLinkClient({
   }
 
   const whatsappDisabled = !normalizePhone(profile.phone)
+  const actionsDisabled = !mounted
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_22%,#f8fafc_48%,#ffffff_100%)] px-4 py-4 text-slate-950 sm:px-6 sm:py-6">
@@ -409,7 +417,7 @@ export function SalesLinkClient({
             <button
               type="button"
               onClick={() => handleWhatsApp('general', ctaVariant)}
-              disabled={whatsappDisabled}
+              disabled={actionsDisabled || whatsappDisabled}
               className="min-h-16 w-full rounded-[20px] bg-emerald-600 px-5 py-4 text-base font-semibold text-white shadow-[0_16px_32px_-18px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] hover:bg-emerald-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {ctaVariant}
@@ -418,7 +426,7 @@ export function SalesLinkClient({
             <button
               type="button"
               onClick={() => handleWhatsApp('service', SERVICE_CTA_VARIANT)}
-              disabled={whatsappDisabled}
+              disabled={actionsDisabled || whatsappDisabled}
               className="min-h-16 w-full rounded-[20px] border border-slate-200 bg-white px-5 py-4 text-base font-semibold text-slate-900 transition hover:scale-[1.01] hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
             >
               {SERVICE_CTA_VARIANT}
@@ -427,6 +435,7 @@ export function SalesLinkClient({
             <button
               type="button"
               onClick={() => void openBooking()}
+              disabled={actionsDisabled}
               className="min-h-16 w-full rounded-[20px] border border-slate-200 bg-white px-5 py-4 text-base font-semibold text-slate-900 transition hover:scale-[1.01] hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99]"
             >
               {showBooking ? 'Hide Time Slots' : 'Book Call'}
@@ -435,7 +444,9 @@ export function SalesLinkClient({
             <button
               type="button"
               onClick={() => void handlePayment()}
-              disabled={paymentLoading || (!paymentProvider && !paymentUpgradeRequired)}
+              disabled={
+                actionsDisabled || paymentLoading || (!paymentProvider && !paymentUpgradeRequired)
+              }
               className="min-h-16 w-full rounded-[20px] border border-slate-200 bg-white px-5 py-4 text-base font-semibold text-slate-900 transition hover:scale-[1.01] hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {paymentLoading

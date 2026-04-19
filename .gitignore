@@ -52,6 +52,7 @@ coverage
 # Playwright
 apps/web/playwright-report/
 apps/web/test-results/
+apps/web/.auth/
 
 # Prisma
 prisma/migrations/dev

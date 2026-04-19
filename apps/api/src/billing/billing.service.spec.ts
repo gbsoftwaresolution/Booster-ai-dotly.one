@@ -30,6 +30,16 @@ jest.mock('stripe', () => {
 
 import { BillingService } from './billing.service'
 
+type RecordedPayment = Awaited<ReturnType<BillingService['readRecordedPaymentByTxHash']>>
+
+function createObservabilityMock() {
+  return {
+    incrementCoreFlowCounter: jest.fn(),
+    observeWebhookLatency: jest.fn(),
+    logOperationalEvent: jest.fn(),
+  }
+}
+
 function makeBillingService() {
   const prisma = {
     subscription: {
@@ -66,7 +76,14 @@ function makeBillingService() {
   return {
     prisma,
     audit,
-    service: new BillingService(prisma as never, audit as never, config, paymentVaultQuotes, email),
+    service: new BillingService(
+      prisma as never,
+      audit as never,
+      config,
+      paymentVaultQuotes,
+      email,
+      createObservabilityMock() as never,
+    ),
   }
 }
 
@@ -180,7 +197,7 @@ describe('refund downgrade flow', () => {
     })
     prisma.auditLog.findFirst.mockResolvedValue(null)
 
-    jest.spyOn(service as any, 'readRecordedPaymentByTxHash').mockResolvedValue({
+    jest.spyOn(service, 'readRecordedPaymentByTxHash').mockResolvedValue({
       paymentId: '0x' + '1'.repeat(64),
       payer: '0xwallet',
       userRef: '0x' + '2'.repeat(64),
@@ -191,7 +208,7 @@ describe('refund downgrade flow', () => {
       paidAt: 1710000000n,
       refundUntil: 1710600000n,
       status: 2,
-    } as any)
+    } as NonNullable<RecordedPayment>)
 
     const summary = await service.getUserSubscription('user_1', 'US')
 
@@ -253,6 +270,7 @@ describe('stripe upgrade flow', () => {
         config,
         paymentVaultQuotes,
         email,
+        createObservabilityMock() as never,
       ),
     }
   }
@@ -302,6 +320,109 @@ describe('stripe upgrade flow', () => {
       where: { id: 'user_1' },
       data: { plan: Plan.PRO },
     })
+  })
+
+  it('ignores replayed checkout completion webhook after subscription is already active', async () => {
+    const { prisma, service } = makeStripeBillingService()
+
+    constructEventMock.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'user_1' },
+          subscription: 'sub_123',
+          customer: 'cus_123',
+        },
+      },
+    })
+    constructEventMock.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'user_1' },
+          subscription: 'sub_123',
+          customer: 'cus_123',
+        },
+      },
+    })
+    retrieveSubscriptionMock.mockResolvedValueOnce({
+      id: 'sub_123',
+      status: 'active',
+      current_period_end: 1780000000,
+    })
+    retrieveSubscriptionMock.mockResolvedValueOnce({
+      id: 'sub_123',
+      status: 'active',
+      current_period_end: 1780000000,
+    })
+    prisma.subscription.upsert.mockResolvedValueOnce({ id: 'sub_local' })
+    prisma.user.update.mockResolvedValueOnce({ id: 'user_1' })
+
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.subscription.upsert).toHaveBeenCalledTimes(2)
+    expect(prisma.user.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns received for unrelated billing webhook events without touching subscriptions', async () => {
+    const { prisma, service } = makeStripeBillingService()
+
+    constructEventMock.mockReturnValueOnce({
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_123',
+        },
+      },
+    })
+
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.subscription.upsert).not.toHaveBeenCalled()
+    expect(prisma.subscription.findFirst).not.toHaveBeenCalled()
+    expect(prisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it('retries billing webhook sync cleanly after a transient subscription sync failure', async () => {
+    const { prisma, service } = makeStripeBillingService()
+
+    constructEventMock.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'user_1' },
+          subscription: 'sub_retry',
+          customer: 'cus_retry',
+        },
+      },
+    })
+    retrieveSubscriptionMock.mockResolvedValue({
+      id: 'sub_retry',
+      status: 'active',
+      current_period_end: 1780000000,
+    })
+    prisma.subscription.upsert
+      .mockRejectedValueOnce(new Error('temporary billing write failure'))
+      .mockResolvedValueOnce({ id: 'sub_local' })
+    prisma.user.update.mockResolvedValue({ id: 'user_1' })
+
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).rejects.toThrow('temporary billing write failure')
+
+    await expect(
+      service.handleStripeBillingWebhook(Buffer.from('payload'), 'stripe_sig_123'),
+    ).resolves.toEqual({ received: true })
+
+    expect(prisma.subscription.upsert).toHaveBeenCalledTimes(2)
+    expect(prisma.user.update).toHaveBeenCalledTimes(1)
   })
 
   it('downgrades the user plan when the Stripe subscription is deleted', async () => {

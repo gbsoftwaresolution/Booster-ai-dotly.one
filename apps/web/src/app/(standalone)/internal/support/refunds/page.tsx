@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getServerApiUrl } from '@/lib/server-api'
+import { getServerUserOrRedirect } from '@/lib/server-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,9 +40,15 @@ async function fetchRefundQueue(supportKey: string): Promise<{
   error: string | null
 }> {
   try {
+    const accessTokenStore = await cookies()
+    const accessToken = accessTokenStore.get('dotly_access_token')?.value
+    if (!accessToken) {
+      return { data: null, error: 'Your sign-in session expired. Sign in again to continue.' }
+    }
     const response = await fetch(`${getServerApiUrl()}/billing/internal/refunds`, {
       method: 'GET',
       headers: {
+        Authorization: `Bearer ${accessToken}`,
         'x-dotly-support-ops-key': supportKey,
       },
       cache: 'no-store',
@@ -55,7 +62,9 @@ async function fetchRefundQueue(supportKey: string): Promise<{
     if (!response.ok) {
       return {
         data: null,
-        error: getMessage(payload && 'message' in payload ? payload.message : undefined) ?? 'Failed to load refund queue',
+        error:
+          getMessage(payload && 'message' in payload ? payload.message : undefined) ??
+          'Failed to load refund queue',
       }
     }
 
@@ -102,14 +111,16 @@ async function runAdminRefund(formData: FormData) {
   const paymentId = String(formData.get('paymentId') ?? '').trim()
   const cookieStore = await cookies()
   const supportKey = cookieStore.get(SUPPORT_COOKIE)?.value
+  const accessToken = cookieStore.get('dotly_access_token')?.value
 
-  if (!supportKey) {
+  if (!supportKey || !accessToken) {
     redirect(`${PAGE_PATH}?error=Support%20session%20expired`)
   }
 
   const response = await fetch(`${getServerApiUrl()}/billing/internal/refunds/admin`, {
     method: 'POST',
     headers: {
+      Authorization: `Bearer ${accessToken}`,
       'content-type': 'application/json',
       'x-dotly-support-ops-key': supportKey,
     },
@@ -142,7 +153,9 @@ function StatusPill({ item }: { item: BillingRefundReviewItem }) {
           ? 'bg-amber-100 text-amber-700'
           : 'bg-rose-100 text-rose-700'
 
-  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{refundStatus}</span>
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{refundStatus}</span>
+  )
 }
 
 export default async function InternalRefundQueuePage({
@@ -150,6 +163,7 @@ export default async function InternalRefundQueuePage({
 }: {
   searchParams?: Promise<{ error?: string; success?: string }>
 }) {
+  await getServerUserOrRedirect(`/auth?next=${encodeURIComponent(PAGE_PATH)}`)
   const params = (await searchParams) ?? {}
   const cookieStore = await cookies()
   const supportKey = cookieStore.get(SUPPORT_COOKIE)?.value ?? null
@@ -167,9 +181,12 @@ export default async function InternalRefundQueuePage({
                 Internal Support Queue
               </span>
               <div>
-                <h1 className="text-3xl font-black tracking-tight">Refund review and admin refund console</h1>
+                <h1 className="text-3xl font-black tracking-tight">
+                  Refund review and admin refund console
+                </h1>
                 <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                  Review manual refund requests, inspect on-chain status, and execute owner refunds when the escrow window is still open.
+                  Review manual refund requests, inspect on-chain status, and execute owner refunds
+                  when the escrow window is still open.
                 </p>
               </div>
             </div>
@@ -196,7 +213,10 @@ export default async function InternalRefundQueuePage({
           ) : null}
 
           {!supportKey ? (
-            <form action={setSupportSession} className="mt-8 grid gap-4 rounded-[28px] border border-slate-200 bg-slate-950 p-6 text-white md:grid-cols-[1fr_auto] md:items-end">
+            <form
+              action={setSupportSession}
+              className="mt-8 grid gap-4 rounded-[28px] border border-slate-200 bg-slate-950 p-6 text-white md:grid-cols-[1fr_auto] md:items-end"
+            >
               <label className="block text-sm font-medium text-slate-200">
                 Support ops key
                 <input
@@ -237,7 +257,10 @@ export default async function InternalRefundQueuePage({
               ) : null}
 
               {queue.data.items.map((item) => (
-                <article key={item.requestId} className="grid gap-5 rounded-[28px] border border-slate-200 bg-slate-50/80 p-5 lg:grid-cols-[1.4fr_0.9fr]">
+                <article
+                  key={item.requestId}
+                  className="grid gap-5 rounded-[28px] border border-slate-200 bg-slate-50/80 p-5 lg:grid-cols-[1.4fr_0.9fr]"
+                >
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <StatusPill item={item} />
@@ -250,7 +273,9 @@ export default async function InternalRefundQueuePage({
                     </div>
 
                     <div>
-                      <h3 className="text-lg font-bold text-slate-950">{item.userEmail ?? 'Unknown user'}</h3>
+                      <h3 className="text-lg font-bold text-slate-950">
+                        {item.userEmail ?? 'Unknown user'}
+                      </h3>
                       <p className="text-sm text-slate-600">
                         {item.userName ?? 'No display name'}
                         {item.userId ? ` • ${item.userId}` : ''}
@@ -259,19 +284,31 @@ export default async function InternalRefundQueuePage({
 
                     <dl className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
                       <div className="rounded-2xl bg-white px-4 py-3">
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Payment ID</dt>
-                        <dd className="mt-1 font-mono text-xs text-slate-700">{item.paymentId ?? 'Missing'}</dd>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Payment ID
+                        </dt>
+                        <dd className="mt-1 font-mono text-xs text-slate-700">
+                          {item.paymentId ?? 'Missing'}
+                        </dd>
                       </div>
                       <div className="rounded-2xl bg-white px-4 py-3">
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Checkout Tx</dt>
-                        <dd className="mt-1 font-mono text-xs text-slate-700">{item.txHash ?? 'Missing'}</dd>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Checkout Tx
+                        </dt>
+                        <dd className="mt-1 font-mono text-xs text-slate-700">
+                          {item.txHash ?? 'Missing'}
+                        </dd>
                       </div>
                       <div className="rounded-2xl bg-white px-4 py-3">
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Refund window</dt>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Refund window
+                        </dt>
                         <dd className="mt-1">{formatDateTime(item.refund?.refundUntil ?? null)}</dd>
                       </div>
                       <div className="rounded-2xl bg-white px-4 py-3">
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Subscription state</dt>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Subscription state
+                        </dt>
                         <dd className="mt-1">{item.subscriptionStatus ?? 'Unknown'}</dd>
                       </div>
                     </dl>
@@ -279,7 +316,9 @@ export default async function InternalRefundQueuePage({
 
                   <div className="flex flex-col justify-between gap-4 rounded-[24px] bg-slate-950 p-5 text-white">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Support action</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        Support action
+                      </p>
                       <h4 className="mt-2 text-lg font-bold">Admin refund</h4>
                       <p className="mt-2 text-sm text-slate-300">
                         {item.canAdminRefund
@@ -292,7 +331,8 @@ export default async function InternalRefundQueuePage({
 
                     <div className="space-y-3">
                       <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-slate-200">
-                        Last admin refund tx: {item.adminRefundTxHash ? shortHash(item.adminRefundTxHash) : '—'}
+                        Last admin refund tx:{' '}
+                        {item.adminRefundTxHash ? shortHash(item.adminRefundTxHash) : '—'}
                       </div>
                       <form action={runAdminRefund}>
                         <input type="hidden" name="paymentId" value={item.paymentId ?? ''} />

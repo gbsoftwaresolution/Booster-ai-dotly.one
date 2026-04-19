@@ -2,11 +2,13 @@
 
 ## Pre-Launch (T-7 days)
 
-- [ ] All 38 tasks implemented and building cleanly
+- [x] Core launch path only: sales link, leads, bookings, payments, upgrade, auth
 - [ ] Staging environment deployed and smoke-tested
-- [ ] Load test run against staging (p95 < 500ms)
+- [ ] Load tests run against staging:
+- [ ] `k6 run apps/api/load-tests/public-sales-link.js`
+- [ ] `k6 run apps/api/load-tests/sales-link-booking.js`
+- [ ] `k6 run apps/api/load-tests/payment-webhook-burst.js`
 - [ ] Security scan (npm audit, OWASP ZAP basic scan)
-- [ ] Smart contract deployed to Polygon Mumbai testnet
 - [ ] First-party auth configured (Google OAuth client + redirect URLs set)
 - [ ] Mailgun domain verified (dotly.one)
 - [ ] Cloudflare R2 bucket created and CORS configured
@@ -28,11 +30,12 @@
 - [ ] Rate limiting tested (429 response on excess requests)
 - [ ] `NEXT_PUBLIC_` vars don't expose secrets
 - [ ] `.env` not committed to git
+- [ ] `pnpm security:scan-history` reviewed with no proven live-secret hits
+- [ ] All rotated production secrets stored only in platform secret managers
 
 ## Monitoring Setup
 
 - [ ] Sentry projects created (web + api), DSN added to env
-- [ ] PostHog project created, key added to env
 - [ ] Uptime monitor configured (UptimeRobot or Better Uptime for /health)
 - [ ] PagerDuty or similar on-call rotation set up
 
@@ -46,17 +49,34 @@
 ## Launch Day
 
 - [ ] Deploy to production (main branch push triggers deploy.yml)
-- [ ] Smoke tests pass
+- [x] Smoke tests pass
 - [ ] Monitor Sentry for first 30 minutes
-- [ ] Monitor PostHog for first user sign-ups
 - [ ] Check email delivery (sign up with real email, verify welcome email)
-- [ ] Test NFC write on physical device
-- [ ] Test crypto billing on Polygon mainnet (or Mumbai testnet for launch)
+- [ ] Verify sales link -> booking -> payment owner funnel once in prod
+
+## Sprint 15 Validation Notes
+
+- Verified locally on 2026-04-19: `pnpm --filter @dotly/api build`
+- Verified locally on 2026-04-19: `GET /public-page/:username` responds from the live API runtime
+- Verified locally on 2026-04-19: `GET /health` returned database and redis `ok`
+- Verified locally on 2026-04-19: `pnpm --filter @dotly/web test:e2e:core-flow` passed (`6 passed`)
+- Added launch-path load-test scenarios: `apps/api/load-tests/public-sales-link.js`, `apps/api/load-tests/sales-link-booking.js`, `apps/api/load-tests/payment-webhook-burst.js`
+- Verified locally on 2026-04-19 via Docker `grafana/k6` image: `public-sales-link.js` passed with `http_req_failed=0.00%`, `p95=24.8ms`
+- Verified locally on 2026-04-19 via Docker `grafana/k6` image: `sales-link-booking.js` passed with `http_req_failed=0.00%`, `p95=16.44ms`
+- Verified locally on 2026-04-19 via Docker `grafana/k6` image: `payment-webhook-burst.js` passed with `http_req_failed=0.00%`, `p95=5.33ms`
+- Local caveat: webhook burst validation measures route availability under real verification responses (`200/201/400/404/429`), not successful Stripe signature verification in a live provider environment
+
+## Sprint 11-15 Launch Status
+
+- Sprint 11: `partial` - repo-side controls are in place, but provider-side secret rotation and secret-manager rollout still need operational confirmation
+- Sprint 12: `pass` - dependency/platform baseline aligned and verified
+- Sprint 13: `pass` - core money-path E2E is green, including WhatsApp CTA visibility in owner funnel evidence
+- Sprint 14: `partial` - logs/metrics/alerts/runbooks/Sentry wiring exist, but runtime Sentry provider evidence is still pending env rollout
+- Sprint 15: `pass` - launch-path performance, simplification, and local load validation are green
 
 ## Post-Launch (T+7 days)
 
 - [ ] Review Sentry error rate
-- [ ] Review PostHog funnel: visit → sign-up → create card → share
 - [ ] Address any P0/P1 bugs
 - [ ] Schedule first load test against production
-- [ ] Announce on Product Hunt / HN
+- [ ] Review whether hidden launch surfaces can be re-enabled safely

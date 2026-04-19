@@ -103,6 +103,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/pipelines') ||
     request.nextUrl.pathname.startsWith('/deals') ||
     request.nextUrl.pathname.startsWith('/tasks') ||
+    request.nextUrl.pathname === '/upgrade' ||
     // M-01: /team routes need auth EXCEPT the public invite-acceptance and
     // sign-in pages which must be reachable by unauthenticated users.
     (request.nextUrl.pathname.startsWith('/team') &&

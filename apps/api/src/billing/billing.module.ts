@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { ObservabilityModule } from '../common/observability/observability.module'
 import { BillingController } from './billing.controller'
 import { BillingCronService } from './billing.cron.service'
 import { BillingService } from './billing.service'
@@ -11,7 +12,7 @@ import { PaymentVaultQuotes } from './payment-vault-quotes'
 import { AuditModule } from '../audit/audit.module'
 
 @Module({
-  imports: [ConfigModule, AuditModule],
+  imports: [ConfigModule, AuditModule, ObservabilityModule],
   controllers: [BillingController, PartnerLinkController],
   providers: [
     BillingService,

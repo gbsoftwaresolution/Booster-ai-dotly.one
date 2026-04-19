@@ -2,8 +2,7 @@
 
 import { apiPost, ApiError } from '@/lib/api'
 
-const ACCESS_STORAGE_KEY = 'dotly_access_token'
-const REFRESH_STORAGE_KEY = 'dotly_refresh_token'
+let inMemoryAccessToken: string | undefined
 
 type SessionResponse = {
   accessToken: string
@@ -11,20 +10,20 @@ type SessionResponse = {
   expiresIn: number
 }
 
-function getStoredAccessToken(): string | undefined {
-  if (typeof window === 'undefined') return undefined
-  return window.localStorage.getItem(ACCESS_STORAGE_KEY) ?? undefined
+type ExistingSessionResponse = {
+  accessToken: string
 }
 
-function getStoredRefreshToken(): string | undefined {
-  if (typeof window === 'undefined') return undefined
-  return window.localStorage.getItem(REFRESH_STORAGE_KEY) ?? undefined
+function getStoredAccessToken(): string | undefined {
+  return inMemoryAccessToken
+}
+
+export function storeAccessToken(accessToken: string): void {
+  inMemoryAccessToken = accessToken
 }
 
 export function storeClientSession(session: { accessToken: string; refreshToken: string }): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(ACCESS_STORAGE_KEY, session.accessToken)
-  window.localStorage.setItem(REFRESH_STORAGE_KEY, session.refreshToken)
+  storeAccessToken(session.accessToken)
 }
 
 async function syncServerSession(session: { accessToken: string; refreshToken: string } | null) {
@@ -47,9 +46,7 @@ export async function persistSession(session: {
 }
 
 export function clearClientSession(): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.removeItem(ACCESS_STORAGE_KEY)
-  window.localStorage.removeItem(REFRESH_STORAGE_KEY)
+  inMemoryAccessToken = undefined
 }
 
 export async function clearPersistedSession(): Promise<void> {
@@ -57,17 +54,55 @@ export async function clearPersistedSession(): Promise<void> {
   await syncServerSession(null)
 }
 
-async function refreshClientSession(refreshToken: string): Promise<string | undefined> {
+async function refreshClientSession(): Promise<string | undefined> {
   try {
-    const refreshed = await apiPost<SessionResponse>('/auth/refresh', { refreshToken })
-    await persistSession({
-      accessToken: refreshed.accessToken,
-      refreshToken: refreshed.refreshToken,
+    const refreshed = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
     })
-    return refreshed.accessToken
+    if (!refreshed.ok) {
+      throw new ApiError({
+        message: `API ${refreshed.status}`,
+        statusCode: refreshed.status,
+      })
+    }
+    const nextSession = (await refreshed.json()) as SessionResponse
+    await persistSession({
+      accessToken: nextSession.accessToken,
+      refreshToken: nextSession.refreshToken,
+    })
+    return nextSession.accessToken
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 401) {
       await clearPersistedSession()
+      return undefined
+    }
+    throw error
+  }
+}
+
+async function loadServerAccessToken(): Promise<string | undefined> {
+  try {
+    const response = await fetch('/api/auth/session', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) return undefined
+      throw new ApiError({
+        message: `API ${response.status}`,
+        statusCode: response.status,
+      })
+    }
+
+    const session = (await response.json()) as ExistingSessionResponse
+    storeAccessToken(session.accessToken)
+    return session.accessToken
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
       return undefined
     }
     throw error
@@ -78,16 +113,19 @@ export async function getAccessToken(): Promise<string | undefined> {
   const accessToken = getStoredAccessToken()
   if (accessToken) return accessToken
 
-  const refreshToken = getStoredRefreshToken()
-  if (!refreshToken) return undefined
+  const serverAccessToken = await loadServerAccessToken()
+  if (serverAccessToken) return serverAccessToken
 
-  return refreshClientSession(refreshToken)
+  return refreshClientSession()
 }
 
 export async function signOut(): Promise<void> {
-  const refreshToken = getStoredRefreshToken()
   try {
-    await apiPost('/auth/sign-out', { refreshToken })
+    await fetch('/api/auth/sign-out', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
   } finally {
     await clearPersistedSession()
   }

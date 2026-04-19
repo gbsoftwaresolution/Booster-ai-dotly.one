@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { BillingPlan, hasPlanAccess } from '@/lib/billing-plans'
+import { isLaunchMode } from '@/lib/launch-mode'
 import {
   BarChart3,
   Calendar,
@@ -57,7 +58,13 @@ export const dashboardNavItems: DashboardNavItem[] = [
   },
 
   // Scheduling — own section so it stands out
-  { href: '/scheduling', label: 'Scheduling', icon: Calendar, section: 'Scheduling', minPlan: 'STARTER' },
+  {
+    href: '/scheduling',
+    label: 'Scheduling',
+    icon: Calendar,
+    section: 'Scheduling',
+    minPlan: 'STARTER',
+  },
 
   // CRM
   { href: '/contacts', label: 'Contacts', icon: Users, section: 'CRM', minPlan: 'STARTER' },
@@ -73,7 +80,13 @@ export const dashboardNavItems: DashboardNavItem[] = [
     section: 'CRM',
     minPlan: 'PRO',
   },
-  { href: '/crm/analytics', label: 'CRM Analytics', icon: TrendingUp, section: 'CRM', minPlan: 'PRO' },
+  {
+    href: '/crm/analytics',
+    label: 'CRM Analytics',
+    icon: TrendingUp,
+    section: 'CRM',
+    minPlan: 'PRO',
+  },
 
   // Administration
   {
@@ -142,13 +155,40 @@ export const dashboardNavSections = groupDashboardNavItems(dashboardNavItems)
 export const dashboardMoreSections = groupDashboardNavItems(dashboardMoreItems)
 
 export function getVisibleDashboardNavSections(plan: BillingPlan): DashboardNavSection[] {
-  return groupDashboardNavItems(filterDashboardItemsByPlan(dashboardNavItems, plan))
+  const filtered = filterDashboardItemsByPlan(dashboardNavItems, plan)
+
+  if (!isLaunchMode()) {
+    return groupDashboardNavItems(filtered)
+  }
+
+  const launchHrefs = new Set([
+    '/dashboard',
+    '/cards',
+    '/scheduling',
+    '/settings/billing',
+    '/settings',
+  ])
+  return groupDashboardNavItems(filtered.filter((item) => launchHrefs.has(item.href)))
 }
 
 export function getVisibleDashboardBottomTabs(plan: BillingPlan): DashboardNavItem[] {
-  return filterDashboardItemsByPlan(dashboardBottomTabs, plan)
+  const filtered = filterDashboardItemsByPlan(dashboardBottomTabs, plan)
+
+  if (!isLaunchMode()) {
+    return filtered
+  }
+
+  const launchTabs = new Set(['/dashboard', '/cards', '/settings'])
+  return filtered.filter((item) => launchTabs.has(item.href))
 }
 
 export function getVisibleDashboardMoreSections(plan: BillingPlan): DashboardNavSection[] {
-  return groupDashboardNavItems(filterDashboardItemsByPlan(dashboardMoreItems, plan))
+  const filtered = filterDashboardItemsByPlan(dashboardMoreItems, plan)
+
+  if (!isLaunchMode()) {
+    return groupDashboardNavItems(filtered)
+  }
+
+  const launchHrefs = new Set(['/settings', '/settings/billing'])
+  return groupDashboardNavItems(filtered.filter((item) => launchHrefs.has(item.href)))
 }

@@ -44,13 +44,11 @@ describe('SchedulingService booking buffers', () => {
     const bookingDepositFindUnique = overrides?.bookingDepositFindUnique ?? jest.fn()
     const bookingDepositCreate = overrides?.bookingDepositCreate ?? jest.fn()
     const bookingDepositUpdate = overrides?.bookingDepositUpdate ?? jest.fn()
-    const userFindUnique = jest
-      .fn()
-      .mockResolvedValue({
-        email: 'owner@example.com',
-        name: 'Owner',
-        walletAddress: '0xhostwallet',
-      })
+    const userFindUnique = jest.fn().mockResolvedValue({
+      email: 'owner@example.com',
+      name: 'Owner',
+      walletAddress: '0xhostwallet',
+    })
 
     const prisma = {
       appointmentType: {

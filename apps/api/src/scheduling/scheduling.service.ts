@@ -18,7 +18,7 @@ import { BookingStatus } from '@dotly/database'
 import { Prisma } from '@dotly/database'
 import { ConfigService } from '@nestjs/config'
 import { AuditService } from '../audit/audit.service'
-import { createPublicClient, decodeEventLog, erc20Abi, http, type Address, type Hash } from 'viem'
+import { createPublicClient, decodeEventLog, http, type Address, type Hash } from 'viem'
 import { arbitrum } from 'viem/chains'
 
 const ERC20_TRANSFER_EVENT_ABI = [

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import Image from 'next/image'
 import { apiGet, apiPost } from '@/lib/api'
-import { getAccessToken, persistSession } from '@/lib/auth/client'
+import { getAccessToken, storeAccessToken } from '@/lib/auth/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -103,15 +103,25 @@ export function TeamSignInClient({ team }: TeamSignInClientProps): JSX.Element {
     setError(null)
     setLoading(true)
     try {
-      const session = await apiPost<{
-        accessToken: string
-        refreshToken: string
-      }>('/auth/sign-in', {
-        email: trimmedEmail,
-        password,
+      const response = await fetch('/api/auth/sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password,
+        }),
       })
-      await persistSession(session)
-      const token = session.accessToken
+      const payload = (await response.json().catch(() => null)) as {
+        accessToken?: string
+        error?: string
+      } | null
+      if (!response.ok || !payload?.accessToken) {
+        throw new Error(payload?.error ?? 'An unexpected error occurred.')
+      }
+      storeAccessToken(payload.accessToken)
+      const token = payload.accessToken
       await apiGet(`/teams/${team.id}`, token)
       router.push(teamNext)
       router.refresh()

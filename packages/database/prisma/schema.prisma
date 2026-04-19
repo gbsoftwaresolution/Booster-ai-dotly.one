@@ -488,6 +488,7 @@ model LeadEvent {
   @@index([ctaVariant])
   @@index([createdAt])
   @@index([leadId, createdAt])
+  @@index([action, createdAt])
   @@map("lead_events")
 }
 
@@ -502,6 +503,7 @@ model SalesLinkBooking {
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([username, createdAt])
+  @@index([username, slot])
   @@index([leadId])
   @@unique([username, slot])
   @@map("sales_link_bookings")
@@ -522,6 +524,7 @@ model Payment {
   lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   @@index([username, createdAt])
+  @@index([username, status, createdAt])
   @@index([leadId])
   @@index([status])
   @@map("payments")

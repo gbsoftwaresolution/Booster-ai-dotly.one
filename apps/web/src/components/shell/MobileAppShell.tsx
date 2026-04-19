@@ -6,7 +6,7 @@ import type { JSX } from 'react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/cn'
 import { Home, X, Menu, QrCode } from 'lucide-react'
-import { APPS, getActiveApp } from '@/components/navigation/apps-nav'
+import { getActiveApp, getLaunchApps } from '@/components/navigation/apps-nav'
 import { AppSidebarContent } from '@/components/shell/AppSidebar'
 import { useSignOut } from '@/hooks/useSignOut'
 import { LogOut, Settings } from 'lucide-react'
@@ -17,6 +17,7 @@ export function MobileAppRail(): JSX.Element {
   const pathname = usePathname()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { signingOut, handleSignOut } = useSignOut()
+  const apps = getLaunchApps()
 
   // Close drawer on route change
   useEffect(() => {
@@ -56,15 +57,34 @@ export function MobileAppRail(): JSX.Element {
             className="app-touch-target flex flex-1 flex-col items-center justify-center gap-1.5 py-2 transition-opacity active:opacity-60"
             aria-current={isHome ? 'page' : undefined}
           >
-            <span className={cn('flex h-8 w-14 items-center justify-center rounded-full transition-all duration-200', isHome ? 'bg-gray-950 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.8)]' : 'bg-transparent')}>
-              <Home className={cn('h-5 w-5 transition-colors duration-200', isHome ? 'text-white' : 'text-gray-400')} />
+            <span
+              className={cn(
+                'flex h-8 w-14 items-center justify-center rounded-full transition-all duration-200',
+                isHome
+                  ? 'bg-gray-950 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.8)]'
+                  : 'bg-transparent',
+              )}
+            >
+              <Home
+                className={cn(
+                  'h-5 w-5 transition-colors duration-200',
+                  isHome ? 'text-white' : 'text-gray-400',
+                )}
+              />
             </span>
-            <span className={cn('text-[10px] font-bold tracking-wide', isHome ? 'text-gray-950' : 'text-gray-400')}>Home</span>
+            <span
+              className={cn(
+                'text-[10px] font-bold tracking-wide',
+                isHome ? 'text-gray-950' : 'text-gray-400',
+              )}
+            >
+              Home
+            </span>
           </Link>
 
           {/* Cards App */}
           {(() => {
-            const app = APPS[0]!
+            const app = apps[0]!
             const isActive = pathname.startsWith(`/apps/${app.id}`)
             return (
               <Link
@@ -74,12 +94,33 @@ export function MobileAppRail(): JSX.Element {
                 aria-current={isActive ? 'page' : undefined}
               >
                 <span
-                  className={cn('flex h-8 w-14 items-center justify-center rounded-full transition-all duration-200')}
-                  style={isActive ? { background: app.gradient, boxShadow: '0 12px 24px -16px rgba(15,23,42,0.75)' } : {}}
+                  className={cn(
+                    'flex h-8 w-14 items-center justify-center rounded-full transition-all duration-200',
+                  )}
+                  style={
+                    isActive
+                      ? {
+                          background: app.gradient,
+                          boxShadow: '0 12px 24px -16px rgba(15,23,42,0.75)',
+                        }
+                      : {}
+                  }
                 >
-                  <app.icon className={cn('h-5 w-5 transition-colors duration-200', isActive ? 'text-white' : 'text-gray-400')} />
+                  <app.icon
+                    className={cn(
+                      'h-5 w-5 transition-colors duration-200',
+                      isActive ? 'text-white' : 'text-gray-400',
+                    )}
+                  />
                 </span>
-                <span className={cn('text-[10px] font-bold tracking-wide', isActive ? 'text-gray-950' : 'text-gray-400')}>{app.label}</span>
+                <span
+                  className={cn(
+                    'text-[10px] font-bold tracking-wide',
+                    isActive ? 'text-gray-950' : 'text-gray-400',
+                  )}
+                >
+                  {app.label}
+                </span>
               </Link>
             )
           })()}
@@ -97,7 +138,7 @@ export function MobileAppRail(): JSX.Element {
 
           {/* CRM App */}
           {(() => {
-            const app = APPS[1]!
+            const app = apps[1] ?? apps[0]!
             const isActive = pathname.startsWith(`/apps/${app.id}`)
             return (
               <Link
@@ -107,12 +148,33 @@ export function MobileAppRail(): JSX.Element {
                 aria-current={isActive ? 'page' : undefined}
               >
                 <span
-                  className={cn('flex h-8 w-14 items-center justify-center rounded-full transition-all duration-200')}
-                  style={isActive ? { background: app.gradient, boxShadow: '0 12px 24px -16px rgba(15,23,42,0.75)' } : {}}
+                  className={cn(
+                    'flex h-8 w-14 items-center justify-center rounded-full transition-all duration-200',
+                  )}
+                  style={
+                    isActive
+                      ? {
+                          background: app.gradient,
+                          boxShadow: '0 12px 24px -16px rgba(15,23,42,0.75)',
+                        }
+                      : {}
+                  }
                 >
-                  <app.icon className={cn('h-5 w-5 transition-colors duration-200', isActive ? 'text-white' : 'text-gray-400')} />
+                  <app.icon
+                    className={cn(
+                      'h-5 w-5 transition-colors duration-200',
+                      isActive ? 'text-white' : 'text-gray-400',
+                    )}
+                  />
                 </span>
-                <span className={cn('text-[10px] font-bold tracking-wide', isActive ? 'text-gray-950' : 'text-gray-400')}>{app.label}</span>
+                <span
+                  className={cn(
+                    'text-[10px] font-bold tracking-wide',
+                    isActive ? 'text-gray-950' : 'text-gray-400',
+                  )}
+                >
+                  {app.label}
+                </span>
               </Link>
             )
           })()}
@@ -172,7 +234,7 @@ export function MobileAppRail(): JSX.Element {
               /* Otherwise — show all apps grid */
               <div className="px-5 py-5">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {APPS.map((app) => (
+                  {apps.map((app) => (
                     <Link
                       key={app.id}
                       href={app.href}

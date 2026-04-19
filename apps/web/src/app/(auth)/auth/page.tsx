@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { getAuthCallbackUrl, sanitizeNextPath } from '@/lib/app-url'
 import { apiPost, isApiError } from '@/lib/api'
-import { persistSession } from '@/lib/auth/client'
+import { storeAccessToken } from '@/lib/auth/client'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -37,10 +37,7 @@ function AuthPageContent(): JSX.Element {
     [searchParams],
   )
   const authCallbackUrl = useMemo(() => getAuthCallbackUrl(), [])
-  const postAuthPath = useMemo(
-    () => `/auth/continue?next=${encodeURIComponent(next)}`,
-    [next],
-  )
+  const postAuthPath = useMemo(() => `/auth/continue?next=${encodeURIComponent(next)}`, [next])
 
   useEffect(() => {
     const requestedMode = searchParams.get('mode')
@@ -107,11 +104,26 @@ function AuthPageContent(): JSX.Element {
         })
         setSuccessMessage('Password reset link sent — check your email.')
       } else if (mode === 'signin') {
-        const session = await apiPost<{
-          accessToken: string
-          refreshToken: string
-        }>('/auth/sign-in', { email: trimmedEmail, password })
-        await persistSession(session)
+        const response = await fetch('/api/auth/sign-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+          body: JSON.stringify({ email: trimmedEmail, password }),
+        })
+        const payload = (await response.json().catch(() => null)) as {
+          accessToken?: string
+          error?: string
+          code?: string
+        } | null
+        if (!response.ok || !payload?.accessToken) {
+          const error = new Error(payload?.error ?? 'An unexpected error occurred.') as Error & {
+            code?: string
+          }
+          error.code = payload?.code
+          throw error
+        }
+        storeAccessToken(payload.accessToken)
         router.push(postAuthPath)
         router.refresh()
       } else {
@@ -130,7 +142,12 @@ function AuthPageContent(): JSX.Element {
         )
       }
     } catch (err: unknown) {
-      if (isApiError(err) && err.code === 'EMAIL_NOT_VERIFIED') {
+      const errorCode = isApiError(err)
+        ? err.code
+        : err instanceof Error && 'code' in err && typeof err.code === 'string'
+          ? err.code
+          : undefined
+      if (errorCode === 'EMAIL_NOT_VERIFIED') {
         setUnverifiedEmail(trimmedEmail)
         setError('Verify your email address before signing in.')
       } else {

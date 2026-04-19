@@ -23,9 +23,7 @@ export default class Expo {
     return [messages]
   }
 
-  async sendPushNotificationsAsync(
-    chunk: ExpoPushMessage[],
-  ): Promise<ExpoPushTicket[]> {
+  async sendPushNotificationsAsync(chunk: ExpoPushMessage[]): Promise<ExpoPushTicket[]> {
     return chunk.map(() => ({ status: 'ok' }))
   }
 }

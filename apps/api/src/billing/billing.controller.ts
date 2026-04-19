@@ -163,7 +163,7 @@ export class BillingController {
   @Post('create-subscription')
   createStripeSubscription(
     @CurrentUser() user: AuthUser,
-    @Body() dto: CreateStripeSubscriptionDto,
+    @Body() _dto: CreateStripeSubscriptionDto,
   ) {
     return this.billingService.createStripeSubscriptionCheckout(user.id, Plan.PRO)
   }
@@ -228,14 +228,12 @@ export class BillingController {
     return this.billingService.requestManualRefundReview(user.id)
   }
 
-  @Public()
   @UseGuards(DotlySupportOpsGuard)
   @Get('internal/refunds')
   getInternalRefundQueue() {
     return this.billingService.listRefundReviewRequests()
   }
 
-  @Public()
   @UseGuards(DotlySupportOpsGuard)
   @Post('internal/refunds/admin')
   adminRefund(@Body() dto: AdminRefundDto) {

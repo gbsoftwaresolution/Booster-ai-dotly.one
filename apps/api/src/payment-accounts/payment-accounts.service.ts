@@ -4,6 +4,7 @@ import {
   PaymentAccountStatus,
   PaymentAccountType,
   PaymentProvider,
+  type User,
   type PaymentAccount,
 } from '@prisma/client'
 import Stripe from 'stripe'
@@ -383,18 +384,35 @@ export class PaymentAccountsService {
     }
 
     const accounts = await this.prisma.paymentAccount.findMany({ where: { userId: user.id } })
+    return this.resolveActiveProviderForUser({
+      country: user.country,
+      defaultPaymentProvider: user.defaultPaymentProvider,
+      paymentAccounts: accounts,
+    })
+  }
+
+  async resolveActiveProviderForUser(params: {
+    country: string | null
+    defaultPaymentProvider: User['defaultPaymentProvider']
+    paymentAccounts: Array<
+      Pick<
+        PaymentAccount,
+        'provider' | 'providerAccountId' | 'country' | 'chargesEnabled' | 'detailsSubmitted'
+      >
+    >
+  }) {
     const registry = await this.prisma.paymentProviderRegistry.findMany({
       where: { enabled: true },
     })
     const supported = new Map(registry.map((entry) => [entry.provider, entry]))
-    const preferred = user.defaultPaymentProvider ?? null
+    const preferred = params.defaultPaymentProvider ?? null
 
-    const availableAccounts = accounts.filter((account) => {
+    const availableAccounts = params.paymentAccounts.filter((account) => {
       const provider = supported.get(account.provider)
       if (!provider) return false
       return this.isProviderAvailableInCountry(
         provider.supportedCountries,
-        account.country ?? user.country,
+        account.country ?? params.country,
       )
     })
 
@@ -425,7 +443,7 @@ export class PaymentAccountsService {
       return {
         provider: 'stripe_connect' as const,
         providerAccountId: active.providerAccountId,
-        country: active.country ?? user.country ?? null,
+        country: active.country ?? params.country ?? null,
       }
     }
 
@@ -433,7 +451,7 @@ export class PaymentAccountsService {
       return {
         provider: 'upi_link' as const,
         providerAccountId: active.providerAccountId,
-        country: active.country ?? user.country ?? null,
+        country: active.country ?? params.country ?? null,
       }
     }
 
@@ -441,26 +459,26 @@ export class PaymentAccountsService {
       return {
         provider: 'cash_on_delivery' as const,
         providerAccountId: active.providerAccountId,
-        country: active.country ?? user.country ?? null,
+        country: active.country ?? params.country ?? null,
       }
     }
 
     const codProvider = supported.get(PaymentProvider.CASH_ON_DELIVERY)
     if (
       codProvider &&
-      this.isProviderAvailableInCountry(codProvider.supportedCountries, user.country)
+      this.isProviderAvailableInCountry(codProvider.supportedCountries, params.country)
     ) {
       return {
         provider: 'cash_on_delivery' as const,
         providerAccountId: null,
-        country: user.country ?? null,
+        country: params.country ?? null,
       }
     }
 
     return {
       provider: null,
       providerAccountId: null,
-      country: user.country ?? null,
+      country: params.country ?? null,
     }
   }
 

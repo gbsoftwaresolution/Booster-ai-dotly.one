@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/node'
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from 'helmet'
@@ -78,7 +78,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   )
-  app.useGlobalFilters(new SentryExceptionFilter())
+  app.useGlobalFilters(app.get(SentryExceptionFilter))
 
   app.enableShutdownHooks()
 
@@ -113,7 +113,10 @@ async function bootstrap() {
     logger.log(`Swagger: ${url}/api/docs`, 'Bootstrap')
   }
 }
+
+const bootstrapLogger = new Logger('Bootstrap')
+
 bootstrap().catch((err) => {
-  console.error('[Bootstrap] Fatal error during startup:', err)
+  bootstrapLogger.error('Fatal error during startup', err instanceof Error ? err.stack : undefined)
   process.exit(1)
 })

@@ -3,12 +3,9 @@ import { apiGet } from '@/lib/api'
 import { getServerUserAndTokenOrRedirect } from '@/lib/server-auth'
 import Link from 'next/link'
 
-interface RecentActivityData {
+interface LaunchDashboardData {
   recentViews: number
   recentChats: number
-}
-
-interface RevenueDashboardData {
   plan: string
   totalRevenue: number
   totalPayments: number
@@ -38,13 +35,12 @@ interface RevenueDashboardData {
     paymentsLocked: boolean
     showBranding: boolean
   }
-}
-
-interface PaymentHistoryItem {
-  id: string
-  amount: number
-  status: string
-  createdAt: string
+  paymentHistory: Array<{
+    id: string
+    amount: number
+    status: string
+    createdAt: string
+  }>
 }
 
 function formatRate(numerator: number, denominator: number): string {
@@ -52,7 +48,7 @@ function formatRate(numerator: number, denominator: number): string {
   return `${Math.round((numerator / denominator) * 100)}%`
 }
 
-function getDashboardNudge(data: RevenueDashboardData): string {
+function getDashboardNudge(data: LaunchDashboardData): string {
   if (data.totalLeads === 0) {
     return 'Share your link to start getting leads.'
   }
@@ -93,11 +89,10 @@ export default async function DashboardPage(): Promise<JSX.Element> {
     )
   }
 
-  const [dashboard, payments, activity] = await Promise.all([
-    apiGet<RevenueDashboardData>(`/dashboard/${encodeURIComponent(user.username)}`, token),
-    apiGet<PaymentHistoryItem[]>(`/payments/${encodeURIComponent(user.username)}`, token),
-    apiGet<RecentActivityData>(`/activity/${encodeURIComponent(user.username)}`, token),
-  ])
+  const dashboard = await apiGet<LaunchDashboardData>(
+    `/launch-dashboard/${encodeURIComponent(user.username)}`,
+    token,
+  )
 
   const nudge = getDashboardNudge(dashboard)
   const isFreePlan = user.plan === 'FREE'
@@ -177,10 +172,10 @@ export default async function DashboardPage(): Promise<JSX.Element> {
           <h2 className="text-lg font-semibold text-gray-950">Live Signals</h2>
           <div className="mt-4 space-y-3 text-sm text-gray-600">
             <p className="rounded-2xl bg-gray-50 px-4 py-3">
-              🔥 {activity.recentViews} people viewed your link in the last hour
+              🔥 {dashboard.recentViews} people viewed your link in the last hour
             </p>
             <p className="rounded-2xl bg-gray-50 px-4 py-3">
-              💬 {activity.recentChats} people started a chat in the last hour
+              💬 {dashboard.recentChats} people started a chat in the last hour
             </p>
           </div>
         </div>
@@ -218,7 +213,7 @@ export default async function DashboardPage(): Promise<JSX.Element> {
         </section>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-950">Conversion Funnel</h2>
           <div className="mt-4 space-y-3 text-sm text-gray-600">
@@ -260,32 +255,6 @@ export default async function DashboardPage(): Promise<JSX.Element> {
         </div>
 
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-950">Pipeline</h2>
-          <div className="mt-4 space-y-3 text-sm text-gray-600">
-            <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-              <span>New</span>
-              <span className="font-semibold text-gray-950">{dashboard.pipeline.new}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-              <span>Contacted</span>
-              <span className="font-semibold text-gray-950">{dashboard.pipeline.contacted}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-              <span>Booked</span>
-              <span className="font-semibold text-gray-950">{dashboard.pipeline.booked}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-              <span>Paid</span>
-              <span className="font-semibold text-gray-950">{dashboard.pipeline.paid}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-              <span>Lost</span>
-              <span className="font-semibold text-gray-950">{dashboard.pipeline.lost}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-950">Payment History</h2>
           <div className="mt-4 space-y-3">
             {dashboard.usage.paymentsLocked ? (
@@ -301,8 +270,8 @@ export default async function DashboardPage(): Promise<JSX.Element> {
                   </Link>
                 </div>
               </div>
-            ) : payments.length ? (
-              payments.slice(0, 8).map((payment) => (
+            ) : dashboard.paymentHistory.length ? (
+              dashboard.paymentHistory.map((payment) => (
                 <div
                   key={payment.id}
                   className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600"

@@ -7,6 +7,21 @@ const REFRESH_COOKIE = 'dotly_refresh_token'
 const ACCESS_MAX_AGE_SECONDS = 60 * 15
 const REFRESH_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 
+function shouldUseSecureCookies(): boolean {
+  const appUrl =
+    process.env.WEB_URL ??
+    process.env.APP_URL ??
+    process.env.NEXT_PUBLIC_WEB_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    ''
+
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(appUrl)) {
+    return false
+  }
+
+  return process.env.NODE_ENV === 'production'
+}
+
 export type AppSession = {
   accessToken: string
   refreshToken: string
@@ -22,7 +37,7 @@ function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: shouldUseSecureCookies(),
     path: '/',
     maxAge,
   }
@@ -38,6 +53,11 @@ export async function clearServerSession(): Promise<void> {
   const store = await cookies()
   store.set(ACCESS_COOKIE, '', cookieOptions(0))
   store.set(REFRESH_COOKIE, '', cookieOptions(0))
+}
+
+export async function getRefreshToken(): Promise<string | undefined> {
+  const store = await cookies()
+  return store.get(REFRESH_COOKIE)?.value
 }
 
 async function refreshServerSession(refreshToken: string): Promise<string | null> {

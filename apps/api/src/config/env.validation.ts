@@ -80,6 +80,7 @@ class EnvironmentVariables {
   DOTLY_OWNER_PRIVATE_KEY?: string
 
   @IsOptional() @IsString() DOTLY_SUPPORT_OPS_KEY?: string
+  @IsOptional() @IsString() DOTLY_SUPPORT_OPS_EMAILS?: string
 
   @IsOptional() @IsEmail() BILLING_SUPPORT_EMAIL?: string
 

@@ -6,7 +6,7 @@ import type { JSX } from 'react'
 import { BrandLogo } from '@/components/BrandLogo'
 import { cn } from '@/lib/cn'
 import { Home, Settings } from 'lucide-react'
-import { APPS } from '@/components/navigation/apps-nav'
+import { getLaunchApps } from '@/components/navigation/apps-nav'
 import { useSignOut } from '@/hooks/useSignOut'
 import { LogOut } from 'lucide-react'
 
@@ -48,7 +48,14 @@ function RailItem({
         )}
         style={isActive && gradient ? { background: gradient } : {}}
       >
-        <Icon className={cn('h-5 w-5 text-white transition-transform duration-500', isActive ? 'scale-110 drop-shadow-md' : '', isHome && 'h-5 w-5')} aria-hidden="true" />
+        <Icon
+          className={cn(
+            'h-5 w-5 text-white transition-transform duration-500',
+            isActive ? 'scale-110 drop-shadow-md' : '',
+            isHome && 'h-5 w-5',
+          )}
+          aria-hidden="true"
+        />
       </span>
 
       {/* Tooltip */}
@@ -68,6 +75,7 @@ interface AppRailProps {
 export function AppRail({ className }: AppRailProps): JSX.Element {
   const pathname = usePathname()
   const { signingOut, handleSignOut } = useSignOut()
+  const apps = getLaunchApps()
 
   const isHomeActive = pathname === '/dashboard'
   const isSettingsActive = pathname.startsWith('/settings') || pathname.startsWith('/team')
@@ -102,7 +110,7 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
       <RailItem href="/dashboard" label="Home" icon={Home} isActive={isHomeActive} isHome />
 
       {/* App icons */}
-      {APPS.map((app) => {
+      {apps.map((app) => {
         const isActive = pathname.startsWith(`/apps/${app.id}`)
         return (
           <RailItem
@@ -140,7 +148,10 @@ export function AppRail({ className }: AppRailProps): JSX.Element {
         className="group relative mt-2 flex items-center justify-center p-1"
       >
         <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-transparent opacity-50 transition-all duration-500 hover:scale-110 hover:bg-white/5 hover:opacity-100 hover:text-red-400">
-          <LogOut className="h-5 w-5 text-white transition-colors group-hover:text-red-400" aria-hidden="true" />
+          <LogOut
+            className="h-5 w-5 text-white transition-colors group-hover:text-red-400"
+            aria-hidden="true"
+          />
         </span>
         <span className="pointer-events-none absolute left-[calc(100%+16px)] z-50 hidden origin-left scale-95 opacity-0 whitespace-nowrap rounded-[10px] border border-white/10 bg-gray-950/90 backdrop-blur-md px-3 py-2 text-[13px] font-bold tracking-wide text-white shadow-[0_16px_32px_-12px_rgba(0,0,0,0.6)] transition-all duration-200 group-hover:scale-100 group-hover:opacity-100 group-hover:block">
           Sign out

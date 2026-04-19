@@ -103,11 +103,23 @@ export class SalesLinkController {
   @Get('public/:username')
   @ApiOperation({ summary: 'Get a public sales link profile by username' })
   async getPublicProfile(@Param('username') username: string) {
-    const profile = await this.salesLinkService.getPublicProfile(username)
-    if (!profile) {
+    const pageData = await this.salesLinkService.getPublicPageData(username)
+    if (!pageData) {
       throw new NotFoundException('Profile not found')
     }
-    return profile
+    return pageData.profile
+  }
+
+  @Public()
+  @Get('public-page/:username')
+  @ApiOperation({ summary: 'Get public sales-link page data by username' })
+  async getPublicPage(@Param('username') username: string) {
+    const pageData = await this.salesLinkService.getPublicPageData(username)
+    if (!pageData) {
+      throw new NotFoundException('Profile not found')
+    }
+
+    return pageData
   }
 
   @Public()
@@ -145,12 +157,12 @@ export class SalesLinkController {
   @Get('payment/config/:username')
   @ApiOperation({ summary: 'Get public payment availability for a sales link' })
   async getPaymentConfig(@Param('username') username: string) {
-    const profile = await this.salesLinkService.getPublicProfile(username)
-    if (!profile) {
+    const pageData = await this.salesLinkService.getPublicPageData(username)
+    if (!pageData) {
       throw new NotFoundException('Profile not found')
     }
 
-    return this.salesLinkService.getPublicPaymentConfig(username)
+    return pageData.paymentConfig
   }
 
   @Public()
@@ -238,6 +250,15 @@ export class SalesLinkController {
   @ApiOperation({ summary: 'Get revenue visibility dashboard data for the current user' })
   async getDashboard(@Param('username') username: string, @CurrentUser() user: { id: string }) {
     return this.salesLinkService.getRevenueDashboard(username, user.id)
+  }
+
+  @Get('launch-dashboard/:username')
+  @ApiOperation({ summary: 'Get launch-focused revenue dashboard data for the current user' })
+  async getLaunchDashboard(
+    @Param('username') username: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.salesLinkService.getLaunchDashboard(username, user.id)
   }
 
   @Get('payments/:username')
